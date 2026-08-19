@@ -30,6 +30,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
 import { Employee } from '@/lib/supabase/database.types'
 
 export default function EmployeeOverviewPage() {
@@ -496,14 +504,18 @@ export default function EmployeeOverviewPage() {
               <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Designation *
               </Label>
-              <Input
-                type="text"
-                placeholder="e.g. Accounts Executive"
-                value={newDesignation}
-                onChange={(e) => setNewDesignation(e.target.value)}
-                required
-                className="text-sm border-slate-200"
-              />
+              <Select value={newDesignation} onValueChange={setNewDesignation} required>
+                <SelectTrigger className="text-sm border-slate-200 bg-white">
+                  <SelectValue placeholder="Select Designation..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {EMPLOYEE_DESIGNATIONS.map((desig) => (
+                    <SelectItem key={desig} value={desig}>
+                      {desig}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg text-xs text-slate-500 space-y-1">
@@ -525,7 +537,7 @@ export default function EmployeeOverviewPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={isSaving}
+                disabled={isSaving || !newDesignation}
                 className="bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
@@ -537,7 +549,7 @@ export default function EmployeeOverviewPage() {
       </Dialog>
 
       {/* Edit Employee Modal */}
-      <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
+      <Dialog open={!!editingEmployee} onOpenChange={(open: boolean) => !open && setEditingEmployee(null)}>
         <DialogContent className="sm:max-w-md bg-white border border-slate-200 shadow-xl rounded-xl">
           <DialogHeader className="border-b border-slate-100 pb-3">
             <DialogTitle className="text-base font-bold text-[#003D5C] flex items-center gap-2">
@@ -574,13 +586,22 @@ export default function EmployeeOverviewPage() {
               <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Designation *
               </Label>
-              <Input
-                type="text"
-                value={editDesignation}
-                onChange={(e) => setEditDesignation(e.target.value)}
-                required
-                className="text-sm border-slate-200"
-              />
+              <Select value={editDesignation} onValueChange={setEditDesignation} required>
+                <SelectTrigger className="text-sm border-slate-200 bg-white">
+                  <SelectValue placeholder="Select Designation..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {EMPLOYEE_DESIGNATIONS.map((desig) => (
+                    <SelectItem key={desig} value={desig}>
+                      {desig}
+                    </SelectItem>
+                  ))}
+                  {/* If the employee has an existing custom designation not in standard list, include it */}
+                  {editDesignation && !EMPLOYEE_DESIGNATIONS.includes(editDesignation as any) && (
+                    <SelectItem value={editDesignation}>{editDesignation}</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex items-center gap-2 pt-1">
@@ -620,7 +641,7 @@ export default function EmployeeOverviewPage() {
       </Dialog>
 
       {/* Delete Employee Modal */}
-      <Dialog open={!!employeeToDelete} onOpenChange={(open) => !open && setEmployeeToDelete(null)}>
+      <Dialog open={!!employeeToDelete} onOpenChange={(open: boolean) => !open && setEmployeeToDelete(null)}>
         <DialogContent className="sm:max-w-md bg-white border border-[#E2E8F0] shadow-xl rounded-xl font-sans">
           <DialogHeader className="border-b border-[#E2E8F0] pb-3 space-y-2">
             <div className="flex items-center gap-3">
