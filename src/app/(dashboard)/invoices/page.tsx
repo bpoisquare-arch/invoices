@@ -4,7 +4,12 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { InvoiceWithDetails, Company } from '@/lib/supabase/database.types'
-import { getInvoices, duplicateInvoice, InvoiceFilterParams } from '@/lib/services/invoice.service'
+import {
+  getInvoices,
+  duplicateInvoice,
+  InvoiceFilterParams,
+  syncLocalInvoicesToSupabase,
+} from '@/lib/services/invoice.service'
 import { getCompanies } from '@/lib/services/company.service'
 import { renderInvoicePDFDocument } from '@/lib/services/template-registry'
 import { pdf } from '@react-pdf/renderer'
@@ -28,6 +33,8 @@ import {
   Edit2,
   ChevronLeft,
   ChevronRight,
+  Cloud,
+  CheckCircle2,
 } from 'lucide-react'
 import RenameInvoiceDialog from '@/components/invoices/rename-invoice-dialog'
 import DeleteInvoiceDialog from '@/components/invoices/delete-invoice-dialog'
@@ -141,6 +148,30 @@ export default function InvoicesPage() {
     }
   }
 
+  // Sync State
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<string | null>(null)
+
+  async function handleManualSync() {
+    setIsSyncing(true)
+    setSyncStatus(null)
+    try {
+      const res = await syncLocalInvoicesToSupabase()
+      await loadInvoices()
+      if (res.error) {
+        setSyncStatus(`Sync Notice: ${res.error}`)
+      } else {
+        setSyncStatus(`Cloud Synced: ${res.syncedCount} invoice(s) uploaded successfully!`)
+      }
+      setTimeout(() => setSyncStatus(null), 5000)
+    } catch (err: any) {
+      setSyncStatus(`Sync error: ${err?.message || 'Failed to sync'}`)
+      setTimeout(() => setSyncStatus(null), 5000)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 
   return (
@@ -153,13 +184,38 @@ export default function InvoicesPage() {
             Search, filter, preview, duplicate, and manage all company invoices
           </p>
         </div>
-        <Link href="/invoices/select-company">
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 font-semibold shadow-sm">
-            <FilePlus className="w-4 h-4" />
-            Generate Invoice
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            className="h-9 text-xs font-semibold gap-1.5 text-blue-700 hover:bg-blue-50 border-blue-200"
+            title="Sync all invoices with Supabase Cloud Database"
+          >
+            {isSyncing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+            ) : (
+              <Cloud className="w-3.5 h-3.5 text-blue-600" />
+            )}
+            {isSyncing ? 'Syncing...' : 'Sync Cloud'}
           </Button>
-        </Link>
+
+          <Link href="/invoices/select-company">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 font-semibold shadow-sm h-9 text-xs">
+              <FilePlus className="w-4 h-4" />
+              Generate Invoice
+            </Button>
+          </Link>
+        </div>
       </div>
+
+      {syncStatus && (
+        <div className="p-3 text-xs font-semibold text-blue-900 bg-blue-50 border border-blue-200 rounded-md flex items-center gap-2 animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+          <span>{syncStatus}</span>
+        </div>
+      )}
 
       {/* Search & Filters Controls Box */}
       <Card className="shadow-xs border-slate-200 p-4 space-y-4">

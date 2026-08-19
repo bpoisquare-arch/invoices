@@ -18,6 +18,7 @@ import {
   Loader2,
   FileSpreadsheet,
   UploadCloud,
+  Cloud,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,6 +39,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
+import { syncAttendanceToSupabase } from '@/lib/services/attendance.service'
 import { Employee } from '@/lib/supabase/database.types'
 
 export default function EmployeeOverviewPage() {
@@ -68,6 +70,30 @@ export default function EmployeeOverviewPage() {
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // Cloud Sync State
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<string | null>(null)
+
+  async function handleManualSync() {
+    setIsSyncing(true)
+    setSyncStatus(null)
+    try {
+      const res = await syncAttendanceToSupabase()
+      await fetchEmployees()
+      if (res.error) {
+        setSyncStatus(`Sync Notice: ${res.error}`)
+      } else {
+        setSyncStatus(`Cloud Synced: ${res.syncedCount} employee/record(s) uploaded successfully!`)
+      }
+      setTimeout(() => setSyncStatus(null), 5000)
+    } catch (err: any) {
+      setSyncStatus(`Sync error: ${err?.message || 'Failed to sync'}`)
+      setTimeout(() => setSyncStatus(null), 5000)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   const fetchEmployees = async () => {
     try {
@@ -250,7 +276,23 @@ export default function EmployeeOverviewPage() {
 
         {/* Action Buttons Top Right */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Upload Excel Files Button (Red Marked Box from Screenshot) */}
+          {/* Sync Cloud Button */}
+          <Button
+            variant="outline"
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            className="h-9 px-3.5 border border-[#003D5C]/30 bg-white hover:bg-slate-50 text-[#003D5C] text-xs font-bold gap-1.5 shadow-2xs cursor-pointer transition-colors"
+            title="Upload and download employee data from Supabase Cloud"
+          >
+            {isSyncing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#009D9E]" />
+            ) : (
+              <Cloud className="w-3.5 h-3.5 text-[#009D9E]" />
+            )}
+            {isSyncing ? 'Syncing...' : 'Sync Cloud'}
+          </Button>
+
+          {/* Upload Excel Files Button */}
           <Link href="/attendance/import">
             <Button
               variant="outline"
@@ -261,7 +303,7 @@ export default function EmployeeOverviewPage() {
             </Button>
           </Link>
 
-          {/* + ADD EMPLOYEE Button (Black pill from Screenshot) */}
+          {/* + ADD EMPLOYEE Button */}
           <Button
             onClick={() => {
               setIsAddOpen(true)
@@ -275,6 +317,13 @@ export default function EmployeeOverviewPage() {
           </Button>
         </div>
       </div>
+
+      {syncStatus && (
+        <div className="p-3 text-xs font-semibold text-[#003D5C] bg-[#009D9E]/10 border border-[#009D9E]/30 rounded-md flex items-center gap-2 animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 text-[#009D9E] shrink-0" />
+          <span>{syncStatus}</span>
+        </div>
+      )}
 
       {/* Search & Counter Bar */}
       <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -504,7 +553,7 @@ export default function EmployeeOverviewPage() {
               <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Designation *
               </Label>
-              <Select value={newDesignation} onValueChange={setNewDesignation} required>
+              <Select value={newDesignation} onValueChange={(val) => setNewDesignation(val || '')} required>
                 <SelectTrigger className="text-sm border-slate-200 bg-white">
                   <SelectValue placeholder="Select Designation..." />
                 </SelectTrigger>
@@ -586,7 +635,7 @@ export default function EmployeeOverviewPage() {
               <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Designation *
               </Label>
-              <Select value={editDesignation} onValueChange={setEditDesignation} required>
+              <Select value={editDesignation} onValueChange={(val) => setEditDesignation(val || '')} required>
                 <SelectTrigger className="text-sm border-slate-200 bg-white">
                   <SelectValue placeholder="Select Designation..." />
                 </SelectTrigger>

@@ -489,3 +489,81 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
     pageSize,
   }
 }
+
+export async function syncLocalInvoicesToSupabase(): Promise<{ syncedCount: number; error?: string }> {
+  initLocalInvoices()
+  const localList = getStoredInvoices()
+
+  try {
+    const supabase = createClient()
+
+    // 1. Fetch remote existing invoices
+    const { data: remoteData, error: fetchErr } = await supabase
+      .from('invoices')
+      .select('id, invoice_number')
+
+    if (fetchErr) {
+      return { syncedCount: 0, error: fetchErr.message }
+    }
+
+    const remoteIds = new Set((remoteData || []).map((r) => r.id))
+    const remoteNumbers = new Set((remoteData || []).map((r) => r.invoice_number))
+
+    let uploadCount = 0
+
+    // 2. Upload any local invoice that is not yet on remote
+    for (const inv of localList) {
+      if (!remoteIds.has(inv.id) && !remoteNumbers.has(inv.invoice_number)) {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('invoices')
+          .insert({
+            company_id: inv.company_id,
+            template_id: inv.template_id || null,
+            template_snapshot: inv.template_snapshot || {},
+            invoice_number: inv.invoice_number,
+            customer_name: inv.customer_name,
+            reference_name: inv.reference_name || null,
+            invoice_date: inv.invoice_date,
+            due_date: inv.due_date,
+            subtotal: inv.subtotal,
+            total_amount: inv.total_amount,
+          })
+          .select('id')
+          .single()
+
+        if (!insertErr && inserted && inv.invoice_items && inv.invoice_items.length > 0) {
+          await supabase.from('invoice_items').insert(
+            inv.invoice_items.map((item) => ({
+              invoice_id: inserted.id,
+              description: item.description,
+              quantity: item.quantity,
+              amount: item.amount,
+              line_total: item.line_total,
+            }))
+          )
+          uploadCount++
+        }
+      }
+    }
+
+    // 3. Download all from remote and merge back into local cache
+    const { data: allRemote } = await supabase
+      .from('invoices')
+      .select('*, companies(*), templates(*), invoice_items(*)')
+      .order('created_at', { ascending: false })
+
+    if (allRemote && allRemote.length > 0) {
+      const mergedMap = new Map<string, InvoiceWithDetails>()
+      localList.forEach((inv) => mergedMap.set(inv.id, inv))
+      allRemote.forEach((inv: any) => mergedMap.set(inv.id, inv as InvoiceWithDetails))
+      const merged = Array.from(mergedMap.values())
+      saveStoredInvoices(merged)
+      localInvoicesStore = merged
+    }
+
+    return { syncedCount: uploadCount }
+  } catch (err: any) {
+    return { syncedCount: 0, error: err?.message || 'Failed to sync invoices' }
+  }
+}
+

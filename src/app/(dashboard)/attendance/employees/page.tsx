@@ -447,7 +447,7 @@ export default function EmployeesPage() {
               <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Designation *
               </Label>
-              <Select value={newDesignation} onValueChange={setNewDesignation} required>
+              <Select value={newDesignation} onValueChange={(val) => setNewDesignation(val || '')} required>
                 <SelectTrigger className="text-sm border-slate-200 bg-white">
                   <SelectValue placeholder="Select Designation..." />
                 </SelectTrigger>
@@ -529,7 +529,7 @@ export default function EmployeesPage() {
               <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Designation *
               </Label>
-              <Select value={editDesignation} onValueChange={setEditDesignation} required>
+              <Select value={editDesignation} onValueChange={(val) => setEditDesignation(val || '')} required>
                 <SelectTrigger className="text-sm border-slate-200 bg-white">
                   <SelectValue placeholder="Select Designation..." />
                 </SelectTrigger>

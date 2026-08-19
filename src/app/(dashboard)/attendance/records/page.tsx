@@ -18,6 +18,8 @@ import {
   X,
   RefreshCw,
   SlidersHorizontal,
+  Cloud,
+  CheckCircle2,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,6 +36,7 @@ import {
   AttendanceSettings,
   Employee,
 } from '@/lib/supabase/database.types'
+import { syncAttendanceToSupabase } from '@/lib/services/attendance.service'
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
@@ -103,6 +106,30 @@ export default function AttendanceRecordsPage() {
   // Modals
   const [editingRecord, setEditingRecord] = useState<AttendanceRecordWithEmployee | null>(null)
   const [viewingPunchesRecord, setViewingPunchesRecord] = useState<AttendanceRecordWithEmployee | null>(null)
+
+  // Cloud Sync State
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<string | null>(null)
+
+  async function handleManualSync() {
+    setIsSyncing(true)
+    setSyncStatus(null)
+    try {
+      const res = await syncAttendanceToSupabase()
+      await fetchRecords()
+      if (res.error) {
+        setSyncStatus(`Sync Notice: ${res.error}`)
+      } else {
+        setSyncStatus(`Cloud Synced: ${res.syncedCount} record(s) uploaded successfully!`)
+      }
+      setTimeout(() => setSyncStatus(null), 5000)
+    } catch (err: any) {
+      setSyncStatus(`Sync error: ${err?.message || 'Failed to sync'}`)
+      setTimeout(() => setSyncStatus(null), 5000)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   // Summary Metrics
   const [summary, setSummary] = useState({
@@ -395,6 +422,22 @@ export default function AttendanceRecordsPage() {
         <div className="flex items-center gap-2.5 flex-wrap">
           <Button
             variant="outline"
+            size="sm"
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            className="h-9 text-xs font-semibold gap-1.5 text-[#003D5C] hover:bg-slate-100 border-[#003D5C]/30 shadow-2xs"
+            title="Upload local attendance records to Supabase Cloud Database"
+          >
+            {isSyncing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#009D9E]" />
+            ) : (
+              <Cloud className="w-3.5 h-3.5 text-[#009D9E]" />
+            )}
+            {isSyncing ? 'Syncing...' : 'Sync Cloud'}
+          </Button>
+
+          <Button
+            variant="outline"
             onClick={handleExportExcel}
             className="text-xs font-bold uppercase tracking-wider text-slate-700 border-slate-300 gap-1.5 shadow-2xs h-9"
           >
@@ -410,6 +453,13 @@ export default function AttendanceRecordsPage() {
           </Link>
         </div>
       </div>
+
+      {syncStatus && (
+        <div className="p-3 text-xs font-semibold text-[#003D5C] bg-[#009D9E]/10 border border-[#009D9E]/30 rounded-md flex items-center gap-2 animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 text-[#009D9E] shrink-0" />
+          <span>{syncStatus}</span>
+        </div>
+      )}
 
       {/* Top Filter Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-4">

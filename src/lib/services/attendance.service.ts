@@ -966,3 +966,108 @@ export async function deleteAttendanceRecord(id: string): Promise<void> {
     // ignore
   }
 }
+
+export async function syncAttendanceToSupabase(): Promise<{ syncedCount: number; error?: string }> {
+  const localEmployees = getStoredEmployees()
+  const localAttendance = getStoredAttendance()
+
+  try {
+    const supabase = createClient()
+
+    // 1. Sync Employees
+    const { data: remoteEmps, error: empFetchErr } = await supabase
+      .from('employees')
+      .select('*')
+
+    if (empFetchErr) {
+      return { syncedCount: 0, error: empFetchErr.message }
+    }
+
+    const remoteEmpIds = new Set((remoteEmps || []).map((e) => e.employee_id))
+    const remoteEmpMap = new Map((remoteEmps || []).map((e) => [e.employee_id, e.id]))
+
+    for (const emp of localEmployees) {
+      if (!remoteEmpIds.has(emp.employee_id)) {
+        const { data: createdEmp } = await supabase
+          .from('employees')
+          .insert({
+            employee_id: emp.employee_id,
+            name: emp.name,
+            normalized_name: emp.normalized_name || emp.name.toLowerCase().trim(),
+            designation: emp.designation,
+            is_active: emp.is_active ?? true,
+          })
+          .select()
+          .single()
+
+        if (createdEmp) {
+          remoteEmpMap.set(createdEmp.employee_id, createdEmp.id)
+        }
+      }
+    }
+
+    // Refresh remote employees list
+    const { data: allRemoteEmps } = await supabase.from('employees').select('*')
+    if (allRemoteEmps && allRemoteEmps.length > 0) {
+      saveStoredEmployees(allRemoteEmps)
+    }
+
+    // 2. Sync Attendance Records
+    const { data: remoteRecords, error: recFetchErr } = await supabase
+      .from('attendance_records')
+      .select('employee_id, attendance_date')
+
+    if (recFetchErr) {
+      return { syncedCount: 0, error: recFetchErr.message }
+    }
+
+    const remoteKeySet = new Set(
+      (remoteRecords || []).map((r) => `${r.employee_id}_${r.attendance_date}`)
+    )
+
+    let uploadCount = 0
+
+    for (const rec of localAttendance) {
+      // Find employee's Supabase UUID
+      const targetEmpUUID =
+        remoteEmpMap.get((rec as any).employee?.employee_id || '') ||
+        remoteEmpMap.get(rec.employee_id) ||
+        rec.employee_id
+
+      const key = `${targetEmpUUID}_${rec.attendance_date}`
+      if (!remoteKeySet.has(key)) {
+        const { error: insErr } = await supabase.from('attendance_records').insert({
+          employee_id: targetEmpUUID,
+          attendance_date: rec.attendance_date,
+          day_of_week: rec.day_of_week,
+          in_time: rec.in_time || null,
+          out_time: rec.out_time || null,
+          arrival_status: rec.arrival_status,
+          departure_status: rec.departure_status,
+          total_working_minutes: rec.total_working_minutes || 0,
+          total_working_hours_formatted: rec.total_working_hours_formatted || '0h 0m',
+          raw_punches: rec.raw_punches || [],
+        })
+
+        if (!insErr) {
+          uploadCount++
+        }
+      }
+    }
+
+    // Refresh all attendance records from Supabase
+    const { data: allRemoteRecords } = await supabase.from('attendance_records').select('*')
+    if (allRemoteRecords && allRemoteRecords.length > 0) {
+      const mergedMap = new Map<string, AttendanceRecord>()
+      localAttendance.forEach((r) => mergedMap.set(`${r.employee_id}_${r.attendance_date}`, r))
+      allRemoteRecords.forEach((r) => mergedMap.set(`${r.employee_id}_${r.attendance_date}`, r))
+      const merged = Array.from(mergedMap.values())
+      saveStoredAttendance(merged)
+    }
+
+    return { syncedCount: uploadCount }
+  } catch (err: any) {
+    return { syncedCount: 0, error: err?.message || 'Failed to sync attendance' }
+  }
+}
+
