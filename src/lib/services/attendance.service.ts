@@ -15,14 +15,17 @@ import {
   parseDateString,
 } from './attendance-calculator'
 
-// ----------------------------------------------------
-// STORAGE & IN-MEMORY STATE (Persistent server cache & client localStorage)
-// ----------------------------------------------------
-const EMPLOYEES_STORAGE_KEY = 'attendance_employees_store'
-const ATTENDANCE_STORAGE_KEY = 'attendance_records_store'
-const SETTINGS_STORAGE_KEY = 'attendance_settings_store'
+// Clean up stale localStorage cache from previous offline sync versions
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem('attendance_employees_store')
+    localStorage.removeItem('attendance_records_store')
+    localStorage.removeItem('attendance_settings_store')
+  } catch {
+    // Ignore
+  }
+}
 
-// Fallback seed employees for initial development
 export const INITIAL_EMPLOYEES: Employee[] = [
   {
     id: 'emp-0001-uuid',
@@ -59,79 +62,6 @@ export const INITIAL_EMPLOYEES: Employee[] = [
   },
 ]
 
-declare global {
-  var __attendanceStore: AttendanceRecord[] | undefined
-  var __employeesStore: Employee[] | undefined
-  var __attendanceSettingsStore: AttendanceSettings | undefined
-}
-
-if (!globalThis.__employeesStore) {
-  globalThis.__employeesStore = [...INITIAL_EMPLOYEES]
-}
-if (!globalThis.__attendanceStore) {
-  globalThis.__attendanceStore = []
-}
-if (!globalThis.__attendanceSettingsStore) {
-  globalThis.__attendanceSettingsStore = { ...DEFAULT_ATTENDANCE_SETTINGS }
-}
-
-function getStoredEmployees(): Employee[] {
-  if (typeof window !== 'undefined') {
-    try {
-      const raw = localStorage.getItem(EMPLOYEES_STORAGE_KEY)
-      if (raw) return JSON.parse(raw)
-    } catch {}
-  }
-  return globalThis.__employeesStore || INITIAL_EMPLOYEES
-}
-
-function saveStoredEmployees(employees: Employee[]) {
-  globalThis.__employeesStore = employees
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(EMPLOYEES_STORAGE_KEY, JSON.stringify(employees))
-    } catch {}
-  }
-}
-
-function getStoredAttendance(): AttendanceRecord[] {
-  if (typeof window !== 'undefined') {
-    try {
-      const raw = localStorage.getItem(ATTENDANCE_STORAGE_KEY)
-      if (raw) return JSON.parse(raw)
-    } catch {}
-  }
-  return globalThis.__attendanceStore || []
-}
-
-function saveStoredAttendance(records: AttendanceRecord[]) {
-  globalThis.__attendanceStore = records
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(ATTENDANCE_STORAGE_KEY, JSON.stringify(records))
-    } catch {}
-  }
-}
-
-function getStoredSettings(): AttendanceSettings {
-  if (typeof window !== 'undefined') {
-    try {
-      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY)
-      if (raw) return JSON.parse(raw)
-    } catch {}
-  }
-  return globalThis.__attendanceSettingsStore || DEFAULT_ATTENDANCE_SETTINGS
-}
-
-function saveStoredSettings(settings: AttendanceSettings) {
-  globalThis.__attendanceSettingsStore = settings
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
-    } catch {}
-  }
-}
-
 // ----------------------------------------------------
 // 1. ATTENDANCE SETTINGS SERVICES
 // ----------------------------------------------------
@@ -146,12 +76,12 @@ export async function getAttendanceSettings(): Promise<AttendanceSettings> {
       .single()
 
     if (error || !data) {
-      return getStoredSettings()
+      return DEFAULT_ATTENDANCE_SETTINGS
     }
 
     return data
   } catch (err) {
-    return getStoredSettings()
+    return DEFAULT_ATTENDANCE_SETTINGS
   }
 }
 
@@ -165,8 +95,6 @@ export async function updateAttendanceSettings(
     id: 'default',
     updated_at: new Date().toISOString(),
   }
-
-  saveStoredSettings(updated)
 
   try {
     const supabase = createClient()
@@ -204,26 +132,14 @@ export async function getEmployees(params?: {
 
     const { data, error } = await query
 
-    if (error || !data || data.length === 0) {
-      let local = getStoredEmployees()
-      if (params?.isActiveOnly !== false) {
-        local = local.filter((e) => e.is_active)
-      }
-      if (params?.search) {
-        const q = params.search.toLowerCase()
-        local = local.filter(
-          (e) =>
-            e.name.toLowerCase().includes(q) ||
-            e.employee_id.toLowerCase().includes(q) ||
-            e.designation.toLowerCase().includes(q)
-        )
-      }
-      return local
+    if (error || !data) {
+      console.error('Error fetching employees from Supabase:', error?.message)
+      return []
     }
 
     let result = data
-    if (params?.search) {
-      const q = params.search.toLowerCase()
+    if (params?.search && params.search.trim()) {
+      const q = params.search.toLowerCase().trim()
       result = result.filter(
         (e) =>
           e.name.toLowerCase().includes(q) ||
@@ -234,37 +150,27 @@ export async function getEmployees(params?: {
 
     return result
   } catch (err) {
-    let local = getStoredEmployees()
-    if (params?.isActiveOnly !== false) {
-      local = local.filter((e) => e.is_active)
-    }
-    if (params?.search) {
-      const q = params.search.toLowerCase()
-      local = local.filter(
-        (e) =>
-          e.name.toLowerCase().includes(q) ||
-          e.employee_id.toLowerCase().includes(q) ||
-          e.designation.toLowerCase().includes(q)
-      )
-    }
-    return local
+    console.error('Exception fetching employees:', err)
+    return []
   }
 }
 
 export async function getEmployeeById(id: string): Promise<Employee | null> {
   try {
     const supabase = createClient()
-    const { data, error } = await supabase.from('employees').select('*').eq('id', id).single()
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .or(`id.eq.${id},employee_id.eq.${id}`)
+      .single()
 
     if (error || !data) {
-      const local = getStoredEmployees()
-      return local.find((e) => e.id === id || e.employee_id === id) || null
+      return null
     }
 
     return data
   } catch (err) {
-    const local = getStoredEmployees()
-    return local.find((e) => e.id === id || e.employee_id === id) || null
+    return null
   }
 }
 
@@ -289,16 +195,7 @@ export async function checkDuplicateEmployeeName(name: string): Promise<{ exists
  * Generates next unique sequential Employee ID e.g. EMP-0001, EMP-0002
  */
 export async function generateNextEmployeeId(): Promise<string> {
-  const local = getStoredEmployees()
   let maxSeq = 0
-
-  for (const emp of local) {
-    const match = emp.employee_id.match(/EMP-(\d+)/i)
-    if (match) {
-      const num = parseInt(match[1], 10)
-      if (num > maxSeq) maxSeq = num
-    }
-  }
 
   try {
     const supabase = createClient()
@@ -338,46 +235,24 @@ export async function createEmployee(params: {
   }
 
   const employeeId = await generateNextEmployeeId()
-  const newEmp: Employee = {
-    id: `emp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    user_id: null,
-    employee_id: employeeId,
-    name,
-    normalized_name: normalizedName,
-    designation,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('employees')
+    .insert({
+      employee_id: employeeId,
+      name,
+      normalized_name: normalizedName,
+      designation,
+      is_active: true,
+    })
+    .select()
+    .single()
+
+  if (error || !data) {
+    throw new Error(error?.message || 'Failed to create employee in database')
   }
 
-  // Save to local store
-  const local = getStoredEmployees()
-  local.push(newEmp)
-  saveStoredEmployees(local)
-
-  // Save to Supabase
-  try {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('employees')
-      .insert({
-        employee_id: employeeId,
-        name,
-        normalized_name: normalizedName,
-        designation,
-        is_active: true,
-      })
-      .select()
-      .single()
-
-    if (!error && data) {
-      return { employee: data, warning }
-    }
-  } catch (err) {
-    // fallback to local
-  }
-
-  return { employee: newEmp, warning }
+  return { employee: data, warning }
 }
 
 export async function updateEmployee(
@@ -388,89 +263,48 @@ export async function updateEmployee(
     is_active?: boolean
   }
 ): Promise<Employee> {
-  const local = getStoredEmployees()
-  const idx = local.findIndex((e) => e.id === id)
-  let current = idx !== -1 ? local[idx] : null
-
-  if (!current) {
-    const fetched = await getEmployeeById(id)
-    if (!fetched) throw new Error('Employee not found')
-    current = fetched
-  }
-
-  const updated: Employee = {
-    ...current,
+  const supabase = createClient()
+  const updateData: any = {
     updated_at: new Date().toISOString(),
   }
 
   if (params.name !== undefined) {
-    updated.name = params.name.trim()
-    updated.normalized_name = normalizeEmployeeName(params.name)
+    updateData.name = params.name.trim()
+    updateData.normalized_name = normalizeEmployeeName(params.name)
   }
   if (params.designation !== undefined) {
-    updated.designation = params.designation.trim()
+    updateData.designation = params.designation.trim()
   }
   if (params.is_active !== undefined) {
-    updated.is_active = params.is_active
+    updateData.is_active = params.is_active
   }
 
-  if (idx !== -1) {
-    local[idx] = updated
-    saveStoredEmployees(local)
+  const { data, error } = await supabase
+    .from('employees')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error || !data) {
+    throw new Error(error?.message || 'Failed to update employee in database')
   }
 
-  try {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('employees')
-      .update({
-        name: updated.name,
-        normalized_name: updated.normalized_name,
-        designation: updated.designation,
-        is_active: updated.is_active,
-        updated_at: updated.updated_at,
-      })
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (!error && data) {
-      return data
-    }
-  } catch (err) {
-    // fallback
-  }
-
-  return updated
+  return data
 }
 
 export async function deleteEmployee(id: string): Promise<void> {
-  const local = getStoredEmployees()
-  const empToDelete = local.find((e) => e.id === id || e.employee_id === id)
-  const updatedEmployees = local.filter((e) => e.id !== id && e.employee_id !== id)
-  saveStoredEmployees(updatedEmployees)
+  const supabase = createClient()
+  // 1. Delete associated attendance records
+  await supabase
+    .from('attendance_records')
+    .delete()
+    .or(`employee_id.eq.${id}`)
 
-  // Clean local attendance records
-  if (empToDelete) {
-    const records = getStoredAttendance()
-    const updatedRecords = records.filter(
-      (r) => r.employee_id !== empToDelete.id && r.employee_id !== empToDelete.employee_id
-    )
-    saveStoredAttendance(updatedRecords)
-  }
-
-  // Supabase delete
-  try {
-    const supabase = createClient()
-    if (empToDelete) {
-      await supabase
-        .from('attendance_records')
-        .delete()
-        .or(`employee_id.eq.${empToDelete.id},employee_id.eq.${empToDelete.employee_id}`)
-    }
-    await supabase.from('employees').delete().or(`id.eq.${id},employee_id.eq.${id}`)
-  } catch (err) {
-    // Ignore error
+  // 2. Delete employee
+  const { error } = await supabase.from('employees').delete().or(`id.eq.${id},employee_id.eq.${id}`)
+  if (error) {
+    throw new Error(error.message || 'Failed to delete employee from database')
   }
 }
 
@@ -505,7 +339,10 @@ export async function getAttendanceRecords(
 ): Promise<AttendanceListResponse> {
   const employees = await getEmployees({ isActiveOnly: false })
   const empMap = new Map<string, Employee>()
-  employees.forEach((e) => empMap.set(e.id, e))
+  employees.forEach((e) => {
+    empMap.set(e.id, e)
+    empMap.set(e.employee_id, e)
+  })
 
   let allRecords: AttendanceRecord[] = []
 
@@ -531,26 +368,14 @@ export async function getAttendanceRecords(
 
     const { data, error } = await query
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       allRecords = data
-    } else {
-      allRecords = getStoredAttendance()
     }
   } catch (err) {
-    allRecords = getStoredAttendance()
+    console.error('Error querying attendance records from Supabase:', err)
   }
 
-  // Merge any in-memory / local storage records not yet in Supabase
-  const local = getStoredAttendance()
-  if (local.length > 0) {
-    local.forEach((rec) => {
-      if (!allRecords.some((r) => r.id === rec.id || (r.employee_id === rec.employee_id && r.attendance_date === rec.attendance_date))) {
-        allRecords.push(rec)
-      }
-    })
-  }
-
-  // Filter in-memory for rich search across joined relations
+  // Filter in-memory for rich relations and search
   let filtered = allRecords.filter((rec) => {
     const emp = empMap.get(rec.employee_id)
 
@@ -767,88 +592,48 @@ export async function saveImportedAttendanceBatch(
     return { savedCount: 0, skippedDuplicates: 0, errors: [] }
   }
 
-  const local = getStoredAttendance()
+  const supabase = createClient()
   let savedCount = 0
   let skippedDuplicates = 0
   const errors: string[] = []
 
-  const recordsToInsert: AttendanceRecord[] = []
+  const payload = items
+    .filter((item) => item.employee_id && item.attendance_date)
+    .map((r) => ({
+      employee_id: r.employee_id,
+      attendance_date: r.attendance_date,
+      day_of_week: r.day_of_week,
+      in_time: r.in_time,
+      out_time: r.out_time,
+      arrival_status: r.arrival_status,
+      departure_status: r.departure_status,
+      total_working_minutes: r.total_working_minutes,
+      total_working_hours_formatted: r.total_working_hours_formatted,
+      raw_punches: r.raw_punches as any,
+    }))
 
-  for (const item of items) {
-    if (!item.employee_id || !item.attendance_date) continue
-
-    const existingIdx = local.findIndex(
-      (r) => r.employee_id === item.employee_id && r.attendance_date === item.attendance_date
-    )
-
-    if (existingIdx !== -1) {
-      if (duplicateStrategy === 'skip') {
-        skippedDuplicates++
-        continue
-      } else {
-        // Overwrite
-        const updatedRec: AttendanceRecord = {
-          ...local[existingIdx],
-          ...item,
-          raw_punches: item.raw_punches as any,
-          updated_at: new Date().toISOString(),
-        }
-        local[existingIdx] = updatedRec
-        recordsToInsert.push(updatedRec)
-        savedCount++
-        continue
-      }
-    }
-
-    const newRec: AttendanceRecord = {
-      id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      employee_id: item.employee_id,
-      attendance_date: item.attendance_date,
-      day_of_week: item.day_of_week,
-      in_time: item.in_time,
-      out_time: item.out_time,
-      arrival_status: item.arrival_status,
-      departure_status: item.departure_status,
-      total_working_minutes: item.total_working_minutes,
-      total_working_hours_formatted: item.total_working_hours_formatted,
-      raw_punches: item.raw_punches as any,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    local.push(newRec)
-    recordsToInsert.push(newRec)
-    savedCount++
-  }
-
-  saveStoredAttendance(local)
-
-  // Batch insert into Supabase
-  if (recordsToInsert.length > 0) {
+  if (payload.length > 0) {
     try {
-      const supabase = createClient()
-      const payload = recordsToInsert.map((r) => ({
-        employee_id: r.employee_id,
-        attendance_date: r.attendance_date,
-        day_of_week: r.day_of_week,
-        in_time: r.in_time,
-        out_time: r.out_time,
-        arrival_status: r.arrival_status,
-        departure_status: r.departure_status,
-        total_working_minutes: r.total_working_minutes,
-        total_working_hours_formatted: r.total_working_hours_formatted,
-        raw_punches: r.raw_punches,
-      }))
-
       if (duplicateStrategy === 'overwrite') {
-        await supabase.from('attendance_records').upsert(payload, {
+        const { error } = await supabase.from('attendance_records').upsert(payload, {
           onConflict: 'employee_id,attendance_date',
         })
+        if (error) {
+          errors.push(error.message)
+        } else {
+          savedCount = payload.length
+        }
       } else {
-        await supabase.from('attendance_records').insert(payload)
+        const { error } = await supabase.from('attendance_records').insert(payload)
+        if (error) {
+          // If error is unique constraint violation, try inserting row by row or report
+          errors.push(error.message)
+        } else {
+          savedCount = payload.length
+        }
       }
     } catch (err: any) {
-      console.warn('Supabase batch insert error:', err?.message)
+      errors.push(err?.message || 'Database error during batch save')
     }
   }
 
@@ -870,21 +655,15 @@ export async function updateAttendanceRecord(
     attendance_date?: string
   }
 ): Promise<AttendanceRecord> {
-  const local = getStoredAttendance()
-  let current = local.find((r) => r.id === id)
+  const supabase = createClient()
+  const { data: current, error: fetchErr } = await supabase
+    .from('attendance_records')
+    .select('*')
+    .eq('id', id)
+    .single()
 
-  if (!current) {
-    try {
-      const supabase = createClient()
-      const { data } = await supabase.from('attendance_records').select('*').eq('id', id).single()
-      if (data) current = data
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  if (!current) {
-    throw new Error('Attendance record not found.')
+  if (fetchErr || !current) {
+    throw new Error('Attendance record not found in database.')
   }
 
   const settings = await getAttendanceSettings()
@@ -902,8 +681,7 @@ export async function updateAttendanceRecord(
   const departureStatus = calculateDepartureStatus(outTimeToUse, dayOfWeek, settings)
   const { totalMinutes, formatted } = calculateWorkingDuration(inTimeToUse, outTimeToUse)
 
-  const updated: AttendanceRecord = {
-    ...current,
+  const updatedData = {
     attendance_date: dateToUse,
     day_of_week: dayName,
     in_time: inTimeToUse,
@@ -915,159 +693,29 @@ export async function updateAttendanceRecord(
     updated_at: new Date().toISOString(),
   }
 
-  // Update in local store
-  const localIdx = local.findIndex((r) => r.id === id)
-  if (localIdx !== -1) {
-    local[localIdx] = updated
-  } else {
-    local.push(updated)
-  }
-  saveStoredAttendance(local)
+  const { data: updated, error: updateErr } = await supabase
+    .from('attendance_records')
+    .update(updatedData)
+    .eq('id', id)
+    .select()
+    .single()
 
-  // Update in Supabase
-  try {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('attendance_records')
-      .update({
-        attendance_date: updated.attendance_date,
-        day_of_week: updated.day_of_week,
-        in_time: updated.in_time,
-        out_time: updated.out_time,
-        arrival_status: updated.arrival_status,
-        departure_status: updated.departure_status,
-        total_working_minutes: updated.total_working_minutes,
-        total_working_hours_formatted: updated.total_working_hours_formatted,
-        updated_at: updated.updated_at,
-      })
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (!error && data) {
-      return data
-    }
-  } catch (err) {
-    // fallback
+  if (updateErr || !updated) {
+    throw new Error(updateErr?.message || 'Failed to update attendance record in database.')
   }
 
   return updated
 }
 
 export async function deleteAttendanceRecord(id: string): Promise<void> {
-  const local = getStoredAttendance()
-  const filtered = local.filter((r) => r.id !== id)
-  saveStoredAttendance(filtered)
-
-  try {
-    const supabase = createClient()
-    await supabase.from('attendance_records').delete().eq('id', id)
-  } catch (err) {
-    // ignore
+  const supabase = createClient()
+  const { error } = await supabase.from('attendance_records').delete().eq('id', id)
+  if (error) {
+    throw new Error(error.message || 'Failed to delete attendance record from database')
   }
 }
 
+// Deprecated no-op for backward compatibility
 export async function syncAttendanceToSupabase(): Promise<{ syncedCount: number; error?: string }> {
-  const localEmployees = getStoredEmployees()
-  const localAttendance = getStoredAttendance()
-
-  try {
-    const supabase = createClient()
-
-    // 1. Sync Employees
-    const { data: remoteEmps, error: empFetchErr } = await supabase
-      .from('employees')
-      .select('*')
-
-    if (empFetchErr) {
-      return { syncedCount: 0, error: empFetchErr.message }
-    }
-
-    const remoteEmpIds = new Set((remoteEmps || []).map((e) => e.employee_id))
-    const remoteEmpMap = new Map((remoteEmps || []).map((e) => [e.employee_id, e.id]))
-
-    for (const emp of localEmployees) {
-      if (!remoteEmpIds.has(emp.employee_id)) {
-        const { data: createdEmp } = await supabase
-          .from('employees')
-          .insert({
-            employee_id: emp.employee_id,
-            name: emp.name,
-            normalized_name: emp.normalized_name || emp.name.toLowerCase().trim(),
-            designation: emp.designation,
-            is_active: emp.is_active ?? true,
-          })
-          .select()
-          .single()
-
-        if (createdEmp) {
-          remoteEmpMap.set(createdEmp.employee_id, createdEmp.id)
-        }
-      }
-    }
-
-    // Refresh remote employees list
-    const { data: allRemoteEmps } = await supabase.from('employees').select('*')
-    if (allRemoteEmps && allRemoteEmps.length > 0) {
-      saveStoredEmployees(allRemoteEmps)
-    }
-
-    // 2. Sync Attendance Records
-    const { data: remoteRecords, error: recFetchErr } = await supabase
-      .from('attendance_records')
-      .select('employee_id, attendance_date')
-
-    if (recFetchErr) {
-      return { syncedCount: 0, error: recFetchErr.message }
-    }
-
-    const remoteKeySet = new Set(
-      (remoteRecords || []).map((r) => `${r.employee_id}_${r.attendance_date}`)
-    )
-
-    let uploadCount = 0
-
-    for (const rec of localAttendance) {
-      // Find employee's Supabase UUID
-      const targetEmpUUID =
-        remoteEmpMap.get((rec as any).employee?.employee_id || '') ||
-        remoteEmpMap.get(rec.employee_id) ||
-        rec.employee_id
-
-      const key = `${targetEmpUUID}_${rec.attendance_date}`
-      if (!remoteKeySet.has(key)) {
-        const { error: insErr } = await supabase.from('attendance_records').insert({
-          employee_id: targetEmpUUID,
-          attendance_date: rec.attendance_date,
-          day_of_week: rec.day_of_week,
-          in_time: rec.in_time || null,
-          out_time: rec.out_time || null,
-          arrival_status: rec.arrival_status,
-          departure_status: rec.departure_status,
-          total_working_minutes: rec.total_working_minutes || 0,
-          total_working_hours_formatted: rec.total_working_hours_formatted || '0h 0m',
-          raw_punches: rec.raw_punches || [],
-        })
-
-        if (!insErr) {
-          uploadCount++
-        }
-      }
-    }
-
-    // Refresh all attendance records from Supabase
-    const { data: allRemoteRecords } = await supabase.from('attendance_records').select('*')
-    if (allRemoteRecords && allRemoteRecords.length > 0) {
-      const mergedMap = new Map<string, AttendanceRecord>()
-      localAttendance.forEach((r) => mergedMap.set(`${r.employee_id}_${r.attendance_date}`, r))
-      allRemoteRecords.forEach((r) => mergedMap.set(`${r.employee_id}_${r.attendance_date}`, r))
-      const merged = Array.from(mergedMap.values())
-      saveStoredAttendance(merged)
-    }
-
-    return { syncedCount: uploadCount }
-  } catch (err: any) {
-    return { syncedCount: 0, error: err?.message || 'Failed to sync attendance' }
-  }
+  return { syncedCount: 0 }
 }
-

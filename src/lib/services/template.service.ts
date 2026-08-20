@@ -19,36 +19,16 @@ export const FALLBACK_TEMPLATE: Template = {
   updated_at: new Date().toISOString(),
 }
 
-const STORAGE_KEY = 'edlink_template_customizations'
-
-function getStoredTemplateData(): Partial<Template> | null {
-  if (typeof window === 'undefined') return null
+// Clean up stale localStorage cache from previous versions
+if (typeof window !== 'undefined') {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : null
+    localStorage.removeItem('edlink_template_customizations')
   } catch {
-    return null
+    // Ignore
   }
-}
-
-function setStoredTemplateData(updates: Partial<Template>) {
-  if (typeof window === 'undefined') return
-  try {
-    const existing = getStoredTemplateData() || {}
-    const merged = { ...existing, ...updates }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
-  } catch {
-    // Ignore error
-  }
-}
-
-const localTemplatesMap: Record<string, Template> = {
-  'edlink-pk-template-id': { ...FALLBACK_TEMPLATE },
-  'edlink-pk-id': { ...FALLBACK_TEMPLATE },
 }
 
 export async function getTemplates(): Promise<(Template & { companies?: { name: string; prefix: string } | null })[]> {
-  const stored = getStoredTemplateData()
   try {
     const supabase = createClient()
     const { data, error } = await supabase
@@ -57,22 +37,16 @@ export async function getTemplates(): Promise<(Template & { companies?: { name: 
       .order('created_at', { ascending: true })
 
     if (!error && data && data.length > 0) {
-      data.forEach((t) => {
-        localTemplatesMap[t.id] = { ...t, ...stored }
-        if (t.company_id) localTemplatesMap[t.company_id] = { ...t, ...stored }
-      })
-      return data.map((t) => ({ ...t, ...stored }))
+      return data
     }
   } catch (err) {
-    // Ignore error
+    console.error('Error fetching templates:', err)
   }
 
-  const fallbackItem = { ...(localTemplatesMap['edlink-pk-template-id'] || FALLBACK_TEMPLATE), ...stored }
-  return [{ ...fallbackItem, companies: { name: fallbackItem.company_name || 'EdLink Pakistan', prefix: 'EDL' } }]
+  return [{ ...FALLBACK_TEMPLATE, companies: { name: FALLBACK_TEMPLATE.company_name || 'EdLink Pakistan', prefix: 'EDL' } }]
 }
 
 export async function getTemplateByCompanyId(companyId: string): Promise<Template | null> {
-  const stored = getStoredTemplateData()
   try {
     const supabase = createClient()
     const { data, error } = await supabase
@@ -82,21 +56,16 @@ export async function getTemplateByCompanyId(companyId: string): Promise<Templat
       .single()
 
     if (!error && data) {
-      const merged = { ...data, ...stored }
-      localTemplatesMap[data.id] = merged
-      localTemplatesMap[companyId] = merged
-      return merged
+      return data
     }
   } catch (err) {
-    // Ignore error
+    // Fallback below
   }
 
-  const base = localTemplatesMap[companyId] || localTemplatesMap['edlink-pk-template-id'] || FALLBACK_TEMPLATE
-  return { ...base, ...stored }
+  return FALLBACK_TEMPLATE
 }
 
 export async function getTemplateById(id: string): Promise<Template | null> {
-  const stored = getStoredTemplateData()
   try {
     const supabase = createClient()
     const { data, error } = await supabase
@@ -106,37 +75,19 @@ export async function getTemplateById(id: string): Promise<Template | null> {
       .single()
 
     if (!error && data) {
-      const merged = { ...data, ...stored }
-      localTemplatesMap[data.id] = merged
-      if (data.company_id) localTemplatesMap[data.company_id] = merged
-      return merged
+      return data
     }
   } catch (err) {
-    // Ignore error
+    // Fallback below
   }
 
-  const base = localTemplatesMap[id] || localTemplatesMap['edlink-pk-template-id'] || FALLBACK_TEMPLATE
-  return { ...base, ...stored }
+  return FALLBACK_TEMPLATE
 }
 
 export async function updateTemplate(
   id: string,
   updates: Partial<Omit<Template, 'id' | 'company_id' | 'created_at'>>
 ): Promise<Template> {
-  setStoredTemplateData(updates)
-  const current = localTemplatesMap[id] || localTemplatesMap['edlink-pk-template-id'] || { ...FALLBACK_TEMPLATE, id }
-  const updated: Template = {
-    ...current,
-    ...updates,
-    updated_at: new Date().toISOString(),
-  }
-
-  localTemplatesMap[id] = updated
-  if (updated.company_id) {
-    localTemplatesMap[updated.company_id] = updated
-  }
-  Object.assign(FALLBACK_TEMPLATE, updates)
-
   try {
     const supabase = createClient()
     const { data, error } = await supabase
@@ -149,18 +100,14 @@ export async function updateTemplate(
       .select()
       .single()
 
-    if (!error && data) {
-      const merged = { ...data, ...updates }
-      localTemplatesMap[id] = merged
-      if (data.company_id) localTemplatesMap[data.company_id] = merged
-      Object.assign(FALLBACK_TEMPLATE, merged)
-      return merged
+    if (error || !data) {
+      throw new Error(error?.message || 'Failed to update template in database')
     }
-  } catch (err) {
-    // Ignore error
-  }
 
-  return updated
+    return data
+  } catch (err: any) {
+    throw new Error(err?.message || 'Failed to update template')
+  }
 }
 
 export async function duplicateTemplate(
@@ -171,41 +118,34 @@ export async function duplicateTemplate(
   try {
     const supabase = createClient()
 
+    const original = await getTemplateById(templateId)
+    const base = original || FALLBACK_TEMPLATE
+
     const { data: copy, error: createErr } = await supabase
       .from('templates')
       .insert({
         company_id: newCompanyId,
         name: newTemplateName,
-        company_name: FALLBACK_TEMPLATE.company_name,
-        address: FALLBACK_TEMPLATE.address,
-        phone: FALLBACK_TEMPLATE.phone,
-        email: FALLBACK_TEMPLATE.email,
-        payment_details: FALLBACK_TEMPLATE.payment_details,
-        bank_details: FALLBACK_TEMPLATE.bank_details,
-        currency: FALLBACK_TEMPLATE.currency,
-        footer_terms: FALLBACK_TEMPLATE.footer_terms,
-        primary_color: FALLBACK_TEMPLATE.primary_color,
-        layout_type: FALLBACK_TEMPLATE.layout_type,
+        company_name: base.company_name,
+        address: base.address,
+        phone: base.phone,
+        email: base.email,
+        payment_details: base.payment_details,
+        bank_details: base.bank_details,
+        currency: base.currency,
+        footer_terms: base.footer_terms,
+        primary_color: base.primary_color,
+        layout_type: base.layout_type,
       })
       .select()
       .single()
 
     if (createErr || !copy) {
-      return {
-        ...FALLBACK_TEMPLATE,
-        id: `tpl-${Date.now()}`,
-        name: newTemplateName,
-        company_id: newCompanyId,
-      }
+      throw new Error(createErr?.message || 'Failed to duplicate template')
     }
 
     return copy
-  } catch (err) {
-    return {
-      ...FALLBACK_TEMPLATE,
-      id: `tpl-${Date.now()}`,
-      name: newTemplateName,
-      company_id: newCompanyId,
-    }
+  } catch (err: any) {
+    throw new Error(err?.message || 'Failed to duplicate template')
   }
 }

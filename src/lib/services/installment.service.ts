@@ -72,8 +72,16 @@ export interface StudentInstallmentSchedule {
   updated_at: string
 }
 
-const STORAGE_KEY = 'aimt_student_installments'
 const FIXED_INFO_KEY = 'aimt_fixed_info_settings'
+
+// Clean up stale localStorage cache from previous offline sync versions
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem('aimt_student_installments')
+  } catch {
+    // Ignore
+  }
+}
 
 export function getAimtFixedInfo(): AIMTFixedInfo {
   if (typeof window === 'undefined') return DEFAULT_AIMT_FIXED_INFO
@@ -242,33 +250,6 @@ function getOrdinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0])
 }
 
-export function getLocalInstallments(): StudentInstallmentSchedule[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const items: StudentInstallmentSchedule[] = JSON.parse(raw)
-    return items.map((item) => ({
-      ...item,
-      schedule_items: item.schedule_items?.map((s) => ({
-        ...s,
-        description: s.description ? s.description.replace(' + ', ' including ') : s.description,
-      })),
-    }))
-  } catch {
-    return []
-  }
-}
-
-export function setLocalInstallments(items: StudentInstallmentSchedule[]): void {
-  if (typeof window === 'undefined') return
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-  } catch {
-    // Ignore storage errors
-  }
-}
-
 function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
   let scheduleItems: InstallmentRow[] = []
   if (typeof row.schedule_items === 'string') {
@@ -343,83 +324,27 @@ function mapScheduleToDbRow(schedule: StudentInstallmentSchedule): any {
   }
 }
 
-/**
- * Automatically migrates and syncs any local installment schedules from localStorage into Supabase DB.
- * Ensures data saved on Laptop A is uploaded to Cloud and available across all devices.
- */
-export async function syncLocalInstallmentsToSupabase(): Promise<{ syncedCount: number; error?: string }> {
-  const localList = getLocalInstallments()
-  if (localList.length === 0) {
-    return { syncedCount: 0 }
-  }
-
-  try {
-    const supabase = createClient()
-    // Filter out dummy default if it's the only one and not customized
-    const toUpload = localList.map(mapScheduleToDbRow)
-
-    const { error } = await supabase
-      .from('installment_schedules')
-      .upsert(toUpload, { onConflict: 'id' })
-
-    if (error) {
-      console.warn('Sync to Supabase warning:', error.message)
-      return { syncedCount: 0, error: error.message }
-    }
-
-    return { syncedCount: toUpload.length }
-  } catch (err: any) {
-    console.warn('Sync to Supabase exception:', err?.message)
-    return { syncedCount: 0, error: err?.message }
-  }
-}
-
 export async function getInstallments(): Promise<StudentInstallmentSchedule[]> {
-  const localList = getLocalInstallments()
-
   try {
     const supabase = createClient()
-
-    // 1. If local items exist, trigger auto-sync to cloud in background
-    if (localList.length > 0) {
-      syncLocalInstallmentsToSupabase().catch(() => {})
-    }
-
-    // 2. Fetch all installment schedules from Supabase
     const { data, error } = await supabase
       .from('installment_schedules')
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (!error && data && data.length > 0) {
-      const dbSchedules = data.map(mapDbRowToSchedule)
-      // Merge with any local items not yet on DB
-      const mergedMap = new Map<string, StudentInstallmentSchedule>()
-      localList.forEach((item) => mergedMap.set(item.id, item))
-      dbSchedules.forEach((item) => mergedMap.set(item.id, item)) // DB overrides local
-      const merged = Array.from(mergedMap.values()).sort(
-        (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-      )
-
-      setLocalInstallments(merged)
-      return merged
+    if (error) {
+      console.error('Error fetching installment schedules from Supabase:', error.message)
+      return []
     }
 
-    // If Supabase returned empty but local has items, upload local items
-    if (!error && data && data.length === 0 && localList.length > 0) {
-      await syncLocalInstallmentsToSupabase()
-      return localList
-    }
+    return (data || []).map(mapDbRowToSchedule)
   } catch (err) {
-    console.warn('Error fetching installments from Supabase, using local cache:', err)
+    console.error('Exception fetching installment schedules:', err)
+    return []
   }
-
-  // Fallback to local
-  return localList
 }
 
 export async function getInstallmentById(id: string): Promise<StudentInstallmentSchedule | null> {
-  // 1. Try Supabase
   try {
     const supabase = createClient()
     const { data, error } = await supabase
@@ -428,88 +353,65 @@ export async function getInstallmentById(id: string): Promise<StudentInstallment
       .eq('id', id)
       .single()
 
-    if (!error && data) {
-      return mapDbRowToSchedule(data)
+    if (error || !data) {
+      return null
     }
-  } catch (err) {
-    console.warn('Error fetching installment by ID from Supabase:', err)
-  }
 
-  // 2. Fallback to local cache
-  const localList = getLocalInstallments()
-  return localList.find((item) => item.id === id) || null
+    return mapDbRowToSchedule(data)
+  } catch (err) {
+    console.error('Exception fetching installment by ID:', err)
+    return null
+  }
 }
 
 export async function saveInstallment(
   schedule: Omit<StudentInstallmentSchedule, 'id' | 'created_at' | 'updated_at'> & { id?: string }
 ): Promise<StudentInstallmentSchedule> {
   const now = new Date().toISOString()
-  const localList = getLocalInstallments()
+  const scheduleId = schedule.id || `aimt-sch-${Date.now()}`
 
-  let finalSchedule: StudentInstallmentSchedule
-
-  if (schedule.id) {
-    const existing = localList.find((item) => item.id === schedule.id)
-    finalSchedule = {
-      ...existing,
-      ...schedule,
-      id: schedule.id,
-      created_at: existing?.created_at || now,
-      updated_at: now,
-    }
-  } else {
-    finalSchedule = {
-      ...schedule,
-      id: `aimt-sch-${Date.now()}`,
-      created_at: now,
-      updated_at: now,
-    }
+  const finalSchedule: StudentInstallmentSchedule = {
+    ...schedule,
+    id: scheduleId,
+    created_at: schedule.id ? (schedule as any).created_at || now : now,
+    updated_at: now,
   }
 
-  // Update local cache immediately
-  const updatedList = [
-    finalSchedule,
-    ...localList.filter((item) => item.id !== finalSchedule.id),
-  ]
-  setLocalInstallments(updatedList)
+  const supabase = createClient()
+  const dbRow = mapScheduleToDbRow(finalSchedule)
+  const { error } = await supabase
+    .from('installment_schedules')
+    .upsert(dbRow, { onConflict: 'id' })
 
-  // Persist to Supabase Database
-  try {
-    const supabase = createClient()
-    const dbRow = mapScheduleToDbRow(finalSchedule)
-    const { error } = await supabase
-      .from('installment_schedules')
-      .upsert(dbRow, { onConflict: 'id' })
-
-    if (error) {
-      console.error('Failed to save installment schedule to Supabase:', error.message)
-    }
-  } catch (err) {
-    console.error('Exception saving installment schedule to Supabase:', err)
+  if (error) {
+    throw new Error(error.message || 'Failed to save installment schedule to database')
   }
 
   return finalSchedule
 }
 
 export async function deleteInstallment(id: string): Promise<void> {
-  // 1. Delete from local cache
-  const localList = getLocalInstallments()
-  const updated = localList.filter((item) => item.id !== id)
-  setLocalInstallments(updated)
+  const supabase = createClient()
+  await supabase.from('installment_email_logs').delete().eq('schedule_id', id)
+  const { error } = await supabase
+    .from('installment_schedules')
+    .delete()
+    .eq('id', id)
 
-  // 2. Delete from Supabase
-  try {
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('installment_schedules')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      console.error('Failed to delete installment from Supabase:', error.message)
-    }
-  } catch (err) {
-    console.error('Exception deleting installment from Supabase:', err)
+  if (error) {
+    throw new Error(error.message || 'Failed to delete installment schedule from database')
   }
 }
 
+// Deprecated no-op for backward compatibility
+export async function syncLocalInstallmentsToSupabase(): Promise<{ syncedCount: number; error?: string }> {
+  return { syncedCount: 0 }
+}
+
+export function getLocalInstallments(): StudentInstallmentSchedule[] {
+  return []
+}
+
+export function setLocalInstallments(items: StudentInstallmentSchedule[]): void {
+  // No-op
+}

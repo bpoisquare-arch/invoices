@@ -185,49 +185,6 @@ export default function ExcelImportPage() {
         throw new Error(data.error || 'Failed to save attendance records.')
       }
 
-      // Also persist to localStorage for immediate client-side availability
-      try {
-        const rawLocal = localStorage.getItem('attendance_records_store')
-        const currentLocal = rawLocal ? JSON.parse(rawLocal) : []
-
-        itemsToCommit.forEach((item) => {
-          const empId = item.resolvedEmployeeId || item.employee?.id
-          if (!empId) return
-
-          const existingIdx = currentLocal.findIndex(
-            (r: any) => r.employee_id === empId && r.attendance_date === item.date
-          )
-
-          const rec = {
-            id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-            employee_id: empId,
-            attendance_date: item.date,
-            day_of_week: item.dayName,
-            in_time: item.inTime,
-            out_time: item.outTime,
-            arrival_status: item.arrivalStatus,
-            departure_status: item.departureStatus,
-            total_working_minutes: item.totalWorkingMinutes,
-            total_working_hours_formatted: item.totalWorkingHoursFormatted,
-            raw_punches: item.rawPunches || [],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }
-
-          if (existingIdx !== -1) {
-            if (duplicateStrategy === 'overwrite') {
-              currentLocal[existingIdx] = { ...currentLocal[existingIdx], ...rec }
-            }
-          } else {
-            currentLocal.push(rec)
-          }
-        })
-
-        localStorage.setItem('attendance_records_store', JSON.stringify(currentLocal))
-      } catch (e) {
-        console.warn('Local storage sync error:', e)
-      }
-
       setImportSummary(data.summary)
     } catch (err: any) {
       setErrorMessage(err.message || 'Error saving imported records.')

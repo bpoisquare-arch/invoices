@@ -39,50 +39,18 @@ export interface InvoiceFilterParams {
   pageSize?: number
 }
 
-const INVOICES_STORAGE_KEY = 'edlink_invoices_local_store'
-
-function getStoredInvoices(): InvoiceWithDetails[] {
-  if (typeof window === 'undefined') return []
+// Clean up any stale localStorage keys from previous versions
+if (typeof window !== 'undefined') {
   try {
-    const raw = localStorage.getItem(INVOICES_STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-function saveStoredInvoices(invoices: InvoiceWithDetails[]) {
-  if (typeof window === 'undefined') return
-  try {
-    localStorage.setItem(INVOICES_STORAGE_KEY, JSON.stringify(invoices))
+    localStorage.removeItem('edlink_invoices_local_store')
+    localStorage.removeItem('edlink_deleted_invoices_key')
   } catch {
     // Ignore
   }
 }
 
-let localInvoicesStore: InvoiceWithDetails[] = []
-
-function initLocalInvoices() {
-  const stored = getStoredInvoices()
-  if (stored.length > 0) {
-    stored.forEach((inv) => {
-      const idx = localInvoicesStore.findIndex((item) => item.id === inv.id)
-      if (idx >= 0) {
-        localInvoicesStore[idx] = inv
-      } else {
-        localInvoicesStore.push(inv)
-      }
-    })
-  }
-}
-
 export async function generateNextInvoiceNumber(companyId: string): Promise<string> {
-  initLocalInvoices()
-
-  const allNumbers: string[] = ['00327']
-  localInvoicesStore.forEach((inv) => {
-    if (inv.invoice_number) allNumbers.push(inv.invoice_number)
-  })
+  let maxSeq = 326 // Baseline starting number
 
   try {
     const supabase = createClient()
@@ -92,23 +60,19 @@ export async function generateNextInvoiceNumber(companyId: string): Promise<stri
 
     if (existingInvoices && existingInvoices.length > 0) {
       existingInvoices.forEach((inv) => {
-        if (inv.invoice_number) allNumbers.push(inv.invoice_number)
+        if (inv.invoice_number) {
+          const match = inv.invoice_number.match(/\d+/)
+          if (match) {
+            const num = parseInt(match[0], 10)
+            if (num > maxSeq) {
+              maxSeq = num
+            }
+          }
+        }
       })
     }
   } catch (e) {
     // Ignore error
-  }
-
-  let maxSeq = 326 // Baseline so the next generated invoice starts from 00328+
-
-  for (const str of allNumbers) {
-    const match = str.match(/\d+/)
-    if (match) {
-      const num = parseInt(match[0], 10)
-      if (num > maxSeq) {
-        maxSeq = num
-      }
-    }
   }
 
   const nextSeq = maxSeq + 1
@@ -116,7 +80,6 @@ export async function generateNextInvoiceNumber(companyId: string): Promise<stri
 }
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceWithDetails> {
-  initLocalInvoices()
   const supabase = createClient()
 
   let companyName = 'EdLink Pakistan'
@@ -159,7 +122,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
     layout_type: 'edlink_v1',
   }
 
-  const invoiceNumber = input.invoice_number || await generateNextInvoiceNumber(input.company_id)
+  const invoiceNumber = input.invoice_number || (await generateNextInvoiceNumber(input.company_id))
 
   const preparedItems = input.items.map((item) => {
     const qty = Number(item.quantity) || 0
@@ -175,168 +138,116 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
 
   const subtotal = Number(preparedItems.reduce((sum, item) => sum + item.line_total, 0).toFixed(2))
 
-  const newId = `inv-${Date.now()}`
-  const createdInv: InvoiceWithDetails = {
-    id: newId,
-    user_id: null,
-    company_id: input.company_id,
-    template_id: null,
-    template_snapshot: templateSnapshot,
-    invoice_number: invoiceNumber,
-    reference_name: input.reference_name || null,
-    customer_name: input.customer_name,
-    invoice_date: input.invoice_date,
-    due_date: input.due_date,
-    subtotal,
-    total_amount: subtotal,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    invoice_items: preparedItems.map((item, idx) => ({
-      id: `item-${idx}`,
-      invoice_id: newId,
+  const { data: invoice, error } = await supabase
+    .from('invoices')
+    .insert({
+      company_id: input.company_id,
+      template_id: input.template_id || null,
+      template_snapshot: templateSnapshot,
+      invoice_number: invoiceNumber,
+      customer_name: input.customer_name,
+      reference_name: input.reference_name || null,
+      invoice_date: input.invoice_date,
+      due_date: input.due_date,
+      subtotal,
+      total_amount: subtotal,
+    })
+    .select('*, companies(*), templates(*)')
+    .single()
+
+  if (error || !invoice) {
+    throw new Error(error?.message || 'Failed to create invoice in database')
+  }
+
+  if (preparedItems.length > 0) {
+    const itemsToInsert = preparedItems.map((item) => ({
+      invoice_id: invoice.id,
       description: item.description,
       quantity: item.quantity,
       amount: item.amount,
       line_total: item.line_total,
-      created_at: new Date().toISOString(),
-    })),
+    }))
+    await supabase.from('invoice_items').insert(itemsToInsert)
   }
 
-  try {
-    const { data: invoice, error } = await supabase
-      .from('invoices')
-      .insert({
-        company_id: input.company_id,
-        template_id: input.template_id || null,
-        template_snapshot: templateSnapshot,
-        invoice_number: invoiceNumber,
-        customer_name: input.customer_name,
-        reference_name: input.reference_name || null,
-        invoice_date: input.invoice_date,
-        due_date: input.due_date,
-        subtotal,
-        total_amount: subtotal,
-      })
-      .select('*, companies(*), templates(*)')
-      .single()
-
-    if (!error && invoice) {
-      if (preparedItems.length > 0) {
-        const itemsToInsert = preparedItems.map((item) => ({
-          invoice_id: invoice.id,
-          description: item.description,
-          quantity: item.quantity,
-          amount: item.amount,
-          line_total: item.line_total,
-        }))
-        await supabase.from('invoice_items').insert(itemsToInsert)
-      }
-      const fetched = await getInvoiceById(invoice.id)
-      if (fetched) {
-        localInvoicesStore.unshift(fetched)
-        saveStoredInvoices(localInvoicesStore)
-        return fetched
-      }
-    }
-  } catch (err) {
-    // Ignore error
+  const fetched = await getInvoiceById(invoice.id)
+  if (!fetched) {
+    throw new Error('Invoice was created but could not be loaded from database')
   }
-
-  localInvoicesStore.unshift(createdInv)
-  saveStoredInvoices(localInvoicesStore)
-  return createdInv
+  return fetched
 }
 
 export async function updateInvoice(
   invoiceId: string,
   input: UpdateInvoiceInput
 ): Promise<InvoiceWithDetails> {
-  initLocalInvoices()
-  const localInv = localInvoicesStore.find((i) => i.id === invoiceId)
+  const supabase = createClient()
 
-  const preparedItems = input.items && input.items.length > 0 ? input.items.map((item, idx) => {
+  const preparedItems = input.items && input.items.length > 0 ? input.items.map((item) => {
     const qty = Number(item.quantity) || 0
     const amt = Number(item.amount) || 0
     return {
-      id: `item-${idx}`,
       invoice_id: invoiceId,
       description: item.description,
       quantity: qty,
       amount: amt,
       line_total: Number((qty * amt).toFixed(2)),
-      created_at: new Date().toISOString(),
     }
-  }) : localInv?.invoice_items || []
+  }) : null
 
-  const subtotal = Number(preparedItems.reduce((sum, item) => sum + item.line_total, 0).toFixed(2))
+  const updateData: any = { updated_at: new Date().toISOString() }
+  if (input.customer_name !== undefined) updateData.customer_name = input.customer_name
+  if (input.reference_name !== undefined) updateData.reference_name = input.reference_name
+  if (input.invoice_date !== undefined) updateData.invoice_date = input.invoice_date
+  if (input.due_date !== undefined) updateData.due_date = input.due_date
 
-  if (localInv) {
-    if (input.customer_name !== undefined) localInv.customer_name = input.customer_name
-    if (input.reference_name !== undefined) localInv.reference_name = input.reference_name
-    if (input.invoice_date !== undefined) localInv.invoice_date = input.invoice_date
-    if (input.due_date !== undefined) localInv.due_date = input.due_date
-    localInv.invoice_items = preparedItems
-    localInv.subtotal = subtotal
-    localInv.total_amount = subtotal
-    localInv.updated_at = new Date().toISOString()
-    saveStoredInvoices(localInvoicesStore)
-  }
-
-  try {
-    const supabase = createClient()
-    const updateData: any = { updated_at: new Date().toISOString() }
-    if (input.customer_name !== undefined) updateData.customer_name = input.customer_name
-    if (input.reference_name !== undefined) updateData.reference_name = input.reference_name
-    if (input.invoice_date !== undefined) updateData.invoice_date = input.invoice_date
-    if (input.due_date !== undefined) updateData.due_date = input.due_date
+  if (preparedItems) {
+    const subtotal = Number(preparedItems.reduce((sum, item) => sum + item.line_total, 0).toFixed(2))
     updateData.subtotal = subtotal
     updateData.total_amount = subtotal
-
-    await supabase.from('invoices').update(updateData).eq('id', invoiceId)
-    if (input.items && input.items.length > 0) {
-      await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
-      await supabase.from('invoice_items').insert(
-        preparedItems.map((item) => ({
-          invoice_id: invoiceId,
-          description: item.description,
-          quantity: item.quantity,
-          amount: item.amount,
-          line_total: item.line_total,
-        }))
-      )
-    }
-  } catch (err) {
-    // Ignore error
   }
 
-  return localInv || (await getInvoiceById(invoiceId)) as InvoiceWithDetails
+  const { error } = await supabase.from('invoices').update(updateData).eq('id', invoiceId)
+  if (error) {
+    throw new Error(error.message || 'Failed to update invoice in database')
+  }
+
+  if (preparedItems) {
+    await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
+    await supabase.from('invoice_items').insert(preparedItems)
+  }
+
+  const fetched = await getInvoiceById(invoiceId)
+  if (!fetched) {
+    throw new Error('Updated invoice could not be loaded from database')
+  }
+  return fetched
 }
 
 export async function renameInvoiceReference(invoiceId: string, referenceName: string): Promise<void> {
-  initLocalInvoices()
-  const localInv = localInvoicesStore.find((i) => i.id === invoiceId)
-  if (localInv) {
-    localInv.reference_name = referenceName
-    saveStoredInvoices(localInvoicesStore)
-  }
-  try {
-    const supabase = createClient()
-    await supabase.from('invoices').update({ reference_name: referenceName }).eq('id', invoiceId)
-  } catch (err) {
-    // Ignore error
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('invoices')
+    .update({ reference_name: referenceName, updated_at: new Date().toISOString() })
+    .eq('id', invoiceId)
+
+  if (error) {
+    throw new Error(error.message || 'Failed to rename invoice')
   }
 }
 
 export async function duplicateInvoice(invoiceId: string): Promise<InvoiceWithDetails> {
   const original = await getInvoiceById(invoiceId)
+  if (!original) throw new Error('Invoice not found to duplicate')
+
   const newInvoiceInput: CreateInvoiceInput = {
-    company_id: original?.company_id || 'edlink-pk-id',
-    template_id: original?.template_id || null,
-    customer_name: original?.customer_name || '',
-    reference_name: original?.reference_name ? `${original.reference_name} (Copy)` : 'Copied Invoice',
+    company_id: original.company_id || 'edlink-pk-id',
+    template_id: original.template_id || null,
+    customer_name: original.customer_name || '',
+    reference_name: original.reference_name ? `${original.reference_name} (Copy)` : 'Copied Invoice',
     invoice_date: new Date().toISOString().split('T')[0],
     due_date: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
-    items: original?.invoice_items?.map((item) => ({
+    items: original.invoice_items?.map((item) => ({
       description: item.description,
       quantity: item.quantity,
       amount: item.amount,
@@ -346,78 +257,29 @@ export async function duplicateInvoice(invoiceId: string): Promise<InvoiceWithDe
   return createInvoice(newInvoiceInput)
 }
 
-const DELETED_INVOICES_KEY = 'edlink_deleted_invoices_key'
-
-function getDeletedInvoiceIds(): string[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(DELETED_INVOICES_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-function markInvoiceDeleted(id: string) {
-  if (typeof window === 'undefined') return
-  try {
-    const list = getDeletedInvoiceIds()
-    if (!list.includes(id)) {
-      list.push(id)
-      localStorage.setItem(DELETED_INVOICES_KEY, JSON.stringify(list))
-    }
-  } catch {
-    // Ignore
-  }
-}
-
 export async function deleteInvoice(invoiceId: string): Promise<void> {
-  initLocalInvoices()
-  localInvoicesStore = localInvoicesStore.filter((i) => i.id !== invoiceId)
-  saveStoredInvoices(localInvoicesStore)
-  markInvoiceDeleted(invoiceId)
-
-  try {
-    const supabase = createClient()
-    await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
-    await supabase.from('invoices').delete().eq('id', invoiceId)
-  } catch (err) {
-    // Ignore error
+  const supabase = createClient()
+  await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
+  const { error } = await supabase.from('invoices').delete().eq('id', invoiceId)
+  if (error) {
+    throw new Error(error.message || 'Failed to delete invoice from database')
   }
 }
 
 export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithDetails | null> {
-  const deletedIds = getDeletedInvoiceIds()
-  if (deletedIds.includes(invoiceId)) return null
-
-  initLocalInvoices()
-  const localMatch = localInvoicesStore.find((i) => i.id === invoiceId)
-  if (localMatch) return localMatch
-
-  const stored = getStoredInvoices()
-  const storedMatch = stored.find((i) => i.id === invoiceId)
-  if (storedMatch) {
-    localInvoicesStore.push(storedMatch)
-    return storedMatch
-  }
-
   try {
     const supabase = createClient()
-    const { data: invoice } = await supabase
+    const { data: invoice, error } = await supabase
       .from('invoices')
       .select('*, companies(*), templates(*), invoice_items(*)')
       .eq('id', invoiceId)
       .single()
 
-    if (invoice) {
-      localInvoicesStore.unshift(invoice as InvoiceWithDetails)
-      return invoice as InvoiceWithDetails
-    }
+    if (error || !invoice) return null
+    return invoice as InvoiceWithDetails
   } catch (err) {
-    // Ignore error
+    return null
   }
-
-  return null
 }
 
 export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
@@ -426,144 +288,92 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
   page: number
   pageSize: number
 }> {
-  initLocalInvoices()
-  const deletedIds = new Set(getDeletedInvoiceIds())
   const page = params.page && params.page > 0 ? params.page : 1
   const pageSize = params.pageSize && params.pageSize > 0 ? params.pageSize : 20
-
-  let combined: InvoiceWithDetails[] = localInvoicesStore.filter((inv) => !deletedIds.has(inv.id))
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
 
   try {
     const supabase = createClient()
-    const { data } = await supabase
+    let query = supabase
       .from('invoices')
-      .select('*, companies(*), templates(*), invoice_items(*)')
-      .order('created_at', { ascending: false })
+      .select('*, companies(*), templates(*), invoice_items(*)', { count: 'exact' })
 
-    if (data && data.length > 0) {
-      const existingIds = new Set(combined.map((d) => d.id))
-      data.forEach((d: any) => {
-        if (!existingIds.has(d.id) && !deletedIds.has(d.id)) {
-          combined.push(d)
-        }
-      })
+    if (params.companyId && params.companyId !== 'all') {
+      query = query.eq('company_id', params.companyId)
+    }
+
+    // Date filters
+    const now = new Date()
+    const todayStr = now.toISOString().split('T')[0]
+
+    if (params.dateFilter === 'today') {
+      query = query.eq('invoice_date', todayStr)
+    } else if (params.dateFilter === '7days') {
+      const d = subDays(now, 7).toISOString().split('T')[0]
+      query = query.gte('invoice_date', d).lte('invoice_date', todayStr)
+    } else if (params.dateFilter === '30days') {
+      const d = subDays(now, 30).toISOString().split('T')[0]
+      query = query.gte('invoice_date', d).lte('invoice_date', todayStr)
+    } else if (params.dateFilter === 'this_month') {
+      const s = startOfMonth(now).toISOString().split('T')[0]
+      const e = endOfMonth(now).toISOString().split('T')[0]
+      query = query.gte('invoice_date', s).lte('invoice_date', e)
+    } else if (params.dateFilter === 'last_month') {
+      const lastMonth = subMonths(now, 1)
+      const s = startOfMonth(lastMonth).toISOString().split('T')[0]
+      const e = endOfMonth(lastMonth).toISOString().split('T')[0]
+      query = query.gte('invoice_date', s).lte('invoice_date', e)
+    } else if (params.dateFilter === 'this_year') {
+      const s = startOfYear(now).toISOString().split('T')[0]
+      const e = endOfYear(now).toISOString().split('T')[0]
+      query = query.gte('invoice_date', s).lte('invoice_date', e)
+    } else if (params.dateFilter === 'custom') {
+      if (params.startDate) query = query.gte('invoice_date', params.startDate)
+      if (params.endDate) query = query.lte('invoice_date', params.endDate)
+    }
+
+    // Search filter
+    if (params.search && params.search.trim() !== '') {
+      const s = params.search.trim()
+      query = query.or(`invoice_number.ilike.%${s}%,customer_name.ilike.%${s}%,reference_name.ilike.%${s}%`)
+    }
+
+    // Sorting
+    if (params.sortBy === 'oldest') {
+      query = query.order('created_at', { ascending: true })
+    } else if (params.sortBy === 'amount_desc') {
+      query = query.order('total_amount', { ascending: false })
+    } else if (params.sortBy === 'amount_asc') {
+      query = query.order('total_amount', { ascending: true })
+    } else if (params.sortBy === 'number') {
+      query = query.order('invoice_number', { ascending: false })
+    } else {
+      query = query.order('created_at', { ascending: false })
+    }
+
+    query = query.range(from, to)
+
+    const { data, count, error } = await query
+
+    if (error) {
+      console.error('Error fetching invoices from Supabase:', error.message)
+      return { invoices: [], totalCount: 0, page, pageSize }
+    }
+
+    return {
+      invoices: (data as InvoiceWithDetails[]) || [],
+      totalCount: count || 0,
+      page,
+      pageSize,
     }
   } catch (err) {
-    // Ignore error
-  }
-
-  if (params.companyId && params.companyId !== 'all') {
-    combined = combined.filter((i) => i.company_id === params.companyId)
-  }
-
-  if (params.search && params.search.trim() !== '') {
-    const s = params.search.trim().toLowerCase()
-    combined = combined.filter(
-      (i) =>
-        i.invoice_number?.toLowerCase().includes(s) ||
-        i.customer_name?.toLowerCase().includes(s) ||
-        i.reference_name?.toLowerCase().includes(s)
-    )
-  }
-
-  if (params.sortBy === 'oldest') {
-    combined.sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime())
-  } else if (params.sortBy === 'amount_desc') {
-    combined.sort((a, b) => (b.total_amount || 0) - (a.total_amount || 0))
-  } else if (params.sortBy === 'amount_asc') {
-    combined.sort((a, b) => (a.total_amount || 0) - (b.total_amount || 0))
-  } else if (params.sortBy === 'number') {
-    combined.sort((a, b) => (b.invoice_number || '').localeCompare(a.invoice_number || ''))
-  } else {
-    combined.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
-  }
-
-  const totalCount = combined.length
-  const from = (page - 1) * pageSize
-  const paged = combined.slice(from, from + pageSize)
-
-  return {
-    invoices: paged,
-    totalCount,
-    page,
-    pageSize,
+    console.error('Exception fetching invoices:', err)
+    return { invoices: [], totalCount: 0, page, pageSize }
   }
 }
 
+// Deprecated no-op for backward compatibility
 export async function syncLocalInvoicesToSupabase(): Promise<{ syncedCount: number; error?: string }> {
-  initLocalInvoices()
-  const localList = getStoredInvoices()
-
-  try {
-    const supabase = createClient()
-
-    // 1. Fetch remote existing invoices
-    const { data: remoteData, error: fetchErr } = await supabase
-      .from('invoices')
-      .select('id, invoice_number')
-
-    if (fetchErr) {
-      return { syncedCount: 0, error: fetchErr.message }
-    }
-
-    const remoteIds = new Set((remoteData || []).map((r) => r.id))
-    const remoteNumbers = new Set((remoteData || []).map((r) => r.invoice_number))
-
-    let uploadCount = 0
-
-    // 2. Upload any local invoice that is not yet on remote
-    for (const inv of localList) {
-      if (!remoteIds.has(inv.id) && !remoteNumbers.has(inv.invoice_number)) {
-        const { data: inserted, error: insertErr } = await supabase
-          .from('invoices')
-          .insert({
-            company_id: inv.company_id,
-            template_id: inv.template_id || null,
-            template_snapshot: inv.template_snapshot || {},
-            invoice_number: inv.invoice_number,
-            customer_name: inv.customer_name,
-            reference_name: inv.reference_name || null,
-            invoice_date: inv.invoice_date,
-            due_date: inv.due_date,
-            subtotal: inv.subtotal,
-            total_amount: inv.total_amount,
-          })
-          .select('id')
-          .single()
-
-        if (!insertErr && inserted && inv.invoice_items && inv.invoice_items.length > 0) {
-          await supabase.from('invoice_items').insert(
-            inv.invoice_items.map((item) => ({
-              invoice_id: inserted.id,
-              description: item.description,
-              quantity: item.quantity,
-              amount: item.amount,
-              line_total: item.line_total,
-            }))
-          )
-          uploadCount++
-        }
-      }
-    }
-
-    // 3. Download all from remote and merge back into local cache
-    const { data: allRemote } = await supabase
-      .from('invoices')
-      .select('*, companies(*), templates(*), invoice_items(*)')
-      .order('created_at', { ascending: false })
-
-    if (allRemote && allRemote.length > 0) {
-      const mergedMap = new Map<string, InvoiceWithDetails>()
-      localList.forEach((inv) => mergedMap.set(inv.id, inv))
-      allRemote.forEach((inv: any) => mergedMap.set(inv.id, inv as InvoiceWithDetails))
-      const merged = Array.from(mergedMap.values())
-      saveStoredInvoices(merged)
-      localInvoicesStore = merged
-    }
-
-    return { syncedCount: uploadCount }
-  } catch (err: any) {
-    return { syncedCount: 0, error: err?.message || 'Failed to sync invoices' }
-  }
+  return { syncedCount: 0 }
 }
-
