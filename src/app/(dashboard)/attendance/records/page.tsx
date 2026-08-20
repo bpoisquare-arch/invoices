@@ -257,6 +257,73 @@ export default function AttendanceRecordsPage() {
     return map
   }, [records])
 
+  // Dynamically calculate KPI summary stats across grid matrix
+  const kpiStats = useMemo(() => {
+    let onTimeArrivals = 0
+    let lateArrivals = 0
+    let onTimeDepartures = 0
+    let earlyDepartures = 0
+    let totalAbsent = 0
+    let totalLeaves = 0
+
+    const todayStr = formatDate(new Date())
+
+    filteredEmployees.forEach((emp) => {
+      dateColumns.forEach((date) => {
+        const dayName = getDayName(date)
+        if (dayName === 'Sunday') return // Sundays are holidays
+
+        const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
+        const isFuture = date > todayStr
+        const isToday = date === todayStr
+        const isPast = date < todayStr
+
+        if (rec) {
+          const isLeave =
+            rec.arrival_status === 'Leave' ||
+            rec.departure_status?.includes('Leave') ||
+            ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.departure_status as any) ||
+            ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.arrival_status as any)
+
+          const isAbsent =
+            rec.arrival_status === 'Absent' ||
+            rec.departure_status === 'Absent' ||
+            (!rec.in_time && !rec.out_time && !isLeave)
+
+          if (isLeave) {
+            totalLeaves++
+          } else if (isAbsent) {
+            if (!isFuture) totalAbsent++
+          } else {
+            if (rec.arrival_status === 'On Time Arrival') onTimeArrivals++
+            if (rec.arrival_status === 'Late Arrival') lateArrivals++
+            if (rec.departure_status === 'On Time Departure') onTimeDepartures++
+            if (rec.departure_status === 'Early Departure') earlyDepartures++
+          }
+        } else {
+          // No record exists
+          if (isPast) {
+            totalAbsent++
+          } else if (isToday) {
+            if (hasOfficeInTimePassed(date, settings)) {
+              totalAbsent++
+            }
+          }
+        }
+      })
+    })
+
+    return {
+      totalEmployees: filteredEmployees.length,
+      onTimeArrivals,
+      lateArrivals,
+      onTimeDepartures,
+      earlyDepartures,
+      totalAbsent,
+      totalLeaves,
+    }
+  }, [filteredEmployees, dateColumns, recordMatrixMap, settings])
+
   // Export to Excel Matrix
   const handleExportExcel = () => {
     if (filteredEmployees.length === 0) {
@@ -277,11 +344,27 @@ export default function AttendanceRecordsPage() {
         const colHeader = `${date} (${dayName})`
 
         if (rec) {
-          rowData[colHeader] = `${rec.in_time || '--'} - ${rec.out_time || '--'} [${rec.total_working_hours_formatted || ''}]`
+          const isLeave =
+            rec.arrival_status === 'Leave' ||
+            rec.departure_status?.includes('Leave') ||
+            ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.departure_status as any)
+
+          const isAbsent =
+            rec.arrival_status === 'Absent' ||
+            rec.departure_status === 'Absent' ||
+            (!rec.in_time && !rec.out_time && !isLeave)
+
+          if (isLeave) {
+            rowData[colHeader] = `Leave (${rec.departure_status || 'Casual Leave'})`
+          } else if (isAbsent) {
+            rowData[colHeader] = 'Absent'
+          } else {
+            rowData[colHeader] = `${rec.in_time || '--'} - ${rec.out_time || '--'} [${rec.total_working_hours_formatted || ''}]`
+          }
         } else if (dayName === 'Sunday') {
           rowData[colHeader] = 'Holiday'
         } else {
-          rowData[colHeader] = '--'
+          rowData[colHeader] = 'Absent'
         }
       })
 
@@ -294,7 +377,7 @@ export default function AttendanceRecordsPage() {
     XLSX.writeFile(wb, `attendance_matrix_${startDate}_to_${endDate}.xlsx`)
   }
 
-  // Handle Blank Cell Click (Allows adding attendance manually)
+  // Handle Blank Cell Click (Allows adding attendance or marking leave)
   const handleBlankCellClick = (emp: Employee, date: string) => {
     const dayName = getDayName(date)
     setEditingRecord({
@@ -304,12 +387,11 @@ export default function AttendanceRecordsPage() {
       day_of_week: dayName,
       in_time: '',
       out_time: '',
-      arrival_status: 'On Time Arrival',
-      departure_status: 'On Time Departure',
+      arrival_status: 'Absent',
+      departure_status: 'Absent',
       total_working_minutes: 0,
       total_working_hours_formatted: '00:00',
       raw_punches: [],
-      is_manual_override: true,
       notes: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -317,73 +399,53 @@ export default function AttendanceRecordsPage() {
     } as any)
   }
 
+// Helper to check if office arrival cutoff has passed
+function hasOfficeInTimePassed(dateStr: string, settings?: AttendanceSettings): boolean {
+  const now = new Date()
+  const today = formatDate(now)
+  if (dateStr < today) return true
+  if (dateStr > today) return false
+
+  const dayOfWeek = now.getDay() // 0 = Sunday, 6 = Saturday
+  const isSaturday = dayOfWeek === 6
+  const inTimeStr = isSaturday ? (settings?.saturday_in_time || '11:00') : (settings?.weekday_in_time || '10:30')
+  const grace = isSaturday ? (settings?.saturday_grace_minutes ?? 15) : (settings?.weekday_grace_minutes ?? 15)
+
+  const [h, m] = inTimeStr.split(':').map(Number)
+  const cutoffMinutes = (h || 10) * 60 + (m || 30) + grace
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  return currentMinutes >= cutoffMinutes
+}
+
+// Helper to check if office departure cutoff has passed
+function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings): boolean {
+  const now = new Date()
+  const today = formatDate(now)
+  if (dateStr < today) return true
+  if (dateStr > today) return false
+
+  const dayOfWeek = now.getDay()
+  const isSaturday = dayOfWeek === 6
+  const outTimeStr = isSaturday ? (settings?.saturday_out_time || '15:00') : (settings?.weekday_out_time || '18:30')
+
+  const [h, m] = outTimeStr.split(':').map(Number)
+  const cutoffMinutes = (h || 18) * 60 + (m || 30)
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  return currentMinutes >= cutoffMinutes
+}
+
   // Render Status Badge / Content inside each Grid Cell
   const renderCellContent = (emp: Employee, date: string) => {
+    const todayStr = formatDate(new Date())
     const dayName = getDayName(date)
+    const isFuture = date > todayStr
+    const isToday = date === todayStr
+    const isPast = date < todayStr
     const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
 
-    // 1. If Attendance Record Exists
-    if (rec) {
-      const isLate = rec.arrival_status === 'Late Arrival'
-      const isEarlyLeave = rec.departure_status === 'Early Departure'
-      const isMissingOut = !rec.out_time || rec.out_time === '---' || rec.departure_status === 'Missing Out Time'
-      const isMissingIn = !rec.in_time || rec.in_time === '---' || rec.arrival_status === 'Missing In Time'
-
-      return (
-        <div
-          onClick={() => setEditingRecord(rec)}
-          className={`group/cell cursor-pointer p-1.5 rounded-md transition-all flex flex-col items-center justify-center text-center gap-0.5 border ${
-            isMissingOut
-              ? 'bg-amber-50/90 hover:bg-amber-100/95 border-amber-300 text-amber-950 shadow-2xs hover:shadow-xs'
-              : isLate || isEarlyLeave
-              ? 'bg-amber-50/70 hover:bg-amber-100/90 border-amber-200/80 text-amber-900'
-              : 'bg-emerald-50/50 hover:bg-emerald-100/80 border-emerald-200/70 text-slate-800'
-          }`}
-          title="Click to edit timings or enter missing Out Time"
-        >
-          {/* In Time - Out Time */}
-          <div className="font-mono text-[11px] font-semibold tracking-tight whitespace-nowrap flex items-center justify-center gap-1">
-            <span>{rec.in_time || '---'}</span>
-            <span className="text-slate-400">-</span>
-            <span className={isMissingOut ? 'text-amber-700 font-bold bg-amber-200/60 px-1 rounded' : ''}>
-              {rec.out_time || '---'}
-            </span>
-          </div>
-
-          {/* Duration Badge with Clock Icon */}
-          <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-medium">
-            <span
-              className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] ${
-                isMissingOut
-                  ? 'bg-amber-500 text-white'
-                  : isLate
-                  ? 'bg-amber-500 text-white'
-                  : 'bg-emerald-600 text-white'
-              }`}
-            >
-              ⏱
-            </span>
-            <span className={`font-bold ${isMissingOut ? 'text-amber-700' : 'text-slate-700'}`}>
-              ({rec.total_working_hours_formatted || '--'})
-            </span>
-          </div>
-
-          {/* Missing Out Alert or Deviation Status Pill */}
-          {isMissingOut ? (
-            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300 flex items-center gap-0.5 mt-0.5 group-hover/cell:bg-amber-300 transition-colors">
-              <span>Missing Out</span>
-              <Edit2 className="w-2.5 h-2.5 inline" />
-            </span>
-          ) : (isLate || isEarlyLeave) ? (
-            <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-200/90 text-amber-800">
-              {isLate ? 'Late' : 'Early Out'}
-            </span>
-          ) : null}
-        </div>
-      )
-    }
-
-    // 2. Sunday / Weekend / Holiday
+    // 1. Sunday / Weekend / Holiday
     if (dayName === 'Sunday') {
       return (
         <div className="flex items-center justify-center py-2">
@@ -394,14 +456,190 @@ export default function AttendanceRecordsPage() {
       )
     }
 
-    // 3. Fallback Absent / Off Day
+    // 2. If an explicit record exists in database (or manually added)
+    if (rec) {
+      const isLeave =
+        rec.arrival_status === 'Leave' ||
+        rec.departure_status?.includes('Leave') ||
+        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.departure_status as any) ||
+        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.arrival_status as any)
+
+      const isExplicitAbsent =
+        rec.arrival_status === 'Absent' ||
+        rec.departure_status === 'Absent' ||
+        (!rec.in_time && !rec.out_time && !isLeave)
+
+      // A. Leave Record
+      if (isLeave) {
+        const leaveLabel =
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].find(
+            (l) => l === rec.departure_status || l === rec.arrival_status
+          ) || 'Leave'
+
+        return (
+          <div
+            onClick={() => setEditingRecord(rec)}
+            className="group/cell cursor-pointer p-1.5 rounded-md transition-all flex items-center justify-center text-center border bg-indigo-50/80 hover:bg-indigo-100 border-indigo-200 text-indigo-950 shadow-2xs hover:shadow-xs"
+            title={`Click to edit leave (${leaveLabel})`}
+          >
+            <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-tight shadow-2xs">
+              {leaveLabel}
+            </span>
+          </div>
+        )
+      }
+
+      // B. Explicit Absent Record
+      if (isExplicitAbsent) {
+        if (isFuture) {
+          return (
+            <div
+              onClick={() => handleBlankCellClick(emp, date)}
+              className="flex items-center justify-center py-2 text-slate-300 font-mono text-xs cursor-pointer hover:bg-blue-50/40 rounded transition-colors"
+              title="Future date. Click to mark Leave or timings"
+            >
+              --
+            </div>
+          )
+        }
+
+        return (
+          <div
+            onClick={() => setEditingRecord(rec)}
+            className="group/cell cursor-pointer p-1.5 rounded-md transition-all flex items-center justify-center text-center border bg-rose-50/80 hover:bg-rose-100 border-rose-200 text-rose-950 shadow-2xs hover:shadow-xs"
+            title="Click to edit or mark Leave"
+          >
+            <span className="bg-rose-600 text-white px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shadow-2xs">
+              ABSENT
+            </span>
+          </div>
+        )
+      }
+
+      // C. Present Record with timings
+      const isLate = rec.arrival_status === 'Late Arrival'
+      const isEarlyLeave = rec.departure_status === 'Early Departure'
+      const hasInTime = Boolean(rec.in_time && rec.in_time !== '---')
+      const hasOutTime = Boolean(rec.out_time && rec.out_time !== '---')
+
+      // Check if departure time cutoff has passed
+      const outTimePassed = isPast || (isToday && hasOfficeOutTimePassed(date, settings))
+      const isMissingOut = hasInTime && !hasOutTime && outTimePassed
+      const isCurrentlyInOffice = hasInTime && !hasOutTime && isToday && !outTimePassed
+
+      return (
+        <div
+          onClick={() => setEditingRecord(rec)}
+          className={`group/cell cursor-pointer p-1.5 rounded-md transition-all flex flex-col items-center justify-center text-center gap-0.5 border ${
+            isMissingOut
+              ? 'bg-amber-50/90 hover:bg-amber-100/95 border-amber-300 text-amber-950 shadow-2xs hover:shadow-xs'
+              : isCurrentlyInOffice
+              ? 'bg-emerald-50/70 hover:bg-emerald-100 border-emerald-300 text-emerald-950'
+              : isLate || isEarlyLeave
+              ? 'bg-amber-50/70 hover:bg-amber-100/90 border-amber-200/80 text-amber-900'
+              : 'bg-emerald-50/50 hover:bg-emerald-100/80 border-emerald-200/70 text-slate-800'
+          }`}
+          title={isCurrentlyInOffice ? 'Currently active in office' : 'Click to edit timings or enter missing Out Time'}
+        >
+          {/* In Time - Out Time */}
+          <div className="font-mono text-[11px] font-semibold tracking-tight whitespace-nowrap flex items-center justify-center gap-1">
+            <span>{rec.in_time || '---'}</span>
+            <span className="text-slate-400">-</span>
+            <span className={isMissingOut ? 'text-amber-700 font-bold bg-amber-200/60 px-1 rounded' : isCurrentlyInOffice ? 'text-emerald-700 font-semibold' : ''}>
+              {hasOutTime ? rec.out_time : isCurrentlyInOffice ? 'In Office' : '---'}
+            </span>
+          </div>
+
+          {/* Duration Badge with Clock Icon */}
+          <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-medium">
+            <span
+              className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] ${
+                isMissingOut
+                  ? 'bg-amber-500 text-white'
+                  : isCurrentlyInOffice
+                  ? 'bg-emerald-500 text-white animate-pulse'
+                  : isLate
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-emerald-600 text-white'
+              }`}
+            >
+              ⏱
+            </span>
+            <span className={`font-bold ${isMissingOut ? 'text-amber-700' : 'text-slate-700'}`}>
+              ({rec.total_working_hours_formatted && rec.total_working_hours_formatted !== '00:00' ? rec.total_working_hours_formatted : isCurrentlyInOffice ? 'Working' : '--'})
+            </span>
+          </div>
+
+          {/* Missing Out Alert or Status Pill */}
+          {isMissingOut ? (
+            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300 flex items-center gap-0.5 mt-0.5 group-hover/cell:bg-amber-300 transition-colors">
+              <span>Missing Out</span>
+              <Edit2 className="w-2.5 h-2.5 inline" />
+            </span>
+          ) : isCurrentlyInOffice ? (
+            <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+              Active Now
+            </span>
+          ) : (isLate || isEarlyLeave) ? (
+            <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-200/90 text-amber-800">
+              {isLate ? 'Late' : 'Early Out'}
+            </span>
+          ) : null}
+        </div>
+      )
+    }
+
+    // 3. If NO record exists:
+    // A. Future Date -> Show neutral placeholder "--" (Do not mark absent!)
+    if (isFuture) {
+      return (
+        <div
+          onClick={() => handleBlankCellClick(emp, date)}
+          className="flex items-center justify-center py-2 text-slate-300 font-mono text-xs cursor-pointer hover:bg-blue-50/40 rounded transition-colors"
+          title="Future date. Click to pre-record leave or timings"
+        >
+          --
+        </div>
+      )
+    }
+
+    // B. Today -> If in-time cutoff has passed, show ABSENT; else show "--"
+    if (isToday) {
+      if (hasOfficeInTimePassed(date, settings)) {
+        return (
+          <div
+            onClick={() => handleBlankCellClick(emp, date)}
+            className="group/cell cursor-pointer p-1.5 rounded-md transition-all flex items-center justify-center text-center border bg-rose-50/80 hover:bg-rose-100 border-rose-200 text-rose-950 shadow-2xs hover:shadow-xs"
+            title="In time passed (Absent). Click to mark Leave or timings"
+          >
+            <span className="bg-rose-600 text-white px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shadow-2xs">
+              ABSENT
+            </span>
+          </div>
+        )
+      } else {
+        return (
+          <div
+            onClick={() => handleBlankCellClick(emp, date)}
+            className="flex items-center justify-center py-2 text-slate-400 font-mono text-xs cursor-pointer hover:bg-blue-50/40 rounded transition-colors"
+            title="Office shift starting soon. Click to mark Leave or timings"
+          >
+            --
+          </div>
+        )
+      }
+    }
+
+    // C. Past Date -> Show ABSENT (No punches recorded)
     return (
       <div
         onClick={() => handleBlankCellClick(emp, date)}
-        className="flex items-center justify-center py-2 text-slate-400 font-mono text-xs cursor-pointer hover:bg-blue-50/60 rounded transition-colors"
-        title="Click to add attendance"
+        className="group/cell cursor-pointer p-1.5 rounded-md transition-all flex items-center justify-center text-center border bg-rose-50/80 hover:bg-rose-100 border-rose-200 text-rose-950 shadow-2xs hover:shadow-xs"
+        title="Past date with no punches (Absent). Click to mark Leave or enter timings"
       >
-        --
+        <span className="bg-rose-600 text-white px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shadow-2xs">
+          ABSENT
+        </span>
       </div>
     )
   }
@@ -440,8 +678,8 @@ export default function AttendanceRecordsPage() {
 
       {/* Top Filter Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-4">
-        {/* Row 1: From Date, To Date, Designation, Submit Button */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5 items-end">
+        {/* Row 1: From Date, To Date, Designation */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
           <div>
             <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
               From:
@@ -474,10 +712,12 @@ export default function AttendanceRecordsPage() {
               value={selectedDesignation}
               onValueChange={(val) => setSelectedDesignation(val || 'all')}
             >
-              <SelectTrigger className="text-xs border-slate-300 h-9.5 font-medium">
-                <SelectValue placeholder="All Designations" />
+              <SelectTrigger className="text-xs border-slate-300 h-9.5 font-medium w-full min-w-[220px]">
+                <SelectValue placeholder="ALL DESIGNATIONS">
+                  {selectedDesignation === 'all' ? 'ALL DESIGNATIONS' : selectedDesignation}
+                </SelectValue>
               </SelectTrigger>
-              <SelectContent className="max-h-60">
+              <SelectContent className="max-h-64 min-w-[280px]">
                 <SelectItem value="all">ALL DESIGNATIONS</SelectItem>
                 {availableDesignations.map((desig) => (
                   <SelectItem key={desig} value={desig}>
@@ -486,15 +726,6 @@ export default function AttendanceRecordsPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          <div>
-            <Button
-              onClick={fetchRecords}
-              className="w-full bg-[#2d3748] hover:bg-[#1a202c] text-white font-bold uppercase tracking-wider text-xs h-9.5 shadow-xs"
-            >
-              SUBMIT
-            </Button>
           </div>
         </div>
 
@@ -529,50 +760,52 @@ export default function AttendanceRecordsPage() {
             </div>
           </div>
 
-          {/* Instant Search Bar */}
-          <div className="flex items-center gap-2 w-full sm:w-72">
-            <span className="text-xs text-slate-500 font-semibold">Search:</span>
+          {/* Instant Search Bar (Expanded) */}
+          <div className="flex items-center gap-2 flex-1 w-full max-w-xl sm:justify-end">
+            <span className="text-xs text-slate-500 font-semibold shrink-0">Search:</span>
             <div className="relative flex-1">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <Input
                 type="text"
-                placeholder="Search Employee Name, ID..."
+                placeholder="Search Employee Name, ID, Designation..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 text-xs border-slate-300 h-8.5"
+                className="pl-9 text-xs border-slate-300 h-9 w-full bg-slate-50/50 focus:bg-white transition-colors"
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Summary KPI Counters */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
+      {/* Summary KPI Counters (7 cards) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
         <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-2xs">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Employees</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-[#003D5C] mt-0.5">{filteredEmployees.length}</p>
+          <p className="font-['Montserrat'] text-lg font-extrabold text-[#003D5C] mt-0.5">{kpiStats.totalEmployees}</p>
         </div>
         <div className="bg-white border border-slate-200 border-l-4 border-l-emerald-500 rounded-lg p-3 shadow-2xs">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">On Time Arrival</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-emerald-600 mt-0.5">{summary.onTimeArrivals}</p>
+          <p className="font-['Montserrat'] text-lg font-extrabold text-emerald-600 mt-0.5">{kpiStats.onTimeArrivals}</p>
         </div>
         <div className="bg-white border border-slate-200 border-l-4 border-l-amber-500 rounded-lg p-3 shadow-2xs">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Late Arrival</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-amber-600 mt-0.5">{summary.lateArrivals}</p>
+          <p className="font-['Montserrat'] text-lg font-extrabold text-amber-600 mt-0.5">{kpiStats.lateArrivals}</p>
         </div>
         <div className="bg-white border border-slate-200 border-l-4 border-l-teal-500 rounded-lg p-3 shadow-2xs">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">On Time Departure</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-teal-600 mt-0.5">{summary.onTimeDepartures}</p>
+          <p className="font-['Montserrat'] text-lg font-extrabold text-teal-600 mt-0.5">{kpiStats.onTimeDepartures}</p>
         </div>
-        <div className="bg-white border border-slate-200 border-l-4 border-l-rose-500 rounded-lg p-3 shadow-2xs">
+        <div className="bg-white border border-slate-200 border-l-4 border-l-rose-400 rounded-lg p-3 shadow-2xs">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Early Departure</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-rose-600 mt-0.5">{summary.earlyDepartures}</p>
+          <p className="font-['Montserrat'] text-lg font-extrabold text-rose-500 mt-0.5">{kpiStats.earlyDepartures}</p>
         </div>
-        <div className="bg-white border border-slate-200 border-l-4 border-l-[#003D5C] rounded-lg p-3 shadow-2xs">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Hours</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-slate-800 mt-0.5 font-mono">
-            {summary.totalHours}
-          </p>
+        <div className="bg-white border border-slate-200 border-l-4 border-l-rose-600 rounded-lg p-3 shadow-2xs">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Absent</p>
+          <p className="font-['Montserrat'] text-lg font-extrabold text-rose-600 mt-0.5">{kpiStats.totalAbsent}</p>
+        </div>
+        <div className="bg-white border border-slate-200 border-l-4 border-l-indigo-600 rounded-lg p-3 shadow-2xs">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Leave</p>
+          <p className="font-['Montserrat'] text-lg font-extrabold text-indigo-600 mt-0.5">{kpiStats.totalLeaves}</p>
         </div>
       </div>
 
@@ -705,15 +938,21 @@ export default function AttendanceRecordsPage() {
             Showing <span className="font-bold text-slate-800">{filteredEmployees.length}</span> employees across{' '}
             <span className="font-bold text-slate-800">{dateColumns.length}</span> days ({startDate} to {endDate})
           </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1">
+          <div className="flex items-center gap-3.5 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> On Time
             </span>
-            <span className="inline-flex items-center gap-1">
+            <span className="inline-flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Late / Deviation
             </span>
-            <span className="inline-flex items-center gap-1">
+            <span className="inline-flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#b38600]"></span> Holiday
+            </span>
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span> Absent
+            </span>
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span> Leave
             </span>
           </div>
         </div>

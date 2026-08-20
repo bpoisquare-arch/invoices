@@ -647,12 +647,22 @@ export async function saveImportedAttendanceBatch(
 /**
  * Updates an attendance record's in/out times and date, recalculating statuses on the server
  */
+export const LEAVE_TYPES = [
+  'Sick Leave',
+  'Casual Leave',
+  'Annual Leave',
+  'Probation Leave',
+  'Gazetted Leave',
+] as const
+
 export async function updateAttendanceRecord(
   id: string,
   params: {
     in_time?: string | null
     out_time?: string | null
     attendance_date?: string
+    arrival_status?: string
+    departure_status?: string
   }
 ): Promise<AttendanceRecord> {
   const supabase = createClient()
@@ -676,16 +686,39 @@ export async function updateAttendanceRecord(
   const dayOfWeek = parsedDate ? parsedDate.dayOfWeek : 1
   const dayName = parsedDate ? parsedDate.dayName : current.day_of_week
 
-  // Calculate new arrival, departure, working duration
-  const arrivalStatus = calculateArrivalStatus(inTimeToUse, dayOfWeek, settings)
-  const departureStatus = calculateDepartureStatus(outTimeToUse, dayOfWeek, settings)
-  const { totalMinutes, formatted } = calculateWorkingDuration(inTimeToUse, outTimeToUse)
+  let arrivalStatus = params.arrival_status || current.arrival_status
+  let departureStatus = params.departure_status || current.departure_status
+  let totalMinutes = 0
+  let formatted = '00:00'
+
+  if (params.arrival_status === 'Absent' || params.departure_status === 'Absent') {
+    arrivalStatus = 'Absent'
+    departureStatus = 'Absent'
+    totalMinutes = 0
+    formatted = '00:00'
+  } else if (
+    params.arrival_status === 'Leave' ||
+    params.departure_status?.includes('Leave') ||
+    LEAVE_TYPES.includes(params.departure_status as any)
+  ) {
+    arrivalStatus = 'Leave'
+    departureStatus = params.departure_status || 'Casual Leave'
+    totalMinutes = 0
+    formatted = '00:00'
+  } else {
+    // Normal present / punch recalculation
+    arrivalStatus = calculateArrivalStatus(inTimeToUse, dayOfWeek, settings)
+    departureStatus = calculateDepartureStatus(outTimeToUse, dayOfWeek, settings)
+    const duration = calculateWorkingDuration(inTimeToUse, outTimeToUse)
+    totalMinutes = duration.totalMinutes
+    formatted = duration.formatted
+  }
 
   const updatedData = {
     attendance_date: dateToUse,
     day_of_week: dayName,
-    in_time: inTimeToUse,
-    out_time: outTimeToUse,
+    in_time: (arrivalStatus === 'Absent' || arrivalStatus === 'Leave') ? null : inTimeToUse,
+    out_time: (arrivalStatus === 'Absent' || arrivalStatus === 'Leave') ? null : outTimeToUse,
     arrival_status: arrivalStatus,
     departure_status: departureStatus,
     total_working_minutes: totalMinutes,
@@ -712,6 +745,8 @@ export async function createManualAttendanceRecord(params: {
   attendance_date: string
   in_time?: string | null
   out_time?: string | null
+  arrival_status?: string
+  departure_status?: string
 }): Promise<AttendanceRecord> {
   const supabase = createClient()
   const settings = await getAttendanceSettings()
@@ -720,16 +755,39 @@ export async function createManualAttendanceRecord(params: {
   const dayOfWeek = parsedDate ? parsedDate.dayOfWeek : 1
   const dayName = parsedDate ? parsedDate.dayName : 'Monday'
 
-  const arrivalStatus = calculateArrivalStatus(params.in_time || null, dayOfWeek, settings)
-  const departureStatus = calculateDepartureStatus(params.out_time || null, dayOfWeek, settings)
-  const { totalMinutes, formatted } = calculateWorkingDuration(params.in_time || null, params.out_time || null)
+  let arrivalStatus = params.arrival_status || 'On Time Arrival'
+  let departureStatus = params.departure_status || 'On Time Departure'
+  let totalMinutes = 0
+  let formatted = '00:00'
+
+  if (params.arrival_status === 'Absent' || params.departure_status === 'Absent') {
+    arrivalStatus = 'Absent'
+    departureStatus = 'Absent'
+    totalMinutes = 0
+    formatted = '00:00'
+  } else if (
+    params.arrival_status === 'Leave' ||
+    params.departure_status?.includes('Leave') ||
+    LEAVE_TYPES.includes(params.departure_status as any)
+  ) {
+    arrivalStatus = 'Leave'
+    departureStatus = params.departure_status || 'Casual Leave'
+    totalMinutes = 0
+    formatted = '00:00'
+  } else {
+    arrivalStatus = calculateArrivalStatus(params.in_time || null, dayOfWeek, settings)
+    departureStatus = calculateDepartureStatus(params.out_time || null, dayOfWeek, settings)
+    const duration = calculateWorkingDuration(params.in_time || null, params.out_time || null)
+    totalMinutes = duration.totalMinutes
+    formatted = duration.formatted
+  }
 
   const newRecord = {
     employee_id: params.employee_id,
     attendance_date: params.attendance_date,
     day_of_week: dayName,
-    in_time: params.in_time?.trim() || null,
-    out_time: params.out_time?.trim() || null,
+    in_time: (arrivalStatus === 'Absent' || arrivalStatus === 'Leave') ? null : (params.in_time?.trim() || null),
+    out_time: (arrivalStatus === 'Absent' || arrivalStatus === 'Leave') ? null : (params.out_time?.trim() || null),
     arrival_status: arrivalStatus,
     departure_status: departureStatus,
     total_working_minutes: totalMinutes,

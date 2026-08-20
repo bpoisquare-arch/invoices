@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { employee_id, attendance_date, in_time, out_time } = body
+    const { employee_id, attendance_date, in_time, out_time, arrival_status, departure_status } = body
 
     if (!employee_id || !attendance_date) {
       return NextResponse.json(
@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
       attendance_date,
       in_time,
       out_time,
+      arrival_status,
+      departure_status,
     })
 
     return NextResponse.json({ success: true, record: created })
@@ -89,7 +91,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, in_time, out_time, attendance_date } = body
+    const { id, in_time, out_time, attendance_date, arrival_status, departure_status } = body
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Record ID is required.' }, { status: 400 })
@@ -99,6 +101,8 @@ export async function PUT(request: NextRequest) {
       in_time,
       out_time,
       attendance_date,
+      arrival_status,
+      departure_status,
     })
 
     return NextResponse.json({ success: true, record: updated })
