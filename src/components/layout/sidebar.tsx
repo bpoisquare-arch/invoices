@@ -18,8 +18,8 @@ import {
   SlidersHorizontal,
   ChevronDown,
   ChevronRight,
-  BadgePercent,
   Banknote,
+  Receipt,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -27,6 +27,7 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const [invoicesExpanded, setInvoicesExpanded] = useState(true)
   const [payrollExpanded, setPayrollExpanded] = useState(true)
 
   async function handleLogout() {
@@ -35,6 +36,9 @@ export default function Sidebar() {
     router.push('/login')
     router.refresh()
   }
+
+  const isInvoiceActive =
+    pathname.startsWith('/invoices') || pathname.startsWith('/companies')
 
   const isPayrollActive =
     pathname.startsWith('/attendance') || pathname.startsWith('/payroll')
@@ -65,40 +69,72 @@ export default function Sidebar() {
           </p>
         </div>
 
-        {/* Generate Invoice (Action Button) */}
-        <Link
-          href="/invoices/select-company"
-          className="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider bg-[#009D9E] text-white hover:bg-[#007A7A] transition-all shadow-sm mb-2.5"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>Generate Invoice</span>
-        </Link>
+        {/* Invoices Main Menu (Unlinked parent with submenu) */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setInvoicesExpanded(!invoicesExpanded)}
+            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              isInvoiceActive
+                ? 'text-[#81F5F5] bg-[#13557A]/40'
+                : 'text-slate-300 hover:text-white hover:bg-[#13557A]/80'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Receipt className="w-4 h-4" />
+              <span>Invoices</span>
+            </div>
+            {invoicesExpanded ? (
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            )}
+          </button>
 
-        {/* Invoices Link */}
-        <Link
-          href="/invoices"
-          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-            pathname === '/invoices' || (pathname.startsWith('/invoices') && !pathname.includes('/new') && !pathname.includes('/select-company'))
-              ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
-              : 'text-slate-300 hover:text-white hover:bg-[#13557A]/80'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>Invoices</span>
-        </Link>
+          {/* Invoices Submenu Items */}
+          {invoicesExpanded && (
+            <div className="mt-1 ml-3 pl-3 border-l border-slate-700/60 space-y-1">
+              {/* 1. Generate Invoices */}
+              <Link
+                href="/invoices/select-company"
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${
+                  pathname.startsWith('/invoices/new') || pathname.startsWith('/invoices/select-company')
+                    ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-[#13557A]/60'
+                }`}
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Generate Invoices</span>
+              </Link>
 
-        {/* Companies Link */}
-        <Link
-          href="/companies"
-          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-            pathname.startsWith('/companies')
-              ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
-              : 'text-slate-300 hover:text-white hover:bg-[#13557A]/80'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Companies</span>
-        </Link>
+              {/* 2. Invoices */}
+              <Link
+                href="/invoices"
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${
+                  pathname === '/invoices' || (pathname.startsWith('/invoices') && !pathname.includes('/new') && !pathname.includes('/select-company'))
+                    ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-[#13557A]/60'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Invoices</span>
+              </Link>
+
+              {/* 3. Companies */}
+              <Link
+                href="/companies"
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${
+                  pathname.startsWith('/companies')
+                    ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-[#13557A]/60'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Companies</span>
+              </Link>
+            </div>
+          )}
+        </div>
 
         {/* Visual Divider - Payroll Module */}
         <div className="my-5 pt-4 border-t border-slate-800/80 px-2">
