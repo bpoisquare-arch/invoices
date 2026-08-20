@@ -44,9 +44,9 @@ export default function Sidebar() {
     pathname.startsWith('/attendance') || pathname.startsWith('/payroll')
 
   return (
-    <aside className="w-64 bg-[#001E2F] text-slate-100 flex flex-col min-h-screen border-r border-slate-800 shrink-0 font-sans">
+    <aside className="w-64 bg-[#001E2F] text-slate-100 flex flex-col h-screen border-r border-slate-800 shrink-0 font-sans select-none overflow-hidden sticky top-0">
       {/* Stitch Logo Brand Header */}
-      <div className="h-20 flex items-center px-6 border-b border-slate-800/80 gap-3">
+      <div className="h-20 flex items-center px-6 border-b border-slate-800/80 gap-3 shrink-0">
         <div className="w-10 h-10 rounded-lg bg-[#81F5F5] flex items-center justify-center shadow-sm">
           <ReceiptText className="w-6 h-6 text-[#002020]" />
         </div>
@@ -60,8 +60,8 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Main Nav Items */}
-      <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto">
+      {/* Main Nav Items (Independent Scroll) */}
+      <div className="flex-1 py-5 px-4 space-y-1 overflow-y-auto min-h-0">
         {/* Invoices Group Header */}
         <div className="px-2 mb-2">
           <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#81F5F5]/50">
@@ -242,11 +242,14 @@ export default function Sidebar() {
           <GraduationCap className="w-4 h-4" />
           <span>Installments</span>
         </Link>
+      </div>
 
+      {/* User / Settings & Logout Footer (Fixed at bottom) */}
+      <div className="p-3 border-t border-slate-800/80 shrink-0 space-y-1 bg-[#001724]">
         {/* Settings */}
         <Link
           href="/settings"
-          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+          className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
             pathname === '/settings'
               ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
               : 'text-slate-300 hover:text-white hover:bg-[#13557A]/80'
@@ -255,14 +258,12 @@ export default function Sidebar() {
           <Settings className="w-4 h-4" />
           <span>Settings</span>
         </Link>
-      </div>
 
-      {/* User / Logout Footer */}
-      <div className="p-4 border-t border-slate-800/80">
+        {/* Logout Button */}
         <Button
           variant="ghost"
           onClick={handleLogout}
-          className="w-full justify-start text-slate-400 hover:text-rose-400 hover:bg-[#13557A]/50 transition-colors text-xs font-bold uppercase tracking-wider gap-3 px-4 py-2.5"
+          className="w-full justify-start text-slate-400 hover:text-rose-400 hover:bg-[#13557A]/50 transition-colors text-xs font-bold uppercase tracking-wider gap-3 px-4 py-2"
         >
           <LogOut className="w-4 h-4" />
           <span>Logout</span>
