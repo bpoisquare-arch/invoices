@@ -1,14 +1,12 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
-  LayoutDashboard,
   PlusCircle,
   FileText,
-  LayoutTemplate,
   Building2,
   Settings,
   LogOut,
@@ -18,32 +16,18 @@ import {
   FileSpreadsheet,
   Users,
   SlidersHorizontal,
+  ChevronDown,
+  ChevronRight,
+  BadgePercent,
+  Banknote,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
-const invoiceNavItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Generate Invoice', href: '/invoices/new', icon: PlusCircle, highlight: true },
-  { name: 'Invoices', href: '/invoices', icon: FileText },
-  { name: 'Companies', href: '/companies', icon: Building2 },
-]
-
-const attendanceNavItems = [
-  { name: 'Employee Overview', href: '/attendance', icon: Users },
-  { name: 'Attendance Records', href: '/attendance/records', icon: Clock },
-  { name: 'Import Excel', href: '/attendance/import', icon: FileSpreadsheet },
-  { name: 'Attendance Rules', href: '/attendance/settings', icon: SlidersHorizontal },
-]
-
-const secondaryNavItems = [
-  { name: 'Installments', href: '/installments', icon: GraduationCap },
-  { name: 'Settings', href: '/settings', icon: Settings },
-]
 
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const [payrollExpanded, setPayrollExpanded] = useState(true)
 
   async function handleLogout() {
     document.cookie = 'dev-auth-session=; path=/; max-age=0'
@@ -52,38 +36,8 @@ export default function Sidebar() {
     router.refresh()
   }
 
-  const renderLink = (item: typeof invoiceNavItems[0]) => {
-    const Icon = item.icon
-    const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
-
-    if (item.highlight) {
-      return (
-        <Link
-          key={item.name}
-          href={item.href}
-          className="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider bg-[#009D9E] text-white hover:bg-[#007A7A] transition-all shadow-sm my-3"
-        >
-          <Icon className="w-4 h-4" />
-          <span>{item.name}</span>
-        </Link>
-      )
-    }
-
-    return (
-      <Link
-        key={item.name}
-        href={item.href}
-        className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-          isActive
-            ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
-            : 'text-slate-300 hover:text-white hover:bg-[#13557A]/80'
-        }`}
-      >
-        <Icon className="w-4 h-4" />
-        <span>{item.name}</span>
-      </Link>
-    )
-  }
+  const isPayrollActive =
+    pathname.startsWith('/attendance') || pathname.startsWith('/payroll')
 
   return (
     <aside className="w-64 bg-[#001E2F] text-slate-100 flex flex-col min-h-screen border-r border-slate-800 shrink-0 font-sans">
@@ -103,22 +57,134 @@ export default function Sidebar() {
       </div>
 
       {/* Main Nav Items */}
-      <div className="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto">
-        {/* Invoice Module Group */}
-        <div className="space-y-1.5">
-          {invoiceNavItems.map(renderLink)}
-        </div>
-
-        {/* Visual Divider - Attendance Management */}
-        <div className="my-5 pt-4 border-t border-slate-800/80 px-2">
-          <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#81F5F5]/50 mb-2">
-            Attendance Module
+      <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto">
+        {/* Invoices Group Header */}
+        <div className="px-2 mb-2">
+          <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#81F5F5]/50">
+            Invoices
           </p>
         </div>
 
-        {/* Attendance Module Group */}
-        <div className="space-y-1.5">
-          {attendanceNavItems.map(renderLink)}
+        {/* Generate Invoice (Action Button) */}
+        <Link
+          href="/invoices/select-company"
+          className="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider bg-[#009D9E] text-white hover:bg-[#007A7A] transition-all shadow-sm mb-2.5"
+        >
+          <PlusCircle className="w-4 h-4" />
+          <span>Generate Invoice</span>
+        </Link>
+
+        {/* Invoices Link */}
+        <Link
+          href="/invoices"
+          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+            pathname === '/invoices' || (pathname.startsWith('/invoices') && !pathname.includes('/new') && !pathname.includes('/select-company'))
+              ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
+              : 'text-slate-300 hover:text-white hover:bg-[#13557A]/80'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Invoices</span>
+        </Link>
+
+        {/* Companies Link */}
+        <Link
+          href="/companies"
+          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+            pathname.startsWith('/companies')
+              ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
+              : 'text-slate-300 hover:text-white hover:bg-[#13557A]/80'
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Companies</span>
+        </Link>
+
+        {/* Visual Divider - Payroll Module */}
+        <div className="my-5 pt-4 border-t border-slate-800/80 px-2">
+          <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#81F5F5]/50 mb-2">
+            Payroll Module
+          </p>
+        </div>
+
+        {/* Payroll Main Menu (Unlinked parent with submenu) */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setPayrollExpanded(!payrollExpanded)}
+            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              isPayrollActive
+                ? 'text-[#81F5F5] bg-[#13557A]/40'
+                : 'text-slate-300 hover:text-white hover:bg-[#13557A]/80'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Banknote className="w-4 h-4" />
+              <span>Payroll</span>
+            </div>
+            {payrollExpanded ? (
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            )}
+          </button>
+
+          {/* Payroll Submenu Items */}
+          {payrollExpanded && (
+            <div className="mt-1 ml-3 pl-3 border-l border-slate-700/60 space-y-1">
+              {/* 1. Attendance Records */}
+              <Link
+                href="/attendance/records"
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${
+                  pathname === '/attendance/records'
+                    ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-[#13557A]/60'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Attendance Records</span>
+              </Link>
+
+              {/* 2. Employee Overview */}
+              <Link
+                href="/attendance"
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${
+                  pathname === '/attendance' || pathname.startsWith('/attendance/employees')
+                    ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-[#13557A]/60'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Employee Overview</span>
+              </Link>
+
+              {/* 3. Import Excel */}
+              <Link
+                href="/attendance/import"
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${
+                  pathname === '/attendance/import'
+                    ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-[#13557A]/60'
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Import Excel</span>
+              </Link>
+
+              {/* 4. Settings (Renamed from Attendance Rules) */}
+              <Link
+                href="/attendance/settings"
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${
+                  pathname === '/attendance/settings'
+                    ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-[#13557A]/60'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Settings</span>
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Visual Divider - Academic & System */}
@@ -128,10 +194,31 @@ export default function Sidebar() {
           </p>
         </div>
 
-        {/* Secondary Module Group */}
-        <div className="space-y-1.5">
-          {secondaryNavItems.map(renderLink)}
-        </div>
+        {/* Installments */}
+        <Link
+          href="/installments"
+          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+            pathname.startsWith('/installments')
+              ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
+              : 'text-slate-300 hover:text-white hover:bg-[#13557A]/80'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4" />
+          <span>Installments</span>
+        </Link>
+
+        {/* Settings */}
+        <Link
+          href="/settings"
+          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+            pathname === '/settings'
+              ? 'bg-[#81F5F5] text-[#002020] shadow-sm'
+              : 'text-slate-300 hover:text-white hover:bg-[#13557A]/80'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          <span>Settings</span>
+        </Link>
       </div>
 
       {/* User / Logout Footer */}

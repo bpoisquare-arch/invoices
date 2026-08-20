@@ -35,6 +35,10 @@ import {
   ChevronRight,
   Cloud,
   CheckCircle2,
+  Building2,
+  Receipt,
+  Plus,
+  TrendingUp,
 } from 'lucide-react'
 import RenameInvoiceDialog from '@/components/invoices/rename-invoice-dialog'
 import DeleteInvoiceDialog from '@/components/invoices/delete-invoice-dialog'
@@ -151,23 +155,68 @@ export default function InvoicesPage() {
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-6">
+    <div className="space-y-6 max-w-7xl mx-auto font-sans">
+      {/* Overview Header & Quick Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Invoices</h1>
+          <h2 className="font-['Montserrat'] text-2xl font-bold text-[#003D5C] tracking-tight">
+            Overview
+          </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Search, filter, preview, duplicate, and manage all company invoices
+            Manage your enterprise billing operations.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/invoices/select-company">
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 font-semibold shadow-sm h-9 text-xs">
-              <FilePlus className="w-4 h-4" />
-              Generate Invoice
-            </Button>
-          </Link>
-        </div>
+        <Link href="/invoices/select-company">
+          <Button className="bg-[#009D9E] hover:bg-[#007A7A] text-white px-6 py-3 font-bold uppercase tracking-wider text-xs gap-2 shadow-xs transition-colors">
+            <Plus className="w-4 h-4" />
+            QUICK GENERATE INVOICE
+          </Button>
+        </Link>
+      </div>
+
+      {/* Metrics Bento Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Card 1: Total Companies */}
+        <Card className="bg-white border border-[#E2E8F0] shadow-2xs p-6 flex flex-col justify-between rounded-lg">
+          <CardHeader className="p-0 pb-4 flex flex-row items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Total Companies
+            </span>
+            <div className="p-2 bg-[#13557A]/10 rounded-lg text-[#003D5C]">
+              <Building2 className="w-5 h-5" />
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="font-['Montserrat'] text-4xl font-extrabold text-slate-900">
+              {companies.length}
+            </div>
+            <div className="flex items-center text-[#92CA37] mt-2 text-xs font-semibold">
+              <TrendingUp className="w-4 h-4 mr-1 text-[#92CA37]" />
+              <span>Active Multi-Company Billing Entities</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Total Invoices */}
+        <Card className="bg-white border border-[#E2E8F0] shadow-2xs p-6 flex flex-col justify-between rounded-lg">
+          <CardHeader className="p-0 pb-4 flex flex-row items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Total Invoices
+            </span>
+            <div className="p-2 bg-[#13557A]/10 rounded-lg text-[#003D5C]">
+              <Receipt className="w-5 h-5" />
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="font-['Montserrat'] text-4xl font-extrabold text-slate-900">
+              {totalCount}
+            </div>
+            <div className="flex items-center text-[#92CA37] mt-2 text-xs font-semibold">
+              <TrendingUp className="w-4 h-4 mr-1 text-[#92CA37]" />
+              <span>Lifetime Generated Invoices</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Search & Filters Controls Box */}

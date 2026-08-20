@@ -50,7 +50,7 @@ export default function LoginPage() {
 
       if (!signInErr) {
         document.cookie = 'dev-auth-session=true; path=/; max-age=86400'
-        router.push('/dashboard')
+        router.push('/invoices')
         router.refresh()
         return
       }
@@ -67,11 +67,11 @@ export default function LoginPage() {
 
       // Fallback dev session cookie so login ALWAYS succeeds smoothly
       document.cookie = 'dev-auth-session=true; path=/; max-age=86400'
-      router.push('/dashboard')
+      router.push('/invoices')
       router.refresh()
     } catch (err: unknown) {
       document.cookie = 'dev-auth-session=true; path=/; max-age=86400'
-      router.push('/dashboard')
+      router.push('/invoices')
       router.refresh()
     } finally {
       setIsLoading(false)
