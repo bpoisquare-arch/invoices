@@ -707,6 +707,49 @@ export async function updateAttendanceRecord(
   return updated
 }
 
+export async function createManualAttendanceRecord(params: {
+  employee_id: string
+  attendance_date: string
+  in_time?: string | null
+  out_time?: string | null
+}): Promise<AttendanceRecord> {
+  const supabase = createClient()
+  const settings = await getAttendanceSettings()
+
+  const parsedDate = parseDateString(params.attendance_date)
+  const dayOfWeek = parsedDate ? parsedDate.dayOfWeek : 1
+  const dayName = parsedDate ? parsedDate.dayName : 'Monday'
+
+  const arrivalStatus = calculateArrivalStatus(params.in_time || null, dayOfWeek, settings)
+  const departureStatus = calculateDepartureStatus(params.out_time || null, dayOfWeek, settings)
+  const { totalMinutes, formatted } = calculateWorkingDuration(params.in_time || null, params.out_time || null)
+
+  const newRecord = {
+    employee_id: params.employee_id,
+    attendance_date: params.attendance_date,
+    day_of_week: dayName,
+    in_time: params.in_time?.trim() || null,
+    out_time: params.out_time?.trim() || null,
+    arrival_status: arrivalStatus,
+    departure_status: departureStatus,
+    total_working_minutes: totalMinutes,
+    total_working_hours_formatted: formatted,
+    raw_punches: [],
+  }
+
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .upsert(newRecord, { onConflict: 'employee_id,attendance_date' })
+    .select()
+    .single()
+
+  if (error || !data) {
+    throw new Error(error?.message || 'Failed to save attendance record.')
+  }
+
+  return data
+}
+
 export async function deleteAttendanceRecord(id: string): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase.from('attendance_records').delete().eq('id', id)

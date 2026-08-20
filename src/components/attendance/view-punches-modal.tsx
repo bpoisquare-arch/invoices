@@ -16,9 +16,10 @@ interface ViewPunchesModalProps {
   isOpen: boolean
   onClose: () => void
   record: AttendanceRecordWithEmployee | null
+  onEditClick?: () => void
 }
 
-export default function ViewPunchesModal({ isOpen, onClose, record }: ViewPunchesModalProps) {
+export default function ViewPunchesModal({ isOpen, onClose, record, onEditClick }: ViewPunchesModalProps) {
   if (!record) return null
 
   const rawPunches: RawPunch[] =
@@ -121,8 +122,21 @@ export default function ViewPunchesModal({ isOpen, onClose, record }: ViewPunche
           </div>
         </div>
 
-        <DialogFooter className="pt-2 border-t border-slate-100">
-          <Button variant="outline" onClick={onClose} className="text-xs font-bold w-full sm:w-auto">
+        <DialogFooter className="pt-2 border-t border-slate-100 flex items-center justify-between sm:justify-between w-full">
+          {onEditClick ? (
+            <Button
+              type="button"
+              onClick={() => {
+                onClose()
+                onEditClick()
+              }}
+              className="bg-[#009D9E] hover:bg-[#007A7A] text-white text-xs font-bold uppercase tracking-wider gap-1.5"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              Edit / Update Timings
+            </Button>
+          ) : <div />}
+          <Button variant="outline" onClick={onClose} className="text-xs font-bold">
             Close
           </Button>
         </DialogFooter>

@@ -294,6 +294,29 @@ export default function AttendanceRecordsPage() {
     XLSX.writeFile(wb, `attendance_matrix_${startDate}_to_${endDate}.xlsx`)
   }
 
+  // Handle Blank Cell Click (Allows adding attendance manually)
+  const handleBlankCellClick = (emp: Employee, date: string) => {
+    const dayName = getDayName(date)
+    setEditingRecord({
+      id: '',
+      employee_id: emp.id,
+      attendance_date: date,
+      day_of_week: dayName,
+      in_time: '',
+      out_time: '',
+      arrival_status: 'On Time Arrival',
+      departure_status: 'On Time Departure',
+      total_working_minutes: 0,
+      total_working_hours_formatted: '00:00',
+      raw_punches: [],
+      is_manual_override: true,
+      notes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      employee: emp,
+    } as any)
+  }
+
   // Render Status Badge / Content inside each Grid Cell
   const renderCellContent = (emp: Employee, date: string) => {
     const dayName = getDayName(date)
@@ -303,43 +326,59 @@ export default function AttendanceRecordsPage() {
     if (rec) {
       const isLate = rec.arrival_status === 'Late Arrival'
       const isEarlyLeave = rec.departure_status === 'Early Departure'
-      const isMissingOut = rec.departure_status === 'Missing Out Time'
+      const isMissingOut = !rec.out_time || rec.out_time === '---' || rec.departure_status === 'Missing Out Time'
+      const isMissingIn = !rec.in_time || rec.in_time === '---' || rec.arrival_status === 'Missing In Time'
 
       return (
         <div
-          onClick={() => setViewingPunchesRecord(rec)}
+          onClick={() => setEditingRecord(rec)}
           className={`group/cell cursor-pointer p-1.5 rounded-md transition-all flex flex-col items-center justify-center text-center gap-0.5 border ${
-            isLate || isEarlyLeave || isMissingOut
+            isMissingOut
+              ? 'bg-amber-50/90 hover:bg-amber-100/95 border-amber-300 text-amber-950 shadow-2xs hover:shadow-xs'
+              : isLate || isEarlyLeave
               ? 'bg-amber-50/70 hover:bg-amber-100/90 border-amber-200/80 text-amber-900'
               : 'bg-emerald-50/50 hover:bg-emerald-100/80 border-emerald-200/70 text-slate-800'
           }`}
-          title="Click to view punch details"
+          title="Click to edit timings or enter missing Out Time"
         >
           {/* In Time - Out Time */}
-          <div className="font-mono text-[11px] font-semibold tracking-tight whitespace-nowrap">
-            {rec.in_time || '--'} - {rec.out_time || '--'}
+          <div className="font-mono text-[11px] font-semibold tracking-tight whitespace-nowrap flex items-center justify-center gap-1">
+            <span>{rec.in_time || '---'}</span>
+            <span className="text-slate-400">-</span>
+            <span className={isMissingOut ? 'text-amber-700 font-bold bg-amber-200/60 px-1 rounded' : ''}>
+              {rec.out_time || '---'}
+            </span>
           </div>
 
           {/* Duration Badge with Clock Icon */}
           <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-medium">
             <span
               className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] ${
-                isLate ? 'bg-amber-500 text-white' : 'bg-emerald-600 text-white'
+                isMissingOut
+                  ? 'bg-amber-500 text-white'
+                  : isLate
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-emerald-600 text-white'
               }`}
             >
               ⏱
             </span>
-            <span className="text-slate-700 font-bold">
-              ({rec.total_working_hours_formatted || '00:00'})
+            <span className={`font-bold ${isMissingOut ? 'text-amber-700' : 'text-slate-700'}`}>
+              ({rec.total_working_hours_formatted || '--'})
             </span>
           </div>
 
-          {/* Quick status pill for deviations */}
-          {(isLate || isEarlyLeave) && (
+          {/* Missing Out Alert or Deviation Status Pill */}
+          {isMissingOut ? (
+            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300 flex items-center gap-0.5 mt-0.5 group-hover/cell:bg-amber-300 transition-colors">
+              <span>Missing Out</span>
+              <Edit2 className="w-2.5 h-2.5 inline" />
+            </span>
+          ) : (isLate || isEarlyLeave) ? (
             <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-200/90 text-amber-800">
               {isLate ? 'Late' : 'Early Out'}
             </span>
-          )}
+          ) : null}
         </div>
       )
     }
@@ -357,7 +396,11 @@ export default function AttendanceRecordsPage() {
 
     // 3. Fallback Absent / Off Day
     return (
-      <div className="flex items-center justify-center py-2 text-slate-400 font-mono text-xs">
+      <div
+        onClick={() => handleBlankCellClick(emp, date)}
+        className="flex items-center justify-center py-2 text-slate-400 font-mono text-xs cursor-pointer hover:bg-blue-50/60 rounded transition-colors"
+        title="Click to add attendance"
+      >
         --
       </div>
     )
@@ -690,6 +733,11 @@ export default function AttendanceRecordsPage() {
         isOpen={!!viewingPunchesRecord}
         onClose={() => setViewingPunchesRecord(null)}
         record={viewingPunchesRecord}
+        onEditClick={() => {
+          if (viewingPunchesRecord) {
+            setEditingRecord(viewingPunchesRecord)
+          }
+        }}
       />
     </div>
   )

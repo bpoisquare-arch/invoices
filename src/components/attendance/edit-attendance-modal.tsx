@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Clock, Calendar, User, Save, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Clock, Calendar, User, Save, Loader2, AlertCircle, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react'
 
 interface EditAttendanceModalProps {
   isOpen: boolean
@@ -28,6 +28,15 @@ interface EditAttendanceModalProps {
   onSaveSuccess: (updatedRecord: any) => void
   settings?: AttendanceSettings
 }
+
+const COMMON_OUT_PRESETS = [
+  '05:30 PM',
+  '06:00 PM',
+  '06:30 PM',
+  '07:00 PM',
+  '07:30 PM',
+  '08:00 PM',
+]
 
 export default function EditAttendanceModal({
   isOpen,
@@ -53,6 +62,8 @@ export default function EditAttendanceModal({
 
   if (!record) return null
 
+  const isMissingOut = !record.out_time || record.out_time === '---' || record.departure_status === 'Missing Out Time'
+
   // Live recalculations for preview
   const parsedDate = parseDateString(date)
   const dayOfWeek = parsedDate ? parsedDate.dayOfWeek : 1
@@ -75,23 +86,44 @@ export default function EditAttendanceModal({
     setIsSaving(true)
 
     try {
-      const res = await fetch('/api/attendance/records', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: record.id,
-          attendance_date: date,
-          in_time: inTime.trim() || null,
-          out_time: outTime.trim() || null,
-        }),
-      })
+      if (record.id) {
+        // Update existing record
+        const res = await fetch('/api/attendance/records', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: record.id,
+            attendance_date: date,
+            in_time: inTime.trim() || null,
+            out_time: outTime.trim() || null,
+          }),
+        })
 
-      const data = await res.json()
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to update record.')
+        const data = await res.json()
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to update record.')
+        }
+        onSaveSuccess(data.record)
+      } else {
+        // Create new manual record
+        const res = await fetch('/api/attendance/records', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employee_id: record.employee_id || record.employee?.id,
+            attendance_date: date,
+            in_time: inTime.trim() || null,
+            out_time: outTime.trim() || null,
+          }),
+        })
+
+        const data = await res.json()
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to save new record.')
+        }
+        onSaveSuccess(data.record)
       }
 
-      onSaveSuccess(data.record)
       onClose()
     } catch (err: any) {
       setError(err.message || 'An error occurred while saving.')
@@ -106,12 +138,24 @@ export default function EditAttendanceModal({
         <DialogHeader className="border-b border-slate-100 pb-4">
           <DialogTitle className="text-lg font-bold text-[#003D5C] flex items-center gap-2">
             <Clock className="w-5 h-5 text-[#009D9E]" />
-            Edit Attendance Record
+            {isMissingOut ? 'Update Missing Out Time' : 'Edit Attendance Record'}
           </DialogTitle>
           <p className="text-xs text-slate-500 mt-1">
-            Status and working duration are recalculated automatically based on configured timings.
+            Manually update in/out timings. Status and total working hours are automatically recalculated.
           </p>
         </DialogHeader>
+
+        {isMissingOut && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs p-3 rounded-lg flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Missing Punch-Out Detected</p>
+              <p className="text-[11px] text-amber-700 mt-0.5">
+                The employee checked in at <span className="font-bold font-mono">{record.in_time || 'N/A'}</span> but missed checking out. Please enter their confirmed departure time below.
+              </p>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-lg flex items-center gap-2">
@@ -148,7 +192,7 @@ export default function EditAttendanceModal({
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
-              className="text-sm border-slate-200"
+              className="text-sm border-slate-200 font-mono"
             />
             <p className="text-[11px] text-slate-400 font-medium">Day: {dayName}</p>
           </div>
@@ -170,17 +214,49 @@ export default function EditAttendanceModal({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Office Out Time
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+                <span>Office Out Time</span>
+                {isMissingOut && (
+                  <span className="text-[10px] font-bold text-amber-600 uppercase">Required</span>
+                )}
               </Label>
               <Input
                 type="text"
                 placeholder="e.g. 06:30 PM"
                 value={outTime}
                 onChange={(e) => setOutTime(e.target.value)}
-                className="text-sm border-slate-200 font-mono"
+                className={`text-sm font-mono ${
+                  isMissingOut && !outTime
+                    ? 'border-amber-400 bg-amber-50/40 focus:border-[#009D9E]'
+                    : 'border-slate-200'
+                }`}
+                autoFocus={isMissingOut}
               />
               <p className="text-[10px] text-slate-400">Format: 06:30 PM or 18:30</p>
+            </div>
+          </div>
+
+          {/* Quick Presets for Out Time */}
+          <div className="space-y-1.5">
+            <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-[#009D9E]" />
+              Quick Out Time Presets:
+            </Label>
+            <div className="flex flex-wrap gap-1.5">
+              {COMMON_OUT_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setOutTime(preset)}
+                  className={`text-[11px] font-mono px-2.5 py-1 rounded border transition-colors ${
+                    outTime === preset
+                      ? 'bg-[#009D9E] text-white border-[#009D9E] font-bold'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
             </div>
           </div>
 

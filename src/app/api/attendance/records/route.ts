@@ -2,12 +2,38 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   getAttendanceRecords,
   updateAttendanceRecord,
+  createManualAttendanceRecord,
   deleteAttendanceRecord,
   getAttendanceSummary,
   getTodayAttendanceMetrics,
 } from '@/lib/services/attendance.service'
 
 export const dynamic = 'force-dynamic'
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { employee_id, attendance_date, in_time, out_time } = body
+
+    if (!employee_id || !attendance_date) {
+      return NextResponse.json(
+        { success: false, error: 'Employee ID and attendance date are required.' },
+        { status: 400 }
+      )
+    }
+
+    const created = await createManualAttendanceRecord({
+      employee_id,
+      attendance_date,
+      in_time,
+      out_time,
+    })
+
+    return NextResponse.json({ success: true, record: created })
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
