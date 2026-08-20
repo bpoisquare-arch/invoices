@@ -39,6 +39,11 @@ export interface InvoiceFilterParams {
   pageSize?: number
 }
 
+function isValidUUID(str?: string | null): boolean {
+  if (!str) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim())
+}
+
 // Clean up any stale localStorage keys from previous versions
 if (typeof window !== 'undefined') {
   try {
@@ -88,17 +93,35 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
   let phone = '+61 432 536 123'
   let paymentDetails = `Account Name: Riaz & Sons PTY Ltd\nBSB: 083-543\nAccount No: 72-996-1834\nABN: 62 658 488 469`
 
+  // 1. Resolve Company ID to a valid database UUID
+  let resolvedCompanyId = input.company_id
   try {
-    const { data: company } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', input.company_id)
-      .single()
+    if (isValidUUID(input.company_id)) {
+      const { data: company } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', input.company_id)
+        .single()
 
-    if (company) companyName = company.name
+      if (company) {
+        companyName = company.name
+        resolvedCompanyId = company.id
+      }
+    } else {
+      // If company_id is not a valid UUID (e.g. fallback string), get the first company from DB
+      const { data: firstCompany } = await supabase
+        .from('companies')
+        .select('*')
+        .limit(1)
+        .single()
 
-    const activeTemplate = await getTemplateByCompanyId(input.company_id)
+      if (firstCompany) {
+        companyName = firstCompany.name
+        resolvedCompanyId = firstCompany.id
+      }
+    }
 
+    const activeTemplate = await getTemplateByCompanyId(resolvedCompanyId)
     if (activeTemplate) {
       if (activeTemplate.company_name) companyName = activeTemplate.company_name
       if (activeTemplate.address) address = activeTemplate.address
@@ -108,6 +131,12 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
     }
   } catch (err) {
     // Ignore error
+  }
+
+  // 2. Resolve Template ID: only send to DB if it is a valid UUID
+  let validTemplateId: string | null = null
+  if (isValidUUID(input.template_id)) {
+    validTemplateId = input.template_id!
   }
 
   const templateSnapshot: TemplateSnapshot = {
@@ -122,7 +151,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
     layout_type: 'edlink_v1',
   }
 
-  const invoiceNumber = input.invoice_number || (await generateNextInvoiceNumber(input.company_id))
+  const invoiceNumber = input.invoice_number || (await generateNextInvoiceNumber(resolvedCompanyId))
 
   const preparedItems = input.items.map((item) => {
     const qty = Number(item.quantity) || 0
@@ -141,8 +170,8 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
   const { data: invoice, error } = await supabase
     .from('invoices')
     .insert({
-      company_id: input.company_id,
-      template_id: input.template_id || null,
+      company_id: resolvedCompanyId,
+      template_id: validTemplateId,
       template_snapshot: templateSnapshot,
       invoice_number: invoiceNumber,
       customer_name: input.customer_name,
@@ -241,8 +270,8 @@ export async function duplicateInvoice(invoiceId: string): Promise<InvoiceWithDe
   if (!original) throw new Error('Invoice not found to duplicate')
 
   const newInvoiceInput: CreateInvoiceInput = {
-    company_id: original.company_id || 'edlink-pk-id',
-    template_id: original.template_id || null,
+    company_id: original.company_id,
+    template_id: isValidUUID(original.template_id) ? original.template_id : null,
     customer_name: original.customer_name || '',
     reference_name: original.reference_name ? `${original.reference_name} (Copy)` : 'Copied Invoice',
     invoice_date: new Date().toISOString().split('T')[0],
@@ -267,6 +296,8 @@ export async function deleteInvoice(invoiceId: string): Promise<void> {
 }
 
 export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithDetails | null> {
+  if (!isValidUUID(invoiceId)) return null
+
   try {
     const supabase = createClient()
     const { data: invoice, error } = await supabase
@@ -299,7 +330,7 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
       .from('invoices')
       .select('*, companies(*), templates(*), invoice_items(*)', { count: 'exact' })
 
-    if (params.companyId && params.companyId !== 'all') {
+    if (params.companyId && params.companyId !== 'all' && isValidUUID(params.companyId)) {
       query = query.eq('company_id', params.companyId)
     }
 

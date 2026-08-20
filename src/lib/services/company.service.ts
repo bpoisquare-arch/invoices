@@ -30,23 +30,33 @@ export async function getCompanies(): Promise<Company[]> {
   }
 }
 
+function isValidUUID(str?: string | null): boolean {
+  if (!str) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim())
+}
+
 export async function getCompanyById(id: string): Promise<Company | null> {
   try {
     const supabase = createClient()
-    const { data, error } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', id)
-      .single()
+    if (isValidUUID(id)) {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-    if (error || !data) {
-      return FALLBACK_COMPANY
+      if (!error && data) {
+        return data
+      }
     }
-
-    return data
+    // If not a valid UUID or not found, try to return first company in DB
+    const { data: first } = await supabase.from('companies').select('*').limit(1).single()
+    if (first) return first
   } catch (err) {
     return FALLBACK_COMPANY
   }
+
+  return FALLBACK_COMPANY
 }
 
 export async function createCompany(params: {
