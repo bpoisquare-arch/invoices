@@ -8,8 +8,8 @@ import {
   calculateWorkingDuration,
   parseDateString,
   DEFAULT_ATTENDANCE_SETTINGS,
+  LEAVE_TYPES,
 } from '@/lib/services/attendance-calculator'
-import { LEAVE_TYPES } from '@/lib/services/attendance.service'
 import {
   Dialog,
   DialogContent,

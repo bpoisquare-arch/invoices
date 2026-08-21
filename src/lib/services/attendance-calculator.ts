@@ -14,6 +14,14 @@ export const DEFAULT_ATTENDANCE_SETTINGS: AttendanceSettings = {
   updated_at: new Date().toISOString(),
 }
 
+export const LEAVE_TYPES = [
+  'Official Leave',
+  'Sick Leave',
+  'Casual Leave',
+  'Half Day',
+  'Unpaid Leave',
+]
+
 /**
  * Normalizes an employee name for deterministic, safe matching.
  * Trims leading/trailing spaces, collapses multiple whitespace characters, and lowercases.

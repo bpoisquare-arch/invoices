@@ -36,7 +36,6 @@ import {
   AttendanceSettings,
   Employee,
 } from '@/lib/supabase/database.types'
-import { syncAttendanceToSupabase } from '@/lib/services/attendance.service'
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'

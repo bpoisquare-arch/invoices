@@ -114,11 +114,15 @@ export async function updateAttendanceSettings(
   }
 }
 
+import { readAllEmployeeMetadata, writeEmployeeMetadata } from '@/lib/services/employee-storage'
+
 // ----------------------------------------------------
 // 2. EMPLOYEE SERVICES & METADATA SYNC
 // ----------------------------------------------------
 
 export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?: string; salary?: number | null; joining_date?: string }>> {
+  const fileMeta = readAllEmployeeMetadata()
+
   try {
     const supabase = createClient()
     const { data } = await supabase
@@ -130,18 +134,25 @@ export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?
       .single()
 
     if (data && data.details && typeof data.details === 'object') {
-      return data.details as Record<string, { branch?: string; salary?: number | null; joining_date?: string }>
+      return {
+        ...(data.details as Record<string, any>),
+        ...fileMeta,
+      }
     }
   } catch (err) {
     // Ignore
   }
-  return {}
+  return fileMeta as any
 }
 
 export async function saveEmployeeMetadata(
   idOrEmpId: string,
   meta: { branch?: string | null; salary?: number | null; joining_date?: string | null }
 ): Promise<void> {
+  // 1. Write immediately to server-side permanent file store
+  writeEmployeeMetadata(idOrEmpId, meta)
+
+  // 2. Also attempt DB audit logs store
   try {
     const currentMap = await getEmployeeMetadataMap()
     const existing = currentMap[idOrEmpId] || {}
@@ -158,7 +169,7 @@ export async function saveEmployeeMetadata(
       details: currentMap as any,
     })
   } catch (err) {
-    console.error('Error saving employee metadata to DB store:', err)
+    // DB audit log failed or not permitted, file store handles it
   }
 }
 
@@ -187,9 +198,9 @@ export async function getEmployees(params?: {
       const meta = metaMap[emp.id] || metaMap[emp.employee_id] || {}
       return {
         ...emp,
-        branch: emp.branch || meta.branch || 'Multan',
-        salary: emp.salary !== undefined && emp.salary !== null ? emp.salary : (meta.salary !== undefined ? meta.salary : null),
-        joining_date: emp.joining_date || meta.joining_date || emp.created_at,
+        branch: meta.branch || emp.branch || 'Multan',
+        salary: meta.salary !== undefined && meta.salary !== null ? meta.salary : (emp.salary !== undefined && emp.salary !== null ? emp.salary : null),
+        joining_date: meta.joining_date || emp.joining_date || emp.created_at,
       }
     })
 

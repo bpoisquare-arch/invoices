@@ -86,22 +86,7 @@ export default function EmployeeOverviewPage() {
       const res = await fetch('/api/attendance/employees')
       const data = await res.json()
       if (data.success && data.employees) {
-        let localMap: Record<string, any> = {}
-        try {
-          const cached = localStorage.getItem('emp_meta_cache_v2')
-          if (cached) localMap = JSON.parse(cached)
-        } catch {}
-
-        const merged = data.employees.map((e: any) => {
-          const l = localMap[e.id] || localMap[e.employee_id] || {}
-          return {
-            ...e,
-            branch: e.branch || l.branch || 'Multan',
-            salary: e.salary !== undefined && e.salary !== null ? e.salary : (l.salary !== undefined ? l.salary : null),
-            joining_date: e.joining_date || l.joining_date || e.created_at,
-          }
-        })
-        setEmployees(merged)
+        setEmployees(data.employees)
       }
     } catch (err) {
       console.error('Error fetching employees:', err)
@@ -158,25 +143,6 @@ export default function EmployeeOverviewPage() {
         throw new Error(data.error || 'Failed to create employee.')
       }
 
-      if (data.employee) {
-        try {
-          let localMap: Record<string, any> = {}
-          const cached = localStorage.getItem('emp_meta_cache_v2')
-          if (cached) localMap = JSON.parse(cached)
-          localMap[data.employee.id] = {
-            branch: newBranch,
-            joining_date: newJoiningDate,
-            salary: newSalary ? Number(newSalary) : null,
-          }
-          localMap[data.employee.employee_id] = {
-            branch: newBranch,
-            joining_date: newJoiningDate,
-            salary: newSalary ? Number(newSalary) : null,
-          }
-          localStorage.setItem('emp_meta_cache_v2', JSON.stringify(localMap))
-        } catch {}
-      }
-
       setIsAddOpen(false)
       setNewName('')
       setNewDesignation('')
@@ -184,7 +150,7 @@ export default function EmployeeOverviewPage() {
       setNewJoiningDate(todayStr)
       setNewSalary('')
       setAddWarning(null)
-      fetchEmployees()
+      await fetchEmployees()
     } catch (err: any) {
       setAddError(err.message || 'Error creating employee.')
     } finally {
@@ -198,6 +164,10 @@ export default function EmployeeOverviewPage() {
     setEditError(null)
     setIsSaving(true)
 
+    const targetBranch = newBranch || editBranch || 'Multan'
+    const targetJoiningDate = editJoiningDate || todayStr
+    const targetSalary = editSalary ? Number(editSalary) : null
+
     try {
       const res = await fetch('/api/attendance/employees', {
         method: 'PUT',
@@ -208,7 +178,7 @@ export default function EmployeeOverviewPage() {
           designation: editDesignation.trim(),
           branch: editBranch,
           joining_date: editJoiningDate,
-          salary: editSalary ? Number(editSalary) : null,
+          salary: targetSalary,
           is_active: editActive,
         }),
       })
@@ -218,35 +188,17 @@ export default function EmployeeOverviewPage() {
         throw new Error(data.error || 'Failed to update employee.')
       }
 
-      // Update local storage cache
-      try {
-        let localMap: Record<string, any> = {}
-        const cached = localStorage.getItem('emp_meta_cache_v2')
-        if (cached) localMap = JSON.parse(cached)
-        localMap[editingEmployee.id] = {
-          branch: editBranch,
-          joining_date: editJoiningDate,
-          salary: editSalary ? Number(editSalary) : null,
-        }
-        localMap[editingEmployee.employee_id] = {
-          branch: editBranch,
-          joining_date: editJoiningDate,
-          salary: editSalary ? Number(editSalary) : null,
-        }
-        localStorage.setItem('emp_meta_cache_v2', JSON.stringify(localMap))
-      } catch {}
-
       // Immediately update local state
       setEmployees((prev) =>
         prev.map((emp) =>
-          emp.id === editingEmployee.id
+          emp.id === editingEmployee.id || emp.employee_id === editingEmployee.employee_id
             ? {
                 ...emp,
                 name: editName.trim(),
                 designation: editDesignation.trim(),
                 branch: editBranch,
                 joining_date: editJoiningDate,
-                salary: editSalary ? Number(editSalary) : null,
+                salary: targetSalary,
                 is_active: editActive,
               }
             : emp
@@ -254,7 +206,7 @@ export default function EmployeeOverviewPage() {
       )
 
       setEditingEmployee(null)
-      fetchEmployees()
+      await fetchEmployees()
     } catch (err: any) {
       setEditError(err.message || 'Error updating employee.')
     } finally {
@@ -269,7 +221,7 @@ export default function EmployeeOverviewPage() {
     setEditBranch(emp.branch || 'Multan')
     const rawDate = emp.joining_date || emp.created_at
     setEditJoiningDate(rawDate ? rawDate.split('T')[0] : todayStr)
-    setEditSalary(emp.salary ? String(emp.salary) : '')
+    setEditSalary(emp.salary !== undefined && emp.salary !== null ? String(emp.salary) : '')
     setEditActive(emp.is_active)
     setEditError(null)
   }
@@ -290,7 +242,7 @@ export default function EmployeeOverviewPage() {
       }
 
       setEmployeeToDelete(null)
-      fetchEmployees()
+      await fetchEmployees()
     } catch (err: any) {
       setDeleteError(err.message || 'Error deleting employee.')
     } finally {
@@ -314,16 +266,19 @@ export default function EmployeeOverviewPage() {
   const formatJoiningDate = (dateStr?: string | null) => {
     if (!dateStr) return '--'
     try {
-      const clean = dateStr.split('T')[0]
+      const clean = String(dateStr).split('T')[0]
       const parts = clean.split('-')
       if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+        const year = parseInt(parts[0], 10)
+        const month = parseInt(parts[1], 10) - 1
+        const day = parseInt(parts[2], 10)
+        const d = new Date(year, month, day)
         return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
       }
       const d = new Date(dateStr)
       return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     } catch {
-      return dateStr
+      return String(dateStr)
     }
   }
 
@@ -647,18 +602,18 @@ export default function EmployeeOverviewPage() {
                 <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Branch *
                 </Label>
-                <Select value={newBranch} onValueChange={(val) => setNewBranch(val || 'Multan')} required>
-                  <SelectTrigger className="text-sm border-slate-200 bg-white">
-                    <SelectValue placeholder="Select Branch..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BRANCHES.map((b) => (
-                      <SelectItem key={b} value={b}>
-                        {b}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <select
+                  value={newBranch}
+                  onChange={(e) => setNewBranch(e.target.value)}
+                  required
+                  className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 focus:border-[#009D9E]"
+                >
+                  {BRANCHES.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-1.5">
@@ -782,18 +737,18 @@ export default function EmployeeOverviewPage() {
                 <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Branch *
                 </Label>
-                <Select value={editBranch} onValueChange={(val) => setEditBranch(val || 'Multan')} required>
-                  <SelectTrigger className="text-sm border-slate-200 bg-white">
-                    <SelectValue placeholder="Select Branch..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BRANCHES.map((b) => (
-                      <SelectItem key={b} value={b}>
-                        {b}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <select
+                  value={editBranch}
+                  onChange={(e) => setEditBranch(e.target.value)}
+                  required
+                  className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 focus:border-[#009D9E]"
+                >
+                  {BRANCHES.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-1.5">
