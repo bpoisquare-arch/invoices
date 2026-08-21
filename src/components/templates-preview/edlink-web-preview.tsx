@@ -9,7 +9,7 @@ interface EdLinkWebPreviewProps {
 }
 
 export default function EdLinkWebPreview({ invoice, snapshot }: EdLinkWebPreviewProps) {
-  const companyName = snapshot?.company_name || invoice.companies?.name || 'EdLink Pakistan'
+  const companyName = snapshot?.company_name || invoice.companies?.name || 'EdLink Australia'
   const address = snapshot?.address || invoice.templates?.address || 'Suit 3, Level 4/20 Collins Street, Melbourne 3000'
   const email = snapshot?.email || invoice.templates?.email || 'finance@edlink.com.au'
   const phone = snapshot?.phone || invoice.templates?.phone || '+61 432 536 123'
@@ -36,11 +36,11 @@ export default function EdLinkWebPreview({ invoice, snapshot }: EdLinkWebPreview
         {/* Left Column: Logo & Company Contact */}
         <div className="space-y-3 max-w-[340px]">
           {/* Logo reproduction */}
-          <div className="flex items-center gap-3">
+          <div className="flex justify-start items-start">
             <img
               src={snapshot?.logo_url || invoice.companies?.logo_url || '/edlink-logo.png'}
               alt={companyName}
-              className="h-16 object-contain"
+              className="h-16 object-contain object-left"
             />
           </div>
 

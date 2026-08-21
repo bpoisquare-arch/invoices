@@ -8,7 +8,8 @@ import path from 'path'
 export const dynamic = 'force-dynamic'
 
 function resolveLogo(rawUrl?: string | null): string {
-  const logoUrl = rawUrl || '/edlink-logo.png'
+  if (!rawUrl) return ''
+  const logoUrl = rawUrl
   if (logoUrl.startsWith('data:') || logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
     return logoUrl
   }
@@ -39,8 +40,25 @@ export async function GET(
       return new NextResponse('Invoice not found', { status: 404 })
     }
 
-    const rawLogo = invoice.template_snapshot?.logo_url || invoice.companies?.logo_url || '/edlink-logo.png'
-    const resolvedLogoUrl = resolveLogo(rawLogo)
+    const isAnonymous =
+      invoice.template_snapshot?.is_anonymous ||
+      invoice.template_snapshot?.layout_type === 'anonymous_v1'
+    const headerMode =
+      invoice.template_snapshot?.header_mode ||
+      (invoice.template_snapshot?.logo_url ? 'logo' : 'text')
+
+    let resolvedLogoUrl: string | undefined = undefined
+    if (isAnonymous) {
+      if (headerMode === 'logo' && invoice.template_snapshot?.logo_url) {
+        resolvedLogoUrl = resolveLogo(invoice.template_snapshot.logo_url)
+      }
+    } else {
+      const rawLogo =
+        invoice.template_snapshot?.logo_url ||
+        invoice.companies?.logo_url ||
+        '/edlink-logo.png'
+      resolvedLogoUrl = resolveLogo(rawLogo)
+    }
 
     const doc = renderInvoicePDFDocument(invoice, invoice.template_snapshot, resolvedLogoUrl)
     const stream = await renderToStream(doc)

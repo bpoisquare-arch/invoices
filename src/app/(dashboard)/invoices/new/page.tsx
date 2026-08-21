@@ -54,7 +54,7 @@ function CreateInvoiceContent() {
     return (
       <div className="p-12 text-center text-slate-500 flex items-center justify-center gap-3">
         <Loader2 className="w-6 h-6 animate-spin text-[#003D5C]" />
-        <span>Loading EdLink Pakistan Invoice Template...</span>
+        <span>Loading EdLink Australia Invoice Template...</span>
       </div>
     )
   }

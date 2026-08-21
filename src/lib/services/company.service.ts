@@ -4,15 +4,26 @@ import { Company } from '@/lib/supabase/database.types'
 export const FALLBACK_COMPANY: Company = {
   id: 'edlink-pk-id',
   user_id: null,
-  name: 'EdLink Pakistan',
+  name: 'EdLink Australia',
   prefix: 'EDL',
+  currency: 'AUD',
+  logo_url: '/edlink-logo.png',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
+
+export const ANONYMOUS_COMPANY: Company = {
+  id: 'anonymous-company-id',
+  user_id: null,
+  name: 'Anonymous',
+  prefix: 'ANO',
   currency: 'AUD',
   logo_url: null,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 }
 
-export async function getCompanies(): Promise<Company[]> {
+export async function getCompanies(includeAnonymous = false): Promise<Company[]> {
   try {
     const supabase = createClient()
     const { data, error } = await supabase
@@ -20,13 +31,37 @@ export async function getCompanies(): Promise<Company[]> {
       .select('*')
       .order('created_at', { ascending: true })
 
+    let result: Company[] = []
+
     if (error || !data || data.length === 0) {
-      return [FALLBACK_COMPANY]
+      result = [FALLBACK_COMPANY]
+    } else {
+      const valid = data
+        .filter((c) => (c.name || '').toLowerCase() !== 'anonymous')
+        .map((c) => {
+          if (c.name === 'EdLink Pakistan') {
+            return {
+              ...c,
+              name: 'EdLink Australia',
+              logo_url: c.logo_url || '/edlink-logo.png',
+            }
+          }
+          return c
+        })
+
+      result = valid.length > 0 ? valid : [FALLBACK_COMPANY]
     }
 
-    return data
+    if (includeAnonymous) {
+      const hasAnon = result.some((c) => c.id === ANONYMOUS_COMPANY.id || c.prefix === 'ANO')
+      if (!hasAnon) {
+        result.push(ANONYMOUS_COMPANY)
+      }
+    }
+
+    return result
   } catch (err) {
-    return [FALLBACK_COMPANY]
+    return includeAnonymous ? [FALLBACK_COMPANY, ANONYMOUS_COMPANY] : [FALLBACK_COMPANY]
   }
 }
 
@@ -36,6 +71,10 @@ function isValidUUID(str?: string | null): boolean {
 }
 
 export async function getCompanyById(id: string): Promise<Company | null> {
+  if (id === 'anonymous-company-id' || id === 'anonymous') {
+    return ANONYMOUS_COMPANY
+  }
+
   try {
     const supabase = createClient()
     if (isValidUUID(id)) {
@@ -46,12 +85,28 @@ export async function getCompanyById(id: string): Promise<Company | null> {
         .single()
 
       if (!error && data) {
+        if (data.name === 'EdLink Pakistan') {
+          return {
+            ...data,
+            name: 'EdLink Australia',
+            logo_url: data.logo_url || '/edlink-logo.png',
+          }
+        }
         return data
       }
     }
     // If not a valid UUID or not found, try to return first company in DB
     const { data: first } = await supabase.from('companies').select('*').limit(1).single()
-    if (first) return first
+    if (first) {
+      if (first.name === 'EdLink Pakistan') {
+        return {
+          ...first,
+          name: 'EdLink Australia',
+          logo_url: first.logo_url || '/edlink-logo.png',
+        }
+      }
+      return first
+    }
   } catch (err) {
     return FALLBACK_COMPANY
   }

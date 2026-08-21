@@ -191,7 +191,7 @@ export default function CompanyDialog({
                   <FormItem className="sm:col-span-2">
                     <FormLabel>Company Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="EdLink Pakistan" {...field} />
+                      <Input placeholder="EdLink Australia" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

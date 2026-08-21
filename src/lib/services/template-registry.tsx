@@ -1,7 +1,9 @@
 import React from 'react'
 import EdLinkWebPreview from '@/components/templates-preview/edlink-web-preview'
+import AnonymousWebPreview from '@/components/templates-preview/anonymous-web-preview'
 import DefaultWebPreview from '@/components/templates-preview/default-web-preview'
 import EdLinkPDFTemplate from '@/components/pdf/edlink-pdf-template'
+import AnonymousPDFTemplate from '@/components/pdf/anonymous-pdf-template'
 import DefaultPDFTemplate from '@/components/pdf/default-pdf-template'
 import { InvoiceWithDetails, TemplateSnapshot } from '@/lib/supabase/database.types'
 
@@ -9,6 +11,8 @@ export function renderInvoiceWebPreview(invoice: Partial<InvoiceWithDetails>, sn
   const layout = snapshot?.layout_type || invoice.templates?.layout_type || 'edlink_v1'
 
   switch (layout) {
+    case 'anonymous_v1':
+      return <AnonymousWebPreview invoice={invoice} snapshot={snapshot} />
     case 'edlink_v1':
       return <EdLinkWebPreview invoice={invoice} snapshot={snapshot} />
     default:
@@ -24,6 +28,8 @@ export function renderInvoicePDFDocument(
   const layout = snapshot?.layout_type || invoice.templates?.layout_type || 'edlink_v1'
 
   switch (layout) {
+    case 'anonymous_v1':
+      return <AnonymousPDFTemplate invoice={invoice} snapshot={snapshot} resolvedLogoUrl={resolvedLogoUrl} />
     case 'edlink_v1':
       return <EdLinkPDFTemplate invoice={invoice} snapshot={snapshot} resolvedLogoUrl={resolvedLogoUrl} />
     default:

@@ -16,16 +16,40 @@ export interface CreateInvoiceInput {
   customer_name: string
   reference_name?: string | null
   invoice_date: string
-  due_date: string
+  due_date?: string | null
   items: InvoiceItemInput[]
+  custom_company_name?: string | null
+  custom_address?: string | null
+  custom_phone?: string | null
+  custom_email?: string | null
+  custom_payment_details?: string | null
+  custom_logo_url?: string | null
+  currency?: string | null
+  header_mode?: 'logo' | 'text' | null
+  bill_to_label?: string | null
+  footer_terms?: string | null
+  is_anonymous?: boolean | null
+  logo_size?: number | string | null
 }
 
 export interface UpdateInvoiceInput {
   customer_name?: string
   reference_name?: string | null
   invoice_date?: string
-  due_date?: string
+  due_date?: string | null
   items?: InvoiceItemInput[]
+  custom_company_name?: string | null
+  custom_address?: string | null
+  custom_phone?: string | null
+  custom_email?: string | null
+  custom_payment_details?: string | null
+  custom_logo_url?: string | null
+  currency?: string | null
+  header_mode?: 'logo' | 'text' | null
+  bill_to_label?: string | null
+  footer_terms?: string | null
+  is_anonymous?: boolean | null
+  logo_size?: number | string | null
 }
 
 export interface InvoiceFilterParams {
@@ -87,7 +111,7 @@ export async function generateNextInvoiceNumber(companyId: string): Promise<stri
 export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceWithDetails> {
   const supabase = createClient()
 
-  let companyName = 'EdLink Pakistan'
+  let companyName = 'EdLink Australia'
   let address = 'Suit 3, Level 4/20 Collins Street, Melbourne 3000'
   let email = 'finance@edlink.com.au'
   let phone = '+61 432 536 123'
@@ -139,17 +163,44 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
     validTemplateId = input.template_id!
   }
 
-  const templateSnapshot: TemplateSnapshot = {
-    company_name: companyName,
-    address,
-    phone,
-    email,
-    payment_details: paymentDetails,
-    currency: 'AUD',
-    footer_terms: 'Thank you for getting services from us',
-    primary_color: '#2563eb',
-    layout_type: 'edlink_v1',
-  }
+  const isAnonymous = Boolean(
+    input.is_anonymous ||
+      input.company_id === 'anonymous-company-id' ||
+      companyName.toLowerCase() === 'anonymous'
+  )
+
+  const templateSnapshot: TemplateSnapshot = isAnonymous
+    ? {
+        company_name: input.custom_company_name?.trim() || 'Company Name',
+        address: input.custom_address || '',
+        phone: input.custom_phone || '',
+        email: input.custom_email || '',
+        payment_details: input.custom_payment_details || '',
+        currency: input.currency || 'AUD',
+        footer_terms: input.footer_terms || 'Thank you for getting services from us',
+        primary_color: '#2563eb',
+        logo_url: input.custom_logo_url || null,
+        layout_type: 'anonymous_v1',
+        header_mode: input.header_mode || (input.custom_logo_url ? 'logo' : 'text'),
+        bill_to_label: input.bill_to_label || 'Issued to:',
+        is_anonymous: true,
+        logo_size: input.logo_size || 60,
+      }
+    : {
+        company_name: companyName,
+        address,
+        phone,
+        email,
+        payment_details: paymentDetails,
+        currency: input.currency || 'AUD',
+        footer_terms: 'Thank you for getting services from us',
+        primary_color: '#2563eb',
+        layout_type: 'edlink_v1',
+        logo_url: '/edlink-logo.png',
+        header_mode: 'logo',
+        bill_to_label: 'BILL TO',
+        is_anonymous: false,
+      }
 
   const invoiceNumber = input.invoice_number || (await generateNextInvoiceNumber(resolvedCompanyId))
 
@@ -177,7 +228,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
       customer_name: input.customer_name,
       reference_name: input.reference_name || null,
       invoice_date: input.invoice_date,
-      due_date: input.due_date,
+      due_date: input.due_date || input.invoice_date,
       subtotal,
       total_amount: subtotal,
     })
@@ -295,6 +346,32 @@ export async function deleteInvoice(invoiceId: string): Promise<void> {
   }
 }
 
+function normalizeInvoice(inv: InvoiceWithDetails): InvoiceWithDetails {
+  if (!inv) return inv
+  const companyName = inv.template_snapshot?.company_name === 'EdLink Pakistan' ? 'EdLink Australia' : inv.template_snapshot?.company_name
+  const templateSnapshot = inv.template_snapshot
+    ? {
+      ...inv.template_snapshot,
+      company_name: companyName || inv.template_snapshot.company_name,
+      logo_url: inv.template_snapshot.logo_url || '/edlink-logo.png',
+    }
+    : inv.template_snapshot
+
+  const companies = inv.companies
+    ? {
+      ...inv.companies,
+      name: inv.companies.name === 'EdLink Pakistan' ? 'EdLink Australia' : inv.companies.name,
+      logo_url: inv.companies.logo_url || '/edlink-logo.png',
+    }
+    : inv.companies
+
+  return {
+    ...inv,
+    template_snapshot: templateSnapshot,
+    companies: companies,
+  }
+}
+
 export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithDetails | null> {
   if (!isValidUUID(invoiceId)) return null
 
@@ -307,7 +384,7 @@ export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithDeta
       .single()
 
     if (error || !invoice) return null
-    return invoice as InvoiceWithDetails
+    return normalizeInvoice(invoice as InvoiceWithDetails)
   } catch (err) {
     return null
   }
@@ -392,8 +469,9 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
       return { invoices: [], totalCount: 0, page, pageSize }
     }
 
+    const rawInvoices = (data as InvoiceWithDetails[]) || []
     return {
-      invoices: (data as InvoiceWithDetails[]) || [],
+      invoices: rawInvoices.map(normalizeInvoice),
       totalCount: count || 0,
       page,
       pageSize,

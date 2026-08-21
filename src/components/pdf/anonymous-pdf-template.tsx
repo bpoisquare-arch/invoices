@@ -30,6 +30,12 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginBottom: 10,
   },
+  companyHeadingText: {
+    fontSize: 20,
+    fontFamily: 'Helvetica-Bold',
+    color: '#0f172a',
+    marginBottom: 8,
+  },
   companyInfoText: {
     fontSize: 9.5,
     color: '#1e293b',
@@ -113,11 +119,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
     color: '#0f172a',
   },
-  refText: {
-    fontSize: 9,
-    color: '#64748b',
-    marginTop: 2,
-  },
   itemsTableContainer: {
     marginTop: 8,
     borderWidth: 1,
@@ -128,143 +129,145 @@ const styles = StyleSheet.create({
     backgroundColor: '#DCE6F1',
     borderBottomWidth: 1,
     borderBottomColor: '#cbd5e1',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   colDescHeader: {
-    width: '76%',
+    width: '75%',
     fontSize: 9.5,
     fontFamily: 'Helvetica-Bold',
     color: '#1e293b',
     textTransform: 'uppercase',
-    paddingVertical: 6.5,
-    paddingHorizontal: 12,
-    borderRightWidth: 1,
-    borderRightColor: '#cbd5e1',
   },
   colAmountHeader: {
-    width: '24%',
+    width: '25%',
     textAlign: 'right',
     fontSize: 9.5,
     fontFamily: 'Helvetica-Bold',
     color: '#1e293b',
     textTransform: 'uppercase',
-    paddingVertical: 6.5,
-    paddingHorizontal: 12,
   },
   tableBodyContainer: {
     flexDirection: 'row',
-    minHeight: 270,
+    minHeight: 220,
+    backgroundColor: '#ffffff',
   },
   tableDescColumn: {
-    width: '76%',
+    width: '75%',
     borderRightWidth: 1,
     borderRightColor: '#cbd5e1',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 10,
+    padding: 12,
   },
   tableAmountColumn: {
-    width: '24%',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 10,
+    width: '25%',
+    padding: 12,
     alignItems: 'flex-end',
   },
   itemDescRow: {
-    marginBottom: 8,
-  },
-  itemAmountRow: {
     marginBottom: 8,
   },
   itemDescText: {
     fontSize: 10.5,
     fontFamily: 'Helvetica',
     color: '#0f172a',
+    lineHeight: 1.3,
+  },
+  itemQtySubtext: {
+    fontSize: 8.5,
+    color: '#64748b',
+    marginTop: 1.5,
+  },
+  itemAmountRow: {
+    marginBottom: 8,
+    alignItems: 'flex-end',
   },
   itemAmountText: {
     fontSize: 10.5,
     fontFamily: 'Helvetica-Bold',
     color: '#0f172a',
     textAlign: 'right',
-  },
-  itemQtySubtext: {
-    fontSize: 8.5,
-    color: '#64748b',
-    marginTop: 2,
+    lineHeight: 1.3,
   },
   tableFooterRow: {
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: '#cbd5e1',
     backgroundColor: '#ffffff',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     alignItems: 'center',
   },
   footerTermsCol: {
-    width: '54%',
-    fontSize: 10,
-    color: '#0f172a',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    width: '60%',
+    fontSize: 9,
+    fontFamily: 'Helvetica',
+    color: '#334155',
   },
   totalLabelCol: {
-    width: '22%',
+    width: '18%',
     textAlign: 'right',
-    fontSize: 11.5,
-    fontFamily: 'Helvetica-Bold',
-    color: '#0f172a',
-    textTransform: 'uppercase',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRightWidth: 1,
-    borderRightColor: '#cbd5e1',
-  },
-  totalValueCol: {
-    width: '24%',
-    textAlign: 'right',
-    fontSize: 11.5,
-    fontFamily: 'Helvetica-Bold',
-    color: '#0f172a',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  paymentSection: {
-    marginTop: 26,
-    paddingTop: 12,
-  },
-  paymentTitle: {
     fontSize: 10,
     fontFamily: 'Helvetica-Bold',
-    textDecoration: 'underline',
     color: '#0f172a',
-    marginBottom: 5,
+    borderRightWidth: 1,
+    borderRightColor: '#cbd5e1',
+    paddingRight: 8,
+    textTransform: 'uppercase',
   },
-  paymentText: {
-    fontSize: 9.5,
+  totalValueCol: {
+    width: '22%',
+    textAlign: 'right',
+    fontSize: 11,
+    fontFamily: 'Helvetica-Bold',
     color: '#0f172a',
+    paddingLeft: 6,
+  },
+  paymentSection: {
+    marginTop: 18,
+    paddingTop: 8,
+  },
+  paymentHeader: {
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+    color: '#0f172a',
+    textDecoration: 'underline',
+    marginBottom: 4,
+  },
+  paymentBody: {
+    fontSize: 9,
+    fontFamily: 'Helvetica',
+    color: '#334155',
     lineHeight: 1.45,
   },
 })
 
-interface EdLinkPDFTemplateProps {
+interface AnonymousPDFTemplateProps {
   invoice: Partial<InvoiceWithDetails>
   snapshot?: TemplateSnapshot
   resolvedLogoUrl?: string
 }
 
-export default function EdLinkPDFTemplate({ invoice, snapshot, resolvedLogoUrl }: EdLinkPDFTemplateProps) {
-  const address = snapshot?.address || invoice.templates?.address || 'Suit 3, Level 4/20 Collins Street, Melbourne 3000'
-  const email = snapshot?.email || invoice.templates?.email || 'finance@edlink.com.au'
-  const phone = snapshot?.phone || invoice.templates?.phone || '+61 432 536 123'
-  const currency = snapshot?.currency || invoice.companies?.currency || 'AUD'
-  const footerTerms = snapshot?.footer_terms || invoice.templates?.footer_terms || 'Thank you for getting services from us'
-  const paymentDetails = snapshot?.payment_details || invoice.templates?.payment_details || `Account Name: Riaz & Sons PTY Ltd\nBSB: 083-543\nAccount No: 72-996-1834\nABN: 62 658 488 469`
-
-  const logoSrc = resolvedLogoUrl || snapshot?.logo_url || invoice.companies?.logo_url || '/edlink-logo.png'
+export default function AnonymousPDFTemplate({
+  invoice,
+  snapshot,
+  resolvedLogoUrl,
+}: AnonymousPDFTemplateProps) {
+  const companyName = snapshot?.company_name || 'Company Name'
+  const address = snapshot?.address || ''
+  const email = snapshot?.email || ''
+  const phone = snapshot?.phone || ''
+  const currency = snapshot?.currency || 'AUD'
+  const footerTerms = snapshot?.footer_terms || 'Thank you for getting services from us'
+  const paymentDetails = snapshot?.payment_details || ''
+  const headerMode = snapshot?.header_mode || (snapshot?.logo_url ? 'logo' : 'text')
+  const logoSrc = resolvedLogoUrl || snapshot?.logo_url || null
+  const billToLabel = snapshot?.bill_to_label || 'ISSUED TO'
 
   const items = invoice.invoice_items || []
   const totalAmount = invoice.total_amount || invoice.subtotal || 0
 
   const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return 'N/A'
+    if (!dateStr) return ''
     const parts = dateStr.split('-')
     if (parts.length === 3) {
       return `${parts[2]}/${parts[1]}/${parts[0]}`
@@ -272,55 +275,86 @@ export default function EdLinkPDFTemplate({ invoice, snapshot, resolvedLogoUrl }
     return dateStr
   }
 
+  const hasDueDate = Boolean(invoice.due_date && invoice.due_date.trim())
+  const hasContactInfo = Boolean(address || email || phone)
+  const logoSize = Math.min(85, Math.max(40, Number(snapshot?.logo_size) || 58))
+
   return (
-    <Document title={`Invoice-${invoice.invoice_number || 'EDL-000001'}`}>
+    <Document title={`Invoice-${invoice.invoice_number || '00001'}`}>
       <Page size="A4" style={styles.page}>
         {/* Header Row */}
         <View style={styles.headerRow}>
           {/* Company Info Left */}
           <View style={styles.leftCompanyBox}>
-            {logoSrc ? (
-              <Image src={logoSrc} style={styles.logoImage} />
+            {headerMode === 'logo' && logoSrc ? (
+              <Image src={logoSrc} style={[styles.logoImage, { height: logoSize, maxHeight: logoSize }]} />
+            ) : headerMode === 'text' && companyName ? (
+              <Text style={styles.companyHeadingText}>{companyName}</Text>
             ) : null}
-            <Text style={styles.companyInfoText}>
-              <Text style={styles.boldLabel}>Add: </Text>{address}
-            </Text>
-            <Text style={styles.companyInfoText}>
-              <Text style={styles.boldLabel}>Email: </Text>{email}
-            </Text>
-            <Text style={styles.companyInfoText}>
-              <Text style={styles.boldLabel}>Phone: </Text>{phone}
-            </Text>
+            {hasContactInfo && (
+              <View>
+                {address ? (
+                  <Text style={styles.companyInfoText}>
+                    <Text style={styles.boldLabel}>Add: </Text>
+                    {address}
+                  </Text>
+                ) : null}
+                {email ? (
+                  <Text style={styles.companyInfoText}>
+                    <Text style={styles.boldLabel}>Email: </Text>
+                    {email}
+                  </Text>
+                ) : null}
+                {phone ? (
+                  <Text style={styles.companyInfoText}>
+                    <Text style={styles.boldLabel}>Phone: </Text>
+                    {phone}
+                  </Text>
+                ) : null}
+              </View>
+            )}
           </View>
 
           {/* Right Header Invoice Metadata */}
           <View style={styles.rightInvoiceBox}>
             <Text style={styles.invoiceTitle}>INVOICE</Text>
             <View style={styles.metaTable}>
-              <View style={styles.metaHeaderRow}>
-                <Text style={styles.metaHeaderCell}>INVOICE #</Text>
-                <Text style={styles.metaHeaderCell}>DATE</Text>
-                <Text style={styles.metaHeaderCell}>DUE DATE</Text>
-              </View>
-              <View style={styles.metaDataRow}>
-                <Text style={styles.metaDataCell}>{invoice.invoice_number || '00327'}</Text>
-                <Text style={styles.metaDataCell}>{formatDate(invoice.invoice_date)}</Text>
-                <Text style={styles.metaDataCell}>{formatDate(invoice.due_date)}</Text>
-              </View>
+              {hasDueDate ? (
+                <>
+                  <View style={styles.metaHeaderRow}>
+                    <Text style={styles.metaHeaderCell}>INVOICE #</Text>
+                    <Text style={styles.metaHeaderCell}>DATE</Text>
+                    <Text style={styles.metaHeaderCell}>DUE DATE</Text>
+                  </View>
+                  <View style={styles.metaDataRow}>
+                    <Text style={styles.metaDataCell}>{invoice.invoice_number || '00001'}</Text>
+                    <Text style={styles.metaDataCell}>{formatDate(invoice.invoice_date)}</Text>
+                    <Text style={styles.metaDataCell}>{formatDate(invoice.due_date)}</Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={styles.metaHeaderRow}>
+                    <Text style={styles.metaHeaderCell}>INVOICE #</Text>
+                    <Text style={styles.metaHeaderCell}>DATE</Text>
+                  </View>
+                  <View style={styles.metaDataRow}>
+                    <Text style={styles.metaDataCell}>{invoice.invoice_number || '00001'}</Text>
+                    <Text style={styles.metaDataCell}>{formatDate(invoice.invoice_date)}</Text>
+                  </View>
+                </>
+              )}
             </View>
           </View>
         </View>
 
-        {/* Bill To Section */}
+        {/* Issued To Section */}
         <View style={styles.billToSection}>
           <View style={styles.billToHeader}>
-            <Text>BILL TO</Text>
+            <Text>{billToLabel}</Text>
           </View>
           <View style={styles.billToBody}>
-            <Text style={styles.customerName}>{invoice.customer_name || '[Customer Name]'}</Text>
-            {invoice.reference_name ? (
-              <Text style={styles.refText}>Ref: {invoice.reference_name}</Text>
-            ) : null}
+            <Text style={styles.customerName}>{invoice.customer_name || '[Client Name]'}</Text>
           </View>
         </View>
 
@@ -332,13 +366,15 @@ export default function EdLinkPDFTemplate({ invoice, snapshot, resolvedLogoUrl }
             <Text style={styles.colAmountHeader}>AMOUNT</Text>
           </View>
 
-          {/* Tall Table Body with Vertical Divider */}
+          {/* Table Body with Vertical Divider */}
           <View style={styles.tableBodyContainer}>
             <View style={styles.tableDescColumn}>
               {items.length > 0 ? (
                 items.map((item, idx) => (
                   <View key={idx} style={styles.itemDescRow}>
-                    <Text style={styles.itemDescText}>{item.description || 'Service Description'}</Text>
+                    <Text style={styles.itemDescText}>
+                      {item.description || 'Service Description'}
+                    </Text>
                     {item.quantity > 1 ? (
                       <Text style={styles.itemQtySubtext}>
                         Qty: {item.quantity} × {item.amount} {currency}
@@ -347,7 +383,9 @@ export default function EdLinkPDFTemplate({ invoice, snapshot, resolvedLogoUrl }
                   </View>
                 ))
               ) : (
-                <Text style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: 10 }}>No items added</Text>
+                <Text style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: 10 }}>
+                  No items added
+                </Text>
               )}
             </View>
 
@@ -356,7 +394,8 @@ export default function EdLinkPDFTemplate({ invoice, snapshot, resolvedLogoUrl }
                 items.map((item, idx) => (
                   <View key={idx} style={styles.itemAmountRow}>
                     <Text style={styles.itemAmountText}>
-                      {Number(item.line_total || item.amount * item.quantity).toFixed(2)} {currency}
+                      {Number(item.line_total || item.amount * item.quantity).toFixed(2)}{' '}
+                      {currency}
                     </Text>
                     {item.quantity > 1 ? (
                       <Text style={[styles.itemQtySubtext, { opacity: 0 }]}>Qty</Text>
@@ -379,11 +418,13 @@ export default function EdLinkPDFTemplate({ invoice, snapshot, resolvedLogoUrl }
           </View>
         </View>
 
-        {/* Payment Details */}
-        <View style={styles.paymentSection}>
-          <Text style={styles.paymentTitle}>Payment Details</Text>
-          <Text style={styles.paymentText}>{paymentDetails}</Text>
-        </View>
+        {/* Payment Details (Omitted if empty) */}
+        {paymentDetails.trim() ? (
+          <View style={styles.paymentSection}>
+            <Text style={styles.paymentHeader}>Payment Details</Text>
+            <Text style={styles.paymentBody}>{paymentDetails}</Text>
+          </View>
+        ) : null}
       </Page>
     </Document>
   )

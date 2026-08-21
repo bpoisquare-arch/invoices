@@ -18,6 +18,10 @@ export interface TemplateSnapshot {
   primary_color?: string | null
   logo_url?: string | null
   layout_type?: string | null
+  header_mode?: 'logo' | 'text' | null
+  bill_to_label?: string | null
+  is_anonymous?: boolean | null
+  logo_size?: number | string | null
   [key: string]: Json | undefined
 }
 

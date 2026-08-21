@@ -80,7 +80,7 @@ export default function InvoicesPage() {
 
   // Load companies dropdown
   useEffect(() => {
-    getCompanies().then(setCompanies).catch(console.error)
+    getCompanies(true).then(setCompanies).catch(console.error)
   }, [])
 
   // Fetch invoices on filter/page change
@@ -182,8 +182,8 @@ export default function InvoicesPage() {
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Total Companies
             </span>
-            <div className="p-2 bg-[#13557A]/10 rounded-lg text-[#003D5C]">
-              <Building2 className="w-5 h-5" />
+            <div className="h-9 w-16 bg-[#13557A]/10 rounded-lg p-1.5 flex items-center justify-center overflow-hidden border border-[#13557A]/15">
+              <img src="/edlink-logo.png" alt="EdLink Australia" className="max-h-full max-w-full object-contain" />
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -381,7 +381,9 @@ export default function InvoicesPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {invoices.map((inv) => {
-                    const compName = inv.template_snapshot?.company_name || inv.companies?.name || 'Company'
+                    const rawName = inv.template_snapshot?.company_name || inv.companies?.name || 'Company'
+                    const compName = rawName === 'EdLink Pakistan' ? 'EdLink Australia' : rawName
+                    const compLogo = inv.template_snapshot?.logo_url || inv.companies?.logo_url || (compName.toLowerCase().includes('edlink') || compName.toLowerCase().includes('australia') ? '/edlink-logo.png' : compName.toLowerCase().includes('aimt') ? '/aimt-logo.png' : null)
                     const curr = inv.template_snapshot?.currency || inv.companies?.currency || 'AUD'
 
                     return (
@@ -403,7 +405,22 @@ export default function InvoicesPage() {
 
                         {/* Company */}
                         <td className="py-4 px-6 text-slate-700 font-medium">
-                          {compName}
+                          <div className="flex items-center gap-2">
+                            {compLogo ? (
+                              <div className="h-6 w-12 rounded bg-slate-50 border border-slate-200 p-0.5 flex items-center justify-center shrink-0 overflow-hidden">
+                                <img
+                                  src={compLogo}
+                                  alt={compName}
+                                  className="max-h-full max-w-full object-contain"
+                                />
+                              </div>
+                            ) : (
+                              <div className="p-1 rounded bg-blue-50 text-blue-600 shrink-0">
+                                <Building2 className="w-3.5 h-3.5" />
+                              </div>
+                            )}
+                            <span className="truncate max-w-[150px]">{compName}</span>
+                          </div>
                         </td>
 
                         {/* Customer */}

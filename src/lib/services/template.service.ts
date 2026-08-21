@@ -4,8 +4,8 @@ import { Template } from '@/lib/supabase/database.types'
 export const FALLBACK_TEMPLATE: Template = {
   id: 'edlink-pk-template-id',
   company_id: 'edlink-pk-id',
-  name: 'EdLink Pakistan Standard Template',
-  company_name: 'EdLink Pakistan',
+  name: 'EdLink Australia Standard Template',
+  company_name: 'EdLink Australia',
   address: 'Suit 3, Level 4/20 Collins Street, Melbourne 3000',
   email: 'finance@edlink.com.au',
   phone: '+61 432 536 123',
@@ -33,6 +33,17 @@ if (typeof window !== 'undefined') {
   }
 }
 
+function normalizeTemplate<T extends Template>(t: T): T {
+  if (!t) return t
+  const companyName = t.company_name === 'EdLink Pakistan' ? 'EdLink Australia' : t.company_name
+  const name = t.name === 'EdLink Pakistan Standard Template' ? 'EdLink Australia Standard Template' : t.name
+  return {
+    ...t,
+    company_name: companyName,
+    name: name,
+  }
+}
+
 export async function getTemplates(): Promise<(Template & { companies?: { name: string; prefix: string } | null })[]> {
   try {
     const supabase = createClient()
@@ -42,16 +53,51 @@ export async function getTemplates(): Promise<(Template & { companies?: { name: 
       .order('created_at', { ascending: true })
 
     if (!error && data && data.length > 0) {
-      return data
+      const valid = data
+        .filter(
+          (t) =>
+            (t.company_name || '').toLowerCase() !== 'anonymous' &&
+            (t.companies?.name || '').toLowerCase() !== 'anonymous'
+        )
+        .map((t) => {
+          const normalized = normalizeTemplate(t)
+          if (normalized.companies && normalized.companies.name === 'EdLink Pakistan') {
+            normalized.companies.name = 'EdLink Australia'
+          }
+          return normalized
+        })
+
+      if (valid.length > 0) return valid
     }
   } catch (err) {
     console.error('Error fetching templates:', err)
   }
 
-  return [{ ...FALLBACK_TEMPLATE, companies: { name: FALLBACK_TEMPLATE.company_name || 'EdLink Pakistan', prefix: 'EDL' } }]
+  return [{ ...FALLBACK_TEMPLATE, companies: { name: FALLBACK_TEMPLATE.company_name || 'EdLink Australia', prefix: 'EDL' } }]
+}
+
+export const ANONYMOUS_TEMPLATE: Template = {
+  id: 'anonymous-template-id',
+  company_id: 'anonymous-company-id',
+  name: 'Anonymous Flexible Template',
+  company_name: '',
+  address: '',
+  email: '',
+  phone: '',
+  payment_details: '',
+  bank_details: '',
+  currency: 'AUD',
+  footer_terms: 'Thank you for getting services from us',
+  primary_color: '#2563eb',
+  layout_type: 'anonymous_v1',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
 }
 
 export async function getTemplateByCompanyId(companyId: string): Promise<Template | null> {
+  if (companyId === 'anonymous-company-id' || companyId === 'anonymous') {
+    return ANONYMOUS_TEMPLATE
+  }
   try {
     const supabase = createClient()
     if (isValidUUID(companyId)) {
@@ -62,7 +108,7 @@ export async function getTemplateByCompanyId(companyId: string): Promise<Templat
         .single()
 
       if (!error && data) {
-        return data
+        return normalizeTemplate(data)
       }
     } else {
       // If companyId is not a UUID, return first template in DB or fallback
@@ -73,7 +119,7 @@ export async function getTemplateByCompanyId(companyId: string): Promise<Templat
         .single()
 
       if (!error && data) {
-        return data
+        return normalizeTemplate(data)
       }
     }
   } catch (err) {
@@ -94,7 +140,7 @@ export async function getTemplateById(id: string): Promise<Template | null> {
         .single()
 
       if (!error && data) {
-        return data
+        return normalizeTemplate(data)
       }
     } else {
       const { data, error } = await supabase
@@ -104,7 +150,7 @@ export async function getTemplateById(id: string): Promise<Template | null> {
         .single()
 
       if (!error && data) {
-        return data
+        return normalizeTemplate(data)
       }
     }
   } catch (err) {
