@@ -71,8 +71,26 @@ function isValidUUID(str?: string | null): boolean {
 }
 
 export async function getCompanyById(id: string): Promise<Company | null> {
-  if (id === 'anonymous-company-id' || id === 'anonymous') {
+  const clean = (id || '').toLowerCase().trim()
+  if (clean === 'anonymous-company-id' || clean === 'anonymous' || clean === 'ano' || clean === 'custom') {
     return ANONYMOUS_COMPANY
+  }
+
+  if (clean === 'edlink' || clean === 'edlink-australia' || clean === 'edl' || clean === 'edlink-pk-id') {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase.from('companies').select('*').limit(1).single()
+      if (data) {
+        return {
+          ...data,
+          name: data.name === 'EdLink Pakistan' ? 'EdLink Australia' : data.name,
+          logo_url: data.logo_url || '/edlink-logo.png',
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    return FALLBACK_COMPANY
   }
 
   try {

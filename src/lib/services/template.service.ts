@@ -95,9 +95,11 @@ export const ANONYMOUS_TEMPLATE: Template = {
 }
 
 export async function getTemplateByCompanyId(companyId: string): Promise<Template | null> {
-  if (companyId === 'anonymous-company-id' || companyId === 'anonymous') {
+  const clean = (companyId || '').toLowerCase().trim()
+  if (clean === 'anonymous-company-id' || clean === 'anonymous' || clean === 'ano' || clean === 'custom') {
     return ANONYMOUS_TEMPLATE
   }
+
   try {
     const supabase = createClient()
     if (isValidUUID(companyId)) {
@@ -110,17 +112,22 @@ export async function getTemplateByCompanyId(companyId: string): Promise<Templat
       if (!error && data) {
         return normalizeTemplate(data)
       }
-    } else {
-      // If companyId is not a UUID, return first template in DB or fallback
-      const { data, error } = await supabase
-        .from('templates')
-        .select('*')
-        .limit(1)
-        .single()
+    }
 
-      if (!error && data) {
-        return normalizeTemplate(data)
-      }
+    // Try finding template for non-anonymous company
+    const { data: list, error: listErr } = await supabase
+      .from('templates')
+      .select('*')
+      .order('created_at', { ascending: true })
+
+    if (!listErr && list && list.length > 0) {
+      const valid = list.find(
+        (t) =>
+          (t.company_name || '').toLowerCase() !== 'anonymous' &&
+          (t.name || '').toLowerCase() !== 'anonymous'
+      )
+      if (valid) return normalizeTemplate(valid)
+      return normalizeTemplate(list[0])
     }
   } catch (err) {
     // Fallback below
@@ -142,16 +149,17 @@ export async function getTemplateById(id: string): Promise<Template | null> {
       if (!error && data) {
         return normalizeTemplate(data)
       }
-    } else {
-      const { data, error } = await supabase
-        .from('templates')
-        .select('*')
-        .limit(1)
-        .single()
+    }
 
-      if (!error && data) {
-        return normalizeTemplate(data)
-      }
+    const { data, error } = await supabase
+      .from('templates')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single()
+
+    if (!error && data) {
+      return normalizeTemplate(data)
     }
   } catch (err) {
     // Fallback below
@@ -164,30 +172,55 @@ export async function updateTemplate(
   id: string,
   updates: Partial<Omit<Template, 'id' | 'company_id' | 'created_at'>>
 ): Promise<Template> {
-  if (!isValidUUID(id)) {
-    return { ...FALLBACK_TEMPLATE, ...updates }
-  }
-
   try {
     const supabase = createClient()
-    const { data, error } = await supabase
-      .from('templates')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single()
+    let targetId = id
 
-    if (error || !data) {
-      throw new Error(error?.message || 'Failed to update template in database')
+    if (!isValidUUID(targetId)) {
+      const { data: first } = await supabase
+        .from('templates')
+        .select('id')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single()
+      if (first) {
+        targetId = first.id
+      }
     }
 
-    return data
+    if (isValidUUID(targetId)) {
+      const { data, error } = await supabase
+        .from('templates')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', targetId)
+        .select()
+        .single()
+
+      if (error || !data) {
+        throw new Error(error?.message || 'Failed to update template in database')
+      }
+
+      // Also sync company name/currency with parent company record if exists
+      if (data.company_id && (updates.company_name || updates.currency)) {
+        await supabase
+          .from('companies')
+          .update({
+            ...(updates.company_name ? { name: updates.company_name } : {}),
+            ...(updates.currency ? { currency: updates.currency } : {}),
+          })
+          .eq('id', data.company_id)
+      }
+
+      return normalizeTemplate(data)
+    }
   } catch (err: any) {
     throw new Error(err?.message || 'Failed to update template')
   }
+
+  return { ...FALLBACK_TEMPLATE, ...updates }
 }
 
 export async function duplicateTemplate(

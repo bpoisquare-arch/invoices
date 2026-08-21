@@ -29,8 +29,10 @@ export default function SelectCompanyPage() {
     loadData()
   }, [])
 
-  function handleSelectCompany(companyId: string) {
-    router.push(`/invoices/new?companyId=${companyId}`)
+  function handleSelectCompany(company: Company) {
+    const isAnon = company.prefix === 'ANO' || company.name.toLowerCase() === 'anonymous'
+    const slug = isAnon ? 'anonymous' : 'edlink'
+    router.push(`/invoices/new?company=${slug}`)
   }
 
   return (
@@ -75,7 +77,7 @@ export default function SelectCompanyPage() {
               <Card
                 key={company.id}
                 className="shadow-xs border-slate-200 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
-                onClick={() => handleSelectCompany(company.id)}
+                onClick={() => handleSelectCompany(company)}
               >
                 <CardHeader>
                   <div className="flex items-center justify-between">

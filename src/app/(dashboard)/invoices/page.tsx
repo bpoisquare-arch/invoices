@@ -182,8 +182,8 @@ export default function InvoicesPage() {
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Total Companies
             </span>
-            <div className="h-9 w-16 bg-[#13557A]/10 rounded-lg p-1.5 flex items-center justify-center overflow-hidden border border-[#13557A]/15">
-              <img src="/edlink-logo.png" alt="EdLink Australia" className="max-h-full max-w-full object-contain" />
+            <div className="p-2 bg-[#13557A]/10 rounded-lg text-[#003D5C]">
+              <Building2 className="w-5 h-5" />
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -221,49 +221,71 @@ export default function InvoicesPage() {
 
       {/* Search & Filters Controls Box */}
       <Card className="shadow-xs border-slate-200 p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
           {/* Multi-field Instant Search */}
-          <div className="md:col-span-2 relative">
+          <div className="md:col-span-6 relative">
             <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
             <Input
               placeholder="Search by Invoice #, Customer, Reference, Company..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className="pl-9 h-10 text-xs"
             />
           </div>
 
           {/* Company Filter */}
-          <div>
-            <Select value={selectedCompany} onValueChange={(val) => { if (val) setSelectedCompany(val); setPage(1); }}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Companies" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Companies</SelectItem>
-                {companies.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name} ({c.prefix})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="md:col-span-3">
+            {(() => {
+              const matched = companies.find((c) => c.id === selectedCompany)
+              const companyDisplay = selectedCompany === 'all' || !matched ? 'All Companies' : `${matched.name} (${matched.prefix})`
+              return (
+                <Select value={selectedCompany} onValueChange={(val) => { if (val) setSelectedCompany(val); setPage(1); }}>
+                  <SelectTrigger className="h-10 text-xs w-full">
+                    <SelectValue placeholder="All Companies">
+                      {companyDisplay}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="min-w-[240px]">
+                    <SelectItem value="all">All Companies</SelectItem>
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} ({c.prefix})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )
+            })()}
           </div>
 
           {/* Sort By */}
-          <div>
-            <Select value={sortBy} onValueChange={(val: any) => { if (val) setSortBy(val); setPage(1); }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sort By" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Newest First</SelectItem>
-                <SelectItem value="oldest">Oldest First</SelectItem>
-                <SelectItem value="number">Invoice Number</SelectItem>
-                <SelectItem value="amount_desc">Amount: High to Low</SelectItem>
-                <SelectItem value="amount_asc">Amount: Low to High</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="md:col-span-3">
+            {(() => {
+              const SORT_MAP: Record<string, string> = {
+                newest: 'Newest First',
+                oldest: 'Oldest First',
+                number: 'Invoice Number',
+                amount_desc: 'Amount: High to Low',
+                amount_asc: 'Amount: Low to High',
+              }
+              const sortDisplay = SORT_MAP[sortBy] || 'Newest First'
+              return (
+                <Select value={sortBy} onValueChange={(val: any) => { if (val) setSortBy(val); setPage(1); }}>
+                  <SelectTrigger className="h-10 text-xs w-full">
+                    <SelectValue placeholder="Sort By">
+                      {sortDisplay}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="min-w-[190px]">
+                    <SelectItem value="newest">Newest First</SelectItem>
+                    <SelectItem value="oldest">Oldest First</SelectItem>
+                    <SelectItem value="number">Invoice Number</SelectItem>
+                    <SelectItem value="amount_desc">Amount: High to Low</SelectItem>
+                    <SelectItem value="amount_asc">Amount: Low to High</SelectItem>
+                  </SelectContent>
+                </Select>
+              )
+            })()}
           </div>
         </div>
 

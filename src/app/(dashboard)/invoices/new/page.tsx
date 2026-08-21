@@ -12,7 +12,7 @@ import { Loader2 } from 'lucide-react'
 
 function CreateInvoiceContent() {
   const searchParams = useSearchParams()
-  const companyId = searchParams.get('companyId')
+  const companyParam = searchParams.get('company') || searchParams.get('companyId') || 'edlink'
   const router = useRouter()
 
   const [company, setCompany] = useState<Company | null>(null)
@@ -25,21 +25,12 @@ function CreateInvoiceContent() {
         setIsLoading(true)
         await fetch('/api/setup-db')
 
-        let targetCompanyId = companyId
-        if (!targetCompanyId) {
-          const comps = await getCompanies()
-          if (comps.length > 0) {
-            targetCompanyId = comps[0].id
-          }
-        }
-
-        if (targetCompanyId) {
-          const comp = await getCompanyById(targetCompanyId)
-          if (comp) {
-            setCompany(comp)
-            const t = await getTemplateByCompanyId(targetCompanyId)
-            setTemplate(t)
-          }
+        const comp = await getCompanyById(companyParam)
+        if (comp) {
+          setCompany(comp)
+          const target = comp.id === 'anonymous-company-id' || comp.name.toLowerCase() === 'anonymous' ? 'anonymous' : comp.id
+          const t = await getTemplateByCompanyId(target)
+          setTemplate(t)
         }
       } catch (err) {
         console.error('Error loading company for invoice creation:', err)
@@ -48,13 +39,13 @@ function CreateInvoiceContent() {
       }
     }
     loadData()
-  }, [companyId])
+  }, [companyParam])
 
   if (isLoading || !company) {
     return (
       <div className="p-12 text-center text-slate-500 flex items-center justify-center gap-3">
         <Loader2 className="w-6 h-6 animate-spin text-[#003D5C]" />
-        <span>Loading EdLink Australia Invoice Template...</span>
+        <span>Loading Invoice Template...</span>
       </div>
     )
   }

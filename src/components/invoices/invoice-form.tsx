@@ -641,7 +641,9 @@ export default function InvoiceForm({
                       }}
                     >
                       <SelectTrigger className="h-9 text-xs font-bold font-mono">
-                        <SelectValue placeholder="Currency" />
+                        <SelectValue placeholder="Currency">
+                          {selectedCurrency}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {CURRENCIES.map((c) => (

@@ -15,7 +15,7 @@ export async function ensureSeedData() {
     }
 
     if (existingCompanies && existingCompanies.length > 0) {
-      // 1. Remove any inadvertently created Anonymous company
+      // Clean up any inadvertently created Anonymous company from previous runs
       const { data: anonComps } = await supabase.from('companies').select('id').ilike('name', 'anonymous')
       if (anonComps && anonComps.length > 0) {
         for (const ac of anonComps) {
@@ -24,35 +24,7 @@ export async function ensureSeedData() {
         }
       }
 
-      // 2. Ensure EdLink Australia company & template has full details restored
-      await supabase
-        .from('companies')
-        .update({
-          name: 'EdLink Australia',
-          prefix: 'EDL',
-          currency: 'AUD',
-          logo_url: '/edlink-logo.png',
-        })
-        .or('name.eq.EdLink Pakistan,name.eq.EdLink Australia,name.eq.Anonymous')
-
-      await supabase
-        .from('templates')
-        .update({
-          name: 'EdLink Australia Standard Template',
-          company_name: 'EdLink Australia',
-          address: 'Suit 3, Level 4/20 Collins Street, Melbourne 3000',
-          email: 'finance@edlink.com.au',
-          phone: '+61 432 536 123',
-          payment_details: 'Account Name: Riaz & Sons PTY Ltd\nBSB: 083-543\nAccount No: 72-996-1834\nABN: 62 658 488 469',
-          bank_details: 'Riaz & Sons PTY Ltd (BSB: 083-543, Account: 72-996-1834)',
-          currency: 'AUD',
-          footer_terms: 'Thank you for getting services from us',
-          primary_color: '#2563eb',
-          layout_type: 'edlink_v1',
-        })
-        .or('company_name.eq.EdLink Pakistan,company_name.eq.EdLink Australia,company_name.eq.Anonymous')
-
-      return { success: true, message: 'Companies updated and restored.', count: existingCompanies.length }
+      return { success: true, message: 'Existing companies loaded.', count: existingCompanies.length }
     }
 
     // 1. EdLink Pakistan
