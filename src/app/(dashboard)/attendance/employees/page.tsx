@@ -5,18 +5,17 @@ import Link from 'next/link'
 import {
   Users,
   UserPlus,
+  Plus,
   Search,
   Edit2,
   Trash2,
+  Eye,
   Calendar,
   History,
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
   Loader2,
-  ShieldCheck,
-  Building,
-  UserCheck,
   FileSpreadsheet,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,15 +39,26 @@ import {
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
 import { Employee } from '@/lib/supabase/database.types'
 
+const BRANCHES = ['Lahore', 'Multan']
+
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
 
+  // Pagination
+  const [page, setPage] = useState(1)
+  const pageSize = 10
+
+  const todayStr = new Date().toISOString().split('T')[0]
+
   // Add Employee Modal
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesignation, setNewDesignation] = useState('')
+  const [newBranch, setNewBranch] = useState('Multan')
+  const [newJoiningDate, setNewJoiningDate] = useState(todayStr)
+  const [newSalary, setNewSalary] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [addWarning, setAddWarning] = useState<string | null>(null)
   const [addError, setAddError] = useState<string | null>(null)
@@ -57,6 +67,9 @@ export default function EmployeesPage() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [editName, setEditName] = useState('')
   const [editDesignation, setEditDesignation] = useState('')
+  const [editBranch, setEditBranch] = useState('Multan')
+  const [editJoiningDate, setEditJoiningDate] = useState(todayStr)
+  const [editSalary, setEditSalary] = useState('')
   const [editActive, setEditActive] = useState(true)
   const [editError, setEditError] = useState<string | null>(null)
 
@@ -71,7 +84,22 @@ export default function EmployeesPage() {
       const res = await fetch('/api/attendance/employees')
       const data = await res.json()
       if (data.success && data.employees) {
-        setEmployees(data.employees)
+        let localMap: Record<string, any> = {}
+        try {
+          const cached = localStorage.getItem('emp_meta_cache_v2')
+          if (cached) localMap = JSON.parse(cached)
+        } catch {}
+
+        const merged = data.employees.map((e: any) => {
+          const l = localMap[e.id] || localMap[e.employee_id] || {}
+          return {
+            ...e,
+            branch: e.branch || l.branch || 'Multan',
+            salary: e.salary !== undefined && e.salary !== null ? e.salary : (l.salary !== undefined ? l.salary : null),
+            joining_date: e.joining_date || l.joining_date || e.created_at,
+          }
+        })
+        setEmployees(merged)
       }
     } catch (err) {
       console.error('Error fetching employees:', err)
@@ -117,6 +145,9 @@ export default function EmployeesPage() {
         body: JSON.stringify({
           name: newName.trim(),
           designation: newDesignation.trim(),
+          branch: newBranch,
+          joining_date: newJoiningDate,
+          salary: newSalary ? Number(newSalary) : null,
         }),
       })
 
@@ -125,9 +156,31 @@ export default function EmployeesPage() {
         throw new Error(data.error || 'Failed to create employee.')
       }
 
+      if (data.employee) {
+        try {
+          let localMap: Record<string, any> = {}
+          const cached = localStorage.getItem('emp_meta_cache_v2')
+          if (cached) localMap = JSON.parse(cached)
+          localMap[data.employee.id] = {
+            branch: newBranch,
+            joining_date: newJoiningDate,
+            salary: newSalary ? Number(newSalary) : null,
+          }
+          localMap[data.employee.employee_id] = {
+            branch: newBranch,
+            joining_date: newJoiningDate,
+            salary: newSalary ? Number(newSalary) : null,
+          }
+          localStorage.setItem('emp_meta_cache_v2', JSON.stringify(localMap))
+        } catch {}
+      }
+
       setIsAddOpen(false)
       setNewName('')
       setNewDesignation('')
+      setNewBranch('Multan')
+      setNewJoiningDate(todayStr)
+      setNewSalary('')
       setAddWarning(null)
       fetchEmployees()
     } catch (err: any) {
@@ -151,6 +204,9 @@ export default function EmployeesPage() {
           id: editingEmployee.id,
           name: editName.trim(),
           designation: editDesignation.trim(),
+          branch: editBranch,
+          joining_date: editJoiningDate,
+          salary: editSalary ? Number(editSalary) : null,
           is_active: editActive,
         }),
       })
@@ -159,6 +215,41 @@ export default function EmployeesPage() {
       if (!data.success) {
         throw new Error(data.error || 'Failed to update employee.')
       }
+
+      // Update local storage cache
+      try {
+        let localMap: Record<string, any> = {}
+        const cached = localStorage.getItem('emp_meta_cache_v2')
+        if (cached) localMap = JSON.parse(cached)
+        localMap[editingEmployee.id] = {
+          branch: editBranch,
+          joining_date: editJoiningDate,
+          salary: editSalary ? Number(editSalary) : null,
+        }
+        localMap[editingEmployee.employee_id] = {
+          branch: editBranch,
+          joining_date: editJoiningDate,
+          salary: editSalary ? Number(editSalary) : null,
+        }
+        localStorage.setItem('emp_meta_cache_v2', JSON.stringify(localMap))
+      } catch {}
+
+      // Immediately update local state
+      setEmployees((prev) =>
+        prev.map((emp) =>
+          emp.id === editingEmployee.id
+            ? {
+                ...emp,
+                name: editName.trim(),
+                designation: editDesignation.trim(),
+                branch: editBranch,
+                joining_date: editJoiningDate,
+                salary: editSalary ? Number(editSalary) : null,
+                is_active: editActive,
+              }
+            : emp
+        )
+      )
 
       setEditingEmployee(null)
       fetchEmployees()
@@ -173,6 +264,10 @@ export default function EmployeesPage() {
     setEditingEmployee(emp)
     setEditName(emp.name)
     setEditDesignation(emp.designation)
+    setEditBranch(emp.branch || 'Multan')
+    const rawDate = emp.joining_date || emp.created_at
+    setEditJoiningDate(rawDate ? rawDate.split('T')[0] : todayStr)
+    setEditSalary(emp.salary ? String(emp.salary) : '')
     setEditActive(emp.is_active)
     setEditError(null)
   }
@@ -206,20 +301,48 @@ export default function EmployeesPage() {
     return (
       emp.name.toLowerCase().includes(q) ||
       emp.employee_id.toLowerCase().includes(q) ||
-      emp.designation.toLowerCase().includes(q)
+      emp.designation.toLowerCase().includes(q) ||
+      (emp.branch && emp.branch.toLowerCase().includes(q))
     )
   })
 
+  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / pageSize))
+  const paginatedEmployees = filteredEmployees.slice((page - 1) * pageSize, page * pageSize)
+
+  const formatJoiningDate = (dateStr?: string | null) => {
+    if (!dateStr) return '--'
+    try {
+      const clean = dateStr.split('T')[0]
+      const parts = clean.split('-')
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      }
+      const d = new Date(dateStr)
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    } catch {
+      return dateStr
+    }
+  }
+
+  // Generate deterministic avatar background based on initial
+  const getAvatarColor = (name: string) => {
+    const char = name.trim().charAt(0).toUpperCase()
+    if (char >= 'A' && char <= 'H') return 'bg-[#131B2E] text-white'
+    if (char >= 'I' && char <= 'P') return 'bg-[#0058BE] text-white'
+    return 'bg-[#007A7A] text-white'
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto font-sans">
-      {/* Header Matching Screenshot */}
+      {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-['Montserrat'] text-3xl font-extrabold text-slate-900 tracking-tight">
             Employees
           </h1>
           <p className="text-sm text-slate-500 mt-1 font-medium">
-            Manage employees and their attendance profiles.
+            Manage employees, branch assignments, salaries, and their attendance profiles.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -236,12 +359,17 @@ export default function EmployeesPage() {
           <Button
             onClick={() => {
               setIsAddOpen(true)
+              setNewName('')
+              setNewDesignation('')
+              setNewBranch('Multan')
+              setNewJoiningDate(todayStr)
+              setNewSalary('')
               setAddError(null)
               setAddWarning(null)
             }}
             className="h-9 px-4 bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5 shadow-sm cursor-pointer transition-all"
           >
-            <UserPlus className="w-4 h-4" />
+            <Plus className="w-4 h-4" />
             ADD EMPLOYEE
           </Button>
         </div>
@@ -253,9 +381,12 @@ export default function EmployeesPage() {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
           <Input
             type="text"
-            placeholder="Search by Employee Name, Employee ID, Designation..."
+            placeholder="Search by Employee Name, Employee ID, Designation, Branch..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
             className="pl-9 text-xs border-slate-200"
           />
         </div>
@@ -267,108 +398,130 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* Employees Table */}
+      {/* Data Table Card */}
       <div className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider">
+            <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="py-3 px-4">Employee ID</th>
-                <th className="py-3 px-4">Employee Name</th>
-                <th className="py-3 px-4">Designation</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Date Added</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3.5 px-4">EMPLOYEE ID</th>
+                <th className="py-3.5 px-4">EMPLOYEE NAME</th>
+                <th className="py-3.5 px-4">DESIGNATION</th>
+                <th className="py-3.5 px-3 text-center">BRANCH</th>
+                <th className="py-3.5 px-4 text-right">SALARY</th>
+                <th className="py-3.5 px-4">ATTENDANCE</th>
+                <th className="py-3.5 px-3 text-center">STATUS</th>
+                <th className="py-3.5 px-4">JOINING DATE</th>
+                <th className="py-3.5 px-4 text-right">ACTIONS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-slate-400">
+                  <td colSpan={9} className="py-16 text-center text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#009D9E]" />
                     Loading employees...
                   </td>
                 </tr>
               ) : filteredEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-slate-400">
+                  <td colSpan={9} className="py-16 text-center text-slate-400">
                     <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                     No employees found matching your search query.
                   </td>
                 </tr>
               ) : (
-                filteredEmployees.map((emp) => {
+                paginatedEmployees.map((emp) => {
                   const initial = emp.name.trim().charAt(0).toUpperCase() || 'E'
+                  const avatarColor = getAvatarColor(emp.name)
+                  const branch = emp.branch || 'Multan'
                   return (
                     <tr key={emp.id} className="hover:bg-slate-50/80 transition-colors group">
-                      {/* ID */}
-                      <td className="py-3.5 px-4 font-mono font-bold text-xs text-[#003D5C]">
+                      {/* Employee ID */}
+                      <td className="py-4 px-4 font-mono font-bold text-xs text-slate-600">
                         {emp.employee_id}
                       </td>
 
-                      {/* Name with Avatar */}
-                      <td className="py-3.5 px-4">
+                      {/* Employee Name with Initial Badge */}
+                      <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#003D5C]/10 text-[#003D5C] font-extrabold text-xs flex items-center justify-center shrink-0 border border-[#003D5C]/15">
+                          <div
+                            className={`w-8 h-8 rounded-full ${avatarColor} font-extrabold text-xs flex items-center justify-center shrink-0 shadow-2xs`}
+                          >
                             {initial}
                           </div>
-                          <div>
-                            <Link
-                              href={`/attendance/employees/${emp.id}`}
-                              className="font-bold text-slate-900 hover:text-[#009D9E] transition-colors block text-xs"
-                            >
-                              {emp.name}
-                            </Link>
-                          </div>
+                          <Link
+                            href={`/attendance/employees/${emp.id}`}
+                            className="font-bold text-slate-900 hover:text-[#0058BE] transition-colors text-xs"
+                          >
+                            {emp.name}
+                          </Link>
                         </div>
                       </td>
 
                       {/* Designation */}
-                      <td className="py-3.5 px-4 font-medium text-slate-600 text-xs">
+                      <td className="py-4 px-4 font-medium text-slate-600 text-xs">
                         {emp.designation}
                       </td>
 
-                      {/* Status */}
-                      <td className="py-3.5 px-4">
+                      {/* Branch */}
+                      <td className="py-4 px-3 text-center">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${
-                            emp.is_active
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
-                              : 'bg-slate-100 text-slate-500 border border-slate-200'
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold ${
+                            branch.toLowerCase() === 'lahore'
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                              : 'bg-blue-100 text-blue-800 border border-blue-200'
                           }`}
                         >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              emp.is_active ? 'bg-emerald-500' : 'bg-slate-400'
-                            }`}
-                          />
+                          {branch}
+                        </span>
+                      </td>
+
+                      {/* Salary */}
+                      <td className="py-4 px-4 text-right font-mono font-bold text-slate-800 text-xs">
+                        {emp.salary ? (
+                          <span>PKR {Number(emp.salary).toLocaleString()}</span>
+                        ) : (
+                          <span className="text-slate-400 font-normal">—</span>
+                        )}
+                      </td>
+
+                      {/* Attendance */}
+                      <td className="py-4 px-4">
+                        <Link
+                          href={`/attendance/employees/${emp.id}`}
+                          className="text-[#0058BE] hover:text-[#004395] font-semibold text-xs inline-flex items-center gap-1.5 hover:underline"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-[#0058BE]" />
+                          View Attendance
+                        </Link>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-4 px-3 text-center">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
+                            emp.is_active
+                              ? 'bg-[#D1FAE5] text-[#065F46]'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
                           {emp.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
 
-                      {/* Date Added */}
-                      <td className="py-3.5 px-4 text-slate-500 font-medium text-xs">
-                        {new Date(emp.created_at).toLocaleDateString()}
+                      {/* Joining Date */}
+                      <td className="py-4 px-4 text-slate-600 font-medium text-xs">
+                        {formatJoiningDate(emp.joining_date || emp.created_at)}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3.5 px-4 text-right space-x-1.5">
-                        <Link href={`/attendance/employees/${emp.id}`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 text-xs font-semibold text-[#009D9E] hover:bg-[#009D9E]/10 gap-1"
-                          >
-                            <History className="w-3.5 h-3.5" />
-                            Attendance History
-                          </Button>
-                        </Link>
-
+                      <td className="py-4 px-4 text-right space-x-1.5 whitespace-nowrap">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => openEditModal(emp)}
-                          className="h-8 text-xs font-semibold text-slate-600 hover:bg-slate-100 gap-1"
+                          className="h-8 text-xs font-semibold text-slate-600 hover:bg-slate-100 gap-1 cursor-pointer"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                           Edit
@@ -381,7 +534,7 @@ export default function EmployeesPage() {
                             setEmployeeToDelete(emp)
                             setDeleteError(null)
                           }}
-                          className="h-8 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 gap-1"
+                          className="h-8 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 gap-1 cursor-pointer"
                           title="Delete Employee"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -395,11 +548,39 @@ export default function EmployeesPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-slate-200 bg-white flex items-center justify-between text-xs text-slate-500">
+          <span>
+            Showing {filteredEmployees.length > 0 ? (page - 1) * pageSize + 1 : 0} to{' '}
+            {Math.min(page * pageSize, filteredEmployees.length)} of {filteredEmployees.length} entries
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(p - 1, 1))}
+              className="h-8 px-3 text-xs font-medium border-slate-200 text-slate-700 disabled:opacity-40 cursor-pointer"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+              className="h-8 px-3 text-xs font-medium border-slate-200 text-slate-700 disabled:opacity-40 cursor-pointer"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Add Employee Modal */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="sm:max-w-md bg-white border border-slate-200 shadow-xl rounded-xl">
+        <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl rounded-xl">
           <DialogHeader className="border-b border-slate-100 pb-3">
             <DialogTitle className="text-base font-bold text-[#003D5C] flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-[#009D9E]" />
@@ -438,9 +619,6 @@ export default function EmployeesPage() {
                 required
                 className="text-sm border-slate-200"
               />
-              <p className="text-[10px] text-slate-400">
-                This exact name will be used as the matching key when importing Excel attendance files.
-              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -459,6 +637,56 @@ export default function EmployeesPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Branch & Joining Date Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Branch *
+                </Label>
+                <Select value={newBranch} onValueChange={(val) => setNewBranch(val || 'Multan')} required>
+                  <SelectTrigger className="text-sm border-slate-200 bg-white">
+                    <SelectValue placeholder="Select Branch..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BRANCHES.map((b) => (
+                      <SelectItem key={b} value={b}>
+                        {b}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Joining Date *
+                </Label>
+                <Input
+                  type="date"
+                  value={newJoiningDate}
+                  onChange={(e) => setNewJoiningDate(e.target.value)}
+                  required
+                  className="text-sm border-slate-200 font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Salary Field */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Monthly Salary (PKR) (Optional)
+              </Label>
+              <Input
+                type="number"
+                placeholder="e.g. 75000"
+                min="0"
+                step="1000"
+                value={newSalary}
+                onChange={(e) => setNewSalary(e.target.value)}
+                className="text-sm border-slate-200 font-mono"
+              />
             </div>
 
             <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg text-xs text-slate-500 space-y-1">
@@ -481,7 +709,7 @@ export default function EmployeesPage() {
               <Button
                 type="submit"
                 disabled={isSaving || !newDesignation}
-                className="bg-[#009D9E] hover:bg-[#007A7A] text-white text-xs font-bold uppercase tracking-wider gap-1.5"
+                className="bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 Create Employee
@@ -493,7 +721,7 @@ export default function EmployeesPage() {
 
       {/* Edit Employee Modal */}
       <Dialog open={!!editingEmployee} onOpenChange={(open: boolean) => !open && setEditingEmployee(null)}>
-        <DialogContent className="sm:max-w-md bg-white border border-slate-200 shadow-xl rounded-xl">
+        <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl rounded-xl">
           <DialogHeader className="border-b border-slate-100 pb-3">
             <DialogTitle className="text-base font-bold text-[#003D5C] flex items-center gap-2">
               <Edit2 className="w-5 h-5 text-[#009D9E]" />
@@ -546,6 +774,56 @@ export default function EmployeesPage() {
               </Select>
             </div>
 
+            {/* Branch & Joining Date Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Branch *
+                </Label>
+                <Select value={editBranch} onValueChange={(val) => setEditBranch(val || 'Multan')} required>
+                  <SelectTrigger className="text-sm border-slate-200 bg-white">
+                    <SelectValue placeholder="Select Branch..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BRANCHES.map((b) => (
+                      <SelectItem key={b} value={b}>
+                        {b}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Joining Date *
+                </Label>
+                <Input
+                  type="date"
+                  value={editJoiningDate}
+                  onChange={(e) => setEditJoiningDate(e.target.value)}
+                  required
+                  className="text-sm border-slate-200 font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Salary Field */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Monthly Salary (PKR) (Optional)
+              </Label>
+              <Input
+                type="number"
+                placeholder="e.g. 75000"
+                min="0"
+                step="1000"
+                value={editSalary}
+                onChange={(e) => setEditSalary(e.target.value)}
+                className="text-sm border-slate-200 font-mono"
+              />
+            </div>
+
             <div className="flex items-center gap-2 pt-1">
               <input
                 type="checkbox"
@@ -572,7 +850,7 @@ export default function EmployeesPage() {
               <Button
                 type="submit"
                 disabled={isSaving}
-                className="bg-[#009D9E] hover:bg-[#007A7A] text-white text-xs font-bold uppercase tracking-wider gap-1.5"
+                className="bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 Save Changes
@@ -616,6 +894,10 @@ export default function EmployeesPage() {
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-semibold">Designation:</span>
                 <span className="font-medium text-slate-700">{employeeToDelete.designation}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-semibold">Branch:</span>
+                <span className="font-medium text-slate-700">{employeeToDelete.branch || 'Multan'}</span>
               </div>
             </div>
           )}

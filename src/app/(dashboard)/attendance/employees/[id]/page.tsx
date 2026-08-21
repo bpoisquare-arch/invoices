@@ -181,16 +181,24 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             {employee?.name?.charAt(0) || 'E'}
           </div>
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h2 className="font-['Montserrat'] text-2xl font-extrabold text-[#003D5C] tracking-tight">
                 {employee?.name || 'Employee'}
               </h2>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#009D9E]/10 text-[#009D9E]">
                 {employee?.employee_id || 'N/A'}
               </span>
+              <span className={`px-2.5 py-0.5 rounded text-xs font-bold ${
+                (employee?.branch || 'Multan').toLowerCase() === 'lahore'
+                  ? 'bg-purple-100 text-purple-800'
+                  : 'bg-blue-100 text-blue-800'
+              }`}>
+                {employee?.branch || 'Multan'} Branch
+              </span>
             </div>
             <p className="text-sm font-semibold text-slate-500 mt-0.5">
-              {employee?.designation || 'Staff'} • Registered on {employee ? new Date(employee.created_at).toLocaleDateString() : ''}
+              {employee?.designation || 'Staff'} • Joined: {employee?.joining_date ? new Date(employee.joining_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (employee ? new Date(employee.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '')}
+              {employee?.salary ? ` • Salary: PKR ${Number(employee.salary).toLocaleString()}` : ''}
             </p>
           </div>
         </div>

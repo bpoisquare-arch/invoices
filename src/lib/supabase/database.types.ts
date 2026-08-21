@@ -396,6 +396,9 @@ export interface Database {
           name: string
           normalized_name: string
           designation: string
+          branch?: string | null
+          salary?: number | null
+          joining_date?: string | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -407,6 +410,9 @@ export interface Database {
           name: string
           normalized_name: string
           designation: string
+          branch?: string | null
+          salary?: number | null
+          joining_date?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -418,6 +424,9 @@ export interface Database {
           name?: string
           normalized_name?: string
           designation?: string
+          branch?: string | null
+          salary?: number | null
+          joining_date?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string

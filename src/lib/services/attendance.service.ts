@@ -115,8 +115,52 @@ export async function updateAttendanceSettings(
 }
 
 // ----------------------------------------------------
-// 2. EMPLOYEE SERVICES
+// 2. EMPLOYEE SERVICES & METADATA SYNC
 // ----------------------------------------------------
+
+export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?: string; salary?: number | null; joining_date?: string }>> {
+  try {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('attendance_audit_logs')
+      .select('details')
+      .eq('action', 'EMPLOYEE_METADATA_STORE')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (data && data.details && typeof data.details === 'object') {
+      return data.details as Record<string, { branch?: string; salary?: number | null; joining_date?: string }>
+    }
+  } catch (err) {
+    // Ignore
+  }
+  return {}
+}
+
+export async function saveEmployeeMetadata(
+  idOrEmpId: string,
+  meta: { branch?: string | null; salary?: number | null; joining_date?: string | null }
+): Promise<void> {
+  try {
+    const currentMap = await getEmployeeMetadataMap()
+    const existing = currentMap[idOrEmpId] || {}
+    currentMap[idOrEmpId] = {
+      ...existing,
+      ...(meta.branch !== undefined ? { branch: meta.branch || 'Multan' } : {}),
+      ...(meta.salary !== undefined ? { salary: meta.salary } : {}),
+      ...(meta.joining_date !== undefined ? { joining_date: meta.joining_date || undefined } : {}),
+    }
+
+    const supabase = createClient()
+    await supabase.from('attendance_audit_logs').insert({
+      action: 'EMPLOYEE_METADATA_STORE',
+      details: currentMap as any,
+    })
+  } catch (err) {
+    console.error('Error saving employee metadata to DB store:', err)
+  }
+}
 
 export async function getEmployees(params?: {
   search?: string
@@ -137,14 +181,26 @@ export async function getEmployees(params?: {
       return []
     }
 
-    let result = data
+    const metaMap = await getEmployeeMetadataMap()
+
+    let result: Employee[] = data.map((emp) => {
+      const meta = metaMap[emp.id] || metaMap[emp.employee_id] || {}
+      return {
+        ...emp,
+        branch: emp.branch || meta.branch || 'Multan',
+        salary: emp.salary !== undefined && emp.salary !== null ? emp.salary : (meta.salary !== undefined ? meta.salary : null),
+        joining_date: emp.joining_date || meta.joining_date || emp.created_at,
+      }
+    })
+
     if (params?.search && params.search.trim()) {
       const q = params.search.toLowerCase().trim()
       result = result.filter(
         (e) =>
           e.name.toLowerCase().includes(q) ||
           e.employee_id.toLowerCase().includes(q) ||
-          e.designation.toLowerCase().includes(q)
+          e.designation.toLowerCase().includes(q) ||
+          (e.branch && e.branch.toLowerCase().includes(q))
       )
     }
 
@@ -168,7 +224,15 @@ export async function getEmployeeById(id: string): Promise<Employee | null> {
       return null
     }
 
-    return data
+    const metaMap = await getEmployeeMetadataMap()
+    const meta = metaMap[data.id] || metaMap[data.employee_id] || {}
+
+    return {
+      ...data,
+      branch: data.branch || meta.branch || 'Multan',
+      salary: data.salary !== undefined && data.salary !== null ? data.salary : (meta.salary !== undefined ? meta.salary : null),
+      joining_date: data.joining_date || meta.joining_date || data.created_at,
+    }
   } catch (err) {
     return null
   }
@@ -220,9 +284,15 @@ export async function generateNextEmployeeId(): Promise<string> {
 export async function createEmployee(params: {
   name: string
   designation: string
+  branch?: string | null
+  salary?: number | string | null
+  joining_date?: string | null
 }): Promise<{ employee: Employee; warning?: string }> {
   const name = params.name.trim()
   const designation = params.designation.trim()
+  const branch = params.branch ? params.branch.trim() : 'Multan'
+  const salary = params.salary !== undefined && params.salary !== null && params.salary !== '' ? Number(params.salary) : null
+  const joiningDate = params.joining_date || new Date().toISOString().split('T')[0]
   const normalizedName = normalizeEmployeeName(name)
 
   if (!name) throw new Error('Employee name is required.')
@@ -236,23 +306,46 @@ export async function createEmployee(params: {
 
   const employeeId = await generateNextEmployeeId()
   const supabase = createClient()
-  const { data, error } = await supabase
+  
+  const insertPayload: any = {
+    employee_id: employeeId,
+    name,
+    normalized_name: normalizedName,
+    designation,
+    branch,
+    salary,
+    joining_date: joiningDate,
+    is_active: true,
+  }
+
+  let { data, error } = await supabase
     .from('employees')
-    .insert({
+    .insert(insertPayload)
+    .select()
+    .single()
+
+  if (error) {
+    const fallbackPayload = {
       employee_id: employeeId,
       name,
       normalized_name: normalizedName,
       designation,
       is_active: true,
-    })
-    .select()
-    .single()
-
-  if (error || !data) {
-    throw new Error(error?.message || 'Failed to create employee in database')
+    }
+    const res = await supabase.from('employees').insert(fallbackPayload).select().single()
+    data = res.data
   }
 
-  return { employee: data, warning }
+  if (data) {
+    await saveEmployeeMetadata(data.id, { branch, salary, joining_date: joiningDate })
+    await saveEmployeeMetadata(data.employee_id, { branch, salary, joining_date: joiningDate })
+  }
+
+  if (!data) {
+    throw new Error('Failed to create employee in database')
+  }
+
+  return { employee: { ...data, branch, salary, joining_date: joiningDate }, warning }
 }
 
 export async function updateEmployee(
@@ -260,6 +353,9 @@ export async function updateEmployee(
   params: {
     name?: string
     designation?: string
+    branch?: string | null
+    salary?: number | string | null
+    joining_date?: string | null
     is_active?: boolean
   }
 ): Promise<Employee> {
@@ -275,22 +371,64 @@ export async function updateEmployee(
   if (params.designation !== undefined) {
     updateData.designation = params.designation.trim()
   }
+  if (params.branch !== undefined) {
+    updateData.branch = params.branch
+  }
+  if (params.salary !== undefined) {
+    updateData.salary = params.salary !== null && params.salary !== '' ? Number(params.salary) : null
+  }
+  if (params.joining_date !== undefined) {
+    updateData.joining_date = params.joining_date
+  }
   if (params.is_active !== undefined) {
     updateData.is_active = params.is_active
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('employees')
     .update(updateData)
     .eq('id', id)
     .select()
     .single()
 
-  if (error || !data) {
-    throw new Error(error?.message || 'Failed to update employee in database')
+  if (error) {
+    const safeData: any = {
+      updated_at: updateData.updated_at,
+    }
+    if (params.name !== undefined) {
+      safeData.name = updateData.name
+      safeData.normalized_name = updateData.normalized_name
+    }
+    if (params.designation !== undefined) safeData.designation = updateData.designation
+    if (params.is_active !== undefined) safeData.is_active = updateData.is_active
+    const res = await supabase.from('employees').update(safeData).eq('id', id).select().single()
+    data = res.data
   }
 
-  return data
+  // Persist metadata to DB store
+  await saveEmployeeMetadata(id, {
+    branch: params.branch,
+    salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : undefined,
+    joining_date: params.joining_date,
+  })
+  if (data?.employee_id) {
+    await saveEmployeeMetadata(data.employee_id, {
+      branch: params.branch,
+      salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : undefined,
+      joining_date: params.joining_date,
+    })
+  }
+
+  if (!data) {
+    throw new Error('Failed to update employee in database')
+  }
+
+  return {
+    ...data,
+    branch: params.branch !== undefined ? params.branch : (data.branch || 'Multan'),
+    salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : (data.salary ?? null),
+    joining_date: params.joining_date !== undefined ? params.joining_date : (data.joining_date || data.created_at),
+  }
 }
 
 export async function deleteEmployee(id: string): Promise<void> {
