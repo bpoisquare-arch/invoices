@@ -61,6 +61,7 @@ export interface StudentInstallmentSchedule {
   scholarship: number
   total_amount: number
   first_installment_amount: number
+  initial_fees?: number[]
   schedule_items: InstallmentRow[]
   // Optional Email Fields
   recipient_email?: string
@@ -112,7 +113,7 @@ export function updateAimtFixedInfo(info: Partial<AIMTFixedInfo>): AIMTFixedInfo
   }
 }
 
-export function calculateInstallmentScheduleItems(params: {
+export interface InstallmentCalculationParams {
   start_date: string
   end_date: string
   start_month_year?: string // YYYY-MM
@@ -122,8 +123,14 @@ export function calculateInstallmentScheduleItems(params: {
   material_fee?: number
   tuition_fee: number
   scholarship: number
-  first_installment_amount: number
-}): { scheduleItems: InstallmentRow[]; totalAmount: number } {
+  first_installment_amount?: number
+  initial_fees?: number[]
+}
+
+export function calculateInstallmentScheduleItems(params: InstallmentCalculationParams): {
+  scheduleItems: InstallmentRow[]
+  totalAmount: number
+} {
   const admin = Number(params.admin_fee) || 0
   const resources = Number(params.resources_fee) || 0
   const material = Number(params.material_fee) || 0
@@ -155,8 +162,14 @@ export function calculateInstallmentScheduleItems(params: {
       return { scheduleItems: [], totalAmount }
     }
 
-    const firstAmt = Math.min(totalAmount, Math.round(Number(params.first_installment_amount) || 0))
-    const remainingTotal = Math.max(0, totalAmount - firstAmt)
+    // Resolve initial fee inputs array
+    let initialFees: number[] = []
+    if (Array.isArray(params.initial_fees) && params.initial_fees.length > 0) {
+      initialFees = params.initial_fees.map((n) => Math.max(0, Math.round(Number(n) || 0)))
+    } else {
+      const single = Math.max(0, Math.round(Number(params.first_installment_amount) || 0))
+      initialFees = [single]
+    }
 
     const rows: InstallmentRow[] = []
 
@@ -168,48 +181,55 @@ export function calculateInstallmentScheduleItems(params: {
       installmentCounter: 0,
     }
 
-    const firstRowDescription = getRowDescription(firstAmt, admin, resources, material, feeState)
-
-    // 1st Row Independent Month Label (Selected manually by user, e.g. Dec-25)
-    rows.push({
-      monthLabel: format(startD, 'MMM-yy'),
-      description: firstRowDescription,
-      amount: firstAmt,
-    })
-
-    // Course Start Date base (e.g. 21/09/2026 -> Sep-26)
+    // Course Start Date base
     const courseStartD = parseISO(params.start_date)
     const validCourseStart = !isNaN(courseStartD.getTime()) ? courseStartD : startD
-
     const startYear = validCourseStart.getFullYear()
-    const startMonth = validCourseStart.getMonth() // 0-indexed
-
+    const startMonth = validCourseStart.getMonth()
     const endYear = endD.getFullYear()
-    const endMonth = endD.getMonth() // 0-indexed
+    const endMonth = endD.getMonth()
 
-    // Target end month index (subtracting offset months from end date month)
     const startMonthIndex = startYear * 12 + startMonth
     const rawTargetEndMonthIndex = (endYear * 12 + endMonth) - offsetMonths
     const targetEndMonthIndex = Math.max(startMonthIndex, rawTargetEndMonthIndex)
-
-    // Calculate total course-based installment count from start_date to targetEnd
     let totalCourseMonthsCount = targetEndMonthIndex - startMonthIndex + 1
     if (totalCourseMonthsCount < 1) totalCourseMonthsCount = 1
 
-    const remainingMonths = totalCourseMonthsCount - 1
+    let sumInitialFees = 0
 
-    if (remainingMonths > 0) {
+    // Push initial fee rows
+    for (let k = 0; k < initialFees.length; k++) {
+      const amt = initialFees[k]
+      sumInitialFees += amt
+
+      const monthLabel =
+        k === 0
+          ? format(startD, 'MMM-yy')
+          : format(new Date(startYear, startMonth + k, 1), 'MMM-yy')
+
+      const description = getRowDescription(amt, admin, resources, material, feeState)
+
+      rows.push({
+        monthLabel,
+        description,
+        amount: amt,
+      })
+    }
+
+    // Remaining total to divide
+    const remainingTotal = Math.max(0, totalAmount - sumInitialFees)
+    const remainingMonths = totalCourseMonthsCount - initialFees.length
+
+    if (remainingMonths > 0 && remainingTotal > 0) {
       const basePerMonth = Math.floor(remainingTotal / remainingMonths)
       const remainder = remainingTotal - basePerMonth * remainingMonths
 
       for (let i = 1; i <= remainingMonths; i++) {
-        // Forward count from course start month: 2nd row = next calendar month
-        const currentDate = new Date(startYear, startMonth + i, 1)
+        const monthIndex = initialFees.length + i - 1
+        const currentDate = new Date(startYear, startMonth + monthIndex, 1)
         const monthLabel = format(currentDate, 'MMM-yy')
 
-        // Add remainder to the last installment month to ensure total matches exactly with integers
         const amt = i === remainingMonths ? basePerMonth + remainder : basePerMonth
-
         const description = getRowDescription(amt, admin, resources, material, feeState)
 
         rows.push({
@@ -239,145 +259,103 @@ function getRowDescription(
   }
 ): string {
   const paidAdmin = Math.min(amount, state.unallocatedAdmin)
+  const prevUnallocatedAdmin = state.unallocatedAdmin
   state.unallocatedAdmin -= paidAdmin
   const remAfterAdmin = amount - paidAdmin
 
   const paidResources = Math.min(remAfterAdmin, state.unallocatedResources)
+  const prevUnallocatedResources = state.unallocatedResources
   state.unallocatedResources -= paidResources
   const remAfterResources = remAfterAdmin - paidResources
 
   const paidMaterial = Math.min(remAfterResources, state.unallocatedMaterial)
+  const prevUnallocatedMaterial = state.unallocatedMaterial
   state.unallocatedMaterial -= paidMaterial
   const remAfterMaterial = remAfterResources - paidMaterial
 
   const paidTuition = remAfterMaterial
 
-  const adminWasPartial = (state.unallocatedAdmin + paidAdmin) < totalAdmin
+  const adminWasPartial = (totalAdmin - prevUnallocatedAdmin) > 0
   const adminIsPartial = state.unallocatedAdmin > 0
 
-  const resourceWasPartial = (state.unallocatedResources + paidResources) < totalResources
+  const resourceWasPartial = (totalResources - prevUnallocatedResources) > 0
   const resourceIsPartial = state.unallocatedResources > 0
 
-  const materialWasPartial = (state.unallocatedMaterial + paidMaterial) < totalMaterial
+  const materialWasPartial = (totalMaterial - prevUnallocatedMaterial) > 0
   const materialIsPartial = state.unallocatedMaterial > 0
 
-  let installmentStr = ''
+  let instText = ''
   if (paidTuition > 0) {
     state.installmentCounter++
-    installmentStr = `${getOrdinal(state.installmentCounter)} Installment`
+    instText = `${getOrdinal(state.installmentCounter)} Installment`
   }
 
-  // Helper when Material Fee is involved
-  if (totalMaterial > 0) {
-    if (paidAdmin > 0 && paidResources === 0 && paidMaterial === 0 && paidTuition === 0) {
-      return adminIsPartial ? 'Partial Admin Fee' : (adminWasPartial ? 'Remaining Admin fee' : 'Admin Fee')
-    }
-    if (paidAdmin === 0 && paidResources > 0 && paidMaterial === 0 && paidTuition === 0) {
-      return resourceIsPartial ? 'Partial Resource Fee' : (resourceWasPartial ? 'Remaining Resource fee' : 'Resource Fee')
-    }
-    if (paidAdmin === 0 && paidResources === 0 && paidMaterial > 0 && paidTuition === 0) {
-      return materialIsPartial ? 'Partial Material Fee' : (materialWasPartial ? 'Remaining Material fee' : 'Material Fee')
-    }
-    if (paidAdmin > 0 && paidResources > 0 && paidMaterial === 0 && paidTuition === 0) {
-      return resourceIsPartial
-        ? (adminWasPartial ? 'Remaining Admin fee including Partial Resource fee' : 'Admin Fee including Partial Resource Fee')
-        : 'Admin fee and Resource fee'
-    }
-    if (paidAdmin === 0 && paidResources > 0 && paidMaterial > 0 && paidTuition === 0) {
-      return materialIsPartial
-        ? (resourceWasPartial ? 'Remaining Resource fee including Partial Material fee' : 'Resource fee including Partial Material fee')
-        : 'Resource fee and Material fee'
-    }
-    if (paidAdmin === 0 && paidResources === 0 && paidMaterial > 0 && paidTuition > 0) {
-      return materialWasPartial
-        ? `Remaining Material fee including ${installmentStr}`
-        : `${installmentStr} including Material fee`
-    }
-    if (paidAdmin > 0 && paidResources > 0 && paidMaterial > 0 && paidTuition > 0) {
-      return `${installmentStr} including Admin fee, Resource fee and Material fee`
-    }
-    if (paidAdmin === 0 && paidResources > 0 && paidMaterial > 0 && paidTuition > 0) {
-      return `${installmentStr} including Resource fee and Material fee`
-    }
+  const feeParts: string[] = []
+  if (paidAdmin > 0) {
+    if (adminIsPartial) feeParts.push('Partial Admin Fee')
+    else if (adminWasPartial) feeParts.push('Remaining Admin fee')
+    else feeParts.push('Admin fee')
+  }
+  if (paidResources > 0) {
+    if (resourceIsPartial) feeParts.push('Partial Resource fee')
+    else if (resourceWasPartial) feeParts.push('Remaining Resource fee')
+    else feeParts.push('Resource fee')
+  }
+  if (paidMaterial > 0) {
+    if (materialIsPartial) feeParts.push('Partial Material fee')
+    else if (materialWasPartial) feeParts.push('Remaining Material fee')
+    else feeParts.push('Material fee')
   }
 
-  // 1. Only Admin Fee paid
-  if (paidAdmin > 0 && paidResources === 0 && paidTuition === 0) {
-    if (adminIsPartial) {
-      return 'Partial Admin Fee'
+  // Combine fee parts with installment if tuition is paid
+  if (paidTuition > 0) {
+    if (feeParts.length === 0) {
+      return instText
     }
-    if (adminWasPartial) {
-      return 'Remaining Admin fee'
+    let combinedFees = ''
+    if (feeParts.length === 1) {
+      combinedFees = feeParts[0]
+    } else if (feeParts.length === 2) {
+      combinedFees = `${feeParts[0]} and ${feeParts[1]}`
+    } else {
+      combinedFees = `${feeParts.slice(0, -1).join(', ')} and ${feeParts[feeParts.length - 1]}`
     }
-    return 'Admin Fee'
+
+    if (feeParts[0].startsWith('Remaining')) {
+      return `${combinedFees} including ${instText}`
+    }
+    return `${instText} including ${combinedFees}`
   }
 
-  // 2. Only Resource Fee paid
-  if (paidAdmin === 0 && paidResources > 0 && paidTuition === 0) {
-    if (resourceIsPartial) {
-      return 'Partial Resource Fee'
-    }
-    if (resourceWasPartial) {
-      return 'Remaining Resource fee'
-    }
-    return 'Resource Fee'
+  // When only upfront fees are paid in this row
+  if (feeParts.length === 0) {
+    return `${getOrdinal(state.installmentCounter + 1)} Installment`
   }
 
-  // 3. Admin + Resource Fee paid (No Tuition)
-  if (paidAdmin > 0 && paidResources > 0 && paidTuition === 0) {
-    if (resourceIsPartial) {
-      if (adminWasPartial) {
-        return 'Remaining Admin fee including Partial Resource fee'
-      }
+  if (feeParts.length === 1) {
+    const single = feeParts[0]
+    if (single === 'Admin fee') return 'Admin Fee'
+    if (single === 'Resource fee') return 'Resource Fee'
+    if (single === 'Material fee') return 'Material Fee'
+    if (single === 'Partial Resource fee') return 'Partial Resource Fee'
+    if (single === 'Partial Material fee') return 'Partial Material Fee'
+    return single
+  }
+
+  if (feeParts.length === 2) {
+    if (feeParts[0] === 'Admin fee' && feeParts[1] === 'Partial Resource fee') {
       return 'Admin Fee including Partial Resource Fee'
     }
-    // Resource is complete
-    if (adminWasPartial && resourceWasPartial) {
-      return 'Remaining Admin fee and Remaining Resource fee'
+    if (feeParts[0] === 'Remaining Admin fee' && feeParts[1] === 'Partial Resource fee') {
+      return 'Remaining Admin fee including Partial Resource fee'
     }
-    if (adminWasPartial) {
-      return 'Remaining Admin fee and Resource fee'
-    }
-    return 'Admin fee and Resource fee'
+    return `${feeParts[0]} and ${feeParts[1]}`
   }
 
-  // 4. Resource + Tuition paid (No Admin)
-  if (paidAdmin === 0 && paidResources > 0 && paidTuition > 0) {
-    if (resourceWasPartial) {
-      return `Remaining Resources fee including ${installmentStr}`
-    }
-    return `${installmentStr} including Resource fee`
-  }
-
-  // 5. Admin + Tuition paid (No Resource)
-  if (paidAdmin > 0 && paidResources === 0 && paidTuition > 0) {
-    if (adminWasPartial) {
-      return `Remaining Admin fee including ${installmentStr}`
-    }
-    return `Admin Fee including ${installmentStr}`
-  }
-
-  // 6. Admin + Resource + Tuition all paid in this row
-  if (paidAdmin > 0 && paidResources > 0 && paidTuition > 0) {
-    if (adminWasPartial && resourceWasPartial) {
-      return `${installmentStr} including Remaining Admin fee and Remaining Resource fee`
-    }
-    if (adminWasPartial) {
-      return `${installmentStr} including Remaining Admin fee and Resource fee`
-    }
-    return `${installmentStr} including Admin fee and Resource fee`
-  }
-
-  // 7. Only Tuition paid
-  if (paidTuition > 0) {
-    return installmentStr
-  }
-
-  // Fallback
-  return `${getOrdinal(state.installmentCounter + 1)} Installment`
+  return feeParts.slice(0, -1).join(', ') + ' and ' + feeParts[feeParts.length - 1]
 }
 
-function getOrdinal(n: number): string {
+export function getOrdinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd']
   const v = n % 100
   return n + (s[(v - 20) % 10] || s[v] || s[0])
@@ -386,6 +364,7 @@ function getOrdinal(n: number): string {
 function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
   let scheduleItems: InstallmentRow[] = []
   let extraMaterialFee: number | undefined = undefined
+  let extraInitialFees: number[] | undefined = undefined
 
   if (typeof row.schedule_items === 'string') {
     try {
@@ -395,10 +374,15 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
       } else if (parsed && typeof parsed === 'object') {
         scheduleItems = parsed.items || []
         extraMaterialFee = parsed.__material_fee
+        extraInitialFees = parsed.__initial_fees
       }
     } catch {
       scheduleItems = []
     }
+  } else if (row.schedule_items && typeof row.schedule_items === 'object' && !Array.isArray(row.schedule_items)) {
+    scheduleItems = row.schedule_items.items || []
+    extraMaterialFee = row.schedule_items.__material_fee
+    extraInitialFees = row.schedule_items.__initial_fees
   } else if (Array.isArray(row.schedule_items)) {
     scheduleItems = row.schedule_items
   }
@@ -432,6 +416,7 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
     scholarship: scholarship,
     total_amount: total,
     first_installment_amount: Number(row.first_installment_amount) || 0,
+    initial_fees: extraInitialFees || [Number(row.first_installment_amount) || 0],
     schedule_items: scheduleItems.map((s) => ({
       ...s,
       description: s.description ? s.description.replace(' + ', ' including ') : s.description,
@@ -465,7 +450,11 @@ function mapScheduleToDbRow(schedule: StudentInstallmentSchedule): any {
     scholarship: Number(schedule.scholarship) || 0,
     total_amount: Number(schedule.total_amount) || 0,
     first_installment_amount: Number(schedule.first_installment_amount) || 0,
-    schedule_items: schedule.schedule_items || [],
+    schedule_items: {
+      items: schedule.schedule_items || [],
+      __material_fee: schedule.material_fee,
+      __initial_fees: schedule.initial_fees,
+    },
     recipient_email: schedule.recipient_email || null,
     from_email: schedule.from_email || null,
     email_subject: schedule.email_subject || null,

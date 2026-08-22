@@ -10,6 +10,7 @@ import {
   saveInstallment,
   getAimtFixedInfo,
   AIMTFixedInfo,
+  getOrdinal,
 } from '@/lib/services/installment.service'
 import AimtScheduleWebPreview from '@/components/installments/aimt-schedule-web-preview'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,6 +24,8 @@ import {
   Award,
   AlertCircle,
   Layers,
+  Plus,
+  Trash2,
 } from 'lucide-react'
 
 interface InstallmentFormProps {
@@ -58,9 +61,17 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
   
   const [showScholarship, setShowScholarship] = useState<boolean>((existingSchedule?.scholarship || 0) > 0)
   const [scholarship, setScholarship] = useState<number>(existingSchedule?.scholarship || 0)
-  const [firstInstallmentAmount, setFirstInstallmentAmount] = useState<number>(
-    existingSchedule?.first_installment_amount ?? 5000
-  )
+
+  // Dynamic Initial Fee inputs array (1st initial fee, 2nd initial fee, etc.)
+  const [initialFees, setInitialFees] = useState<number[]>(() => {
+    if (existingSchedule?.initial_fees && existingSchedule.initial_fees.length > 0) {
+      return existingSchedule.initial_fees
+    }
+    if (existingSchedule?.first_installment_amount !== undefined) {
+      return [existingSchedule.first_installment_amount]
+    }
+    return [5000]
+  })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -78,8 +89,22 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     }
   }
 
+  function handleAddInitialFee() {
+    setInitialFees((prev) => [...prev, 0])
+  }
+
+  function handleUpdateInitialFee(index: number, val: number) {
+    setInitialFees((prev) => prev.map((f, i) => (i === index ? val : f)))
+  }
+
+  function handleRemoveInitialFee(index: number) {
+    setInitialFees((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev))
+  }
+
   const activeScholarship = showScholarship ? scholarship : 0
   const activeMaterialFee = showMaterialFee && Number(materialFee) > 0 ? Number(materialFee) : 0
+
+  const totalInitialPayment = initialFees.reduce((acc, n) => acc + (Number(n) || 0), 0)
 
   const { scheduleItems, totalAmount } = calculateInstallmentScheduleItems({
     start_date: startDate,
@@ -91,7 +116,8 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     material_fee: activeMaterialFee,
     tuition_fee: tuitionFee,
     scholarship: activeScholarship,
-    first_installment_amount: firstInstallmentAmount,
+    initial_fees: initialFees,
+    first_installment_amount: totalInitialPayment,
   })
 
   const liveSchedule: Partial<StudentInstallmentSchedule> = {
@@ -111,7 +137,8 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     tuition_fee: tuitionFee,
     scholarship: activeScholarship,
     total_amount: totalAmount,
-    first_installment_amount: firstInstallmentAmount,
+    first_installment_amount: totalInitialPayment,
+    initial_fees: initialFees,
     schedule_items: scheduleItems,
   }
 
@@ -152,7 +179,8 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
         tuition_fee: Number(tuitionFee) || 0,
         scholarship: Number(activeScholarship) || 0,
         total_amount: totalAmount,
-        first_installment_amount: Number(firstInstallmentAmount) || 0,
+        first_installment_amount: totalInitialPayment,
+        initial_fees: initialFees,
         schedule_items: scheduleItems,
       })
 
@@ -509,26 +537,100 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
-                <div>
-                  <Label className="text-xs font-bold text-blue-900 uppercase tracking-wider text-[11px]">
-                    INITIAL FEE *
-                  </Label>
-                  <Input
-                    type="number"
-                    value={firstInstallmentAmount}
-                    onChange={(e) => setFirstInstallmentAmount(Number(e.target.value))}
-                    className="mt-1.5 h-9 text-xs font-mono font-bold text-blue-900 bg-blue-50 border-blue-200"
-                    required
-                  />
-                </div>
-
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-md flex flex-col justify-center text-right">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    TOTAL AMOUNT
-                  </span>
+              <div className="pt-2 border-t border-slate-100">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-md flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      TOTAL COURSE AMOUNT
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Admin + Resources {showMaterialFee && '+ Material'} + Tuition {showScholarship && '- Scholarship'}
+                    </span>
+                  </div>
                   <span className="font-mono text-xl font-extrabold text-[#003D5C]">
                     AUD {totalAmount.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border border-[#E2E8F0] shadow-2xs rounded-lg">
+            <CardHeader className="py-3.5 border-b border-[#E2E8F0] flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="font-['Montserrat'] text-base font-bold text-[#003D5C]">
+                  Initial Fee Breakdown
+                </CardTitle>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  Enter upfront fee amounts received from the student
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddInitialFee}
+                className="text-xs h-8 font-semibold border-dashed border-[#009D9E] text-[#009D9E] hover:bg-[#009D9E]/10"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                + Add {getOrdinal(initialFees.length + 1)} Initial Fee
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-4">
+              <div className="space-y-3">
+                {initialFees.map((fee, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 bg-slate-50 border border-slate-200 rounded-md flex items-center justify-between gap-3"
+                  >
+                    <div className="flex-1">
+                      <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                        {idx === 0
+                          ? '1ST INITIAL FEE (AUD) *'
+                          : `${getOrdinal(idx + 1).toUpperCase()} INITIAL FEE (AUD)`}
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={fee === 0 ? '' : fee}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          handleUpdateInitialFee(idx, v === '' ? 0 : Number(v))
+                        }}
+                        placeholder={`e.g. ${idx === 0 ? '400' : '1000'}`}
+                        className="mt-1.5 h-9 text-xs font-mono font-bold text-slate-900 bg-white"
+                        required={idx === 0}
+                      />
+                    </div>
+
+                    {initialFees.length > 1 && idx > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveInitialFee(idx)}
+                        className="text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 self-end mb-1 h-8 px-2"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-1" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 border-t border-slate-100">
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block">
+                      TOTAL INITIAL PAYMENT
+                    </span>
+                    <span className="text-[11px] text-blue-600/80">
+                      {initialFees.length} upfront payment{initialFees.length > 1 ? 's' : ''} configured
+                    </span>
+                  </div>
+                  <span className="font-mono text-xl font-extrabold text-[#003D5C]">
+                    AUD {totalInitialPayment.toLocaleString()}
                   </span>
                 </div>
               </div>
