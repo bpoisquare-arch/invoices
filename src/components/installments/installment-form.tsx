@@ -213,19 +213,6 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-                    STUDENT ID *
-                  </Label>
-                  <Input
-                    placeholder="e.g. BCP3000465"
-                    value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
-                    className="mt-1.5 h-9 text-xs font-mono font-bold text-slate-900"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
                     STUDENT NAME *
                   </Label>
                   <Input
@@ -233,6 +220,19 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
                     className="mt-1.5 h-9 text-xs font-semibold text-slate-900"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                    STUDENT ID *
+                  </Label>
+                  <Input
+                    placeholder="e.g. BCP3000465"
+                    value={studentId}
+                    onChange={(e) => setStudentId(e.target.value)}
+                    className="mt-1.5 h-9 text-xs font-mono font-bold text-slate-900"
                     required
                   />
                 </div>
@@ -338,19 +338,25 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
 
                 <div>
                   <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-                    LAST INSTALLMENT OFFSET
+                    LAST INSTALLMENT OFFSET (MONTHS)
                   </Label>
-                  <select
-                    value={endMonthOffset}
-                    onChange={(e) => setEndMonthOffset(Number(e.target.value))}
-                    className="mt-1.5 w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#009D9E]"
-                  >
-                    <option value={1}>1 Month before end</option>
-                    <option value={2}>2 Months before end</option>
-                    <option value={3}>3 Months before end (Standard)</option>
-                    <option value={4}>4 Months before end</option>
-                    <option value={0}>Up to course end date</option>
-                  </select>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={24}
+                    value={isNaN(endMonthOffset) ? '' : endMonthOffset}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setEndMonthOffset(val === '' ? 0 : Number(val))
+                    }}
+                    placeholder="e.g. 2"
+                    className="mt-1.5 h-9 text-xs font-semibold text-slate-800"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {endMonthOffset > 0
+                      ? `${endMonthOffset} month${endMonthOffset > 1 ? 's' : ''} before course end`
+                      : 'Ends in course end month'}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -363,7 +369,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                   Fees & Installment Breakdown
                 </CardTitle>
                 <p className="text-[11px] text-slate-400 font-medium">
-                  Admin fee, Resource fee, Tuition fee & First installment
+                  Admin fee, Resource fee, Tuition fee & Initial fee
                 </p>
               </div>
 
@@ -446,7 +452,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
               <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
                 <div>
                   <Label className="text-xs font-bold text-blue-900 uppercase tracking-wider text-[11px]">
-                    1ST INSTALLMENT *
+                    INITIAL FEE *
                   </Label>
                   <Input
                     type="number"

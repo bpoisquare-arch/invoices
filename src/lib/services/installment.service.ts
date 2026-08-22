@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import { addMonths, format, parseISO, differenceInMonths, subMonths } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 
 export interface AIMTFixedInfo {
   college_name: string
@@ -157,40 +157,14 @@ export function calculateInstallmentScheduleItems(params: {
 
     const rows: InstallmentRow[] = []
 
-    // Dynamic 1st row description logic based on firstAmt vs fees
-    let firstRowDescription = ''
-    let isFirstInstallmentIncluded = true
-
-    if (admin > 0 && firstAmt === admin) {
-      firstRowDescription = 'Admin Fee'
-      isFirstInstallmentIncluded = false
-    } else if (resources > 0 && firstAmt === resources && admin === 0) {
-      firstRowDescription = 'Resource Fee'
-      isFirstInstallmentIncluded = false
-    } else if (admin > 0 && resources > 0 && firstAmt === admin + resources) {
-      firstRowDescription = 'Admin fee and Resource fee'
-      isFirstInstallmentIncluded = false
-    } else if (resources === 0 && admin > 0 && firstAmt > admin) {
-      firstRowDescription = 'Admin Fee including 1st Installment'
-      isFirstInstallmentIncluded = true
-    } else if (admin > 0 && resources > 0 && firstAmt > (admin + resources)) {
-      firstRowDescription = '1st Installment including Admin fee and Resource fee'
-      isFirstInstallmentIncluded = true
-    } else if (admin > 0 && firstAmt > admin && firstAmt < (admin + resources)) {
-      firstRowDescription = 'Admin Fee including Partial Resource Fee'
-      isFirstInstallmentIncluded = false
-    } else {
-      // Default fallback
-      firstRowDescription = '1st Installment'
-      if (admin > 0 && resources > 0) {
-        firstRowDescription = '1st Installment including Admin fee and Resource fee'
-      } else if (admin > 0) {
-        firstRowDescription = '1st Installment including Admin fee'
-      } else if (resources > 0) {
-        firstRowDescription = '1st Installment including Resource fee'
-      }
-      isFirstInstallmentIncluded = true
+    // Fee allocation state across schedule rows
+    const feeState = {
+      unallocatedAdmin: admin,
+      unallocatedResources: resources,
+      installmentCounter: 0,
     }
+
+    const firstRowDescription = getRowDescription(firstAmt, admin, resources, feeState)
 
     // 1st Row Independent Month Label (Selected manually by user, e.g. Dec-25)
     rows.push({
@@ -203,12 +177,19 @@ export function calculateInstallmentScheduleItems(params: {
     const courseStartD = parseISO(params.start_date)
     const validCourseStart = !isNaN(courseStartD.getTime()) ? courseStartD : startD
 
-    // Last installment month = End date month minus offsetMonths (e.g. 3 or 2)
-    const lastInstallmentD = subMonths(endD, offsetMonths)
-    const targetEnd = lastInstallmentD >= validCourseStart ? lastInstallmentD : endD
+    const startYear = validCourseStart.getFullYear()
+    const startMonth = validCourseStart.getMonth() // 0-indexed
+
+    const endYear = endD.getFullYear()
+    const endMonth = endD.getMonth() // 0-indexed
+
+    // Target end month index (subtracting offset months from end date month)
+    const startMonthIndex = startYear * 12 + startMonth
+    const rawTargetEndMonthIndex = (endYear * 12 + endMonth) - offsetMonths
+    const targetEndMonthIndex = Math.max(startMonthIndex, rawTargetEndMonthIndex)
 
     // Calculate total course-based installment count from start_date to targetEnd
-    let totalCourseMonthsCount = differenceInMonths(targetEnd, validCourseStart) + 1
+    let totalCourseMonthsCount = targetEndMonthIndex - startMonthIndex + 1
     if (totalCourseMonthsCount < 1) totalCourseMonthsCount = 1
 
     const remainingMonths = totalCourseMonthsCount - 1
@@ -218,17 +199,14 @@ export function calculateInstallmentScheduleItems(params: {
       const remainder = remainingTotal - basePerMonth * remainingMonths
 
       for (let i = 1; i <= remainingMonths; i++) {
-        // Forward count from course start month: 2nd row = courseStartD + 1 month (e.g. Oct-26 if start is Sep-26)
-        const currentDate = addMonths(validCourseStart, i)
+        // Forward count from course start month: 2nd row = next calendar month
+        const currentDate = new Date(startYear, startMonth + i, 1)
         const monthLabel = format(currentDate, 'MMM-yy')
 
-        // Ordinal counter logic: If 1st row was not 1st installment, counting starts at 1st Installment for 2nd row
-        const installmentIndex = isFirstInstallmentIncluded ? (i + 1) : i
-        const ordinal = getOrdinal(installmentIndex)
-        const description = `${ordinal} Installment`
-
-        // Add remainder to the last installment month to ensure total matches exactly
+        // Add remainder to the last installment month to ensure total matches exactly with integers
         const amt = i === remainingMonths ? basePerMonth + remainder : basePerMonth
+
+        const description = getRowDescription(amt, admin, resources, feeState)
 
         rows.push({
           monthLabel,
@@ -242,6 +220,114 @@ export function calculateInstallmentScheduleItems(params: {
   } catch (e) {
     return { scheduleItems: [], totalAmount }
   }
+}
+
+function getRowDescription(
+  amount: number,
+  totalAdmin: number,
+  totalResources: number,
+  state: {
+    unallocatedAdmin: number
+    unallocatedResources: number
+    installmentCounter: number
+  }
+): string {
+  const paidAdmin = Math.min(amount, state.unallocatedAdmin)
+  state.unallocatedAdmin -= paidAdmin
+  const remAfterAdmin = amount - paidAdmin
+
+  const paidResources = Math.min(remAfterAdmin, state.unallocatedResources)
+  state.unallocatedResources -= paidResources
+  const remAfterResources = remAfterAdmin - paidResources
+
+  const paidTuition = remAfterResources
+
+  const adminWasPartial = (state.unallocatedAdmin + paidAdmin) < totalAdmin
+  const adminIsPartial = state.unallocatedAdmin > 0
+
+  const resourceWasPartial = (state.unallocatedResources + paidResources) < totalResources
+  const resourceIsPartial = state.unallocatedResources > 0
+
+  let installmentStr = ''
+  if (paidTuition > 0) {
+    state.installmentCounter++
+    installmentStr = `${getOrdinal(state.installmentCounter)} Installment`
+  }
+
+  // 1. Only Admin Fee paid
+  if (paidAdmin > 0 && paidResources === 0 && paidTuition === 0) {
+    if (adminIsPartial) {
+      return 'Partial Admin Fee'
+    }
+    if (adminWasPartial) {
+      return 'Remaining Admin fee'
+    }
+    return 'Admin Fee'
+  }
+
+  // 2. Only Resource Fee paid
+  if (paidAdmin === 0 && paidResources > 0 && paidTuition === 0) {
+    if (resourceIsPartial) {
+      return 'Partial Resource Fee'
+    }
+    if (resourceWasPartial) {
+      return 'Remaining Resource fee'
+    }
+    return 'Resource Fee'
+  }
+
+  // 3. Admin + Resource Fee paid (No Tuition)
+  if (paidAdmin > 0 && paidResources > 0 && paidTuition === 0) {
+    if (resourceIsPartial) {
+      if (adminWasPartial) {
+        return 'Remaining Admin fee including Partial Resource fee'
+      }
+      return 'Admin Fee including Partial Resource Fee'
+    }
+    // Resource is complete
+    if (adminWasPartial && resourceWasPartial) {
+      return 'Remaining Admin fee and Remaining Resource fee'
+    }
+    if (adminWasPartial) {
+      return 'Remaining Admin fee and Resource fee'
+    }
+    return 'Admin fee and Resource fee'
+  }
+
+  // 4. Resource + Tuition paid (No Admin)
+  if (paidAdmin === 0 && paidResources > 0 && paidTuition > 0) {
+    if (resourceWasPartial) {
+      return `Remaining Resources fee including ${installmentStr}`
+    }
+    return `${installmentStr} including Resource fee`
+  }
+
+  // 5. Admin + Tuition paid (No Resource)
+  if (paidAdmin > 0 && paidResources === 0 && paidTuition > 0) {
+    if (adminWasPartial) {
+      return `Remaining Admin fee including ${installmentStr}`
+    }
+    return `Admin Fee including ${installmentStr}`
+  }
+
+  // 6. Admin + Resource + Tuition all paid in this row
+  if (paidAdmin > 0 && paidResources > 0 && paidTuition > 0) {
+    if (adminWasPartial && resourceWasPartial) {
+      return `${installmentStr} including Remaining Admin fee and Remaining Resource fee`
+    }
+    if (adminWasPartial) {
+      return `${installmentStr} including Remaining Admin fee and Resource fee`
+    }
+    return `${installmentStr} including Admin fee and Resource fee`
+  }
+
+  // 7. Only Tuition paid
+  if (paidTuition > 0) {
+    return installmentStr
+  }
+
+  // Fallback
+  return `${getOrdinal(state.installmentCounter + 1)} Installment`
 }
 
 function getOrdinal(n: number): string {

@@ -8,5 +8,15 @@
     "branch": "Lahore",
     "salary": null,
     "joining_date": "2026-08-18"
+  },
+  "6d06d295-7618-4d8e-b48d-7bb3ddeb257e": {
+    "branch": "Multan",
+    "salary": null,
+    "joining_date": "2026-08-20"
+  },
+  "EMP-0002": {
+    "branch": "Multan",
+    "salary": null,
+    "joining_date": "2026-08-20"
   }
 }
