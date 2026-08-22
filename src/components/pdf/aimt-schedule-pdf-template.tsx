@@ -263,6 +263,17 @@ export default function AimtSchedulePDFTemplate({ schedule, fixedInfo = DEFAULT_
             <Text style={styles.underlineValue}>AUD {schedule.admin_fee ?? 0}</Text>
             <Text style={[styles.boldLabel, { marginLeft: 6 }]}>RESOURCES FEE: </Text>
             <Text style={styles.underlineValue}>AUD {schedule.resources_fee ?? 0}</Text>
+            {(() => {
+              const mat = Number(schedule.material_fee || 0) > 0
+                ? Number(schedule.material_fee)
+                : Math.max(0, (Number(totalAmt) || 0) - ((Number(schedule.admin_fee) || 0) + (Number(schedule.resources_fee) || 0) + (Number(schedule.tuition_fee) || 0) - (Number(schedule.scholarship) || 0)))
+              return mat > 0 ? (
+                <>
+                  <Text style={[styles.boldLabel, { marginLeft: 6 }]}>MATERIAL FEE: </Text>
+                  <Text style={styles.underlineValue}>AUD {Number(mat).toLocaleString()}</Text>
+                </>
+              ) : null
+            })()}
             <Text style={[styles.boldLabel, { marginLeft: 6 }]}>TUITION FEE: </Text>
             <Text style={styles.underlineValue}>AUD {Number(schedule.tuition_fee || 0).toLocaleString()}</Text>
           </View>

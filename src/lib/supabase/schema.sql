@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS public.installment_schedules (
     end_month_offset INT DEFAULT 3,
     admin_fee NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     resources_fee NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    material_fee NUMERIC(12, 2) DEFAULT 0.00,
     tuition_fee NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     scholarship NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,

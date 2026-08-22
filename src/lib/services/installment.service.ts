@@ -56,6 +56,7 @@ export interface StudentInstallmentSchedule {
   end_month_offset?: number // Months to subtract before end date (default 3)
   admin_fee: number
   resources_fee: number
+  material_fee?: number
   tuition_fee: number
   scholarship: number
   total_amount: number
@@ -118,17 +119,19 @@ export function calculateInstallmentScheduleItems(params: {
   end_month_offset?: number // default 3
   admin_fee: number
   resources_fee: number
+  material_fee?: number
   tuition_fee: number
   scholarship: number
   first_installment_amount: number
 }): { scheduleItems: InstallmentRow[]; totalAmount: number } {
   const admin = Number(params.admin_fee) || 0
   const resources = Number(params.resources_fee) || 0
+  const material = Number(params.material_fee) || 0
   const tuition = Number(params.tuition_fee) || 0
   const scholarship = Number(params.scholarship) || 0
   const offsetMonths = typeof params.end_month_offset === 'number' ? params.end_month_offset : 3
 
-  const totalAmount = Math.max(0, Math.round(admin + resources + tuition - scholarship))
+  const totalAmount = Math.max(0, Math.round(admin + resources + material + tuition - scholarship))
 
   if (!params.start_date || !params.end_date) {
     return { scheduleItems: [], totalAmount }
@@ -161,10 +164,11 @@ export function calculateInstallmentScheduleItems(params: {
     const feeState = {
       unallocatedAdmin: admin,
       unallocatedResources: resources,
+      unallocatedMaterial: material,
       installmentCounter: 0,
     }
 
-    const firstRowDescription = getRowDescription(firstAmt, admin, resources, feeState)
+    const firstRowDescription = getRowDescription(firstAmt, admin, resources, material, feeState)
 
     // 1st Row Independent Month Label (Selected manually by user, e.g. Dec-25)
     rows.push({
@@ -206,7 +210,7 @@ export function calculateInstallmentScheduleItems(params: {
         // Add remainder to the last installment month to ensure total matches exactly with integers
         const amt = i === remainingMonths ? basePerMonth + remainder : basePerMonth
 
-        const description = getRowDescription(amt, admin, resources, feeState)
+        const description = getRowDescription(amt, admin, resources, material, feeState)
 
         rows.push({
           monthLabel,
@@ -226,9 +230,11 @@ function getRowDescription(
   amount: number,
   totalAdmin: number,
   totalResources: number,
+  totalMaterial: number,
   state: {
     unallocatedAdmin: number
     unallocatedResources: number
+    unallocatedMaterial: number
     installmentCounter: number
   }
 ): string {
@@ -240,7 +246,11 @@ function getRowDescription(
   state.unallocatedResources -= paidResources
   const remAfterResources = remAfterAdmin - paidResources
 
-  const paidTuition = remAfterResources
+  const paidMaterial = Math.min(remAfterResources, state.unallocatedMaterial)
+  state.unallocatedMaterial -= paidMaterial
+  const remAfterMaterial = remAfterResources - paidMaterial
+
+  const paidTuition = remAfterMaterial
 
   const adminWasPartial = (state.unallocatedAdmin + paidAdmin) < totalAdmin
   const adminIsPartial = state.unallocatedAdmin > 0
@@ -248,10 +258,47 @@ function getRowDescription(
   const resourceWasPartial = (state.unallocatedResources + paidResources) < totalResources
   const resourceIsPartial = state.unallocatedResources > 0
 
+  const materialWasPartial = (state.unallocatedMaterial + paidMaterial) < totalMaterial
+  const materialIsPartial = state.unallocatedMaterial > 0
+
   let installmentStr = ''
   if (paidTuition > 0) {
     state.installmentCounter++
     installmentStr = `${getOrdinal(state.installmentCounter)} Installment`
+  }
+
+  // Helper when Material Fee is involved
+  if (totalMaterial > 0) {
+    if (paidAdmin > 0 && paidResources === 0 && paidMaterial === 0 && paidTuition === 0) {
+      return adminIsPartial ? 'Partial Admin Fee' : (adminWasPartial ? 'Remaining Admin fee' : 'Admin Fee')
+    }
+    if (paidAdmin === 0 && paidResources > 0 && paidMaterial === 0 && paidTuition === 0) {
+      return resourceIsPartial ? 'Partial Resource Fee' : (resourceWasPartial ? 'Remaining Resource fee' : 'Resource Fee')
+    }
+    if (paidAdmin === 0 && paidResources === 0 && paidMaterial > 0 && paidTuition === 0) {
+      return materialIsPartial ? 'Partial Material Fee' : (materialWasPartial ? 'Remaining Material fee' : 'Material Fee')
+    }
+    if (paidAdmin > 0 && paidResources > 0 && paidMaterial === 0 && paidTuition === 0) {
+      return resourceIsPartial
+        ? (adminWasPartial ? 'Remaining Admin fee including Partial Resource fee' : 'Admin Fee including Partial Resource Fee')
+        : 'Admin fee and Resource fee'
+    }
+    if (paidAdmin === 0 && paidResources > 0 && paidMaterial > 0 && paidTuition === 0) {
+      return materialIsPartial
+        ? (resourceWasPartial ? 'Remaining Resource fee including Partial Material fee' : 'Resource fee including Partial Material fee')
+        : 'Resource fee and Material fee'
+    }
+    if (paidAdmin === 0 && paidResources === 0 && paidMaterial > 0 && paidTuition > 0) {
+      return materialWasPartial
+        ? `Remaining Material fee including ${installmentStr}`
+        : `${installmentStr} including Material fee`
+    }
+    if (paidAdmin > 0 && paidResources > 0 && paidMaterial > 0 && paidTuition > 0) {
+      return `${installmentStr} including Admin fee, Resource fee and Material fee`
+    }
+    if (paidAdmin === 0 && paidResources > 0 && paidMaterial > 0 && paidTuition > 0) {
+      return `${installmentStr} including Resource fee and Material fee`
+    }
   }
 
   // 1. Only Admin Fee paid
@@ -338,14 +385,33 @@ function getOrdinal(n: number): string {
 
 function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
   let scheduleItems: InstallmentRow[] = []
+  let extraMaterialFee: number | undefined = undefined
+
   if (typeof row.schedule_items === 'string') {
     try {
-      scheduleItems = JSON.parse(row.schedule_items)
+      const parsed = JSON.parse(row.schedule_items)
+      if (Array.isArray(parsed)) {
+        scheduleItems = parsed
+      } else if (parsed && typeof parsed === 'object') {
+        scheduleItems = parsed.items || []
+        extraMaterialFee = parsed.__material_fee
+      }
     } catch {
       scheduleItems = []
     }
   } else if (Array.isArray(row.schedule_items)) {
     scheduleItems = row.schedule_items
+  }
+
+  const admin = Number(row.admin_fee) || 0
+  const resources = Number(row.resources_fee) || 0
+  const tuition = Number(row.tuition_fee) || 0
+  const scholarship = Number(row.scholarship) || 0
+  const total = Number(row.total_amount) || 0
+
+  let matFee = Number(row.material_fee) || Number(extraMaterialFee) || 0
+  if (!matFee && total > (admin + resources + tuition - scholarship)) {
+    matFee = total - (admin + resources + tuition - scholarship)
   }
 
   return {
@@ -359,11 +425,12 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
     end_date: row.end_date,
     start_month_year: row.start_month_year || undefined,
     end_month_offset: row.end_month_offset ?? 3,
-    admin_fee: Number(row.admin_fee) || 0,
-    resources_fee: Number(row.resources_fee) || 0,
-    tuition_fee: Number(row.tuition_fee) || 0,
-    scholarship: Number(row.scholarship) || 0,
-    total_amount: Number(row.total_amount) || 0,
+    admin_fee: admin,
+    resources_fee: resources,
+    material_fee: matFee > 0 ? matFee : undefined,
+    tuition_fee: tuition,
+    scholarship: scholarship,
+    total_amount: total,
     first_installment_amount: Number(row.first_installment_amount) || 0,
     schedule_items: scheduleItems.map((s) => ({
       ...s,
@@ -381,7 +448,7 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
 }
 
 function mapScheduleToDbRow(schedule: StudentInstallmentSchedule): any {
-  return {
+  const row: any = {
     id: schedule.id,
     date: schedule.date,
     student_name: schedule.student_name,
@@ -408,6 +475,12 @@ function mapScheduleToDbRow(schedule: StudentInstallmentSchedule): any {
     created_at: schedule.created_at,
     updated_at: schedule.updated_at,
   }
+
+  if (schedule.material_fee !== undefined && schedule.material_fee > 0) {
+    row.material_fee = Number(schedule.material_fee)
+  }
+
+  return row
 }
 
 export async function getInstallments(): Promise<StudentInstallmentSchedule[]> {
@@ -465,9 +538,18 @@ export async function saveInstallment(
 
   const supabase = createClient()
   const dbRow = mapScheduleToDbRow(finalSchedule)
-  const { error } = await supabase
+  let { error } = await supabase
     .from('installment_schedules')
     .upsert(dbRow, { onConflict: 'id' })
+
+  // If material_fee column doesn't exist yet in Supabase schema, gracefully retry
+  if (error && (error.message.includes('material_fee') || error.code === '42703')) {
+    delete dbRow.material_fee
+    const retry = await supabase
+      .from('installment_schedules')
+      .upsert(dbRow, { onConflict: 'id' })
+    error = retry.error
+  }
 
   if (error) {
     throw new Error(error.message || 'Failed to save installment schedule to database')

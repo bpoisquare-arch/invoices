@@ -22,6 +22,7 @@ import {
   Send,
   Award,
   AlertCircle,
+  Layers,
 } from 'lucide-react'
 
 interface InstallmentFormProps {
@@ -51,6 +52,8 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
 
   const [adminFee, setAdminFee] = useState<number>(existingSchedule?.admin_fee ?? 500)
   const [resourcesFee, setResourcesFee] = useState<number>(existingSchedule?.resources_fee ?? 800)
+  const [showMaterialFee, setShowMaterialFee] = useState<boolean>((existingSchedule?.material_fee || 0) > 0)
+  const [materialFee, setMaterialFee] = useState<number>(existingSchedule?.material_fee || 0)
   const [tuitionFee, setTuitionFee] = useState<number>(existingSchedule?.tuition_fee ?? 10000)
   
   const [showScholarship, setShowScholarship] = useState<boolean>((existingSchedule?.scholarship || 0) > 0)
@@ -76,6 +79,8 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
   }
 
   const activeScholarship = showScholarship ? scholarship : 0
+  const activeMaterialFee = showMaterialFee && Number(materialFee) > 0 ? Number(materialFee) : 0
+
   const { scheduleItems, totalAmount } = calculateInstallmentScheduleItems({
     start_date: startDate,
     end_date: endDate,
@@ -83,6 +88,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     end_month_offset: endMonthOffset,
     admin_fee: adminFee,
     resources_fee: resourcesFee,
+    material_fee: activeMaterialFee,
     tuition_fee: tuitionFee,
     scholarship: activeScholarship,
     first_installment_amount: firstInstallmentAmount,
@@ -101,6 +107,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     end_month_offset: endMonthOffset,
     admin_fee: adminFee,
     resources_fee: resourcesFee,
+    material_fee: activeMaterialFee > 0 ? activeMaterialFee : undefined,
     tuition_fee: tuitionFee,
     scholarship: activeScholarship,
     total_amount: totalAmount,
@@ -141,6 +148,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
         end_month_offset: endMonthOffset,
         admin_fee: Number(adminFee) || 0,
         resources_fee: Number(resourcesFee) || 0,
+        material_fee: activeMaterialFee > 0 ? Number(activeMaterialFee) : undefined,
         tuition_fee: Number(tuitionFee) || 0,
         scholarship: Number(activeScholarship) || 0,
         total_amount: totalAmount,
@@ -373,18 +381,36 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                 </p>
               </div>
 
-              {!showScholarship && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowScholarship(true)}
-                  className="h-8 text-[11px] gap-1.5 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 font-semibold"
-                >
-                  <Award className="w-3.5 h-3.5" />
-                  + Scholarship
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {!showMaterialFee && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowMaterialFee(true)
+                      setMaterialFee(500)
+                    }}
+                    className="h-8 text-[11px] gap-1.5 text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100 font-semibold"
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    + Material Fee
+                  </Button>
+                )}
+
+                {!showScholarship && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowScholarship(true)}
+                    className="h-8 text-[11px] gap-1.5 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 font-semibold"
+                  >
+                    <Award className="w-3.5 h-3.5" />
+                    + Scholarship
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
               <div className="grid grid-cols-3 gap-3">
@@ -422,6 +448,40 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                   />
                 </div>
               </div>
+
+              {showMaterialFee && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md flex items-center justify-between gap-3">
+                  <div className="flex-1">
+                    <Label className="text-xs font-bold text-blue-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-blue-600" />
+                      MATERIAL FEE (AUD)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={materialFee === 0 ? '' : materialFee}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setMaterialFee(val === '' ? 0 : Number(val))
+                      }}
+                      placeholder="e.g. 500"
+                      className="mt-1.5 h-9 text-xs font-mono font-bold text-blue-900 bg-white"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowMaterialFee(false)
+                      setMaterialFee(0)
+                    }}
+                    className="text-xs text-rose-600 hover:text-rose-800 self-end mb-1"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              )}
 
               {showScholarship && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md flex items-center justify-between gap-3">

@@ -105,22 +105,43 @@ export default function AimtScheduleWebPreview({ schedule, fixedInfo = DEFAULT_A
           </span>
         </div>
 
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pt-1">
-          <div className="flex items-baseline gap-1 flex-1 min-w-[130px]">
-            <span className="font-bold uppercase tracking-wider text-slate-700">Admin Fee:</span>
-            <span className="flex-1 border-b border-slate-900 pb-0.5 font-medium px-1">
+        <div className="flex items-baseline gap-x-2 sm:gap-x-3 pt-1 text-[11px] sm:text-xs">
+          <div className="flex items-baseline gap-1 flex-1 min-w-0">
+            <span className="font-bold uppercase tracking-wider text-slate-700 shrink-0 whitespace-nowrap">
+              Admin Fee:
+            </span>
+            <span className="flex-1 border-b border-slate-900 pb-0.5 font-medium px-1 whitespace-nowrap">
               AUD {schedule.admin_fee ?? 0}
             </span>
           </div>
-          <div className="flex items-baseline gap-1 flex-1 min-w-[150px]">
-            <span className="font-bold uppercase tracking-wider text-slate-700">Resources Fee:</span>
-            <span className="flex-1 border-b border-slate-900 pb-0.5 font-medium px-1">
+          <div className="flex items-baseline gap-1 flex-1 min-w-0">
+            <span className="font-bold uppercase tracking-wider text-slate-700 shrink-0 whitespace-nowrap">
+              Resources Fee:
+            </span>
+            <span className="flex-1 border-b border-slate-900 pb-0.5 font-medium px-1 whitespace-nowrap">
               AUD {schedule.resources_fee ?? 0}
             </span>
           </div>
-          <div className="flex items-baseline gap-1 flex-1 min-w-[150px]">
-            <span className="font-bold uppercase tracking-wider text-slate-700">Tuition Fee:</span>
-            <span className="flex-1 border-b border-slate-900 pb-0.5 font-medium px-1">
+          {(() => {
+            const mat = Number(schedule.material_fee || 0) > 0
+              ? Number(schedule.material_fee)
+              : Math.max(0, (Number(schedule.total_amount) || 0) - ((Number(schedule.admin_fee) || 0) + (Number(schedule.resources_fee) || 0) + (Number(schedule.tuition_fee) || 0) - (Number(schedule.scholarship) || 0)))
+            return mat > 0 ? (
+              <div className="flex items-baseline gap-1 flex-1 min-w-0">
+                <span className="font-bold uppercase tracking-wider text-slate-700 shrink-0 whitespace-nowrap">
+                  Material Fee:
+                </span>
+                <span className="flex-1 border-b border-slate-900 pb-0.5 font-medium px-1 whitespace-nowrap">
+                  AUD {Number(mat).toLocaleString()}
+                </span>
+              </div>
+            ) : null
+          })()}
+          <div className="flex items-baseline gap-1 flex-1 min-w-0">
+            <span className="font-bold uppercase tracking-wider text-slate-700 shrink-0 whitespace-nowrap">
+              Tuition Fee:
+            </span>
+            <span className="flex-1 border-b border-slate-900 pb-0.5 font-medium px-1 whitespace-nowrap">
               AUD {Number(schedule.tuition_fee || 0).toLocaleString()}
             </span>
           </div>
