@@ -41,7 +41,15 @@ import {
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
 import { Employee } from '@/lib/supabase/database.types'
 
-const BRANCHES = ['Lahore', 'Multan']
+const BRANCHES = ['Lahore', 'Multan', 'Onshore', 'AIMT']
+
+const getBranchBadgeClass = (branchName?: string | null) => {
+  const b = (branchName || '').toLowerCase()
+  if (b === 'lahore') return 'bg-purple-100 text-purple-800 border border-purple-200'
+  if (b === 'onshore') return 'bg-teal-100 text-teal-800 border border-teal-200'
+  if (b === 'aimt') return 'bg-amber-100 text-amber-800 border border-amber-200'
+  return 'bg-blue-100 text-blue-800 border border-blue-200'
+}
 
 export default function EmployeeOverviewPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -424,11 +432,9 @@ export default function EmployeeOverviewPage() {
                       {/* Branch */}
                       <td className="py-4 px-3 text-center">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold ${
-                            branch.toLowerCase() === 'lahore'
-                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                              : 'bg-blue-100 text-blue-800 border border-blue-200'
-                          }`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold ${getBranchBadgeClass(
+                            branch
+                          )}`}
                         >
                           {branch}
                         </span>
@@ -618,13 +624,12 @@ export default function EmployeeOverviewPage() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Joining Date *
+                  Joining Date (Optional)
                 </Label>
                 <Input
                   type="date"
                   value={newJoiningDate}
                   onChange={(e) => setNewJoiningDate(e.target.value)}
-                  required
                   className="text-sm border-slate-200 font-mono"
                 />
               </div>
@@ -753,13 +758,12 @@ export default function EmployeeOverviewPage() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Joining Date *
+                  Joining Date (Optional)
                 </Label>
                 <Input
                   type="date"
                   value={editJoiningDate}
                   onChange={(e) => setEditJoiningDate(e.target.value)}
-                  required
                   className="text-sm border-slate-200 font-mono"
                 />
               </div>

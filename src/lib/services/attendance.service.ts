@@ -173,6 +173,14 @@ export async function saveEmployeeMetadata(
   }
 }
 
+export function cleanDesignation(desig?: string | null): string {
+  if (!desig) return 'Staff'
+  return desig
+    .replace(/[–—\-]\s*(Multan|Lahore)(\s+Office)?/gi, '')
+    .replace(/\s*(Multan|Lahore)\s*Office/gi, '')
+    .trim()
+}
+
 export async function getEmployees(params?: {
   search?: string
   isActiveOnly?: boolean
@@ -198,6 +206,7 @@ export async function getEmployees(params?: {
       const meta = metaMap[emp.id] || metaMap[emp.employee_id] || {}
       return {
         ...emp,
+        designation: cleanDesignation(emp.designation),
         branch: meta.branch || emp.branch || 'Multan',
         salary: meta.salary !== undefined && meta.salary !== null ? meta.salary : (emp.salary !== undefined && emp.salary !== null ? emp.salary : null),
         joining_date: meta.joining_date || emp.joining_date || emp.created_at,
@@ -240,6 +249,7 @@ export async function getEmployeeById(id: string): Promise<Employee | null> {
 
     return {
       ...data,
+      designation: cleanDesignation(data.designation),
       branch: data.branch || meta.branch || 'Multan',
       salary: data.salary !== undefined && data.salary !== null ? data.salary : (meta.salary !== undefined ? meta.salary : null),
       joining_date: data.joining_date || meta.joining_date || data.created_at,
@@ -300,10 +310,10 @@ export async function createEmployee(params: {
   joining_date?: string | null
 }): Promise<{ employee: Employee; warning?: string }> {
   const name = params.name.trim()
-  const designation = params.designation.trim()
+  const designation = cleanDesignation(params.designation)
   const branch = params.branch ? params.branch.trim() : 'Multan'
   const salary = params.salary !== undefined && params.salary !== null && params.salary !== '' ? Number(params.salary) : null
-  const joiningDate = params.joining_date || new Date().toISOString().split('T')[0]
+  const joiningDate = params.joining_date && params.joining_date.trim() ? params.joining_date.trim() : new Date().toISOString().split('T')[0]
   const normalizedName = normalizeEmployeeName(name)
 
   if (!name) throw new Error('Employee name is required.')
@@ -356,7 +366,7 @@ export async function createEmployee(params: {
     throw new Error('Failed to create employee in database')
   }
 
-  return { employee: { ...data, branch, salary, joining_date: joiningDate }, warning }
+  return { employee: { ...data, branch, salary, joining_date: joiningDate, designation }, warning }
 }
 
 export async function updateEmployee(
@@ -380,7 +390,7 @@ export async function updateEmployee(
     updateData.normalized_name = normalizeEmployeeName(params.name)
   }
   if (params.designation !== undefined) {
-    updateData.designation = params.designation.trim()
+    updateData.designation = cleanDesignation(params.designation)
   }
   if (params.branch !== undefined) {
     updateData.branch = params.branch
@@ -644,6 +654,7 @@ export async function getAttendanceSummary(params?: {
   let missingOutTimes = 0
 
   let totalWorkingMinutes = 0
+  let requiredWorkingMinutes = 0
 
   for (const r of records) {
     if (r.arrival_status === 'On Time Arrival') onTimeArrivals++
@@ -655,12 +666,49 @@ export async function getAttendanceSummary(params?: {
     else if (r.departure_status === 'Missing Out Time') missingOutTimes++
 
     totalWorkingMinutes += r.total_working_minutes || 0
+
+    // Calculate required hours per day:
+    // Monday-Friday: 8 hours (480 mins)
+    // Saturday: 4 hours (240 mins)
+    // Sunday: 0 hours (holiday)
+    const dayName = (r.day_of_week || '').toLowerCase()
+    let dayNum = -1
+    if (r.attendance_date) {
+      const dt = new Date(r.attendance_date + 'T00:00:00')
+      if (!isNaN(dt.getTime())) dayNum = dt.getDay()
+    }
+
+    const isSaturday = dayNum === 6 || dayName.includes('sat')
+    const isSunday = dayNum === 0 || dayName.includes('sun')
+
+    if (isSunday) {
+      requiredWorkingMinutes += 0
+    } else if (isSaturday) {
+      requiredWorkingMinutes += 4 * 60 // 4 hours on Saturday
+    } else {
+      requiredWorkingMinutes += 8 * 60 // 8 hours on Mon-Fri
+    }
   }
 
   const totalDays = records.length
   const totalHours = Math.floor(totalWorkingMinutes / 60)
   const totalMins = totalWorkingMinutes % 60
   const formattedTotalHours = `${totalHours}h ${totalMins}m`
+
+  const reqHours = Math.floor(requiredWorkingMinutes / 60)
+  const reqMins = requiredWorkingMinutes % 60
+  const formattedRequiredHours = `${reqHours}h ${reqMins}m`
+
+  const differenceMinutes = totalWorkingMinutes - requiredWorkingMinutes
+  const diffAbs = Math.abs(differenceMinutes)
+  const diffHours = Math.floor(diffAbs / 60)
+  const diffMins = diffAbs % 60
+  const formattedDifference = `${differenceMinutes >= 0 ? '+' : '-'}${diffHours}h ${diffMins}m`
+
+  const hoursCompletionRate =
+    requiredWorkingMinutes > 0
+      ? Math.round((totalWorkingMinutes / requiredWorkingMinutes) * 100)
+      : 100
 
   const onTimeArrivalRate = totalDays > 0 ? Math.round((onTimeArrivals / totalDays) * 100) : 0
   const onTimeDepartureRate = totalDays > 0 ? Math.round((onTimeDepartures / totalDays) * 100) : 0
@@ -677,6 +725,11 @@ export async function getAttendanceSummary(params?: {
     onTimeDepartureRate,
     totalWorkingMinutes,
     formattedTotalHours,
+    requiredWorkingMinutes,
+    formattedRequiredHours,
+    differenceMinutes,
+    formattedDifference,
+    hoursCompletionRate,
   }
 }
 

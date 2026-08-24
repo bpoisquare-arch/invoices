@@ -50,7 +50,6 @@ export default function EmployeeDetailPage({ params }: PageProps) {
   const [isLoading, setIsLoading] = useState(true)
 
   // Filters
-  const [selectedMonth, setSelectedMonth] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [arrivalStatus, setArrivalStatus] = useState('all')
@@ -64,7 +63,13 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     onTimeDepartures: number
     earlyDepartures: number
     onTimeDepartureRate: number
+    totalWorkingMinutes: number
     formattedTotalHours: string
+    requiredWorkingMinutes: number
+    formattedRequiredHours: string
+    differenceMinutes: number
+    formattedDifference: string
+    hoursCompletionRate: number
   }>({
     totalDays: 0,
     onTimeArrivals: 0,
@@ -73,7 +78,13 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     onTimeDepartures: 0,
     earlyDepartures: 0,
     onTimeDepartureRate: 0,
+    totalWorkingMinutes: 0,
     formattedTotalHours: '0h 0m',
+    requiredWorkingMinutes: 0,
+    formattedRequiredHours: '0h 0m',
+    differenceMinutes: 0,
+    formattedDifference: '+0h 0m',
+    hoursCompletionRate: 100,
   })
 
   // Modals
@@ -102,7 +113,6 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       // Fetch employee records
       const queryParams = new URLSearchParams()
       queryParams.set('employeeId', employeeId)
-      if (selectedMonth) queryParams.set('month', selectedMonth)
       if (startDate) queryParams.set('startDate', startDate)
       if (endDate) queryParams.set('endDate', endDate)
       if (arrivalStatus && arrivalStatus !== 'all') queryParams.set('arrivalStatus', arrivalStatus)
@@ -118,7 +128,6 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       // Fetch summary
       const summaryParams = new URLSearchParams()
       summaryParams.set('employeeId', employeeId)
-      if (selectedMonth) summaryParams.set('month', selectedMonth)
       if (startDate) summaryParams.set('startDate', startDate)
       if (endDate) summaryParams.set('endDate', endDate)
       summaryParams.set('mode', 'summary')
@@ -137,7 +146,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
   useEffect(() => {
     loadData()
-  }, [employeeId, selectedMonth, startDate, endDate, arrivalStatus])
+  }, [employeeId, startDate, endDate, arrivalStatus])
 
   const handleExportExcel = () => {
     if (records.length === 0) {
@@ -188,16 +197,32 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#009D9E]/10 text-[#009D9E]">
                 {employee?.employee_id || 'N/A'}
               </span>
-              <span className={`px-2.5 py-0.5 rounded text-xs font-bold ${
-                (employee?.branch || 'Multan').toLowerCase() === 'lahore'
-                  ? 'bg-purple-100 text-purple-800'
-                  : 'bg-blue-100 text-blue-800'
-              }`}>
+              <span
+                className={`px-2.5 py-0.5 rounded text-xs font-bold ${
+                  (employee?.branch || '').toLowerCase() === 'lahore'
+                    ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                    : (employee?.branch || '').toLowerCase() === 'onshore'
+                    ? 'bg-teal-100 text-teal-800 border border-teal-200'
+                    : (employee?.branch || '').toLowerCase() === 'aimt'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                    : 'bg-blue-100 text-blue-800 border border-blue-200'
+                }`}
+              >
                 {employee?.branch || 'Multan'} Branch
               </span>
             </div>
             <p className="text-sm font-semibold text-slate-500 mt-0.5">
-              {employee?.designation || 'Staff'} • Joined: {employee?.joining_date ? new Date(employee.joining_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (employee ? new Date(employee.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '')}
+              {(employee?.designation || 'Staff')
+                .replace(/[–—\-]\s*(Multan|Lahore)(\s+Office)?/gi, '')
+                .replace(/\s*(Multan|Lahore)\s*Office/gi, '')
+                .trim()}
+              {employee?.joining_date
+                ? ` • Joined: ${new Date(employee.joining_date).toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })}`
+                : ''}
               {employee?.salary ? ` • Salary: PKR ${Number(employee.salary).toLocaleString()}` : ''}
             </p>
           </div>
@@ -223,47 +248,81 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       </div>
 
       {/* Metrics Summary Bento */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {/* Total Working Days */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        {/* 1. Total Working Days */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-2xs">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Days</p>
           <p className="text-2xl font-extrabold text-[#003D5C] mt-1">{summary.totalDays}</p>
           <p className="text-[11px] text-slate-400 mt-1">Recorded days</p>
         </div>
 
-        {/* On-Time Arrival */}
+        {/* 2. On-Time Arrival */}
         <div className="bg-white border border-emerald-200/80 rounded-xl p-4 shadow-2xs bg-emerald-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">On Time Arrival</p>
           <p className="text-2xl font-extrabold text-emerald-600 mt-1">{summary.onTimeArrivals}</p>
           <p className="text-[11px] text-emerald-700 font-semibold mt-1">{summary.onTimeArrivalRate}% rate</p>
         </div>
 
-        {/* Late Arrival */}
+        {/* 3. Late Arrival */}
         <div className="bg-white border border-amber-200/80 rounded-xl p-4 shadow-2xs bg-amber-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Late Arrivals</p>
           <p className="text-2xl font-extrabold text-amber-600 mt-1">{summary.lateArrivals}</p>
           <p className="text-[11px] text-amber-700 font-semibold mt-1">After cutoff</p>
         </div>
 
-        {/* On-Time Departure */}
+        {/* 4. On-Time Departure */}
         <div className="bg-white border border-emerald-200/80 rounded-xl p-4 shadow-2xs bg-emerald-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">On Time Departure</p>
           <p className="text-2xl font-extrabold text-emerald-600 mt-1">{summary.onTimeDepartures}</p>
           <p className="text-[11px] text-emerald-700 font-semibold mt-1">{summary.onTimeDepartureRate}% rate</p>
         </div>
 
-        {/* Early Departure */}
+        {/* 5. Early Departure */}
         <div className="bg-white border border-rose-200/80 rounded-xl p-4 shadow-2xs bg-rose-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Early Departure</p>
           <p className="text-2xl font-extrabold text-rose-600 mt-1">{summary.earlyDepartures}</p>
           <p className="text-[11px] text-rose-700 font-semibold mt-1">Left early</p>
         </div>
 
-        {/* Total Working Hours */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-2xs">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Worked</p>
-          <p className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">{summary.formattedTotalHours}</p>
-          <p className="text-[11px] text-slate-400 mt-1">Sum of intervals</p>
+        {/* 6. Hours Required (Kitny hours karne thy) */}
+        <div className="bg-white border border-blue-200/80 rounded-xl p-4 shadow-2xs bg-blue-50/15">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Hours Required</p>
+          <p className="text-2xl font-extrabold text-blue-900 mt-1 font-mono">
+            {summary.formattedRequiredHours}
+          </p>
+          <p className="text-[11px] text-blue-600/80 font-medium mt-1">Target duration</p>
+        </div>
+
+        {/* 7. Total Hours (Kitny employee ne hours kare hai) */}
+        <div
+          className={`bg-white border rounded-xl p-4 shadow-2xs transition-all ${
+            summary.differenceMinutes >= 0
+              ? 'border-emerald-200/80 bg-emerald-50/20'
+              : 'border-amber-200/80 bg-amber-50/20'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Hours</p>
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                summary.differenceMinutes >= 0
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {summary.formattedDifference}
+            </span>
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">
+            {summary.formattedTotalHours}
+          </p>
+          <p
+            className={`text-[11px] font-semibold mt-1 ${
+              summary.hoursCompletionRate >= 100 ? 'text-emerald-700' : 'text-amber-700'
+            }`}
+          >
+            {summary.hoursCompletionRate}% completed
+          </p>
         </div>
       </div>
 
@@ -271,28 +330,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-wrap flex-1">
           <div>
-            <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Month</label>
-            <Input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => {
-                setSelectedMonth(e.target.value)
-                setStartDate('')
-                setEndDate('')
-              }}
-              className="text-xs border-slate-200 w-44"
-            />
-          </div>
-
-          <div>
             <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">From Date</label>
             <Input
               type="date"
               value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value)
-                setSelectedMonth('')
-              }}
+              onChange={(e) => setStartDate(e.target.value)}
               className="text-xs border-slate-200"
             />
           </div>
@@ -302,10 +344,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             <Input
               type="date"
               value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value)
-                setSelectedMonth('')
-              }}
+              onChange={(e) => setEndDate(e.target.value)}
               className="text-xs border-slate-200"
             />
           </div>
@@ -325,12 +364,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        {(selectedMonth || startDate || endDate || arrivalStatus !== 'all') && (
+        {(startDate || endDate || arrivalStatus !== 'all') && (
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
-              setSelectedMonth('')
               setStartDate('')
               setEndDate('')
               setArrivalStatus('all')

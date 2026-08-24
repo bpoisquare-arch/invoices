@@ -12,14 +12,13 @@ export const EMPLOYEE_DESIGNATIONS = [
   'SM Manager & Graphics Designer',
   'Sales Head',
   'Operational & AfterSales Officer',
-  'Branch & After Sales Manager – Multan',
+  'Branch & After Sales Manager',
   'Offshore Visa File Officer',
   'Onshore Processing Lead',
   'Onshore Processing Officer',
   'Operational Coordinator',
-  'Student Counsellor – Multan Office',
-  'Student Counsellor – Lahore Office',
-  'IELTS/PTE Trainer – Multan Office',
+  'Student Counsellor',
+  'IELTS/PTE Trainer',
 ] as const
 
 export type EmployeeDesignation = (typeof EMPLOYEE_DESIGNATIONS)[number] | string
