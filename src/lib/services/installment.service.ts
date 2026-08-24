@@ -321,9 +321,6 @@ function getRowDescription(
       combinedFees = `${feeParts.slice(0, -1).join(', ')} and ${feeParts[feeParts.length - 1]}`
     }
 
-    if (feeParts[0].startsWith('Remaining')) {
-      return `${combinedFees} including ${instText}`
-    }
     return `${instText} including ${combinedFees}`
   }
 

@@ -87,6 +87,9 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     hoursCompletionRate: 100,
   })
 
+  // Gazetted Holidays State
+  const [holidays, setHolidays] = useState<Record<string, string>>({})
+
   // Modals
   const [editingRecord, setEditingRecord] = useState<AttendanceRecordWithEmployee | null>(null)
   const [viewingPunchesRecord, setViewingPunchesRecord] = useState<AttendanceRecordWithEmployee | null>(null)
@@ -95,20 +98,31 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     try {
       setIsLoading(true)
 
-      // Fetch employee info
-      const empRes = await fetch('/api/attendance/employees')
+      // Fetch employee info, settings, and holidays in parallel
+      const [empRes, settRes, holRes] = await Promise.all([
+        fetch('/api/attendance/employees'),
+        fetch('/api/attendance/settings'),
+        fetch('/api/attendance/holidays'),
+      ])
+
       const empData = await empRes.json()
+      let currentEmp: Employee | null = null
       if (empData.success && empData.employees) {
         const found = empData.employees.find(
           (e: Employee) => e.id === employeeId || e.employee_id === employeeId
         )
-        if (found) setEmployee(found)
+        if (found) {
+          currentEmp = found
+          setEmployee(found)
+        }
       }
 
-      // Fetch settings
-      const settRes = await fetch('/api/attendance/settings')
       const settData = await settRes.json()
       if (settData.success && settData.settings) setSettings(settData.settings)
+
+      const holData = await holRes.json()
+      const holMap: Record<string, string> = holData.success && holData.holidays ? holData.holidays : {}
+      setHolidays(holMap)
 
       // Fetch employee records
       const queryParams = new URLSearchParams()
@@ -120,9 +134,98 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
       const recordsRes = await fetch(`/api/attendance/records?${queryParams.toString()}`)
       const recordsData = await recordsRes.json()
+      const fetchedRecords: AttendanceRecordWithEmployee[] =
+        recordsData.success && recordsData.records ? recordsData.records : []
 
-      if (recordsData.success && recordsData.records) {
-        setRecords(recordsData.records)
+      // If user selected a date range (startDate to endDate), generate full list of days in range:
+      if (startDate && endDate) {
+        const sParts = startDate.split('-').map(Number)
+        const eParts = endDate.split('-').map(Number)
+
+        if (sParts.length === 3 && eParts.length === 3) {
+          const cur = new Date(sParts[0], sParts[1] - 1, sParts[2], 12, 0, 0)
+          const end = new Date(eParts[0], eParts[1] - 1, eParts[2], 12, 0, 0)
+
+          const recordsByDate = new Map<string, AttendanceRecordWithEmployee>()
+          fetchedRecords.forEach((r) => {
+            if (r.attendance_date) {
+              recordsByDate.set(r.attendance_date.split('T')[0], r)
+            }
+          })
+
+          const fullGridRows: AttendanceRecordWithEmployee[] = []
+
+          while (cur <= end) {
+            const year = cur.getFullYear()
+            const month = String(cur.getMonth() + 1).padStart(2, '0')
+            const day = String(cur.getDate()).padStart(2, '0')
+            const dStr = `${year}-${month}-${day}`
+
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+            const dayName = dayNames[cur.getDay()]
+            const isSunday = cur.getDay() === 0
+            const isGazettedHoliday = Boolean(holMap[dStr])
+
+            const existing = recordsByDate.get(dStr)
+
+            if (existing) {
+              fullGridRows.push(existing)
+            } else if (isSunday || isGazettedHoliday) {
+              fullGridRows.push({
+                id: `holiday-${dStr}`,
+                employee_id: currentEmp?.id || employeeId,
+                attendance_date: dStr,
+                day_of_week: dayName,
+                in_time: null,
+                out_time: null,
+                arrival_status: isGazettedHoliday ? 'Gazetted Holiday' : 'Holiday',
+                departure_status: isGazettedHoliday ? (holMap[dStr] ? `Gazetted Holiday (${holMap[dStr]})` : 'Gazetted Holiday') : 'Sunday Holiday',
+                total_working_minutes: 0,
+                total_working_hours_formatted: '00:00',
+                raw_punches: [],
+                notes: isGazettedHoliday ? `Gazetted Holiday: ${holMap[dStr]}` : 'Sunday Holiday',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                employee: currentEmp || undefined,
+              } as any)
+            } else {
+              fullGridRows.push({
+                id: `absent-${dStr}`,
+                employee_id: currentEmp?.id || employeeId,
+                attendance_date: dStr,
+                day_of_week: dayName,
+                in_time: null,
+                out_time: null,
+                arrival_status: 'Absent',
+                departure_status: 'Absent',
+                total_working_minutes: 0,
+                total_working_hours_formatted: '00:00',
+                raw_punches: [],
+                notes: 'Absent (No punches recorded)',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                employee: currentEmp || undefined,
+              } as any)
+            }
+
+            cur.setDate(cur.getDate() + 1)
+          }
+
+          // Sort descending (newest date first)
+          fullGridRows.sort((a, b) => b.attendance_date.localeCompare(a.attendance_date))
+
+          // Filter by arrival status if selected
+          let displayRows = fullGridRows
+          if (arrivalStatus && arrivalStatus !== 'all') {
+            displayRows = fullGridRows.filter((r) => r.arrival_status === arrivalStatus)
+          }
+
+          setRecords(displayRows)
+        } else {
+          setRecords(fetchedRecords)
+        }
+      } else {
+        setRecords(fetchedRecords)
       }
 
       // Fetch summary
@@ -290,7 +393,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           <p className="text-2xl font-extrabold text-blue-900 mt-1 font-mono">
             {summary.formattedRequiredHours}
           </p>
-          <p className="text-[11px] text-blue-600/80 font-medium mt-1">Target duration</p>
+          <p className="text-[11px] text-blue-600/80 font-medium mt-1">Excl. Leaves & Holidays</p>
         </div>
 
         {/* 7. Total Hours (Kitny employee ne hours kare hai) */}
@@ -435,7 +538,13 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                     <td className="py-3.5 px-4">
                       <span
                         className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
-                          record.arrival_status === 'On Time Arrival'
+                          record.arrival_status === 'Holiday'
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            : record.arrival_status === 'Absent'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : record.arrival_status === 'Leave' || record.arrival_status?.toLowerCase().includes('leave')
+                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                            : record.arrival_status === 'On Time Arrival'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                             : record.arrival_status === 'Late Arrival'
                             ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
@@ -455,7 +564,13 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                     <td className="py-3.5 px-4">
                       <span
                         className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
-                          record.departure_status === 'On Time Departure'
+                          record.departure_status === 'Holiday' || record.departure_status?.includes('Holiday')
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            : record.departure_status === 'Absent'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : record.departure_status?.toLowerCase().includes('leave')
+                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                            : record.departure_status === 'On Time Departure'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                             : record.departure_status === 'Early Departure'
                             ? 'bg-rose-50 text-rose-700 border border-rose-200/60'

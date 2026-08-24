@@ -85,3 +85,56 @@ export function writeEmployeeMetadata(
     console.error('Error writing employee metadata file:', err)
   }
 }
+
+function getHolidaysFilePath(): string | null {
+  const tools = getFsAndPath()
+  if (!tools) return null
+  return tools.path.join(process.cwd(), 'data', 'gazetted_holidays.json')
+}
+
+export function readAllHolidays(): Record<string, string> {
+  const tools = getFsAndPath()
+  const filePath = getHolidaysFilePath()
+  if (!tools || !filePath) return {}
+
+  try {
+    if (!tools.fs.existsSync(filePath)) {
+      const dir = tools.path.dirname(filePath)
+      if (!tools.fs.existsSync(dir)) {
+        tools.fs.mkdirSync(dir, { recursive: true })
+      }
+      tools.fs.writeFileSync(filePath, JSON.stringify({}, null, 2), 'utf-8')
+      return {}
+    }
+    const raw = tools.fs.readFileSync(filePath, 'utf-8')
+    return JSON.parse(raw || '{}')
+  } catch (err) {
+    console.error('Error reading holidays file:', err)
+    return {}
+  }
+}
+
+export function writeHoliday(date: string, name?: string, isHoliday: boolean = true): Record<string, string> {
+  const tools = getFsAndPath()
+  const filePath = getHolidaysFilePath()
+  if (!tools || !filePath) return {}
+
+  try {
+    const dir = tools.path.dirname(filePath)
+    if (!tools.fs.existsSync(dir)) {
+      tools.fs.mkdirSync(dir, { recursive: true })
+    }
+    const all = readAllHolidays()
+    if (isHoliday) {
+      all[date] = name && name.trim() ? name.trim() : 'Gazetted Holiday'
+    } else {
+      delete all[date]
+    }
+    tools.fs.writeFileSync(filePath, JSON.stringify(all, null, 2), 'utf-8')
+    return all
+  } catch (err) {
+    console.error('Error writing holidays file:', err)
+    return readAllHolidays()
+  }
+}
+

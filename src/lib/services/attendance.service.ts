@@ -114,7 +114,7 @@ export async function updateAttendanceSettings(
   }
 }
 
-import { readAllEmployeeMetadata, writeEmployeeMetadata } from '@/lib/services/employee-storage'
+import { readAllEmployeeMetadata, writeEmployeeMetadata, readAllHolidays } from '@/lib/services/employee-storage'
 
 // ----------------------------------------------------
 // 2. EMPLOYEE SERVICES & METADATA SYNC
@@ -510,7 +510,13 @@ export async function getAttendanceRecords(
     let query = supabase.from('attendance_records').select('*')
 
     if (params.employeeId && params.employeeId !== 'all') {
-      query = query.eq('employee_id', params.employeeId)
+      const targetEmp = empMap.get(params.employeeId)
+      const empUuid = targetEmp?.id || (params.employeeId.includes('-') && params.employeeId.length > 20 ? params.employeeId : null)
+      if (empUuid) {
+        query = query.eq('employee_id', empUuid)
+      } else {
+        query = query.eq('employee_id', params.employeeId)
+      }
     }
     if (params.startDate) {
       query = query.gte('attendance_date', params.startDate)
@@ -538,8 +544,12 @@ export async function getAttendanceRecords(
   let filtered = allRecords.filter((rec) => {
     const emp = empMap.get(rec.employee_id)
 
-    if (params.employeeId && params.employeeId !== 'all' && rec.employee_id !== params.employeeId) {
-      return false
+    if (params.employeeId && params.employeeId !== 'all') {
+      const isMatch =
+        rec.employee_id === params.employeeId ||
+        emp?.id === params.employeeId ||
+        emp?.employee_id === params.employeeId
+      if (!isMatch) return false
     }
 
     if (params.startDate && rec.attendance_date < params.startDate) {
@@ -656,6 +666,19 @@ export async function getAttendanceSummary(params?: {
   let totalWorkingMinutes = 0
   let requiredWorkingMinutes = 0
 
+  const holidaysMap = readAllHolidays()
+
+  // Helper to check if a record represents an approved leave (case-insensitive)
+  const isLeaveRecord = (rec?: AttendanceRecordWithEmployee | null): boolean => {
+    if (!rec) return false
+    const arr = (rec.arrival_status || '').toLowerCase()
+    const dep = (rec.departure_status || '').toLowerCase()
+    return arr.includes('leave') || dep.includes('leave')
+  }
+
+  // Track dates present in existing records
+  const recordsByDate = new Map<string, AttendanceRecordWithEmployee>()
+
   for (const r of records) {
     if (r.arrival_status === 'On Time Arrival') onTimeArrivals++
     else if (r.arrival_status === 'Late Arrival') lateArrivals++
@@ -667,26 +690,78 @@ export async function getAttendanceSummary(params?: {
 
     totalWorkingMinutes += r.total_working_minutes || 0
 
-    // Calculate required hours per day:
-    // Monday-Friday: 8 hours (480 mins)
-    // Saturday: 4 hours (240 mins)
-    // Sunday: 0 hours (holiday)
-    const dayName = (r.day_of_week || '').toLowerCase()
-    let dayNum = -1
     if (r.attendance_date) {
-      const dt = new Date(r.attendance_date + 'T00:00:00')
-      if (!isNaN(dt.getTime())) dayNum = dt.getDay()
+      const cleanDate = r.attendance_date.split('T')[0]
+      recordsByDate.set(cleanDate, r)
     }
 
-    const isSaturday = dayNum === 6 || dayName.includes('sat')
-    const isSunday = dayNum === 0 || dayName.includes('sun')
+    // If no explicit startDate & endDate range provided, calculate directly per record:
+    if (!params?.startDate || !params?.endDate) {
+      const isLeave = isLeaveRecord(r)
+      const cleanDate = r.attendance_date ? r.attendance_date.split('T')[0] : ''
+      const dayName = (r.day_of_week || '').toLowerCase()
+      let dayNum = -1
+      if (cleanDate) {
+        const parts = cleanDate.split('-').map(Number)
+        if (parts.length === 3) {
+          const dt = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0)
+          dayNum = dt.getDay()
+        }
+      }
 
-    if (isSunday) {
-      requiredWorkingMinutes += 0
-    } else if (isSaturday) {
-      requiredWorkingMinutes += 4 * 60 // 4 hours on Saturday
-    } else {
-      requiredWorkingMinutes += 8 * 60 // 8 hours on Mon-Fri
+      const isSaturday = dayNum === 6 || dayName.includes('sat')
+      const isSunday = dayNum === 0 || dayName.includes('sun')
+      const isGazettedHoliday = Boolean(cleanDate && holidaysMap[cleanDate])
+
+      if (isSunday || isGazettedHoliday || isLeave) {
+        // Sundays, Gazetted Holidays, and approved Leaves have 0 required hours
+        requiredWorkingMinutes += 0
+      } else if (isSaturday) {
+        // Saturday: 4 hours
+        requiredWorkingMinutes += 4 * 60
+      } else {
+        // Normal workday (Mon-Fri) including unapproved Absent: 8 hours
+        requiredWorkingMinutes += 8 * 60
+      }
+    }
+  }
+
+  // If explicit date range (startDate to endDate) is provided, iterate all calendar dates in range:
+  if (params?.startDate && params?.endDate) {
+    const sParts = params.startDate.split('-').map(Number)
+    const eParts = params.endDate.split('-').map(Number)
+
+    if (sParts.length === 3 && eParts.length === 3) {
+      const cur = new Date(sParts[0], sParts[1] - 1, sParts[2], 12, 0, 0)
+      const end = new Date(eParts[0], eParts[1] - 1, eParts[2], 12, 0, 0)
+
+      while (cur <= end) {
+        const year = cur.getFullYear()
+        const month = String(cur.getMonth() + 1).padStart(2, '0')
+        const day = String(cur.getDate()).padStart(2, '0')
+        const dStr = `${year}-${month}-${day}`
+
+        const dayNum = cur.getDay() // 0 = Sunday, 6 = Saturday
+        const isSunday = dayNum === 0
+        const isSaturday = dayNum === 6
+        const isGazettedHoliday = Boolean(holidaysMap[dStr])
+
+        const r = recordsByDate.get(dStr)
+        const isLeave = isLeaveRecord(r)
+
+        if (isSunday || isGazettedHoliday || isLeave) {
+          // 0 hours for Sunday, Gazetted Holiday, and approved Leave
+          requiredWorkingMinutes += 0
+        } else if (isSaturday) {
+          // Saturday: 4 hours
+          requiredWorkingMinutes += 4 * 60
+        } else {
+          // Normal workday (Mon-Fri) including Absent: 8 hours
+          requiredWorkingMinutes += 8 * 60
+        }
+
+        cur.setDate(cur.getDate() + 1)
+      }
     }
   }
 

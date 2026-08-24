@@ -20,6 +20,7 @@ import {
   SlidersHorizontal,
   Cloud,
   CheckCircle2,
+  AlertCircle,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import {
   AttendanceRecordWithEmployee,
   AttendanceSettings,
@@ -106,6 +115,12 @@ export default function AttendanceRecordsPage() {
   const [editingRecord, setEditingRecord] = useState<AttendanceRecordWithEmployee | null>(null)
   const [viewingPunchesRecord, setViewingPunchesRecord] = useState<AttendanceRecordWithEmployee | null>(null)
 
+  // Gazetted Holidays State & Modal
+  const [holidays, setHolidays] = useState<Record<string, string>>({})
+  const [holidayModalDate, setHolidayModalDate] = useState<string | null>(null)
+  const [holidayNameInput, setHolidayNameInput] = useState<string>('Gazetted Holiday')
+  const [isHolidaySaving, setIsHolidaySaving] = useState(false)
+
   // Summary Metrics
   const [summary, setSummary] = useState({
     totalRecords: 0,
@@ -116,24 +131,86 @@ export default function AttendanceRecordsPage() {
     totalHours: '0h 0m',
   })
 
-  // Load Initial Metadata (Employees & Settings)
+  // Load Initial Metadata (Employees, Settings & Holidays)
   useEffect(() => {
     async function loadMeta() {
       try {
-        const [empRes, settRes] = await Promise.all([
+        const [empRes, settRes, holRes] = await Promise.all([
           fetch('/api/attendance/employees'),
           fetch('/api/attendance/settings'),
+          fetch('/api/attendance/holidays'),
         ])
         const empData = await empRes.json()
         const settData = await settRes.json()
+        const holData = await holRes.json()
         if (empData.success && empData.employees) setEmployees(empData.employees)
         if (settData.success && settData.settings) setSettings(settData.settings)
+        if (holData.success && holData.holidays) setHolidays(holData.holidays)
       } catch (err) {
         console.error('Error loading meta:', err)
       }
     }
     loadMeta()
   }, [])
+
+  const getPresentEmployeesCountOnDate = (date: string): number => {
+    let count = 0
+    employees.forEach((emp) => {
+      const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
+      if (rec) {
+        const isPresent =
+          Boolean(rec.in_time && rec.in_time !== '--') ||
+          Boolean(rec.out_time && rec.out_time !== '--') ||
+          (rec.total_working_minutes ? rec.total_working_minutes > 0 : false) ||
+          rec.arrival_status === 'On Time Arrival' ||
+          rec.arrival_status === 'Late Arrival' ||
+          rec.departure_status === 'On Time Departure' ||
+          rec.departure_status === 'Early Departure'
+        if (isPresent) count++
+      }
+    })
+    return count
+  }
+
+  const handleDateHeaderClick = (date: string) => {
+    setHolidayModalDate(date)
+    setHolidayNameInput(holidays[date] || 'Gazetted Holiday')
+  }
+
+  const handleSaveHoliday = async (date: string, isHoliday: boolean) => {
+    if (isHoliday) {
+      const presentCount = getPresentEmployeesCountOnDate(date)
+      if (presentCount > 0) {
+        alert(
+          `Cannot mark as Gazetted Holiday because ${presentCount} employee(s) have recorded attendance/punches on this date.\n\nGazetted Holiday can only be marked on days where ALL employees are absent.`
+        )
+        return
+      }
+    }
+
+    try {
+      setIsHolidaySaving(true)
+      const res = await fetch('/api/attendance/holidays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date,
+          name: holidayNameInput.trim() || 'Gazetted Holiday',
+          isHoliday,
+        }),
+      })
+      const data = await res.json()
+      if (data.success && data.holidays) {
+        setHolidays(data.holidays)
+      }
+      setHolidayModalDate(null)
+      await fetchRecords()
+    } catch (err) {
+      console.error('Error saving holiday:', err)
+    } finally {
+      setIsHolidaySaving(false)
+    }
+  }
 
   // Fetch Attendance Records
   const fetchRecords = async () => {
@@ -270,7 +347,8 @@ export default function AttendanceRecordsPage() {
     filteredEmployees.forEach((emp) => {
       dateColumns.forEach((date) => {
         const dayName = getDayName(date)
-        if (dayName === 'Sunday') return // Sundays are holidays
+        const isGazettedHoliday = Boolean(holidays[date])
+        if (dayName === 'Sunday' || isGazettedHoliday) return // Sundays and Gazetted Holidays
 
         const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
         const isFuture = date > todayStr
@@ -321,7 +399,7 @@ export default function AttendanceRecordsPage() {
       totalAbsent,
       totalLeaves,
     }
-  }, [filteredEmployees, dateColumns, recordMatrixMap, settings])
+  }, [filteredEmployees, dateColumns, recordMatrixMap, settings, holidays])
 
   // Export to Excel Matrix
   const handleExportExcel = () => {
@@ -335,10 +413,12 @@ export default function AttendanceRecordsPage() {
         'Batch ID': emp.employee_id,
         'Employee Name': emp.name,
         Designation: emp.designation || '--',
+        Branch: emp.branch || 'Multan',
       }
 
       dateColumns.forEach((date) => {
         const dayName = getDayName(date)
+        const isGazettedHoliday = Boolean(holidays[date])
         const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
         const colHeader = `${date} (${dayName})`
 
@@ -360,6 +440,8 @@ export default function AttendanceRecordsPage() {
           } else {
             rowData[colHeader] = `${rec.in_time || '--'} - ${rec.out_time || '--'} [${rec.total_working_hours_formatted || ''}]`
           }
+        } else if (isGazettedHoliday) {
+          rowData[colHeader] = `Gazetted Holiday (${holidays[date] || 'Gazetted Holiday'})`
         } else if (dayName === 'Sunday') {
           rowData[colHeader] = 'Holiday'
         } else {
@@ -442,12 +524,30 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
     const isFuture = date > todayStr
     const isToday = date === todayStr
     const isPast = date < todayStr
+    const isGazettedHoliday = Boolean(holidays[date])
     const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
 
-    // 1. Sunday / Weekend / Holiday
+    // 1. Gazetted Holiday
+    if (isGazettedHoliday) {
+      return (
+        <div
+          className="flex items-center justify-center py-2"
+          title={`Gazetted Holiday: ${holidays[date]}`}
+        >
+          <span className="bg-[#b38600] text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-2xs tracking-wide whitespace-nowrap">
+            Gazetted Holiday
+          </span>
+        </div>
+      )
+    }
+
+    // 2. Sunday / Weekend
     if (dayName === 'Sunday') {
       return (
-        <div className="flex items-center justify-center py-2">
+        <div
+          className="flex items-center justify-center py-2"
+          title="Sunday Holiday"
+        >
           <span className="bg-[#b38600] text-white px-2.5 py-1 rounded text-[11px] font-bold shadow-2xs tracking-wide">
             Holiday
           </span>
@@ -827,24 +927,48 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
                 </th>
 
                 {/* Fixed Column 3: Designation */}
-                <th className="py-3 px-3.5 sticky left-[260px] z-40 bg-[#2d3748] border-r border-slate-600/80 min-w-[160px] uppercase tracking-wider text-[11px]">
+                <th className="py-3 px-3.5 sticky left-[260px] z-40 bg-[#2d3748] border-r border-slate-600/80 min-w-[150px] uppercase tracking-wider text-[11px]">
                   Designation ⇅
+                </th>
+
+                {/* Fixed Column 4: Branch */}
+                <th className="py-3 px-3 sticky left-[410px] z-40 bg-[#2d3748] border-r border-slate-600/80 min-w-[110px] text-center uppercase tracking-wider text-[11px] shadow-[3px_0_5px_rgba(0,0,0,0.2)]">
+                  Branch ⇅
                 </th>
 
                 {/* Dynamic Date Columns */}
                 {dateColumns.map((date) => {
                   const day = getDayName(date)
                   const isSunday = day === 'Sunday'
+                  const isGazettedHoliday = Boolean(holidays[date])
                   return (
                     <th
                       key={date}
-                      className={`py-2 px-3 text-center border-r border-slate-600/80 min-w-[155px] font-sans ${
-                        isSunday ? 'bg-[#242c3a] text-amber-300' : 'bg-[#2d3748] text-white'
+                      onClick={() => handleDateHeaderClick(date)}
+                      className={`py-2 px-3 text-center border-r border-slate-600/80 min-w-[155px] font-sans cursor-pointer transition-all select-none group/th ${
+                        isSunday
+                          ? 'bg-[#242c3a] text-amber-300 hover:bg-[#1a202c]'
+                          : isGazettedHoliday
+                          ? 'bg-[#8c6b00] text-amber-100 hover:bg-[#735700]'
+                          : 'bg-[#2d3748] text-white hover:bg-[#3d4a60]'
                       }`}
+                      title={
+                        isGazettedHoliday
+                          ? `Gazetted Holiday: ${holidays[date]}. Click to edit or remove.`
+                          : 'Click date to mark as Gazetted Holiday'
+                      }
                     >
-                      <div className="text-[11px] font-bold font-mono tracking-tight">{date}</div>
-                      <div className="text-[10px] font-semibold tracking-wider text-slate-300 uppercase">
-                        {day} ⇅
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-[11px] font-bold font-mono tracking-tight">{date}</span>
+                        {isGazettedHoliday && (
+                          <span className="text-[9px] bg-amber-300 text-amber-950 font-extrabold px-1 rounded shadow-2xs">
+                            HOLIDAY
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] font-semibold tracking-wider text-slate-300 uppercase flex items-center justify-center gap-1 mt-0.5 group-hover/th:text-white">
+                        <span>{day}</span>
+                        <span className="text-[9px] opacity-70">⚙️</span>
                       </div>
                     </th>
                   )
@@ -857,7 +981,7 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
               {isLoading ? (
                 <tr>
                   <td
-                    colSpan={3 + dateColumns.length}
+                    colSpan={4 + dateColumns.length}
                     className="py-20 text-center text-slate-400 bg-white"
                   >
                     <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-[#009D9E]" />
@@ -867,7 +991,7 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
               ) : filteredEmployees.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={3 + dateColumns.length}
+                    colSpan={4 + dateColumns.length}
                     className="py-20 text-center text-slate-400 bg-white"
                   >
                     <Calendar className="w-10 h-10 mx-auto mb-2 text-slate-300" />
@@ -909,9 +1033,32 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
                       <td
                         className={`py-3 px-3.5 text-slate-600 border-r border-slate-200 text-xs sticky left-[260px] z-20 ${
                           isEven ? 'bg-white' : 'bg-[#f8fafc]'
-                        } shadow-[3px_0_5px_rgba(0,0,0,0.04)] font-medium`}
+                        } shadow-[2px_0_4px_rgba(0,0,0,0.02)] font-medium`}
                       >
                         {emp.designation || 'Staff'}
+                      </td>
+
+                      {/* Sticky Column 4: Branch */}
+                      <td
+                        className={`py-3 px-2 text-center border-r border-slate-200 text-xs sticky left-[410px] z-20 ${
+                          isEven ? 'bg-white' : 'bg-[#f8fafc]'
+                        } shadow-[3px_0_5px_rgba(0,0,0,0.04)]`}
+                      >
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            emp.branch === 'Lahore'
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                              : emp.branch === 'Multan'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : emp.branch === 'Onshore'
+                              ? 'bg-teal-100 text-teal-800 border border-teal-200'
+                              : emp.branch === 'AIMT'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          {emp.branch || 'Multan'}
+                        </span>
                       </td>
 
                       {/* Dynamic Date Data Cells */}
@@ -977,6 +1124,127 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
           }
         }}
       />
+
+      {/* Gazetted Holiday Configuration Modal */}
+      <Dialog open={!!holidayModalDate} onOpenChange={(open) => !open && setHolidayModalDate(null)}>
+        <DialogContent className="sm:max-w-md bg-white border border-slate-200 shadow-xl rounded-xl">
+          <DialogHeader className="border-b border-slate-100 pb-3">
+            <DialogTitle className="text-base font-bold text-[#003D5C] flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-[#009D9E]" />
+              Manage Gazetted Holiday
+            </DialogTitle>
+            <p className="text-xs text-slate-500">
+              Configure whether this date is an official Gazetted Holiday for all employees.
+            </p>
+          </DialogHeader>
+
+          {holidayModalDate && (() => {
+            const presentCount = getPresentEmployeesCountOnDate(holidayModalDate)
+            const isAlreadyHoliday = Boolean(holidays[holidayModalDate])
+            const canMarkHoliday = isAlreadyHoliday || presentCount === 0
+
+            return (
+              <div className="space-y-4 py-2">
+                <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase text-slate-400">Selected Date</p>
+                    <p className="text-sm font-bold text-slate-900 font-mono mt-0.5">
+                      {holidayModalDate} ({getDayName(holidayModalDate)})
+                    </p>
+                  </div>
+                  {isAlreadyHoliday ? (
+                    <span className="bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold px-2.5 py-1 rounded-full">
+                      🎉 Gazetted Holiday
+                    </span>
+                  ) : (
+                    <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">
+                      Regular Working Day
+                    </span>
+                  )}
+                </div>
+
+                {!canMarkHoliday ? (
+                  <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-lg text-xs text-rose-800 space-y-1.5">
+                    <p className="font-bold text-rose-900 flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      Cannot Mark as Gazetted Holiday
+                    </p>
+                    <p>
+                      <strong>{presentCount}</strong> employee(s) have recorded attendance/punches on this date.
+                    </p>
+                    <p className="text-[11px] text-rose-700 font-medium">
+                      Gazetted Holiday can only be marked on days where <strong>ALL employees are absent</strong>.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Holiday Name / Reason (Optional)
+                    </Label>
+                    <Input
+                      type="text"
+                      placeholder="e.g. Independence Day, Eid Holiday, Gazetted Holiday"
+                      value={holidayNameInput}
+                      onChange={(e) => setHolidayNameInput(e.target.value)}
+                      className="text-sm border-slate-200"
+                    />
+                  </div>
+                )}
+
+                <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs text-blue-800 space-y-1">
+                  <p className="font-semibold text-blue-900">Effect on Attendance:</p>
+                  <p>
+                    Marking this date as a Gazetted Holiday will automatically display <strong>Gazetted Holiday</strong> for every employee across the system, and set expected working hours to <strong>0h</strong>.
+                  </p>
+                </div>
+
+                <DialogFooter className="pt-3 border-t border-slate-100 flex items-center justify-between sm:justify-between gap-2">
+                  {isAlreadyHoliday ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleSaveHoliday(holidayModalDate, false)}
+                      disabled={isHolidaySaving}
+                      className="text-xs font-bold text-rose-600 border-rose-200 hover:bg-rose-50"
+                    >
+                      {isHolidaySaving ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4 mr-1 text-rose-600" />
+                      )}
+                      Remove Holiday
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setHolidayModalDate(null)}
+                      disabled={isHolidaySaving}
+                      className="text-xs font-bold"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+
+                  <Button
+                    type="button"
+                    onClick={() => handleSaveHoliday(holidayModalDate, true)}
+                    disabled={!canMarkHoliday || isHolidaySaving}
+                    className="bg-[#009D9E] hover:bg-[#007A7A] text-white text-xs font-bold uppercase tracking-wider gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isHolidaySaving ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4" />
+                    )}
+                    {isAlreadyHoliday ? 'Update Holiday' : 'Mark as Gazetted Holiday'}
+                  </Button>
+                </DialogFooter>
+              </div>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
