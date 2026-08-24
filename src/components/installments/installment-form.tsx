@@ -195,19 +195,19 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     <div className="space-y-6 max-w-[1600px] mx-auto font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="font-['Montserrat'] text-2xl font-bold text-[#003D5C] tracking-tight">
-            Student Installment Schedule
+          <h1 className="font-['Montserrat'] text-xl sm:text-2xl font-bold text-[#003D5C] tracking-tight">
+            {mode === 'edit' ? 'Edit Installment Schedule' : 'Create Installment Schedule'}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Configure student course details, duration, fees, and installment breakdown for AIMT.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Button
             type="button"
             onClick={handleSubmit}
-            className="bg-[#009D9E] hover:bg-[#007A7A] text-white font-bold uppercase text-xs h-9 gap-2 shadow-xs transition-colors"
+            className="w-full sm:w-auto bg-[#009D9E] hover:bg-[#007A7A] text-white font-bold uppercase text-xs h-10 sm:h-9 gap-2 shadow-xs transition-colors justify-center"
             disabled={isSubmitting}
           >
             {isSubmitting ? (
@@ -218,7 +218,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                SAVE SCHEDULE
+                {mode === 'edit' ? 'UPDATE SCHEDULE' : 'SAVE SCHEDULE'}
               </>
             )}
           </Button>
@@ -232,7 +232,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
         <div className="lg:col-span-5 space-y-6">
           <Card className="bg-white border border-[#E2E8F0] shadow-2xs rounded-lg">
             <CardHeader className="py-4 border-b border-[#E2E8F0] flex flex-row items-center justify-between">

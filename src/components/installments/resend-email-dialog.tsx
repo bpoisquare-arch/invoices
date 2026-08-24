@@ -202,8 +202,8 @@ export default function ResendEmailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl p-0 gap-0 overflow-hidden bg-white text-slate-900 border-slate-200">
-        <DialogHeader className="p-6 pb-4 bg-slate-50/80 border-b border-slate-200">
+      <DialogContent className="max-w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto p-0 gap-0 bg-white text-slate-900 border-slate-200">
+        <DialogHeader className="p-4 sm:p-6 pb-4 bg-slate-50/80 border-b border-slate-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-[#003D5C] text-white rounded-lg">

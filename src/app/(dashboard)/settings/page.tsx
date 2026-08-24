@@ -144,7 +144,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white gap-2 text-xs font-semibold" disabled={isSaving}>
+            <Button type="submit" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white gap-2 text-xs font-semibold justify-center" disabled={isSaving}>
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Update Password
             </Button>

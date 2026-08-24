@@ -50,7 +50,7 @@ export default function LoginPage() {
 
       if (!signInErr) {
         document.cookie = 'dev-auth-session=true; path=/; max-age=86400'
-        router.push('/invoices')
+        router.push('/portal')
         router.refresh()
         return
       }

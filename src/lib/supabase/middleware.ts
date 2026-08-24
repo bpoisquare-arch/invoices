@@ -49,13 +49,13 @@ export async function updateSession(request: NextRequest) {
 
   if (isAuthenticated && isAuthRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = '/invoices'
+    url.pathname = '/portal'
     return NextResponse.redirect(url)
   }
 
   if (isAuthenticated && request.nextUrl.pathname === '/') {
     const url = request.nextUrl.clone()
-    url.pathname = '/invoices'
+    url.pathname = '/portal'
     return NextResponse.redirect(url)
   }
 

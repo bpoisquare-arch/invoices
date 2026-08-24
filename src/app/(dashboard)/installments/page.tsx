@@ -139,8 +139,8 @@ export default function InstallmentsPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="font-['Montserrat'] text-2xl font-bold text-[#003D5C] tracking-tight flex items-center gap-2.5">
-            <GraduationCap className="w-7 h-7 text-[#009D9E]" />
+          <h1 className="font-['Montserrat'] text-xl sm:text-2xl font-bold text-[#003D5C] tracking-tight flex items-center gap-2.5">
+            <GraduationCap className="w-6 h-6 sm:w-7 sm:h-7 text-[#009D9E]" />
             Student Installment Schedules
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -148,20 +148,20 @@ export default function InstallmentsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={resetFilters}
-            className="h-9 text-xs font-semibold gap-1.5 text-slate-700 hover:bg-slate-100 border-slate-300"
+            className="w-full sm:w-auto h-9 text-xs font-semibold gap-1.5 text-slate-700 hover:bg-slate-100 border-slate-300 justify-center"
             title="Refresh Data & Reset Filters"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Refresh
           </Button>
 
-          <Link href="/installments/new">
-            <Button size="sm" className="bg-[#009D9E] hover:bg-[#007A7A] text-white font-bold uppercase text-xs h-9 gap-2 shadow-xs">
+          <Link href="/installments/new" className="w-full sm:w-auto">
+            <Button size="sm" className="w-full sm:w-auto bg-[#009D9E] hover:bg-[#007A7A] text-white font-bold uppercase text-xs h-9 gap-2 shadow-xs justify-center">
               <PlusCircle className="w-4 h-4" />
               Create Schedule
             </Button>
@@ -170,13 +170,13 @@ export default function InstallmentsPage() {
       </div>
 
       {/* Filter / Search & Custom Date Range Bar */}
-      <Card className="p-4 bg-white border-slate-200 shadow-2xs space-y-4">
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+      <Card className="p-3.5 sm:p-4 bg-white border-slate-200 shadow-2xs space-y-3 sm:space-y-4">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4">
           {/* Search Input */}
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 max-w-md w-full">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
-              placeholder="Search by Student ID (e.g. BCP3000465) or Name..."
+              placeholder="Search by Student ID or Name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 h-9 text-xs font-medium"
@@ -249,13 +249,13 @@ export default function InstallmentsPage() {
 
         {/* Custom Date Pickers Row (Visible when Custom Range selected or dates specified) */}
         {(datePreset === 'custom' || startDateFilter || endDateFilter) && (
-          <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-3 bg-slate-50/80 p-3 rounded-md">
+          <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50/80 p-3 rounded-md">
             <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-[#009D9E]" />
               Custom Date Range:
             </span>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-500 font-semibold">From:</span>
+              <span className="text-[11px] text-slate-500 font-semibold w-10 sm:w-auto">From:</span>
               <Input
                 type="date"
                 value={startDateFilter}
@@ -263,12 +263,12 @@ export default function InstallmentsPage() {
                   setStartDateFilter(e.target.value)
                   setDatePreset('custom')
                 }}
-                className="h-8 w-36 text-xs font-mono bg-white"
+                className="h-8 w-full sm:w-36 text-xs font-mono bg-white"
               />
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-500 font-semibold">To:</span>
+              <span className="text-[11px] text-slate-500 font-semibold w-10 sm:w-auto">To:</span>
               <Input
                 type="date"
                 value={endDateFilter}
@@ -276,7 +276,7 @@ export default function InstallmentsPage() {
                   setEndDateFilter(e.target.value)
                   setDatePreset('custom')
                 }}
-                className="h-8 w-36 text-xs font-mono bg-white"
+                className="h-8 w-full sm:w-36 text-xs font-mono bg-white"
               />
             </div>
 
@@ -289,7 +289,7 @@ export default function InstallmentsPage() {
                   setEndDateFilter('')
                   setDatePreset('all')
                 }}
-                className="h-8 text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 font-semibold gap-1"
+                className="h-8 text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 font-semibold gap-1 self-start sm:self-auto"
               >
                 <X className="w-3 h-3" /> Clear Date Range
               </Button>
@@ -303,7 +303,7 @@ export default function InstallmentsPage() {
         {isLoading ? (
           <div className="p-12 text-center text-slate-500">Loading schedules...</div>
         ) : filteredSchedules.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 space-y-3">
+          <div className="p-8 sm:p-12 text-center text-slate-500 space-y-3">
             <GraduationCap className="w-12 h-12 text-slate-300 mx-auto" />
             <h3 className="text-base font-bold text-slate-800">No installment schedules found</h3>
             <p className="text-xs text-slate-500">
@@ -311,8 +311,8 @@ export default function InstallmentsPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left text-xs border-collapse min-w-[750px]">
               <thead>
                 <tr className="bg-slate-50 text-slate-600 font-semibold border-y border-slate-200">
                   <th className="py-3.5 px-6">Student ID</th>

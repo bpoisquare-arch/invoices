@@ -43,9 +43,9 @@ export default function CompaniesPage() {
   return (
     <div className="space-y-8 max-w-7xl mx-auto font-sans">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4 sm:pb-6">
         <div>
-          <h1 className="font-['Montserrat'] text-2xl font-bold text-[#003D5C] tracking-tight">
+          <h1 className="font-['Montserrat'] text-xl sm:text-2xl font-bold text-[#003D5C] tracking-tight">
             Registered Companies
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -60,24 +60,24 @@ export default function CompaniesPage() {
           <span>Loading company details...</span>
         </div>
       ) : templates.length === 0 ? (
-        <div className="p-12 text-center text-slate-500 bg-white border border-slate-200 rounded-lg">
+        <div className="p-8 sm:p-12 text-center text-slate-500 bg-white border border-slate-200 rounded-lg">
           <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <h3 className="text-base font-bold text-slate-800">No companies available</h3>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {templates.map((template) => (
             <Card key={template.id} className="shadow-xs border-slate-200 hover:shadow-md transition-shadow flex flex-col justify-between rounded-xl overflow-hidden bg-white">
-              <CardHeader className="bg-[#003D5C]/5 border-b border-slate-100 p-6">
-                <div className="flex items-center justify-between">
+              <CardHeader className="bg-[#003D5C]/5 border-b border-slate-100 p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <img
                       src="/edlink-logo.png"
                       alt={template.companies?.name || template.company_name || 'EdLink Logo'}
-                      className="h-10 object-contain"
+                      className="h-9 sm:h-10 object-contain"
                     />
                     <div>
-                      <CardTitle className="font-['Montserrat'] text-lg font-bold text-[#003D5C]">
+                      <CardTitle className="font-['Montserrat'] text-base sm:text-lg font-bold text-[#003D5C]">
                         {template.companies?.name || template.company_name || template.name}
                       </CardTitle>
                       <CardDescription className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
@@ -86,7 +86,7 @@ export default function CompaniesPage() {
                       </CardDescription>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-md bg-[#81F5F5] text-[#002020] font-mono font-bold text-[11px] border border-teal-200 uppercase tracking-wider">
+                  <span className="self-start sm:self-auto px-2.5 py-1 rounded-md bg-[#81F5F5] text-[#002020] font-mono font-bold text-[11px] border border-teal-200 uppercase tracking-wider">
                     PREFIX: {template.companies?.prefix || 'EDL'}
                   </span>
                 </div>

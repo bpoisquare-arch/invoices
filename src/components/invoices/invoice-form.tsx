@@ -302,9 +302,9 @@ export default function InvoiceForm({
       {/* Top Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-['Montserrat'] text-2xl font-bold text-[#003D5C] tracking-tight">
-              Generate Invoice
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-['Montserrat'] text-xl sm:text-2xl font-bold text-[#003D5C] tracking-tight">
+              {mode === 'edit' ? 'Edit Invoice' : 'Generate Invoice'}
             </h1>
             {isAnonymous && (
               <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center gap-1 border border-blue-200">
@@ -319,11 +319,11 @@ export default function InvoiceForm({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Button
             type="button"
             onClick={handleSubmit}
-            className="bg-[#009D9E] hover:bg-[#007A7A] text-white font-bold uppercase text-xs h-9 gap-2 shadow-xs transition-colors"
+            className="w-full sm:w-auto bg-[#009D9E] hover:bg-[#007A7A] text-white font-bold uppercase text-xs h-10 sm:h-9 gap-2 shadow-xs transition-colors justify-center"
             disabled={isSubmitting}
           >
             {isSubmitting ? (
@@ -334,7 +334,7 @@ export default function InvoiceForm({
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                GENERATE & SAVE
+                {mode === 'edit' ? 'UPDATE & SAVE' : 'GENERATE & SAVE'}
               </>
             )}
           </Button>
@@ -677,8 +677,8 @@ export default function InvoiceForm({
               </Button>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left text-xs border-collapse min-w-[500px]">
                   <thead>
                     <tr className="bg-[#F8FAFC] text-slate-600 font-bold uppercase text-[10px] tracking-wider border-b border-[#E2E8F0]">
                       <th className="py-2.5 px-3 w-[55%]">DESCRIPTION</th>
@@ -738,7 +738,7 @@ export default function InvoiceForm({
               </div>
 
               {/* Total Calculation Row */}
-              <div className="p-4 bg-[#F8FAFC] border-t border-[#E2E8F0] flex justify-between items-center">
+              <div className="p-3 sm:p-4 bg-[#F8FAFC] border-t border-[#E2E8F0] flex justify-between items-center">
                 <Button
                   type="button"
                   variant="outline"
@@ -754,7 +754,7 @@ export default function InvoiceForm({
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
                     Total Amount Due
                   </span>
-                  <span className="font-mono text-2xl font-extrabold text-[#003D5C] block">
+                  <span className="font-mono text-xl sm:text-2xl font-extrabold text-[#003D5C] block">
                     {grandTotal.toFixed(2)} <span className="text-xs font-sans text-slate-500">{selectedCurrency}</span>
                   </span>
                 </div>
@@ -775,7 +775,7 @@ export default function InvoiceForm({
             </span>
           </div>
 
-          <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 shadow-inner flex justify-center overflow-x-auto">
+          <div className="bg-slate-100 p-2 sm:p-4 rounded-xl border border-slate-200 shadow-inner flex justify-center overflow-x-auto">
             {renderInvoiceWebPreview(livePreviewInvoice, dynamicSnapshot)}
           </div>
         </div>

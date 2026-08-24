@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins, Montserrat } from "next/font/google";
 import "./globals.css";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -29,7 +30,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`h-full antialiased ${poppins.variable} ${montserrat.variable}`}>
       <body className={`min-h-full flex flex-col bg-[#F8FAFC] text-slate-900 ${poppins.className}`}>
-        {children}
+        <TooltipProvider delay={0}>
+          {children}
+        </TooltipProvider>
       </body>
     </html>
   );

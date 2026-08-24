@@ -302,11 +302,11 @@ export default function EmployeeOverviewPage() {
             Manage employees, branch assignments, salaries, and their attendance profiles.
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <Link href="/attendance/import">
+        <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto">
+          <Link href="/attendance/import" className="w-full sm:w-auto">
             <Button
               variant="outline"
-              className="h-9 px-4 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold uppercase tracking-wider gap-2 shadow-2xs cursor-pointer transition-colors"
+              className="w-full sm:w-auto h-9 px-4 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold uppercase tracking-wider gap-2 shadow-2xs cursor-pointer transition-colors justify-center"
             >
               <FileSpreadsheet className="w-4 h-4 text-[#009D9E]" />
               Upload Excel Files
@@ -324,7 +324,7 @@ export default function EmployeeOverviewPage() {
               setAddError(null)
               setAddWarning(null)
             }}
-            className="h-9 px-4 bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5 shadow-sm cursor-pointer transition-all"
+            className="w-full sm:w-auto h-9 px-4 bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5 shadow-sm cursor-pointer transition-all justify-center"
           >
             <Plus className="w-4 h-4" />
             ADD EMPLOYEE
@@ -333,12 +333,12 @@ export default function EmployeeOverviewPage() {
       </div>
 
       {/* Search & Counter Bar */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-md w-full">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
           <Input
             type="text"
-            placeholder="Search by Employee Name, Employee ID, Designation, Branch..."
+            placeholder="Search by Employee Name, ID, Designation, Branch..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
@@ -357,8 +357,8 @@ export default function EmployeeOverviewPage() {
 
       {/* Data Table Card */}
       <div className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-xs min-w-[850px]">
             <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-3.5 px-4">EMPLOYEE ID</th>

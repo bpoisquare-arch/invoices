@@ -55,6 +55,7 @@ export interface UpdateInvoiceInput {
 export interface InvoiceFilterParams {
   search?: string
   companyId?: string
+  entityType?: 'edlink-pk' | 'edlink-au' | 'all'
   dateFilter?: 'all' | 'today' | '7days' | '30days' | 'this_month' | 'last_month' | 'this_year' | 'custom'
   startDate?: string
   endDate?: string
@@ -232,7 +233,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
       subtotal,
       total_amount: subtotal,
     })
-    .select('*, companies(*), templates(*)')
+    .select('*, companies(*)')
     .single()
 
   if (error || !invoice) {
@@ -379,7 +380,7 @@ export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithDeta
     const supabase = createClient()
     const { data: invoice, error } = await supabase
       .from('invoices')
-      .select('*, companies(*), templates(*), invoice_items(*)')
+      .select('*, companies(*), invoice_items(*)')
       .eq('id', invoiceId)
       .single()
 
@@ -403,9 +404,11 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
 
   try {
     const supabase = createClient()
+    
+    // Optimized select: omit redundant templates join which triggers Postgres timeout
     let query = supabase
       .from('invoices')
-      .select('*, companies(*), templates(*), invoice_items(*)', { count: 'exact' })
+      .select('*, companies(*), invoice_items(*)', { count: 'exact' })
 
     if (params.companyId && params.companyId !== 'all' && isValidUUID(params.companyId)) {
       query = query.eq('company_id', params.companyId)
@@ -465,14 +468,76 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
     const { data, count, error } = await query
 
     if (error) {
-      console.error('Error fetching invoices from Supabase:', error.message)
+      console.warn('Primary invoice fetch failed, running fallback query:', error.message)
+      
+      // Fallback query without count: 'exact' to prevent statement timeout
+      const fallback = await supabase
+        .from('invoices')
+        .select('*, companies(*), invoice_items(*)')
+        .order('created_at', { ascending: false })
+        .range(from, to)
+
+      if (fallback.data) {
+        const rawInvoices = (fallback.data as InvoiceWithDetails[]) || []
+        let filteredInvoices = rawInvoices.map(normalizeInvoice)
+        if (params.entityType === 'edlink-pk') {
+          filteredInvoices = filteredInvoices.filter((inv) => {
+            return Boolean(
+              inv.template_snapshot?.is_anonymous ||
+              inv.template_snapshot?.layout_type === 'anonymous_v1' ||
+              inv.companies?.prefix === 'ANO' ||
+              inv.companies?.name?.toLowerCase() === 'anonymous'
+            )
+          })
+        } else if (params.entityType === 'edlink-au') {
+          filteredInvoices = filteredInvoices.filter((inv) => {
+            return !Boolean(
+              inv.template_snapshot?.is_anonymous ||
+              inv.template_snapshot?.layout_type === 'anonymous_v1' ||
+              inv.companies?.prefix === 'ANO' ||
+              inv.companies?.name?.toLowerCase() === 'anonymous'
+            )
+          })
+        }
+        return {
+          invoices: filteredInvoices,
+          totalCount: filteredInvoices.length,
+          page,
+          pageSize,
+        }
+      }
+
       return { invoices: [], totalCount: 0, page, pageSize }
     }
 
-    const rawInvoices = (data as InvoiceWithDetails[]) || []
+    const rawInvoices = ((data || []) as InvoiceWithDetails[]).map(normalizeInvoice)
+
+    let filteredInvoices = rawInvoices
+    if (params.entityType === 'edlink-pk') {
+      filteredInvoices = rawInvoices.filter((inv) => {
+        const isAnon = Boolean(
+          inv.template_snapshot?.is_anonymous ||
+          inv.template_snapshot?.layout_type === 'anonymous_v1' ||
+          inv.companies?.prefix === 'ANO' ||
+          inv.companies?.name?.toLowerCase() === 'anonymous'
+        )
+        return isAnon
+      })
+    } else if (params.entityType === 'edlink-au') {
+      filteredInvoices = rawInvoices.filter((inv) => {
+        const isAnon = Boolean(
+          inv.template_snapshot?.is_anonymous ||
+          inv.template_snapshot?.layout_type === 'anonymous_v1' ||
+          inv.companies?.prefix === 'ANO' ||
+          inv.companies?.name?.toLowerCase() === 'anonymous'
+        )
+        return !isAnon
+      })
+    }
+
     return {
-      invoices: rawInvoices.map(normalizeInvoice),
-      totalCount: count || 0,
+      invoices: filteredInvoices,
+      totalCount: params.entityType ? filteredInvoices.length : (count ?? rawInvoices.length),
       page,
       pageSize,
     }
