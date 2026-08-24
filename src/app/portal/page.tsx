@@ -147,16 +147,6 @@ export default function EntityPortalPage() {
           <div className="w-8 h-8 rounded-lg bg-[#0E3E5B] text-[#81F5F5] text-xs font-bold flex items-center justify-center border border-slate-200 shadow-2xs">
             {initials}
           </div>
-          <Link href="/settings">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-xs font-semibold text-slate-600 hover:text-[#003D5C]"
-              title="System Settings"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
-          </Link>
           <Button
             variant="ghost"
             size="sm"

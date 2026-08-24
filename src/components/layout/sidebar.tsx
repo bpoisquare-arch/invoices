@@ -20,6 +20,9 @@ import {
   ChevronsUpDown,
   Banknote,
   Receipt,
+  Sparkles,
+  Headphones,
+  Check,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -43,15 +46,71 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+
+interface EntityItem {
+  id: string
+  name: string
+  shortName: string
+  subtitle: string
+  prefix: string
+  logo?: string
+  icon?: any
+  route: string
+  shortcut: string
+}
+
+const ENTITIES: EntityItem[] = [
+  {
+    id: 'edlink-pk',
+    name: 'EdLink Pakistan',
+    shortName: 'EdLink PK',
+    subtitle: 'Education & Visa (PK)',
+    prefix: 'EDL',
+    logo: '/edlink-logo.png',
+    route: '/invoices',
+    shortcut: '⌘1',
+  },
+  {
+    id: 'edlink-au',
+    name: 'EdLink Australia',
+    shortName: 'EdLink AU',
+    subtitle: 'Education & Visa (AU)',
+    prefix: 'EDA',
+    logo: '/edlink-logo.png',
+    route: '/invoices',
+    shortcut: '⌘2',
+  },
+  {
+    id: 'aimt',
+    name: 'AIMT College',
+    shortName: 'AIMT',
+    subtitle: 'Academic & Vocational',
+    prefix: 'AIMT',
+    logo: '/aimt-logo.png',
+    route: '/installments',
+    shortcut: '⌘3',
+  },
+  {
+    id: 'nsc',
+    name: 'Neighbourhood Shine Co.',
+    shortName: 'NSC',
+    subtitle: 'Cleaning & Maintenance',
+    prefix: 'NSC',
+    icon: Sparkles,
+    route: '/invoices?entity=nsc',
+    shortcut: '⌘4',
+  },
+  {
+    id: 'isquare-bpo',
+    name: 'ISquare BPO',
+    shortName: 'ISQ',
+    subtitle: 'BPO & IT Outsourcing',
+    prefix: 'ISQ',
+    icon: Headphones,
+    route: '/invoices?entity=isq',
+    shortcut: '⌘5',
+  },
+]
 
 export default function AppSidebar() {
   const pathname = usePathname()
@@ -60,7 +119,9 @@ export default function AppSidebar() {
   const [user, setUser] = useState<User | null>(null)
   const { setOpenMobile, isMobile } = useSidebar()
 
-  const [activeEntity, setActiveEntity] = useState<'edlink-pk' | 'edlink-au' | 'aimt' | 'other'>('edlink-pk')
+  const [activeEntity, setActiveEntity] = useState<string>('edlink-pk')
+  const [entityMenuOpen, setEntityMenuOpen] = useState(false)
+  const menuRef = React.useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -81,10 +142,27 @@ export default function AppSidebar() {
         const stored = localStorage.getItem('active_entity')
         if (stored === 'aimt') setActiveEntity('aimt')
         else if (stored === 'edlink-au') setActiveEntity('edlink-au')
+        else if (stored === 'nsc') setActiveEntity('nsc')
+        else if (stored === 'isquare-bpo') setActiveEntity('isquare-bpo')
         else setActiveEntity('edlink-pk')
       }
     }
   }, [pathname])
+
+  // Click outside to close team switcher dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setEntityMenuOpen(false)
+      }
+    }
+    if (entityMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [entityMenuOpen])
 
   const email = user?.email || 'admin@isquarebpo.com'
   const initials = email.substring(0, 2).toUpperCase()
@@ -101,6 +179,16 @@ export default function AppSidebar() {
     if (isMobile) {
       setOpenMobile(false)
     }
+  }
+
+  const handleSelectEntity = (entity: EntityItem) => {
+    setActiveEntity(entity.id)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('active_entity', entity.id)
+    }
+    setEntityMenuOpen(false)
+    if (isMobile) setOpenMobile(false)
+    router.push(entity.route)
   }
 
   const isInvoiceActive =
@@ -129,95 +217,113 @@ export default function AppSidebar() {
 
   const isAimt = activeEntity === 'aimt' || pathname.startsWith('/installments')
   const isEdLinkAu = activeEntity === 'edlink-au'
-  const isEdLinkPk = !isAimt && !isEdLinkAu
+  const isEdLinkPk = !isAimt && !isEdLinkAu && activeEntity !== 'nsc' && activeEntity !== 'isquare-bpo'
 
-  // Header Title & Logo info
-  const entityTitle = isAimt
-    ? 'AIMT College'
-    : isEdLinkAu
-    ? 'EdLink Australia'
-    : 'EdLink Pakistan'
-
-  const entitySubtitle = isAimt
-    ? 'Academic & Vocational'
-    : isEdLinkAu
-    ? 'Education & Visa (AU)'
-    : 'Education & Visa (PK)'
-
-  const entityPrefix = isAimt ? 'AIMT' : isEdLinkAu ? 'EDA' : 'EDL'
-  const entityLogo = isAimt ? '/aimt-logo.png' : '/edlink-logo.png'
+  const currentEntityObj =
+    ENTITIES.find((e) => e.id === activeEntity) ||
+    (isAimt ? ENTITIES[2] : isEdLinkAu ? ENTITIES[1] : ENTITIES[0])
 
   return (
     <Sidebar
       collapsible="icon"
       className="border-r border-white/10 bg-[#001E2F] text-slate-100 font-sans select-none"
     >
-      {/* 1. Header: Brand / Workspace Switcher */}
-      <SidebarHeader className="p-3 border-b border-white/10 bg-[#001724]">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <SidebarMenuButton
-                    size="lg"
-                    className="hover:bg-[#0E3E5B]/80 text-slate-100 transition-colors data-[state=open]:bg-[#0E3E5B] rounded-lg p-1.5"
-                  />
-                }
+      {/* 1. Header: Brand / Teams Workspace Switcher (shadcn style) */}
+      <SidebarHeader className="p-3 border-b border-white/10 bg-[#001724] relative">
+        <div ref={menuRef} className="relative w-full">
+          <button
+            type="button"
+            onClick={() => setEntityMenuOpen((prev) => !prev)}
+            className="w-full flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-[#0E3E5B]/80 text-slate-100 transition-colors text-left group cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#81F5F5]/40"
+          >
+            <div className="flex aspect-square size-9 items-center justify-center rounded-lg bg-white p-1 shadow-sm shrink-0 border border-white/20">
+              {currentEntityObj.logo ? (
+                <img
+                  src={currentEntityObj.logo}
+                  alt={currentEntityObj.name}
+                  className="max-h-full max-w-full object-contain"
+                />
+              ) : currentEntityObj.icon ? (
+                <currentEntityObj.icon className="size-5 text-[#003D5C]" />
+              ) : (
+                <Building2 className="size-5 text-[#003D5C]" />
+              )}
+            </div>
+            <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden min-w-0">
+              <span className="truncate font-bold text-white tracking-tight font-['Montserrat'] text-[13px]">
+                {currentEntityObj.name}
+              </span>
+              <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-[#81F5F5]/90">
+                {currentEntityObj.subtitle}
+              </span>
+            </div>
+            <ChevronsUpDown className="ml-auto size-4 text-slate-400 group-data-[collapsible=icon]:hidden shrink-0" />
+          </button>
+
+          {/* Teams Dropdown Menu */}
+          {entityMenuOpen && (
+            <div className="absolute top-full left-0 mt-2 w-72 rounded-xl bg-[#001E2F] border border-slate-700 text-slate-100 shadow-2xl p-1.5 z-50 animate-in fade-in-0 zoom-in-95">
+              <div className="px-2.5 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Teams
+              </div>
+              <div className="space-y-0.5 mt-0.5">
+                {ENTITIES.map((entity) => {
+                  const isSelected = entity.id === currentEntityObj.id
+                  const IconComp = entity.icon || Building2
+                  return (
+                    <button
+                      key={entity.id}
+                      type="button"
+                      onClick={() => handleSelectEntity(entity)}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all cursor-pointer group/item ${
+                        isSelected
+                          ? 'bg-[#0E3E5B] text-white'
+                          : 'text-slate-300 hover:bg-[#0E3E5B]/70 hover:text-white'
+                      }`}
+                    >
+                      <div className="size-7 rounded-md bg-white p-0.5 flex items-center justify-center shrink-0 border border-white/20">
+                        {entity.logo ? (
+                          <img
+                            src={entity.logo}
+                            alt={entity.name}
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        ) : (
+                          <IconComp className="size-4 text-[#003D5C]" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold truncate flex items-center gap-1.5">
+                          <span>{entity.name}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {entity.subtitle}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-white/10 text-slate-300 group-hover/item:text-white shrink-0">
+                        {entity.shortcut}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="h-px bg-white/10 my-1.5" />
+
+              <Link
+                href="/portal"
+                onClick={() => {
+                  setEntityMenuOpen(false)
+                  handleNavClick()
+                }}
+                className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:bg-[#0E3E5B] hover:text-white transition-colors cursor-pointer"
               >
-                <div className="flex aspect-square size-9 items-center justify-center rounded-lg bg-white p-1 shadow-sm shrink-0 border border-white/20">
-                  <img
-                    src={entityLogo}
-                    alt={entityTitle}
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                  <span className="truncate font-bold text-white tracking-tight font-['Montserrat'] text-[14px]">
-                    {entityTitle}
-                  </span>
-                  <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-[#81F5F5]/90">
-                    {entitySubtitle}
-                  </span>
-                </div>
-                <ChevronsUpDown className="ml-auto size-4 text-slate-400 group-data-[collapsible=icon]:hidden" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-64 rounded-xl bg-[#001E2F] border-slate-700 text-slate-100 shadow-2xl p-1.5"
-                side="bottom"
-                align="start"
-                sideOffset={8}
-              >
-                <DropdownMenuLabel className="px-2.5 py-1.5 text-[11px] font-bold text-[#81F5F5] uppercase tracking-wider">
-                  Active Entity
-                </DropdownMenuLabel>
-                <div className="flex items-center gap-2.5 p-2 rounded-lg bg-[#0E3E5B] text-white">
-                  <div className="size-7 rounded bg-white p-0.5 flex items-center justify-center">
-                    <img
-                      src={entityLogo}
-                      alt={entityTitle}
-                      className="max-h-full object-contain"
-                    />
-                  </div>
-                  <div className="flex-1 truncate text-xs font-bold">
-                    {entityTitle}
-                  </div>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-400/20 text-teal-300 font-mono font-bold">
-                    {entityPrefix}
-                  </span>
-                </div>
-                <DropdownMenuSeparator className="bg-white/10 my-1.5" />
-                <DropdownMenuItem
-                  render={<Link href="/portal" onClick={handleNavClick} className="flex items-center gap-2.5 w-full" />}
-                  className="text-xs hover:bg-[#0E3E5B] hover:text-white cursor-pointer px-2.5 py-2 rounded-md transition-colors font-semibold text-slate-200"
-                >
-                  <Building2 className="size-4 text-[#81F5F5]" />
-                  <span>Switch Entity / All Portals</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+                <Building2 className="size-4 text-[#81F5F5]" />
+                <span>All Portals / Overview</span>
+              </Link>
+            </div>
+          )}
+        </div>
       </SidebarHeader>
 
       {/* 2. Main Navigation Content */}
@@ -527,75 +633,29 @@ export default function AppSidebar() {
         )}
       </SidebarContent>
 
-      {/* 3. Footer: User Profile & Dropdown Menu */}
+      {/* 3. Footer: User Profile & Quick Actions */}
       <SidebarFooter className="p-2.5 border-t border-white/10 bg-[#001724]">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <SidebarMenuButton
-                    size="lg"
-                    className="hover:bg-[#0E3E5B]/80 text-slate-100 transition-colors data-[state=open]:bg-[#0E3E5B] rounded-lg px-2"
-                  />
-                }
-              >
-                <div className="size-8 rounded-lg bg-[#0E3E5B] text-[#81F5F5] font-bold text-xs flex items-center justify-center shrink-0 border border-white/10 shadow-xs">
-                  {initials}
-                </div>
-                <div className="grid flex-1 text-left text-xs leading-tight group-data-[collapsible=icon]:hidden">
-                  <span className="truncate font-semibold text-white">
-                    {email}
-                  </span>
-                  <span className="truncate text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-                    Administrator
-                  </span>
-                </div>
-                <ChevronsUpDown className="ml-auto size-4 text-slate-400 group-data-[collapsible=icon]:hidden" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-60 rounded-xl bg-[#001E2F] border border-slate-700 text-slate-100 shadow-2xl p-1.5"
-                side="top"
-                align="end"
-                sideOffset={10}
-              >
-                <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="flex items-center gap-2.5 px-3 py-2.5 text-left text-xs bg-[#001724] rounded-lg border border-white/5">
-                    <div className="size-8 rounded-lg bg-[#0E3E5B] text-[#81F5F5] font-bold text-xs flex items-center justify-center shrink-0 border border-white/10">
-                      {initials}
-                    </div>
-                    <div className="grid flex-1 text-left text-xs leading-tight min-w-0">
-                      <span className="truncate font-semibold text-white">
-                        {email}
-                      </span>
-                      <span className="truncate text-[10px] text-slate-400 font-medium">
-                        Administrator
-                      </span>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-white/10 my-1.5" />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem
-                    render={<Link href="/settings" onClick={handleNavClick} className="flex items-center gap-2.5 w-full" />}
-                    className="text-xs hover:bg-[#0E3E5B] hover:text-white cursor-pointer px-3 py-2 rounded-md transition-colors font-medium text-slate-200"
-                  >
-                    <Settings className="size-4 text-[#81F5F5]" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator className="bg-white/10 my-1.5" />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="text-xs text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 cursor-pointer px-3 py-2 rounded-md flex items-center gap-2.5 transition-colors font-semibold"
-                >
-                  <LogOut className="size-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <div className="flex items-center gap-2.5 p-2 rounded-lg bg-white/5 border border-white/5 select-none">
+          <div className="size-8 rounded-lg bg-[#0E3E5B] text-[#81F5F5] font-bold text-xs flex items-center justify-center shrink-0 border border-white/10 shadow-xs">
+            {initials}
+          </div>
+          <div className="grid flex-1 text-left text-xs leading-tight group-data-[collapsible=icon]:hidden min-w-0">
+            <span className="truncate font-semibold text-white">
+              {email}
+            </span>
+            <span className="truncate text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+              Administrator
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            title="Log out"
+            className="text-slate-400 hover:text-rose-400 p-1.5 rounded-md hover:bg-rose-500/10 transition-colors group-data-[collapsible=icon]:hidden cursor-pointer"
+          >
+            <LogOut className="size-4" />
+          </button>
+        </div>
       </SidebarFooter>
 
       {/* 4. Rail for resizing / collapsing */}

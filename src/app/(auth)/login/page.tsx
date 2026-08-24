@@ -67,11 +67,11 @@ export default function LoginPage() {
 
       // Fallback dev session cookie so login ALWAYS succeeds smoothly
       document.cookie = 'dev-auth-session=true; path=/; max-age=86400'
-      router.push('/invoices')
+      router.push('/portal')
       router.refresh()
     } catch (err: unknown) {
       document.cookie = 'dev-auth-session=true; path=/; max-age=86400'
-      router.push('/invoices')
+      router.push('/portal')
       router.refresh()
     } finally {
       setIsLoading(false)
