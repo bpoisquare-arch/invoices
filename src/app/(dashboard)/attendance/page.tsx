@@ -19,6 +19,7 @@ import {
   FileSpreadsheet,
   MapPin,
   Coins,
+  MoreHorizontal,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,6 +39,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
 import { Employee } from '@/lib/supabase/database.types'
 
@@ -479,30 +486,33 @@ export default function EmployeeOverviewPage() {
                       </td>
 
                       {/* Actions */}
-                      <td className="py-4 px-4 text-right space-x-1.5 whitespace-nowrap">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditModal(emp)}
-                          className="h-8 text-xs font-semibold text-slate-600 hover:bg-slate-100 gap-1 cursor-pointer"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                          Edit
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEmployeeToDelete(emp)
-                            setDeleteError(null)
-                          }}
-                          className="h-8 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 gap-1 cursor-pointer"
-                          title="Delete Employee"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Delete
-                        </Button>
+                      <td className="py-4 px-4 text-right whitespace-nowrap">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300 transition-colors shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 data-popup-open:bg-slate-100">
+                            <MoreHorizontal className="w-4 h-4" />
+                            <span className="sr-only">Actions</span>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-36 bg-white border border-slate-200 shadow-lg rounded-xl p-1 text-xs">
+                            <DropdownMenuItem
+                              onClick={() => openEditModal(emp)}
+                              className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Edit</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => {
+                                setEmployeeToDelete(emp)
+                                setDeleteError(null)
+                              }}
+                              className="flex items-center gap-2 px-2.5 py-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg cursor-pointer font-medium transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   )
