@@ -14,6 +14,12 @@ import {
   calculateWorkingDuration,
   parseDateString,
 } from './attendance-calculator'
+import {
+  readAllEmployeeMetadata,
+  writeEmployeeMetadata,
+  readAllHolidays,
+  writeHoliday,
+} from './employee-storage'
 
 // Clean up stale localStorage cache from previous offline sync versions
 if (typeof window !== 'undefined') {
@@ -113,8 +119,6 @@ export async function updateAttendanceSettings(
     return updated
   }
 }
-
-import { readAllEmployeeMetadata, writeEmployeeMetadata, readAllHolidays } from '@/lib/services/employee-storage'
 
 // ----------------------------------------------------
 // 2. EMPLOYEE SERVICES & METADATA SYNC
@@ -859,7 +863,7 @@ export interface AttendanceImportSaveItem {
  */
 export async function saveImportedAttendanceBatch(
   items: AttendanceImportSaveItem[],
-  duplicateStrategy: 'skip' | 'overwrite' = 'skip'
+  duplicateStrategy: 'skip' | 'overwrite' = 'overwrite'
 ): Promise<{
   savedCount: number
   skippedDuplicates: number
@@ -888,6 +892,28 @@ export async function saveImportedAttendanceBatch(
       total_working_hours_formatted: r.total_working_hours_formatted,
       raw_punches: r.raw_punches as any,
     }))
+
+  // Automatically unmark gazetted holiday for dates with recorded presence
+  const datesWithPresence = new Set<string>()
+  for (const item of items) {
+    if (
+      (item.in_time && item.in_time !== '--' && item.in_time !== '---') ||
+      (item.out_time && item.out_time !== '--' && item.out_time !== '---') ||
+      item.total_working_minutes > 0 ||
+      item.arrival_status === 'On Time Arrival' ||
+      item.arrival_status === 'Late Arrival'
+    ) {
+      datesWithPresence.add(item.attendance_date)
+    }
+  }
+
+  for (const d of datesWithPresence) {
+    try {
+      writeHoliday(d, undefined, false)
+    } catch {
+      // ignore
+    }
+  }
 
   if (payload.length > 0) {
     try {

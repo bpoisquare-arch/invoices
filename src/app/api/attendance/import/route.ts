@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
 
       const batchResult = await saveImportedAttendanceBatch(
         saveItems,
-        duplicateStrategy === 'overwrite' ? 'overwrite' : 'skip'
+        duplicateStrategy === 'skip' ? 'skip' : 'overwrite'
       )
 
       return NextResponse.json({

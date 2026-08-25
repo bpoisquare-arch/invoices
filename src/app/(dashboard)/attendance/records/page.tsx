@@ -347,7 +347,7 @@ export default function AttendanceRecordsPage() {
     filteredEmployees.forEach((emp) => {
       dateColumns.forEach((date) => {
         const dayName = getDayName(date)
-        const isGazettedHoliday = Boolean(holidays[date])
+        const isGazettedHoliday = Boolean(holidays[date]) && getPresentEmployeesCountOnDate(date) === 0
         if (dayName === 'Sunday' || isGazettedHoliday) return // Sundays and Gazetted Holidays
 
         const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
@@ -418,7 +418,7 @@ export default function AttendanceRecordsPage() {
 
       dateColumns.forEach((date) => {
         const dayName = getDayName(date)
-        const isGazettedHoliday = Boolean(holidays[date])
+        const isGazettedHoliday = Boolean(holidays[date]) && getPresentEmployeesCountOnDate(date) === 0
         const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
         const colHeader = `${date} (${dayName})`
 
@@ -524,38 +524,11 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
     const isFuture = date > todayStr
     const isToday = date === todayStr
     const isPast = date < todayStr
-    const isGazettedHoliday = Boolean(holidays[date])
+    const presentCountOnDate = getPresentEmployeesCountOnDate(date)
+    const isGazettedHoliday = Boolean(holidays[date]) && presentCountOnDate === 0
     const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
 
-    // 1. Gazetted Holiday
-    if (isGazettedHoliday) {
-      return (
-        <div
-          className="flex items-center justify-center py-2"
-          title={`Gazetted Holiday: ${holidays[date]}`}
-        >
-          <span className="bg-[#b38600] text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-2xs tracking-wide whitespace-nowrap">
-            Gazetted Holiday
-          </span>
-        </div>
-      )
-    }
-
-    // 2. Sunday / Weekend
-    if (dayName === 'Sunday') {
-      return (
-        <div
-          className="flex items-center justify-center py-2"
-          title="Sunday Holiday"
-        >
-          <span className="bg-[#b38600] text-white px-2.5 py-1 rounded text-[11px] font-bold shadow-2xs tracking-wide">
-            Holiday
-          </span>
-        </div>
-      )
-    }
-
-    // 2. If an explicit record exists in database (or manually added)
+    // 1. If an explicit record exists in database (or manually added)
     if (rec) {
       const isLeave =
         rec.arrival_status === 'Leave' ||
@@ -567,6 +540,79 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
         rec.arrival_status === 'Absent' ||
         rec.departure_status === 'Absent' ||
         (!rec.in_time && !rec.out_time && !isLeave)
+
+      // A. Leave Record
+      if (isLeave) {
+        const leaveLabel =
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].find(
+            (l) => l === rec.departure_status || l === rec.arrival_status
+          ) || 'Leave'
+
+        return (
+          <div
+            onClick={() => setEditingRecord(rec)}
+            className="group/cell cursor-pointer p-1.5 rounded-md transition-all flex items-center justify-center text-center border bg-indigo-50/80 hover:bg-indigo-100 border-indigo-200 text-indigo-950 shadow-2xs hover:shadow-xs"
+            title={`Click to edit leave (${leaveLabel})`}
+          >
+            <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-tight shadow-2xs">
+              {leaveLabel}
+            </span>
+          </div>
+        )
+      }
+
+      // B. Explicit Absent Record
+      if (isExplicitAbsent) {
+        if (isGazettedHoliday) {
+          return (
+            <div
+              className="flex items-center justify-center py-2"
+              title={`Gazetted Holiday: ${holidays[date]}`}
+            >
+              <span className="bg-[#b38600] text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-2xs tracking-wide whitespace-nowrap">
+                Gazetted Holiday
+              </span>
+            </div>
+          )
+        }
+
+        if (dayName === 'Sunday') {
+          return (
+            <div
+              className="flex items-center justify-center py-2"
+              title="Sunday Holiday"
+            >
+              <span className="bg-[#b38600] text-white px-2.5 py-1 rounded text-[11px] font-bold shadow-2xs tracking-wide">
+                Holiday
+              </span>
+            </div>
+          )
+        }
+
+        if (isFuture) {
+          return (
+            <div
+              onClick={() => handleBlankCellClick(emp, date)}
+              className="flex items-center justify-center py-2 text-slate-300 font-mono text-xs cursor-pointer hover:bg-blue-50/40 rounded transition-colors"
+              title="Future date. Click to mark Leave or timings"
+            >
+              --
+            </div>
+          )
+        }
+
+        return (
+          <div
+            onClick={() => setEditingRecord(rec)}
+            className="group/cell cursor-pointer p-1.5 rounded-md transition-all flex items-center justify-center text-center border bg-rose-50/80 hover:bg-rose-100 border-rose-200 text-rose-950 shadow-2xs hover:shadow-xs"
+            title="Click to edit or mark Leave"
+          >
+            <span className="bg-rose-600 text-white px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shadow-2xs">
+              ABSENT
+            </span>
+          </div>
+        )
+      }
 
       // A. Leave Record
       if (isLeave) {
@@ -940,7 +986,7 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
                 {dateColumns.map((date) => {
                   const day = getDayName(date)
                   const isSunday = day === 'Sunday'
-                  const isGazettedHoliday = Boolean(holidays[date])
+                  const isGazettedHoliday = Boolean(holidays[date]) && getPresentEmployeesCountOnDate(date) === 0
                   return (
                     <th
                       key={date}

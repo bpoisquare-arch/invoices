@@ -62,8 +62,8 @@ export default function ExcelImportPage() {
   // Ambiguous resolutions: Map of previewItem.key -> employeeId
   const [ambiguousResolutions, setAmbiguousResolutions] = useState<Record<string, string>>({})
 
-  // Duplicate strategy
-  const [duplicateStrategy, setDuplicateStrategy] = useState<'skip' | 'overwrite'>('skip')
+  // Duplicate strategy (defaults to overwrite matching dates)
+  const [duplicateStrategy, setDuplicateStrategy] = useState<'skip' | 'overwrite'>('overwrite')
 
   // Commit / Import Execution
   const [isCommitting, setIsCommitting] = useState(false)
