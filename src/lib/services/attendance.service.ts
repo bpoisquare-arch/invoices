@@ -966,6 +966,7 @@ export async function updateAttendanceRecord(
     attendance_date?: string
     arrival_status?: string
     departure_status?: string
+    notes?: string | null
   }
 ): Promise<AttendanceRecord> {
   const supabase = createClient()
@@ -994,6 +995,11 @@ export async function updateAttendanceRecord(
   let totalMinutes = 0
   let formatted = '00:00'
 
+  const isWfh =
+    params.departure_status === 'Work From Home' ||
+    params.arrival_status === 'Work From Home' ||
+    params.notes === 'Work From Home'
+
   if (params.arrival_status === 'Absent' || params.departure_status === 'Absent') {
     arrivalStatus = 'Absent'
     departureStatus = 'Absent'
@@ -1008,6 +1014,11 @@ export async function updateAttendanceRecord(
     departureStatus = params.departure_status || 'Casual Leave'
     totalMinutes = 0
     formatted = '00:00'
+  } else if (isWfh) {
+    arrivalStatus = 'On Time Arrival'
+    departureStatus = 'Work From Home'
+    totalMinutes = dayOfWeek === 6 ? 4 * 60 : 8 * 60
+    formatted = dayOfWeek === 6 ? '04:00' : '08:00'
   } else {
     // Normal present / punch recalculation
     arrivalStatus = calculateArrivalStatus(inTimeToUse, dayOfWeek, settings)
@@ -1017,7 +1028,7 @@ export async function updateAttendanceRecord(
     formatted = duration.formatted
   }
 
-  const updatedData = {
+  const updatedData: Record<string, any> = {
     attendance_date: dateToUse,
     day_of_week: dayName,
     in_time: (arrivalStatus === 'Absent' || arrivalStatus === 'Leave') ? null : inTimeToUse,
@@ -1027,6 +1038,13 @@ export async function updateAttendanceRecord(
     total_working_minutes: totalMinutes,
     total_working_hours_formatted: formatted,
     updated_at: new Date().toISOString(),
+  }
+
+  if (isWfh) {
+    updatedData.raw_punches = [
+      { punch_time: inTimeToUse, type: 'IN', source: 'WFH' },
+      { punch_time: outTimeToUse, type: 'OUT', source: 'WFH' },
+    ]
   }
 
   const { data: updated, error: updateErr } = await supabase
@@ -1050,6 +1068,7 @@ export async function createManualAttendanceRecord(params: {
   out_time?: string | null
   arrival_status?: string
   departure_status?: string
+  notes?: string | null
 }): Promise<AttendanceRecord> {
   const supabase = createClient()
   const settings = await getAttendanceSettings()
@@ -1062,6 +1081,11 @@ export async function createManualAttendanceRecord(params: {
   let departureStatus = params.departure_status || 'On Time Departure'
   let totalMinutes = 0
   let formatted = '00:00'
+
+  const isWfh =
+    params.departure_status === 'Work From Home' ||
+    params.arrival_status === 'Work From Home' ||
+    params.notes === 'Work From Home'
 
   if (params.arrival_status === 'Absent' || params.departure_status === 'Absent') {
     arrivalStatus = 'Absent'
@@ -1077,6 +1101,11 @@ export async function createManualAttendanceRecord(params: {
     departureStatus = params.departure_status || 'Casual Leave'
     totalMinutes = 0
     formatted = '00:00'
+  } else if (isWfh) {
+    arrivalStatus = 'On Time Arrival'
+    departureStatus = 'Work From Home'
+    totalMinutes = dayOfWeek === 6 ? 4 * 60 : 8 * 60
+    formatted = dayOfWeek === 6 ? '04:00' : '08:00'
   } else {
     arrivalStatus = calculateArrivalStatus(params.in_time || null, dayOfWeek, settings)
     departureStatus = calculateDepartureStatus(params.out_time || null, dayOfWeek, settings)
@@ -1084,6 +1113,13 @@ export async function createManualAttendanceRecord(params: {
     totalMinutes = duration.totalMinutes
     formatted = duration.formatted
   }
+
+  const rawPunches = isWfh
+    ? [
+        { punch_time: params.in_time, type: 'IN', source: 'WFH' },
+        { punch_time: params.out_time, type: 'OUT', source: 'WFH' },
+      ]
+    : []
 
   const newRecord = {
     employee_id: params.employee_id,
@@ -1095,7 +1131,7 @@ export async function createManualAttendanceRecord(params: {
     departure_status: departureStatus,
     total_working_minutes: totalMinutes,
     total_working_hours_formatted: formatted,
-    raw_punches: [],
+    raw_punches: rawPunches,
   }
 
   const { data, error } = await supabase

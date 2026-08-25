@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, use } from 'react'
+import React, { useEffect, useState, use, useMemo } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -16,6 +16,12 @@ import {
   User,
   Building2,
   FileSpreadsheet,
+  Banknote,
+  Coins,
+  Wallet,
+  ShieldCheck,
+  AlertCircle,
+  Sparkles,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,6 +40,7 @@ import {
 } from '@/lib/supabase/database.types'
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
+import EmployeeCommissionModal from '@/components/attendance/employee-commission-modal'
 import * as XLSX from 'xlsx'
 
 interface PageProps {
@@ -48,6 +55,14 @@ export default function EmployeeDetailPage({ params }: PageProps) {
   const [records, setRecords] = useState<AttendanceRecordWithEmployee[]>([])
   const [settings, setSettings] = useState<AttendanceSettings | undefined>()
   const [isLoading, setIsLoading] = useState(true)
+
+  // Monthly Commission & Month Selector
+  const [selectedMonth, setSelectedMonth] = useState<string>('2026-08')
+  const [monthlyCommission, setMonthlyCommission] = useState<{ amount: number; notes: string }>({
+    amount: 0,
+    notes: '',
+  })
+  const [isCommissionModalOpen, setIsCommissionModalOpen] = useState(false)
 
   // Filters
   const [startDate, setStartDate] = useState('')
@@ -93,6 +108,23 @@ export default function EmployeeDetailPage({ params }: PageProps) {
   // Modals
   const [editingRecord, setEditingRecord] = useState<AttendanceRecordWithEmployee | null>(null)
   const [viewingPunchesRecord, setViewingPunchesRecord] = useState<AttendanceRecordWithEmployee | null>(null)
+
+  const loadCommission = async (targetEmpId: string, monthStr: string) => {
+    try {
+      const res = await fetch(`/api/attendance/commissions?employeeId=${targetEmpId}&month=${monthStr}`)
+      const data = await res.json()
+      if (data.success && data.commission) {
+        setMonthlyCommission({
+          amount: Number(data.commission.amount) || 0,
+          notes: data.commission.notes || '',
+        })
+      } else {
+        setMonthlyCommission({ amount: 0, notes: '' })
+      }
+    } catch (e) {
+      console.error('Failed to load commission:', e)
+    }
+  }
 
   const loadData = async () => {
     try {
@@ -240,6 +272,9 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       if (summaryData.success && summaryData.summary) {
         setSummary(summaryData.summary)
       }
+
+      // Load monthly commission
+      await loadCommission(employeeId, selectedMonth)
     } catch (err) {
       console.error('Error loading employee details:', err)
     } finally {
@@ -249,7 +284,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
   useEffect(() => {
     loadData()
-  }, [employeeId, startDate, endDate, arrivalStatus])
+  }, [employeeId, startDate, endDate, arrivalStatus, selectedMonth])
 
   const handleExportExcel = () => {
     if (records.length === 0) {
@@ -272,6 +307,66 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     XLSX.utils.book_append_sheet(wb, ws, `${employee?.name || 'Attendance'}`)
     XLSX.writeFile(wb, `${employee?.name || 'Employee'}_Attendance_History.xlsx`)
   }
+
+  // Calculate attendance status breakdown & earned salary (including monthly commission)
+  const salaryStats = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0]
+    let presentDays = 0
+    let leaveDays = 0
+    let holidayDays = 0
+    let absentDays = 0
+
+    records.forEach((r) => {
+      const isSunday = (r.day_of_week || '').toLowerCase() === 'sunday'
+      const isGazettedHoliday = Boolean(r.attendance_date && holidays[r.attendance_date.split('T')[0]])
+      const isHoliday = isSunday || isGazettedHoliday || r.arrival_status === 'Holiday' || r.arrival_status === 'Gazetted Holiday'
+
+      const isLeave =
+        r.arrival_status === 'Leave' ||
+        (r.departure_status || '').includes('Leave') ||
+        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(r.departure_status as any) ||
+        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(r.arrival_status as any)
+
+      const hasPunches =
+        Boolean(r.in_time && r.in_time !== '---') ||
+        Boolean(r.out_time && r.out_time !== '---') ||
+        (r.total_working_minutes ? r.total_working_minutes > 0 : false)
+
+      const isExplicitAbsent =
+        r.arrival_status === 'Absent' ||
+        r.departure_status === 'Absent' ||
+        (!hasPunches && !isLeave && !isHoliday)
+
+      if (isLeave) {
+        leaveDays++
+      } else if (hasPunches) {
+        presentDays++
+      } else if (isHoliday) {
+        holidayDays++
+      } else if (isExplicitAbsent) {
+        if (r.attendance_date && r.attendance_date <= todayStr) {
+          absentDays++
+        }
+      }
+    })
+
+    const baseSalary = employee?.salary ? Number(employee.salary) : null
+    const commissionAmount = monthlyCommission.amount || 0
+    const totalEarnedSalary = baseSalary !== null ? baseSalary + commissionAmount : commissionAmount > 0 ? commissionAmount : null
+
+    return {
+      presentDays,
+      leaveDays,
+      holidayDays,
+      absentDays,
+      baseSalary,
+      commissionAmount,
+      totalEarnedSalary,
+      hasSalaryConfigured: (baseSalary !== null && baseSalary > 0) || commissionAmount > 0,
+      isFullSalaryPayable: absentDays === 0 && ((baseSalary !== null && baseSalary > 0) || commissionAmount > 0),
+      hasAbsents: absentDays > 0,
+    }
+  }, [records, employee, holidays, monthlyCommission])
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto font-sans">
@@ -350,8 +445,8 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Metrics Summary Bento */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      {/* Metrics Summary Bento Grid (8 Cards) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         {/* 1. Total Working Days */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-2xs">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Days</p>
@@ -387,7 +482,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           <p className="text-[11px] text-rose-700 font-semibold mt-1">Left early</p>
         </div>
 
-        {/* 6. Hours Required (Kitny hours karne thy) */}
+        {/* 6. Hours Required */}
         <div className="bg-white border border-blue-200/80 rounded-xl p-4 shadow-2xs bg-blue-50/15">
           <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Hours Required</p>
           <p className="text-2xl font-extrabold text-blue-900 mt-1 font-mono">
@@ -396,7 +491,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           <p className="text-[11px] text-blue-600/80 font-medium mt-1">Excl. Leaves & Holidays</p>
         </div>
 
-        {/* 7. Total Hours (Kitny employee ne hours kare hai) */}
+        {/* 7. Total Hours */}
         <div
           className={`bg-white border rounded-xl p-4 shadow-2xs transition-all ${
             summary.differenceMinutes >= 0
@@ -426,6 +521,193 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           >
             {summary.hoursCompletionRate}% completed
           </p>
+        </div>
+
+        {/* 8. Earned / Payable Salary Card */}
+        <div
+          className={`bg-white border rounded-xl p-4 shadow-2xs transition-all ${
+            salaryStats.isFullSalaryPayable
+              ? 'border-emerald-200/80 bg-emerald-50/20'
+              : salaryStats.hasAbsents
+              ? 'border-rose-200/80 bg-rose-50/15'
+              : 'border-slate-200/80'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Earned Salary</p>
+            <span
+              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                salaryStats.isFullSalaryPayable
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : salaryStats.hasAbsents
+                  ? 'bg-amber-100 text-amber-800'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {salaryStats.isFullSalaryPayable ? '100% Payable' : salaryStats.hasAbsents ? 'On Hold' : 'Not Set'}
+            </span>
+          </div>
+          <p className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1 font-mono tracking-tight truncate">
+            {salaryStats.isFullSalaryPayable
+              ? `PKR ${salaryStats.totalEarnedSalary?.toLocaleString()}`
+              : salaryStats.hasAbsents
+              ? '--'
+              : 'Not Set'}
+          </p>
+          <p
+            className={`text-[11px] font-semibold mt-1 truncate ${
+              salaryStats.isFullSalaryPayable
+                ? 'text-emerald-700'
+                : salaryStats.hasAbsents
+                ? 'text-amber-700'
+                : 'text-slate-400'
+            }`}
+          >
+            {salaryStats.isFullSalaryPayable
+              ? salaryStats.commissionAmount > 0
+                ? `Includes PKR ${salaryStats.commissionAmount.toLocaleString()} commission • 0 Absents`
+                : '0 Absents • Full Base Salary'
+              : salaryStats.hasAbsents
+              ? `${salaryStats.absentDays} Absent(s) • Pending`
+              : 'Salary not configured'}
+          </p>
+        </div>
+      </div>
+
+      {/* Dedicated Salary & Attendance Section (with Month Selection & Commission) */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+        <div className="space-y-3 flex-1">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#003D5C] text-[#81F5F5] flex items-center justify-center font-bold shadow-2xs">
+                <Banknote className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-['Montserrat'] text-sm sm:text-base font-bold text-[#003D5C] tracking-tight">
+                  Salary & Commission Status
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Monthly payable earnings including attendance & custom commission.
+                </p>
+              </div>
+            </div>
+
+            {/* Month Filter Selector for Salary & Commission */}
+            <div className="flex items-center gap-1.5 self-start sm:self-auto">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Month:</span>
+              <Select
+                value={selectedMonth}
+                onValueChange={(val) => {
+                  if (val) {
+                    setSelectedMonth(val)
+                    const [y, m] = val.split('-')
+                    const lastDay = new Date(parseInt(y, 10), parseInt(m, 10), 0).getDate()
+                    setStartDate(`${val}-01`)
+                    setEndDate(`${val}-${String(lastDay).padStart(2, '0')}`)
+                  }
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs font-bold text-[#003D5C] bg-slate-50 border-slate-200 min-w-36">
+                  <SelectValue placeholder="Select Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2026-08" className="text-xs font-medium">August 2026</SelectItem>
+                  <SelectItem value="2026-09" className="text-xs font-medium">September 2026</SelectItem>
+                  <SelectItem value="2026-10" className="text-xs font-medium">October 2026</SelectItem>
+                  <SelectItem value="2026-11" className="text-xs font-medium">November 2026</SelectItem>
+                  <SelectItem value="2026-12" className="text-xs font-medium">December 2026</SelectItem>
+                  <SelectItem value="2026-07" className="text-xs font-medium">July 2026</SelectItem>
+                  <SelectItem value="2026-06" className="text-xs font-medium">June 2026</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Quick Metrics Badges & Commission Button */}
+          <div className="flex items-center gap-2 flex-wrap pt-1">
+            <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
+              Base Salary: <strong className="text-slate-900 font-mono">{salaryStats.baseSalary ? `PKR ${salaryStats.baseSalary.toLocaleString()}` : 'Not Configured'}</strong>
+            </span>
+
+            {/* Monthly Commission Badge + Action Button */}
+            <div className="flex items-center gap-1.5">
+              <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 text-xs font-semibold border border-amber-200/90 flex items-center gap-1.5 shadow-2xs">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                Commission:{' '}
+                <strong className="font-mono text-amber-950 font-bold">
+                  {salaryStats.commissionAmount > 0
+                    ? `+ PKR ${salaryStats.commissionAmount.toLocaleString()}`
+                    : 'PKR 0'}
+                </strong>
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCommissionModalOpen(true)}
+                className="h-7 px-2.5 text-xs font-bold text-amber-800 bg-amber-50/60 border-amber-300 hover:bg-amber-100 hover:text-amber-950 gap-1 rounded-lg shadow-2xs transition-colors"
+                title="Add or update monthly commission for this employee"
+              >
+                <Sparkles className="w-3 h-3 text-amber-600" />
+                <span>{salaryStats.commissionAmount > 0 ? 'Edit' : 'Add Commission'}</span>
+              </Button>
+            </div>
+
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
+              Attended: <strong className="font-mono">{salaryStats.presentDays} Days</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 text-xs font-semibold border border-indigo-200">
+              Approved Leaves: <strong className="font-mono">{salaryStats.leaveDays} Days</strong>
+            </span>
+            <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+              salaryStats.absentDays > 0
+                ? 'bg-rose-50 text-rose-800 border-rose-200'
+                : 'bg-slate-50 text-slate-600 border-slate-200'
+            }`}>
+              Absents: <strong className="font-mono">{salaryStats.absentDays} Days</strong>
+            </span>
+          </div>
+        </div>
+
+        {/* Right Status Banner */}
+        <div className="lg:text-right border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 lg:pl-6 shrink-0 min-w-56">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Total Net Payable Salary
+          </p>
+          {salaryStats.isFullSalaryPayable ? (
+            <div>
+              <p className="text-2xl sm:text-3xl font-extrabold text-emerald-600 font-mono tracking-tight mt-0.5">
+                PKR {salaryStats.totalEarnedSalary?.toLocaleString()}
+              </p>
+              <div className="flex items-center lg:justify-end gap-1.5 text-xs text-emerald-700 font-bold mt-1">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  {salaryStats.commissionAmount > 0
+                    ? `Base (${salaryStats.baseSalary?.toLocaleString()}) + Comm (${salaryStats.commissionAmount.toLocaleString()})`
+                    : 'Full Base Salary (0 Absents)'}
+                </span>
+              </div>
+            </div>
+          ) : salaryStats.hasAbsents ? (
+            <div>
+              <p className="text-2xl sm:text-3xl font-extrabold text-amber-600 font-mono tracking-tight mt-0.5">
+                -- <span className="text-sm font-sans font-bold text-amber-700">(On Hold)</span>
+              </p>
+              <div className="flex items-center lg:justify-end gap-1.5 text-xs text-amber-700 font-bold mt-1">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>{salaryStats.absentDays} Absent Day(s) — Calculation Pending</span>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-lg font-bold text-slate-500 mt-1">
+                Salary Not Set
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Configure salary in employee profile
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -536,23 +818,32 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
                     {/* Arrival Status */}
                     <td className="py-3.5 px-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
-                          record.arrival_status === 'Holiday'
-                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                            : record.arrival_status === 'Absent'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : record.arrival_status === 'Leave' || record.arrival_status?.toLowerCase().includes('leave')
-                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                            : record.arrival_status === 'On Time Arrival'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                            : record.arrival_status === 'Late Arrival'
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                            : 'bg-slate-100 text-slate-600 border border-slate-200'
-                        }`}
-                      >
-                        {record.arrival_status}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
+                            record.arrival_status === 'Holiday'
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : record.arrival_status === 'Absent'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : record.arrival_status === 'Leave' || record.arrival_status?.toLowerCase().includes('leave')
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                              : record.arrival_status === 'On Time Arrival'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                              : record.arrival_status === 'Late Arrival'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          {record.arrival_status}
+                        </span>
+                        {(record.departure_status === 'Work From Home' ||
+                          record.arrival_status === 'Work From Home' ||
+                          record.notes?.includes('Work From Home')) && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase bg-cyan-100 text-cyan-800 border border-cyan-300">
+                            WFH
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Out Time */}
@@ -597,15 +888,17 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingRecord(record)}
-                        title="Edit Attendance"
-                        className="h-8 w-8 p-0 text-slate-500 hover:text-[#003D5C] hover:bg-slate-100"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </Button>
+                      {record.day_of_week !== 'Sunday' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingRecord(record)}
+                          title="Edit Attendance"
+                          className="h-8 w-8 p-0 text-slate-500 hover:text-[#003D5C] hover:bg-slate-100"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -629,6 +922,19 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         isOpen={!!viewingPunchesRecord}
         onClose={() => setViewingPunchesRecord(null)}
         record={viewingPunchesRecord}
+      />
+
+      {/* Monthly Commission Modal */}
+      <EmployeeCommissionModal
+        isOpen={isCommissionModalOpen}
+        onClose={() => setIsCommissionModalOpen(false)}
+        employee={employee}
+        month={selectedMonth}
+        currentCommission={monthlyCommission.amount}
+        currentNotes={monthlyCommission.notes}
+        onSaveSuccess={({ amount, notes }) => {
+          setMonthlyCommission({ amount, notes })
+        }}
       />
     </div>
   )

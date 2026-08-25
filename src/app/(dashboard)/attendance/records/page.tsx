@@ -238,6 +238,8 @@ export default function AttendanceRecordsPage() {
   }
 
   const handleDateHeaderClick = (date: string) => {
+    const day = getDayName(date)
+    if (day === 'Sunday') return // Sunday is automatically a weekly holiday
     setHolidayModalDate(date)
     setHolidayNameInput(holidays[date] || 'Gazetted Holiday')
   }
@@ -526,6 +528,8 @@ export default function AttendanceRecordsPage() {
   // Handle Blank Cell Click (Allows adding attendance or marking leave)
   const handleBlankCellClick = (emp: Employee, date: string) => {
     const dayName = getDayName(date)
+    if (dayName === 'Sunday') return // Sunday is weekly off-day (no edit)
+
     setEditingRecord({
       id: '',
       employee_id: emp.id,
@@ -591,9 +595,38 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
     const isPast = date < todayStr
     const presentCountOnDate = getPresentEmployeesCountOnDate(date)
     const isGazettedHoliday = Boolean(holidays[date]) && presentCountOnDate === 0
+
+    // 0. Sunday is strictly an official weekly holiday (auto Holiday, no edit needed)
+    if (dayName === 'Sunday') {
+      return (
+        <div
+          className="flex items-center justify-center py-2 select-none"
+          title="Sunday (Weekly Holiday / Off Day)"
+        >
+          <span className="bg-[#b38600] text-white px-2.5 py-1 rounded text-[11px] font-bold shadow-2xs tracking-wide">
+            Holiday
+          </span>
+        </div>
+      )
+    }
+
+    // 1. Gazetted Holiday (when 0 punches recorded on this date)
+    if (isGazettedHoliday) {
+      return (
+        <div
+          className="flex items-center justify-center py-2 select-none"
+          title={`Gazetted Holiday: ${holidays[date]}`}
+        >
+          <span className="bg-[#b38600] text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-2xs tracking-wide whitespace-nowrap">
+            Gazetted Holiday
+          </span>
+        </div>
+      )
+    }
+
     const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
 
-    // 1. If an explicit record exists in database (or manually added)
+    // 2. If an explicit record exists in database (or manually added)
     if (rec) {
       const isLeave =
         rec.arrival_status === 'Leave' ||
@@ -605,79 +638,6 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
         rec.arrival_status === 'Absent' ||
         rec.departure_status === 'Absent' ||
         (!rec.in_time && !rec.out_time && !isLeave)
-
-      // A. Leave Record
-      if (isLeave) {
-        const leaveLabel =
-          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].find(
-            (l) => l === rec.departure_status || l === rec.arrival_status
-          ) || 'Leave'
-
-        return (
-          <div
-            onClick={() => setEditingRecord(rec)}
-            className="group/cell cursor-pointer p-1.5 rounded-md transition-all flex items-center justify-center text-center border bg-indigo-50/80 hover:bg-indigo-100 border-indigo-200 text-indigo-950 shadow-2xs hover:shadow-xs"
-            title={`Click to edit leave (${leaveLabel})`}
-          >
-            <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-tight shadow-2xs">
-              {leaveLabel}
-            </span>
-          </div>
-        )
-      }
-
-      // B. Explicit Absent Record
-      if (isExplicitAbsent) {
-        if (isGazettedHoliday) {
-          return (
-            <div
-              className="flex items-center justify-center py-2"
-              title={`Gazetted Holiday: ${holidays[date]}`}
-            >
-              <span className="bg-[#b38600] text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-2xs tracking-wide whitespace-nowrap">
-                Gazetted Holiday
-              </span>
-            </div>
-          )
-        }
-
-        if (dayName === 'Sunday') {
-          return (
-            <div
-              className="flex items-center justify-center py-2"
-              title="Sunday Holiday"
-            >
-              <span className="bg-[#b38600] text-white px-2.5 py-1 rounded text-[11px] font-bold shadow-2xs tracking-wide">
-                Holiday
-              </span>
-            </div>
-          )
-        }
-
-        if (isFuture) {
-          return (
-            <div
-              onClick={() => handleBlankCellClick(emp, date)}
-              className="flex items-center justify-center py-2 text-slate-300 font-mono text-xs cursor-pointer hover:bg-blue-50/40 rounded transition-colors"
-              title="Future date. Click to mark Leave or timings"
-            >
-              --
-            </div>
-          )
-        }
-
-        return (
-          <div
-            onClick={() => setEditingRecord(rec)}
-            className="group/cell cursor-pointer p-1.5 rounded-md transition-all flex items-center justify-center text-center border bg-rose-50/80 hover:bg-rose-100 border-rose-200 text-rose-950 shadow-2xs hover:shadow-xs"
-            title="Click to edit or mark Leave"
-          >
-            <span className="bg-rose-600 text-white px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shadow-2xs">
-              ABSENT
-            </span>
-          </div>
-        )
-      }
 
       // A. Leave Record
       if (isLeave) {
@@ -727,6 +687,11 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
       }
 
       // C. Present Record with timings
+      const isWfh = Boolean(
+        rec.notes?.includes('Work From Home') ||
+        rec.arrival_status === 'Work From Home' ||
+        rec.departure_status === 'Work From Home'
+      )
       const isLate = rec.arrival_status === 'Late Arrival'
       const isEarlyLeave = rec.departure_status === 'Early Departure'
       const hasInTime = Boolean(rec.in_time && rec.in_time !== '---')
@@ -734,14 +699,16 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
 
       // Check if departure time cutoff has passed
       const outTimePassed = isPast || (isToday && hasOfficeOutTimePassed(date, settings))
-      const isMissingOut = hasInTime && !hasOutTime && outTimePassed
-      const isCurrentlyInOffice = hasInTime && !hasOutTime && isToday && !outTimePassed
+      const isMissingOut = !isWfh && hasInTime && !hasOutTime && outTimePassed
+      const isCurrentlyInOffice = !isWfh && hasInTime && !hasOutTime && isToday && !outTimePassed
 
       return (
         <div
           onClick={() => setEditingRecord(rec)}
           className={`group/cell cursor-pointer p-1.5 rounded-md transition-all flex flex-col items-center justify-center text-center gap-0.5 border ${
-            isMissingOut
+            isWfh
+              ? 'bg-cyan-50/70 hover:bg-cyan-100/90 border-cyan-200/90 text-cyan-950 shadow-2xs hover:shadow-xs'
+              : isMissingOut
               ? 'bg-amber-50/90 hover:bg-amber-100/95 border-amber-300 text-amber-950 shadow-2xs hover:shadow-xs'
               : isCurrentlyInOffice
               ? 'bg-emerald-50/70 hover:bg-emerald-100 border-emerald-300 text-emerald-950'
@@ -749,7 +716,7 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
               ? 'bg-amber-50/70 hover:bg-amber-100/90 border-amber-200/80 text-amber-900'
               : 'bg-emerald-50/50 hover:bg-emerald-100/80 border-emerald-200/70 text-slate-800'
           }`}
-          title={isCurrentlyInOffice ? 'Currently active in office' : 'Click to edit timings or enter missing Out Time'}
+          title={isWfh ? 'Work From Home (Full Present). Click to edit.' : isCurrentlyInOffice ? 'Currently active in office' : 'Click to edit timings or enter missing Out Time'}
         >
           {/* In Time - Out Time */}
           <div className="font-mono text-[11px] font-semibold tracking-tight whitespace-nowrap flex items-center justify-center gap-1">
@@ -764,7 +731,9 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
           <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-medium">
             <span
               className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] ${
-                isMissingOut
+                isWfh
+                  ? 'bg-cyan-600 text-white'
+                  : isMissingOut
                   ? 'bg-amber-500 text-white'
                   : isCurrentlyInOffice
                   ? 'bg-emerald-500 text-white animate-pulse'
@@ -773,9 +742,9 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
                   : 'bg-emerald-600 text-white'
               }`}
             >
-              ⏱
+              {isWfh ? '🏠' : '⏱'}
             </span>
-            <span className={`font-bold ${isMissingOut ? 'text-amber-700' : 'text-slate-700'}`}>
+            <span className={`font-bold ${isMissingOut ? 'text-amber-700' : isWfh ? 'text-cyan-900' : 'text-slate-700'}`}>
               ({rec.total_working_hours_formatted && rec.total_working_hours_formatted !== '00:00' ? rec.total_working_hours_formatted : isCurrentlyInOffice ? 'Working' : '--'})
             </span>
           </div>
@@ -785,6 +754,10 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
             <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300 flex items-center gap-0.5 mt-0.5 group-hover/cell:bg-amber-300 transition-colors">
               <span>Missing Out</span>
               <Edit2 className="w-2.5 h-2.5 inline" />
+            </span>
+          ) : isWfh ? (
+            <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-cyan-100 text-cyan-800 border border-cyan-300">
+              WFH
             </span>
           ) : isCurrentlyInOffice ? (
             <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
@@ -800,7 +773,7 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
     }
 
     // 3. If NO record exists:
-    // A. Future Date -> Show neutral placeholder "--" (Do not mark absent!)
+    // A. Future Date -> Show neutral placeholder "--"
     if (isFuture) {
       return (
         <div
@@ -1064,31 +1037,37 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
                   return (
                     <th
                       key={date}
-                      onClick={() => handleDateHeaderClick(date)}
-                      className={`py-2 px-3 text-center border-r border-slate-600/80 min-w-[155px] font-sans cursor-pointer transition-all select-none group/th ${
+                      onClick={() => !isSunday && handleDateHeaderClick(date)}
+                      className={`py-2 px-3 text-center border-r border-slate-600/80 min-w-[155px] font-sans select-none group/th ${
                         isSunday
-                          ? 'bg-[#242c3a] text-amber-300 hover:bg-[#1a202c]'
+                          ? 'bg-[#242c3a] text-amber-300 cursor-default'
                           : isGazettedHoliday
-                          ? 'bg-[#8c6b00] text-amber-100 hover:bg-[#735700]'
-                          : 'bg-[#2d3748] text-white hover:bg-[#3d4a60]'
+                          ? 'bg-[#8c6b00] text-amber-100 hover:bg-[#735700] cursor-pointer transition-all'
+                          : 'bg-[#2d3748] text-white hover:bg-[#3d4a60] cursor-pointer transition-all'
                       }`}
                       title={
-                        isGazettedHoliday
+                        isSunday
+                          ? 'Sunday (Weekly Holiday / Off Day)'
+                          : isGazettedHoliday
                           ? `Gazetted Holiday: ${holidays[date]}. Click to edit or remove.`
                           : 'Click date to mark as Gazetted Holiday'
                       }
                     >
                       <div className="flex items-center justify-center gap-1">
                         <span className="text-[11px] font-bold font-mono tracking-tight">{date}</span>
-                        {isGazettedHoliday && (
+                        {isSunday ? (
+                          <span className="text-[9px] bg-amber-400 text-amber-950 font-extrabold px-1 rounded shadow-2xs">
+                            OFF
+                          </span>
+                        ) : isGazettedHoliday ? (
                           <span className="text-[9px] bg-amber-300 text-amber-950 font-extrabold px-1 rounded shadow-2xs">
                             HOLIDAY
                           </span>
-                        )}
+                        ) : null}
                       </div>
                       <div className="text-[10px] font-semibold tracking-wider text-slate-300 uppercase flex items-center justify-center gap-1 mt-0.5 group-hover/th:text-white">
                         <span>{day}</span>
-                        <span className="text-[9px] opacity-70">⚙️</span>
+                        {!isSunday && <span className="text-[9px] opacity-70">⚙️</span>}
                       </div>
                     </th>
                   )

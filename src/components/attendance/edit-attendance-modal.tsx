@@ -38,6 +38,7 @@ import {
   UserCheck,
   PlaneTakeoff,
   FileText,
+  Laptop,
 } from 'lucide-react'
 
 interface EditAttendanceModalProps {
@@ -79,7 +80,21 @@ function fromTimeInputValue(timeInput: string): string {
   return timeInput
 }
 
-type AttendanceStatusType = 'present' | 'absent' | 'leave'
+// Helper to get standard shift hours for Work From Home
+function getWfhTimes(dateStr: string, settings?: AttendanceSettings) {
+  const parsedDate = parseDateString(dateStr)
+  const dayOfWeek = parsedDate ? parsedDate.dayOfWeek : 1
+  const isSaturday = dayOfWeek === 6
+  const inTimeStr = isSaturday ? (settings?.saturday_in_time || '11:00') : (settings?.weekday_in_time || '10:30')
+  const outTimeStr = isSaturday ? (settings?.saturday_out_time || '15:00') : (settings?.weekday_out_time || '18:30')
+  return {
+    inTime: fromTimeInputValue(inTimeStr),
+    outTime: fromTimeInputValue(outTimeStr),
+    hours: isSaturday ? '4h 0m' : '8h 0m',
+  }
+}
+
+type AttendanceStatusType = 'present' | 'absent' | 'leave' | 'wfh'
 
 export default function EditAttendanceModal({
   isOpen,
@@ -98,13 +113,23 @@ export default function EditAttendanceModal({
 
   useEffect(() => {
     if (record) {
-      setDate(record.attendance_date || '')
+      const recDate = record.attendance_date || ''
+      setDate(recDate)
       setInTime(record.in_time || '')
       setOutTime(record.out_time || '')
       setError(null)
 
       // Infer current status
       if (
+        record.notes?.includes('Work From Home') ||
+        record.arrival_status === 'Work From Home' ||
+        record.departure_status === 'Work From Home'
+      ) {
+        setAttendanceStatus('wfh')
+        const wfh = getWfhTimes(recDate, settings)
+        setInTime(wfh.inTime)
+        setOutTime(wfh.outTime)
+      } else if (
         record.arrival_status === 'Leave' ||
         record.departure_status?.includes('Leave') ||
         LEAVE_TYPES.includes(record.departure_status as any) ||
@@ -142,6 +167,7 @@ export default function EditAttendanceModal({
   const parsedDate = parseDateString(date)
   const dayOfWeek = parsedDate ? parsedDate.dayOfWeek : 1
   const dayName = parsedDate ? parsedDate.dayName : record.day_of_week
+  const wfhTimes = getWfhTimes(date, settings)
 
   const liveArrivalStatus = inTime.trim()
     ? calculateArrivalStatus(inTime, dayOfWeek, settings)
@@ -154,6 +180,24 @@ export default function EditAttendanceModal({
     outTime.trim() || null
   )
 
+  const handleStatusChange = (newStatus: AttendanceStatusType) => {
+    setAttendanceStatus(newStatus)
+    if (newStatus === 'wfh') {
+      const wfh = getWfhTimes(date, settings)
+      setInTime(wfh.inTime)
+      setOutTime(wfh.outTime)
+    }
+  }
+
+  const handleDateChange = (newDate: string) => {
+    setDate(newDate)
+    if (attendanceStatus === 'wfh') {
+      const wfh = getWfhTimes(newDate, settings)
+      setInTime(wfh.inTime)
+      setOutTime(wfh.outTime)
+    }
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -164,17 +208,26 @@ export default function EditAttendanceModal({
       let payloadDepartureStatus: string | undefined = undefined
       let payloadInTime: string | null = inTime.trim() || null
       let payloadOutTime: string | null = outTime.trim() || null
+      let payloadNotes: string | null = null
 
       if (attendanceStatus === 'absent') {
         payloadArrivalStatus = 'Absent'
         payloadDepartureStatus = 'Absent'
         payloadInTime = null
         payloadOutTime = null
+        payloadNotes = null
       } else if (attendanceStatus === 'leave') {
         payloadArrivalStatus = 'Leave'
         payloadDepartureStatus = selectedLeaveType
         payloadInTime = null
         payloadOutTime = null
+        payloadNotes = selectedLeaveType
+      } else if (attendanceStatus === 'wfh') {
+        payloadInTime = wfhTimes.inTime
+        payloadOutTime = wfhTimes.outTime
+        payloadArrivalStatus = 'On Time Arrival'
+        payloadDepartureStatus = 'Work From Home'
+        payloadNotes = 'Work From Home'
       }
 
       if (record.id) {
@@ -189,6 +242,7 @@ export default function EditAttendanceModal({
             out_time: payloadOutTime,
             arrival_status: payloadArrivalStatus,
             departure_status: payloadDepartureStatus,
+            notes: payloadNotes,
           }),
         })
 
@@ -209,6 +263,7 @@ export default function EditAttendanceModal({
             out_time: payloadOutTime,
             arrival_status: payloadArrivalStatus,
             departure_status: payloadDepartureStatus,
+            notes: payloadNotes,
           }),
         })
 
@@ -236,7 +291,7 @@ export default function EditAttendanceModal({
             Edit Attendance Record
           </DialogTitle>
           <p className="text-xs text-slate-500 mt-0.5">
-            Update attendance status, mark leaves, or pick office in/out timings.
+            Update attendance status, mark leaves, work from home, or pick office in/out timings.
           </p>
         </DialogHeader>
 
@@ -276,17 +331,17 @@ export default function EditAttendanceModal({
             </span>
           </div>
 
-          {/* Attendance Status Selector (Present, Absent, Leave) */}
+          {/* Attendance Status Selector (Present, Absent, Leave, Work From Home) */}
           <div className="space-y-1.5">
             <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
               Attendance Status
             </Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {/* Option 1: Present */}
               <button
                 type="button"
-                onClick={() => setAttendanceStatus('present')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                onClick={() => handleStatusChange('present')}
+                className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
                   attendanceStatus === 'present'
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-500 shadow-2xs'
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
@@ -299,8 +354,8 @@ export default function EditAttendanceModal({
               {/* Option 2: Absent */}
               <button
                 type="button"
-                onClick={() => setAttendanceStatus('absent')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                onClick={() => handleStatusChange('absent')}
+                className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
                   attendanceStatus === 'absent'
                     ? 'bg-rose-50 text-rose-700 border-rose-500 shadow-2xs'
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
@@ -313,8 +368,8 @@ export default function EditAttendanceModal({
               {/* Option 3: Leave */}
               <button
                 type="button"
-                onClick={() => setAttendanceStatus('leave')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                onClick={() => handleStatusChange('leave')}
+                className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
                   attendanceStatus === 'leave'
                     ? 'bg-indigo-50 text-indigo-700 border-indigo-500 shadow-2xs'
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
@@ -323,8 +378,58 @@ export default function EditAttendanceModal({
                 <PlaneTakeoff className="w-3.5 h-3.5" />
                 <span>Leave</span>
               </button>
+
+              {/* Option 4: Work From Home (WFH) */}
+              <button
+                type="button"
+                onClick={() => handleStatusChange('wfh')}
+                className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                  attendanceStatus === 'wfh'
+                    ? 'bg-cyan-50 text-cyan-800 border-cyan-500 shadow-2xs ring-1 ring-cyan-500'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Laptop className="w-3.5 h-3.5 text-cyan-600" />
+                <span>Work From Home</span>
+              </button>
             </div>
           </div>
+
+          {/* If WFH is selected: Auto Assigned Shift Info & Locked Inputs */}
+          {attendanceStatus === 'wfh' && (
+            <div className="space-y-3 bg-cyan-50/70 p-3.5 rounded-lg border border-cyan-200 animate-in fade-in duration-200">
+              <div className="flex items-start gap-2.5 text-xs text-cyan-900">
+                <Laptop className="w-4 h-4 text-cyan-700 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-cyan-950">Work From Home (WFH) Applied</p>
+                  <p className="text-[11px] text-cyan-800 mt-0.5">
+                    Official full shift timings for <strong>{dayName}</strong> ({wfhTimes.inTime} – {wfhTimes.outTime}) are automatically locked. Counted as full <strong>Present ({wfhTimes.hours})</strong>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <Label className="text-[11px] font-bold text-slate-600 block mb-1">In Time (Auto Locked):</Label>
+                  <Input
+                    disabled
+                    readOnly
+                    value={wfhTimes.inTime}
+                    className="bg-white font-mono text-xs font-bold text-slate-800 border-cyan-200 cursor-not-allowed h-9"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[11px] font-bold text-slate-600 block mb-1">Out Time (Auto Locked):</Label>
+                  <Input
+                    disabled
+                    readOnly
+                    value={wfhTimes.outTime}
+                    className="bg-white font-mono text-xs font-bold text-slate-800 border-cyan-200 cursor-not-allowed h-9"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* If LEAVE is selected: Leave Type Dropdown */}
           {attendanceStatus === 'leave' && (
@@ -371,7 +476,7 @@ export default function EditAttendanceModal({
             <Input
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => handleDateChange(e.target.value)}
               required
               className="text-sm border-slate-200 font-mono h-10"
             />
@@ -441,6 +546,8 @@ export default function EditAttendanceModal({
                       ? 'text-rose-600'
                       : attendanceStatus === 'leave'
                       ? 'text-indigo-600'
+                      : attendanceStatus === 'wfh'
+                      ? 'text-cyan-700'
                       : liveArrivalStatus === 'On Time Arrival'
                       ? 'text-emerald-600'
                       : liveArrivalStatus === 'Late Arrival'
@@ -452,6 +559,8 @@ export default function EditAttendanceModal({
                     ? 'Absent'
                     : attendanceStatus === 'leave'
                     ? 'Leave'
+                    : attendanceStatus === 'wfh'
+                    ? 'On Time (WFH)'
                     : liveArrivalStatus}
                 </p>
               </div>
@@ -466,6 +575,8 @@ export default function EditAttendanceModal({
                       ? 'text-rose-600'
                       : attendanceStatus === 'leave'
                       ? 'text-indigo-600'
+                      : attendanceStatus === 'wfh'
+                      ? 'text-cyan-700'
                       : liveDepartureStatus === 'On Time Departure'
                       ? 'text-emerald-600'
                       : liveDepartureStatus === 'Early Departure'
@@ -477,6 +588,8 @@ export default function EditAttendanceModal({
                     ? 'Absent'
                     : attendanceStatus === 'leave'
                     ? selectedLeaveType
+                    : attendanceStatus === 'wfh'
+                    ? 'On Time (WFH)'
                     : liveDepartureStatus}
                 </p>
               </div>
@@ -484,7 +597,11 @@ export default function EditAttendanceModal({
               <div className="bg-white p-2 rounded-md border border-slate-100 shadow-2xs">
                 <p className="text-[10px] text-slate-400 font-semibold uppercase">Working Time</p>
                 <p className="text-xs font-bold text-slate-900 mt-0.5 font-mono">
-                  {attendanceStatus === 'present' ? liveWorkingDuration : '00:00'}
+                  {attendanceStatus === 'present'
+                    ? liveWorkingDuration
+                    : attendanceStatus === 'wfh'
+                    ? wfhTimes.hours
+                    : '00:00'}
                 </p>
               </div>
             </div>
