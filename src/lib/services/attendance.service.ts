@@ -1119,6 +1119,32 @@ export async function deleteAttendanceRecord(id: string): Promise<void> {
   }
 }
 
+export async function bulkDeleteAttendanceRecords(params: {
+  startDate: string
+  endDate: string
+  employeeId?: string
+}): Promise<{ deletedCount: number }> {
+  const supabase = createClient()
+  let query = supabase
+    .from('attendance_records')
+    .delete()
+    .gte('attendance_date', params.startDate)
+    .lte('attendance_date', params.endDate)
+
+  if (params.employeeId && params.employeeId !== 'all') {
+    query = query.eq('employee_id', params.employeeId)
+  }
+
+  const { data, error, count } = await query.select('id', { count: 'exact' })
+
+  if (error) {
+    throw new Error(error.message || 'Failed to delete attendance records.')
+  }
+
+  const deletedCount = count !== null && count !== undefined ? count : (data?.length || 0)
+  return { deletedCount }
+}
+
 // Deprecated no-op for backward compatibility
 export async function syncAttendanceToSupabase(): Promise<{ syncedCount: number; error?: string }> {
   return { syncedCount: 0 }

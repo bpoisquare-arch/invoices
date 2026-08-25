@@ -21,6 +21,7 @@ import {
   Cloud,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -120,6 +121,70 @@ export default function AttendanceRecordsPage() {
   const [holidayModalDate, setHolidayModalDate] = useState<string | null>(null)
   const [holidayNameInput, setHolidayNameInput] = useState<string>('Gazetted Holiday')
   const [isHolidaySaving, setIsHolidaySaving] = useState(false)
+
+  // Bulk Delete Attendance Records Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [deleteStartDate, setDeleteStartDate] = useState(startDate)
+  const [deleteEndDate, setDeleteEndDate] = useState(endDate)
+  const [deleteEmployeeId, setDeleteEmployeeId] = useState('all')
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // Sync deleteStartDate/deleteEndDate when modal opens
+  useEffect(() => {
+    if (isDeleteModalOpen) {
+      setDeleteStartDate(startDate)
+      setDeleteEndDate(endDate)
+      setDeleteEmployeeId(selectedEmployeeId)
+      setDeleteMessage(null)
+      setDeleteError(null)
+    }
+  }, [isDeleteModalOpen, startDate, endDate, selectedEmployeeId])
+
+  const handleDeleteRecords = async () => {
+    if (!deleteStartDate || !deleteEndDate) {
+      setDeleteError('Please select both From and To dates.')
+      return
+    }
+
+    if (deleteStartDate > deleteEndDate) {
+      setDeleteError('From date cannot be after To date.')
+      return
+    }
+
+    try {
+      setIsDeleting(true)
+      setDeleteError(null)
+      setDeleteMessage(null)
+
+      const res = await fetch('/api/attendance/records', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate: deleteStartDate,
+          endDate: deleteEndDate,
+          employeeId: deleteEmployeeId !== 'all' ? deleteEmployeeId : undefined,
+        }),
+      })
+
+      const data = await res.json()
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to delete attendance records.')
+      }
+
+      setDeleteMessage(`Successfully deleted ${data.deletedCount} attendance record(s).`)
+      await fetchRecords()
+      setTimeout(() => {
+        setIsDeleteModalOpen(false)
+        setDeleteMessage(null)
+      }, 1500)
+    } catch (err: any) {
+      setDeleteError(err.message || 'Error deleting records.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   // Summary Metrics
   const [summary, setSummary] = useState({
@@ -805,6 +870,15 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
         <div className="flex items-center gap-2.5 flex-wrap">
           <Button
             variant="outline"
+            onClick={() => setIsDeleteModalOpen(true)}
+            className="text-xs font-bold uppercase tracking-wider text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 gap-1.5 shadow-2xs h-9"
+          >
+            <Trash2 className="w-4 h-4 text-rose-600" />
+            Delete Records
+          </Button>
+
+          <Button
+            variant="outline"
             onClick={handleExportExcel}
             className="text-xs font-bold uppercase tracking-wider text-slate-700 border-slate-300 gap-1.5 shadow-2xs h-9"
           >
@@ -1289,6 +1363,114 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
               </div>
             )
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Attendance Records Modal */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={(open) => !isDeleting && setIsDeleteModalOpen(open)}>
+        <DialogContent className="sm:max-w-md bg-white border border-slate-200 shadow-xl rounded-xl">
+          <DialogHeader className="border-b border-slate-100 pb-3">
+            <DialogTitle className="text-base font-bold text-rose-700 flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-rose-600" />
+              Delete Attendance Records
+            </DialogTitle>
+            <p className="text-xs text-slate-500">
+              Filter by date range and employee to permanently delete recorded attendance data.
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {deleteError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-lg flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            {deleteMessage && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-3 rounded-lg flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{deleteMessage}</span>
+              </div>
+            )}
+
+            {/* Date Filters */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-bold text-slate-700 block mb-1.5">From Date:</Label>
+                <Input
+                  type="date"
+                  value={deleteStartDate}
+                  onChange={(e) => setDeleteStartDate(e.target.value)}
+                  className="text-xs border-slate-300 h-9"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-slate-700 block mb-1.5">To Date:</Label>
+                <Input
+                  type="date"
+                  value={deleteEndDate}
+                  onChange={(e) => setDeleteEndDate(e.target.value)}
+                  className="text-xs border-slate-300 h-9"
+                />
+              </div>
+            </div>
+
+            {/* Employee Filter */}
+            <div>
+              <Label className="text-xs font-bold text-slate-700 block mb-1.5">Filter by Employee:</Label>
+              <Select value={deleteEmployeeId} onValueChange={(val) => setDeleteEmployeeId(val || 'all')}>
+                <SelectTrigger className="text-xs border-slate-300 h-9">
+                  <SelectValue placeholder="All Employees" />
+                </SelectTrigger>
+                <SelectContent className="max-h-56">
+                  <SelectItem value="all">All Employees (Entire Team)</SelectItem>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.employee_id})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Warning Box */}
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs text-amber-900 space-y-1">
+              <p className="font-bold flex items-center gap-1 text-amber-950">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                Warning: Permanent Action
+              </p>
+              <p>
+                All attendance punches, working hours, and check-in/out records for the selected date range (<strong>{deleteStartDate}</strong> to <strong>{deleteEndDate}</strong>) will be permanently deleted.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-3 border-t border-slate-100 flex items-center justify-between sm:justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteModalOpen(false)}
+              disabled={isDeleting}
+              className="text-xs font-bold"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="button"
+              onClick={handleDeleteRecords}
+              disabled={isDeleting}
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-wider gap-1.5 shadow-sm"
+            >
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+              {isDeleting ? 'Deleting...' : 'Confirm & Delete Records'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

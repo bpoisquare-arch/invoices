@@ -4,6 +4,7 @@ import {
   updateAttendanceRecord,
   createManualAttendanceRecord,
   deleteAttendanceRecord,
+  bulkDeleteAttendanceRecords,
   getAttendanceSummary,
   getTodayAttendanceMetrics,
 } from '@/lib/services/attendance.service'
@@ -115,12 +116,43 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
+    const employeeId = searchParams.get('employeeId') || undefined
 
-    if (!id) {
-      return NextResponse.json({ success: false, error: 'Record ID is required.' }, { status: 400 })
+    let body: any = null
+    try {
+      body = await request.json()
+    } catch {
+      // not a json body
     }
 
-    await deleteAttendanceRecord(id)
+    const effectiveId = id || body?.id
+    const effectiveStartDate = startDate || body?.startDate
+    const effectiveEndDate = endDate || body?.endDate
+    const effectiveEmpId = employeeId || body?.employeeId
+
+    if (effectiveStartDate && effectiveEndDate) {
+      const result = await bulkDeleteAttendanceRecords({
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate,
+        employeeId: effectiveEmpId,
+      })
+      return NextResponse.json({
+        success: true,
+        deletedCount: result.deletedCount,
+        message: `Successfully deleted ${result.deletedCount} attendance record(s).`,
+      })
+    }
+
+    if (!effectiveId) {
+      return NextResponse.json(
+        { success: false, error: 'Record ID or Date Range (startDate, endDate) is required.' },
+        { status: 400 }
+      )
+    }
+
+    await deleteAttendanceRecord(effectiveId)
     return NextResponse.json({ success: true, message: 'Record deleted.' })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
