@@ -55,6 +55,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
 
   const [adminFee, setAdminFee] = useState<number>(existingSchedule?.admin_fee ?? 500)
   const [resourcesFee, setResourcesFee] = useState<number>(existingSchedule?.resources_fee ?? 800)
+  const [agency, setAgency] = useState<string>(existingSchedule?.agency || '')
   const [showMaterialFee, setShowMaterialFee] = useState<boolean>((existingSchedule?.material_fee || 0) > 0)
   const [materialFee, setMaterialFee] = useState<number>(existingSchedule?.material_fee || 0)
   const [tuitionFee, setTuitionFee] = useState<number>(existingSchedule?.tuition_fee ?? 10000)
@@ -140,6 +141,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     first_installment_amount: totalInitialPayment,
     initial_fees: initialFees,
     schedule_items: scheduleItems,
+    agency: agency.trim() || undefined,
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -182,6 +184,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
         first_installment_amount: totalInitialPayment,
         initial_fees: initialFees,
         schedule_items: scheduleItems,
+        agency: agency.trim() || undefined,
       })
 
       router.push(`/installments/${savedSchedule.id}/preview`)
@@ -314,6 +317,19 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                     className="mt-1.5 h-9 text-xs"
                   />
                 </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px] flex items-center justify-between">
+                  <span>AGENCY NAME (OPTIONAL)</span>
+                  <span className="text-[10px] text-slate-400 font-normal lowercase">(for schedule list only, not on preview/PDF)</span>
+                </Label>
+                <Input
+                  placeholder="e.g. Global Education Services, Nexus Visa, etc."
+                  value={agency}
+                  onChange={(e) => setAgency(e.target.value)}
+                  className="mt-1.5 h-9 text-xs font-medium text-slate-900"
+                />
               </div>
             </CardContent>
           </Card>

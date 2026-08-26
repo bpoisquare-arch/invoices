@@ -63,6 +63,8 @@ export interface StudentInstallmentSchedule {
   first_installment_amount: number
   initial_fees?: number[]
   schedule_items: InstallmentRow[]
+  // Optional Agency Field
+  agency?: string | null
   // Optional Email Fields
   recipient_email?: string
   from_email?: string
@@ -362,6 +364,7 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
   let scheduleItems: InstallmentRow[] = []
   let extraMaterialFee: number | undefined = undefined
   let extraInitialFees: number[] | undefined = undefined
+  let extraAgency: string | undefined = undefined
 
   if (typeof row.schedule_items === 'string') {
     try {
@@ -372,6 +375,7 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
         scheduleItems = parsed.items || []
         extraMaterialFee = parsed.__material_fee
         extraInitialFees = parsed.__initial_fees
+        extraAgency = parsed.__agency
       }
     } catch {
       scheduleItems = []
@@ -380,6 +384,7 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
     scheduleItems = row.schedule_items.items || []
     extraMaterialFee = row.schedule_items.__material_fee
     extraInitialFees = row.schedule_items.__initial_fees
+    extraAgency = row.schedule_items.__agency
   } else if (Array.isArray(row.schedule_items)) {
     scheduleItems = row.schedule_items
   }
@@ -418,6 +423,7 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
       ...s,
       description: s.description ? s.description.replace(' + ', ' including ') : s.description,
     })),
+    agency: row.agency || extraAgency || undefined,
     recipient_email: row.recipient_email || undefined,
     from_email: row.from_email || undefined,
     email_subject: row.email_subject || undefined,
@@ -451,6 +457,7 @@ function mapScheduleToDbRow(schedule: StudentInstallmentSchedule): any {
       items: schedule.schedule_items || [],
       __material_fee: schedule.material_fee,
       __initial_fees: schedule.initial_fees,
+      __agency: schedule.agency || null,
     },
     recipient_email: schedule.recipient_email || null,
     from_email: schedule.from_email || null,

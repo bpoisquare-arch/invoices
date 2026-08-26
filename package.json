@@ -11,6 +11,7 @@
   "dependencies": {
     "@base-ui/react": "^1.7.0",
     "@hookform/resolvers": "^5.7.1",
+    "@radix-ui/react-popover": "^1.1.23",
     "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.2",
@@ -24,6 +25,7 @@
     "lucide-react": "^1.29.0",
     "next": "16.3.0",
     "react": "19.2.8",
+    "react-day-picker": "^10.0.1",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.84.0",
     "shadcn": "^4.16.2",

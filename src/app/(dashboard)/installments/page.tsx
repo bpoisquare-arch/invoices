@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   StudentInstallmentSchedule,
   getInstallments,
@@ -12,13 +13,20 @@ import {
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, PlusCircle, Eye, Edit, Download, GraduationCap, Calendar, Loader2, RotateCcw, Filter, X, Trash2, Cloud, CheckCircle2 } from 'lucide-react'
+import { Search, PlusCircle, Eye, Edit, Download, GraduationCap, Calendar, Loader2, RotateCcw, Filter, X, Trash2, Cloud, CheckCircle2, MoreHorizontal } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 import { pdf } from '@react-pdf/renderer'
 import AimtSchedulePDFTemplate from '@/components/pdf/aimt-schedule-pdf-template'
 import AimtScheduleWebPreview from '@/components/installments/aimt-schedule-web-preview'
 
 export default function InstallmentsPage() {
+  const router = useRouter()
   const [schedules, setSchedules] = useState<StudentInstallmentSchedule[]>([])
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -113,7 +121,8 @@ export default function InstallmentsPage() {
       const matchSearch =
         s.student_id?.toLowerCase().includes(query) ||
         s.student_name?.toLowerCase().includes(query) ||
-        s.course_name?.toLowerCase().includes(query)
+        s.course_name?.toLowerCase().includes(query) ||
+        s.agency?.toLowerCase().includes(query)
       if (!matchSearch) return false
     }
 
@@ -312,101 +321,109 @@ export default function InstallmentsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-left text-xs border-collapse min-w-[750px]">
+            <table className="w-full text-left text-xs border-collapse min-w-[850px]">
               <thead>
-                <tr className="bg-slate-50 text-slate-600 font-semibold border-y border-slate-200">
-                  <th className="py-3.5 px-6">Student ID</th>
-                  <th className="py-3.5 px-6">Student Name</th>
-                  <th className="py-3.5 px-6">Course Name</th>
-                  <th className="py-3.5 px-6">Start Date</th>
-                  <th className="py-3.5 px-6">End Date</th>
-                  <th className="py-3.5 px-6 text-right">Total Amount</th>
-                  <th className="py-3.5 px-6 text-center">Actions</th>
+                <tr className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[11px] border-y border-slate-200">
+                  <th className="py-3.5 px-5">Student ID</th>
+                  <th className="py-3.5 px-5">Student Name</th>
+                  <th className="py-3.5 px-5">Course Name</th>
+                  <th className="py-3.5 px-4">Agency</th>
+                  <th className="py-3.5 px-4">Start Date</th>
+                  <th className="py-3.5 px-4">End Date</th>
+                  <th className="py-3.5 px-5 text-right">Total Amount</th>
+                  <th className="py-3.5 px-5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredSchedules.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-4 px-6 font-mono font-bold text-blue-700">
+                    <td className="py-4 px-5 font-mono font-bold text-blue-700">
                       <Link href={`/installments/${item.id}/preview`} className="hover:underline">
                         {item.student_id}
                       </Link>
                     </td>
 
-                    <td className="py-4 px-6 font-bold text-slate-900">
+                    <td className="py-4 px-5 font-bold text-slate-900">
                       {item.student_name}
                     </td>
 
-                    <td className="py-4 px-6 text-slate-700 font-medium max-w-[220px] truncate">
+                    <td className="py-4 px-5 text-slate-700 font-medium max-w-[200px] truncate">
                       {item.course_name}
                     </td>
 
-                    <td className="py-4 px-6 text-slate-600">
+                    <td className="py-4 px-4 text-slate-700 font-medium max-w-[160px] truncate">
+                      {item.agency ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-cyan-50 text-cyan-800 border border-cyan-200">
+                          {item.agency}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">--</span>
+                      )}
+                    </td>
+
+                    <td className="py-4 px-4 text-slate-600">
                       {formatDate(item.start_date)}
                     </td>
 
-                    <td className="py-4 px-6 text-slate-600">
+                    <td className="py-4 px-4 text-slate-600">
                       {formatDate(item.end_date)}
                     </td>
 
-                    <td className="py-4 px-6 text-right font-extrabold text-slate-900 text-sm font-mono">
+                    <td className="py-4 px-5 text-right font-extrabold text-slate-900 text-sm font-mono">
                       AUD {Number(item.total_amount).toLocaleString()}
                     </td>
 
-                    <td className="py-4 px-6">
-                      <div className="flex items-center justify-center gap-1">
-                        <Link href={`/installments/${item.id}/preview`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-slate-600 hover:text-blue-600"
-                            title="Preview Schedule"
+                    <td className="py-4 px-5 text-right whitespace-nowrap">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300 transition-colors shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 data-popup-open:bg-slate-100">
+                          <MoreHorizontal className="w-4 h-4" />
+                          <span className="sr-only">Actions</span>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40 bg-white border border-slate-200 shadow-lg rounded-xl p-1 text-xs z-50">
+                          <DropdownMenuItem
+                            onClick={() => router.push(`/installments/${item.id}/preview`)}
+                            className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
                           >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Preview</span>
+                          </DropdownMenuItem>
 
-                        <Link href={`/installments/${item.id}/edit`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-slate-600 hover:text-blue-600"
-                            title="Edit Schedule"
+                          <DropdownMenuItem
+                            onClick={() => router.push(`/installments/${item.id}/edit`)}
+                            className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
                           >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                            <Edit className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Edit</span>
+                          </DropdownMenuItem>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={downloadingId === item.id}
-                          onClick={() => handleDownloadPDF(item)}
-                          className="h-8 w-8 p-0 text-slate-600 hover:text-emerald-600 cursor-pointer"
-                          title="Download PDF"
-                        >
-                          {downloadingId === item.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                          ) : (
-                            <Download className="w-4 h-4" />
-                          )}
-                        </Button>
+                          <DropdownMenuItem
+                            onClick={() => handleDownloadPDF(item)}
+                            disabled={downloadingId === item.id}
+                            className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
+                          >
+                            {downloadingId === item.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                            ) : (
+                              <Download className="w-3.5 h-3.5 text-emerald-600" />
+                            )}
+                            <span>Download PDF</span>
+                          </DropdownMenuItem>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={async () => {
-                            if (window.confirm(`Are you sure you want to delete the schedule for ${item.student_name} (${item.student_id})?`)) {
-                              await deleteInstallment(item.id)
-                              await loadData()
-                            }
-                          }}
-                          className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                          title="Delete Schedule"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={async () => {
+                              if (window.confirm(`Are you sure you want to delete the schedule for ${item.student_name} (${item.student_id})?`)) {
+                                await deleteInstallment(item.id)
+                                await loadData()
+                              }
+                            }}
+                            className="flex items-center gap-2 px-2.5 py-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg cursor-pointer font-medium transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Delete</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))}

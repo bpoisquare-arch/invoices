@@ -307,42 +307,6 @@ export default function EmployeeCommissionModal({
                 autoFocus
               />
             </div>
-
-            {/* Quick Amount Chips */}
-            <div className="flex items-center gap-1.5 pt-1 overflow-x-auto">
-              <span className="text-[10px] text-slate-400 font-medium">Quick add:</span>
-              {[5000, 10000, 20000, 30000, 50000].map((val) => (
-                <button
-                  type="button"
-                  key={val}
-                  onClick={() => setAmount(String((parseFloat(amount) || 0) + val))}
-                  className="px-2 py-0.5 text-[10px] font-semibold rounded bg-slate-100 hover:bg-amber-100 hover:text-amber-900 text-slate-700 border border-slate-200 transition-colors"
-                >
-                  +{val.toLocaleString()}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setAmount('0')}
-                className="px-2 py-0.5 text-[10px] font-semibold rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          {/* Commission Notes / Reason */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-              Note / Reason (Optional)
-            </Label>
-            <Input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Sales target bonus, performance incentive"
-              className="text-xs border-slate-200 h-9"
-            />
           </div>
 
           {/* Live Salary Calculation Preview */}

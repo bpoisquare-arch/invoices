@@ -26,6 +26,8 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -104,6 +106,7 @@ export default function AttendanceRecordsPage() {
   const [startDate, setStartDate] = useState(defaultStart)
   const [endDate, setEndDate] = useState(defaultEnd)
   const [selectedDesignation, setSelectedDesignation] = useState<string>('all')
+  const [selectedBranch, setSelectedBranch] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all')
   const [arrivalStatus, setArrivalStatus] = useState<string>('all')
@@ -349,12 +352,21 @@ export default function AttendanceRecordsPage() {
     return Array.from(set)
   }, [employees])
 
+  // Extract distinct branches for dropdown
+  const availableBranches = useMemo(() => {
+    const set = new Set<string>(['Multan', 'Lahore', 'AIMT', 'Onshore'])
+    employees.forEach((emp) => {
+      if (emp.branch?.trim()) set.add(emp.branch.trim())
+    })
+    return Array.from(set)
+  }, [employees])
+
   // Generate Date Columns for Grid View
   const dateColumns = useMemo(() => {
     return getDatesInRange(startDate, endDate)
   }, [startDate, endDate])
 
-  // Filter Employees based on Search, Designation, and presence of at least 1 attendance/leave record in range
+  // Filter Employees based on Search, Designation, Branch, and presence of at least 1 attendance/leave record in range
   const filteredEmployees = useMemo(() => {
     // Collect all employee IDs/keys that have at least 1 uploaded/saved attendance, leave, or WFH record
     const recordedEmployeeIds = new Set<string>()
@@ -377,6 +389,10 @@ export default function AttendanceRecordsPage() {
       if (selectedDesignation !== 'all' && emp.designation?.trim().toLowerCase() !== selectedDesignation.toLowerCase()) {
         return false
       }
+      // Branch filter
+      if (selectedBranch !== 'all' && (emp.branch || 'Multan').trim().toLowerCase() !== selectedBranch.toLowerCase()) {
+        return false
+      }
       // Employee selection filter
       if (selectedEmployeeId !== 'all' && emp.id !== selectedEmployeeId && emp.employee_id !== selectedEmployeeId) {
         return false
@@ -387,7 +403,8 @@ export default function AttendanceRecordsPage() {
         const nameMatch = emp.name.toLowerCase().includes(q)
         const idMatch = emp.employee_id.toLowerCase().includes(q)
         const desigMatch = emp.designation?.toLowerCase().includes(q)
-        if (!nameMatch && !idMatch && !desigMatch) return false
+        const branchMatch = emp.branch?.toLowerCase().includes(q)
+        if (!nameMatch && !idMatch && !desigMatch && !branchMatch) return false
       }
       return true
     })
@@ -397,7 +414,7 @@ export default function AttendanceRecordsPage() {
     }
 
     return list
-  }, [employees, records, selectedDesignation, selectedEmployeeId, search, pageSize])
+  }, [employees, records, selectedDesignation, selectedBranch, selectedEmployeeId, search, pageSize])
 
   // Fast Lookup Map: (employeeId_date) -> AttendanceRecordWithEmployee
   const recordMatrixMap = useMemo(() => {
@@ -884,48 +901,88 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
         </div>
       </div>
 
-      {/* Top Filter Bar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-4">
-        {/* Row 1: From Date, To Date, Designation */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
-          <div>
-            <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+      {/* Top Unified Filter Bar (Single Responsive Line) */}
+      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-3 items-end">
+          {/* 1. From Date (Shadcn Popover Calendar) */}
+          <div className="lg:col-span-2 space-y-1">
+            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
               From:
             </label>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="text-xs border-slate-300 font-medium h-9.5"
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="w-full h-9.5 px-3 flex items-center justify-between text-xs font-mono font-bold text-slate-800 bg-slate-50/50 hover:bg-white hover:border-[#009D9E] border border-slate-300 rounded-lg shadow-2xs transition-all text-left focus:outline-none focus:ring-2 focus:ring-[#003D5C]"
+                >
+                  <span>{startDate ? startDate.split('-').reverse().join('/') : 'Select date'}</span>
+                  <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 bg-white border border-slate-200 shadow-xl rounded-xl" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={startDate ? new Date(startDate + 'T00:00:00') : undefined}
+                  onSelect={(d) => {
+                    if (d) {
+                      const y = d.getFullYear()
+                      const m = String(d.getMonth() + 1).padStart(2, '0')
+                      const day = String(d.getDate()).padStart(2, '0')
+                      setStartDate(`${y}-${m}-${day}`)
+                    }
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
-          <div>
-            <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+          {/* 2. To Date (Shadcn Popover Calendar) */}
+          <div className="lg:col-span-2 space-y-1">
+            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
               To:
             </label>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="text-xs border-slate-300 font-medium h-9.5"
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="w-full h-9.5 px-3 flex items-center justify-between text-xs font-mono font-bold text-slate-800 bg-slate-50/50 hover:bg-white hover:border-[#009D9E] border border-slate-300 rounded-lg shadow-2xs transition-all text-left focus:outline-none focus:ring-2 focus:ring-[#003D5C]"
+                >
+                  <span>{endDate ? endDate.split('-').reverse().join('/') : 'Select date'}</span>
+                  <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 bg-white border border-slate-200 shadow-xl rounded-xl" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={endDate ? new Date(endDate + 'T00:00:00') : undefined}
+                  onSelect={(d) => {
+                    if (d) {
+                      const y = d.getFullYear()
+                      const m = String(d.getMonth() + 1).padStart(2, '0')
+                      const day = String(d.getDate()).padStart(2, '0')
+                      setEndDate(`${y}-${m}-${day}`)
+                    }
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
-          <div>
-            <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+          {/* 3. Select Designation */}
+          <div className="lg:col-span-3 space-y-1">
+            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
               Select Designation
             </label>
             <Select
               value={selectedDesignation}
               onValueChange={(val) => setSelectedDesignation(val || 'all')}
             >
-              <SelectTrigger className="text-xs border-slate-300 h-9.5 font-medium w-full min-w-[220px]">
+              <SelectTrigger className="text-xs border-slate-300 h-9.5 font-medium rounded-lg bg-slate-50/50 focus:bg-white w-full">
                 <SelectValue placeholder="ALL DESIGNATIONS">
                   {selectedDesignation === 'all' ? 'ALL DESIGNATIONS' : selectedDesignation}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent className="max-h-64 min-w-[280px]">
+              <SelectContent className="max-h-64 min-w-[260px]">
                 <SelectItem value="all">ALL DESIGNATIONS</SelectItem>
                 {availableDesignations.map((desig) => (
                   <SelectItem key={desig} value={desig}>
@@ -935,51 +992,73 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
               </SelectContent>
             </Select>
           </div>
-        </div>
 
-        {/* Row 2: Secondary Quick Filters (Show entries, Search) */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            {/* Quick Excel Button */}
-            <button
-              onClick={handleExportExcel}
-              className="bg-[#2d3748] hover:bg-[#1a202c] text-white text-[11px] font-bold px-3 py-1.5 rounded shadow-2xs transition-colors"
+          {/* 4. Branch Filter */}
+          <div className="lg:col-span-2 space-y-1">
+            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+              Branch
+            </label>
+            <Select
+              value={selectedBranch}
+              onValueChange={(val) => setSelectedBranch(val || 'all')}
             >
-              Excel
-            </button>
-
-            {/* Show entries dropdown */}
-            <div className="flex items-center gap-1.5 text-xs text-slate-600">
-              <span>Show</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setPageSize(val === 'all' ? 'all' : parseInt(val, 10))
-                }}
-                className="border border-slate-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#009D9E]"
-              >
-                <option value="all">All</option>
-                <option value="10">10</option>
-                <option value="25">25</option>
-                <option value="50">50</option>
-              </select>
-              <span>entries</span>
-            </div>
+              <SelectTrigger className="text-xs border-slate-300 h-9.5 font-medium rounded-lg bg-slate-50/50 focus:bg-white w-full">
+                <SelectValue placeholder="ALL BRANCHES">
+                  {selectedBranch === 'all' ? 'ALL BRANCHES' : selectedBranch}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="max-h-64 min-w-[180px]">
+                <SelectItem value="all">ALL BRANCHES</SelectItem>
+                {availableBranches.map((br) => (
+                  <SelectItem key={br} value={br}>
+                    {br}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Instant Search Bar (Expanded) */}
-          <div className="flex items-center gap-2 flex-1 w-full max-w-xl sm:justify-end">
-            <span className="text-xs text-slate-500 font-semibold shrink-0">Search:</span>
-            <div className="relative flex-1">
+          {/* 5. Search Bar */}
+          <div className="lg:col-span-3 space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                Search
+              </label>
+              <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+                <span>Show:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setPageSize(val === 'all' ? 'all' : parseInt(val, 10))
+                  }}
+                  className="border border-slate-200 rounded px-1.5 py-0.5 text-[10px] bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#009D9E]"
+                >
+                  <option value="all">All</option>
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+            </div>
+            <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <Input
                 type="text"
-                placeholder="Search Employee Name, ID, Designation..."
+                placeholder="Search Name, ID, Branch..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 text-xs border-slate-300 h-9 w-full bg-slate-50/50 focus:bg-white transition-colors"
+                className="pl-9 pr-8 text-xs border-slate-300 h-9.5 w-full rounded-lg bg-slate-50/50 focus:bg-white transition-colors"
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>
