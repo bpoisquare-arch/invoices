@@ -500,6 +500,7 @@ export interface Database {
           total_working_minutes: number
           total_working_hours_formatted: string
           raw_punches: Json
+          notes?: string | null
           created_at: string
           updated_at: string
         }
@@ -515,6 +516,7 @@ export interface Database {
           total_working_minutes?: number
           total_working_hours_formatted?: string
           raw_punches?: Json
+          notes?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -530,6 +532,7 @@ export interface Database {
           total_working_minutes?: number
           total_working_hours_formatted?: string
           raw_punches?: Json
+          notes?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -606,9 +609,11 @@ export interface InvoiceWithDetails extends Omit<Invoice, 'template_snapshot'> {
 
 export type Employee = Database['public']['Tables']['employees']['Row']
 export type EmployeeInsert = Database['public']['Tables']['employees']['Insert']
+export type EmployeeUpdate = Database['public']['Tables']['employees']['Update']
 export type AttendanceSettings = Database['public']['Tables']['attendance_settings']['Row']
 export type AttendanceRecord = Database['public']['Tables']['attendance_records']['Row']
 export type AttendanceRecordInsert = Database['public']['Tables']['attendance_records']['Insert']
+export type AttendanceRecordUpdate = Database['public']['Tables']['attendance_records']['Update']
 export type AttendanceAuditLog = Database['public']['Tables']['attendance_audit_logs']['Row']
 
 export interface RawPunch {
@@ -621,5 +626,6 @@ export interface RawPunch {
 export interface AttendanceRecordWithEmployee extends AttendanceRecord {
   employee?: Employee | null
   raw_punches_parsed?: RawPunch[]
+  notes?: string | null
 }
 

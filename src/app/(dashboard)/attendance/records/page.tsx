@@ -686,7 +686,7 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
         )
       }
 
-      // C. Present Record with timings
+      // C. Present Record with timings & notes check
       const isWfh = Boolean(
         rec.notes?.includes('Work From Home') ||
         rec.arrival_status === 'Work From Home' ||

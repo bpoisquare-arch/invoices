@@ -1049,7 +1049,7 @@ export async function updateAttendanceRecord(
 
   const { data: updated, error: updateErr } = await supabase
     .from('attendance_records')
-    .update(updatedData)
+    .update(updatedData as any)
     .eq('id', id)
     .select()
     .single()
@@ -1163,7 +1163,7 @@ export async function bulkDeleteAttendanceRecords(params: {
   const supabase = createClient()
   let query = supabase
     .from('attendance_records')
-    .delete()
+    .delete({ count: 'exact' })
     .gte('attendance_date', params.startDate)
     .lte('attendance_date', params.endDate)
 
@@ -1171,7 +1171,7 @@ export async function bulkDeleteAttendanceRecords(params: {
     query = query.eq('employee_id', params.employeeId)
   }
 
-  const { data, error, count } = await query.select('id', { count: 'exact' })
+  const { data, error, count } = await query.select('id')
 
   if (error) {
     throw new Error(error.message || 'Failed to delete attendance records.')

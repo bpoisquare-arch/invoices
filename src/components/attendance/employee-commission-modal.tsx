@@ -21,7 +21,7 @@ interface EmployeeCommissionModalProps {
     name: string
     employee_id?: string
     designation?: string
-    salary?: number
+    salary?: number | null
   } | null
   month: string // e.g. "2026-08"
   currentCommission: number
