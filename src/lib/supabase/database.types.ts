@@ -500,7 +500,6 @@ export interface Database {
           total_working_minutes: number
           total_working_hours_formatted: string
           raw_punches: Json
-          notes?: string | null
           created_at: string
           updated_at: string
         }
@@ -516,7 +515,6 @@ export interface Database {
           total_working_minutes?: number
           total_working_hours_formatted?: string
           raw_punches?: Json
-          notes?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -532,7 +530,6 @@ export interface Database {
           total_working_minutes?: number
           total_working_hours_formatted?: string
           raw_punches?: Json
-          notes?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -607,7 +604,20 @@ export interface InvoiceWithDetails extends Omit<Invoice, 'template_snapshot'> {
   invoice_items: InvoiceItem[]
 }
 
-export type Employee = Database['public']['Tables']['employees']['Row']
+export interface EmployeeLeaveQuotas {
+  annual_leaves?: number // Default: 6
+  sick_leaves?: number // Default: 7
+  casual_leaves?: number // Default: 7
+  wfh_quota?: number // Default: 4
+  probation_leaves?: number // Default: 3
+}
+
+export type Employee = Database['public']['Tables']['employees']['Row'] & {
+  branch?: string | null
+  salary?: number | null
+  joining_date?: string | null
+  leave_quotas?: EmployeeLeaveQuotas
+}
 export type EmployeeInsert = Database['public']['Tables']['employees']['Insert']
 export type EmployeeUpdate = Database['public']['Tables']['employees']['Update']
 export type AttendanceSettings = Database['public']['Tables']['attendance_settings']['Row']

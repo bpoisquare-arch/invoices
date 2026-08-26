@@ -2,12 +2,26 @@
   "72cb861d-a184-4c3a-ac2c-a5e79a9282f0": {
     "branch": "Multan",
     "salary": 75000,
-    "joining_date": "2026-08-18"
+    "joining_date": "2026-08-18",
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 7,
+      "wfh_quota": 4,
+      "probation_leaves": 0
+    }
   },
   "EMP-0001": {
     "branch": "Multan",
     "salary": 75000,
-    "joining_date": "2026-08-18"
+    "joining_date": "2026-08-18",
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 7,
+      "wfh_quota": 4,
+      "probation_leaves": 0
+    }
   },
   "6d06d295-7618-4d8e-b48d-7bb3ddeb257e": {
     "branch": "Multan",
@@ -18,5 +32,29 @@
     "branch": "Multan",
     "salary": 67000,
     "joining_date": "2026-08-20"
+  },
+  "3823d7df-5be6-4932-ab0c-0bdbf252338e": {
+    "branch": "Multan",
+    "salary": null,
+    "joining_date": "2026-06-17",
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 7,
+      "wfh_quota": 4,
+      "probation_leaves": 1
+    }
+  },
+  "EMP-0004": {
+    "branch": "Multan",
+    "salary": null,
+    "joining_date": "2026-06-17",
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 7,
+      "wfh_quota": 4,
+      "probation_leaves": 1
+    }
   }
 }

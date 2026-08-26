@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, designation, branch, salary, joining_date } = body
+    const { name, designation, branch, salary, joining_date, leave_quotas } = body
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return NextResponse.json({ success: false, error: 'Employee name is required.' }, { status: 400 })
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
       branch,
       salary,
       joining_date,
+      leave_quotas,
     })
 
     return NextResponse.json({
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, name, designation, branch, salary, joining_date, is_active } = body
+    const { id, name, designation, branch, salary, joining_date, is_active, leave_quotas } = body
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Employee ID is required.' }, { status: 400 })
@@ -73,6 +74,7 @@ export async function PUT(request: NextRequest) {
       salary,
       joining_date,
       is_active,
+      leave_quotas,
     })
 
     return NextResponse.json({ success: true, employee: updated })

@@ -88,6 +88,19 @@ export default function EmployeesPage() {
   const [editActive, setEditActive] = useState(true)
   const [editError, setEditError] = useState<string | null>(null)
 
+  // Add / Edit Leave Quotas
+  const [newAnnualLeaves, setNewAnnualLeaves] = useState<number>(6)
+  const [newSickLeaves, setNewSickLeaves] = useState<number>(7)
+  const [newCasualLeaves, setNewCasualLeaves] = useState<number>(7)
+  const [newWfhQuota, setNewWfhQuota] = useState<number>(4)
+  const [newProbationLeaves, setNewProbationLeaves] = useState<number>(3)
+
+  const [editAnnualLeaves, setEditAnnualLeaves] = useState<number>(6)
+  const [editSickLeaves, setEditSickLeaves] = useState<number>(7)
+  const [editCasualLeaves, setEditCasualLeaves] = useState<number>(7)
+  const [editWfhQuota, setEditWfhQuota] = useState<number>(4)
+  const [editProbationLeaves, setEditProbationLeaves] = useState<number>(3)
+
   // Delete Employee Modal
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -148,6 +161,13 @@ export default function EmployeesPage() {
           branch: newBranch,
           joining_date: newJoiningDate,
           salary: newSalary ? Number(newSalary) : null,
+          leave_quotas: {
+            annual_leaves: Number(newAnnualLeaves) || 0,
+            sick_leaves: Number(newSickLeaves) || 0,
+            casual_leaves: Number(newCasualLeaves) || 0,
+            wfh_quota: Number(newWfhQuota) || 0,
+            probation_leaves: Number(newProbationLeaves) || 0,
+          },
         }),
       })
 
@@ -162,6 +182,11 @@ export default function EmployeesPage() {
       setNewBranch('Multan')
       setNewJoiningDate(todayStr)
       setNewSalary('')
+      setNewAnnualLeaves(6)
+      setNewSickLeaves(7)
+      setNewCasualLeaves(7)
+      setNewWfhQuota(4)
+      setNewProbationLeaves(3)
       setAddWarning(null)
       await fetchEmployees()
     } catch (err: any) {
@@ -178,6 +203,13 @@ export default function EmployeesPage() {
     setIsSaving(true)
 
     const targetSalary = editSalary ? Number(editSalary) : null
+    const leave_quotas = {
+      annual_leaves: Number(editAnnualLeaves) || 0,
+      sick_leaves: Number(editSickLeaves) || 0,
+      casual_leaves: Number(editCasualLeaves) || 0,
+      wfh_quota: Number(editWfhQuota) || 0,
+      probation_leaves: Number(editProbationLeaves) || 0,
+    }
 
     try {
       const res = await fetch('/api/attendance/employees', {
@@ -191,6 +223,7 @@ export default function EmployeesPage() {
           joining_date: editJoiningDate,
           salary: targetSalary,
           is_active: editActive,
+          leave_quotas,
         }),
       })
 
@@ -211,6 +244,7 @@ export default function EmployeesPage() {
                 joining_date: editJoiningDate,
                 salary: targetSalary,
                 is_active: editActive,
+                leave_quotas,
               }
             : emp
         )
@@ -234,6 +268,12 @@ export default function EmployeesPage() {
     setEditJoiningDate(rawDate ? rawDate.split('T')[0] : todayStr)
     setEditSalary(emp.salary !== undefined && emp.salary !== null ? String(emp.salary) : '')
     setEditActive(emp.is_active)
+    const q = emp.leave_quotas || {}
+    setEditAnnualLeaves(q.annual_leaves !== undefined ? Number(q.annual_leaves) : 6)
+    setEditSickLeaves(q.sick_leaves !== undefined ? Number(q.sick_leaves) : 7)
+    setEditCasualLeaves(q.casual_leaves !== undefined ? Number(q.casual_leaves) : 7)
+    setEditWfhQuota(q.wfh_quota !== undefined ? Number(q.wfh_quota) : 4)
+    setEditProbationLeaves(q.probation_leaves !== undefined ? Number(q.probation_leaves) : 3)
     setEditError(null)
   }
 
@@ -657,6 +697,82 @@ export default function EmployeesPage() {
               />
             </div>
 
+            {/* Initial Remaining Leave Quotas Section */}
+            <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[#003D5C] uppercase tracking-wider">
+                  <Calendar className="w-3.5 h-3.5 text-[#009D9E]" />
+                  <span>Initial / Remaining Leave Balances</span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-medium">Annual Quotas</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Annual (6/yr)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={newAnnualLeaves}
+                    onChange={(e) => setNewAnnualLeaves(Number(e.target.value))}
+                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                  />
+                </div>
+
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Sick (7/yr)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={newSickLeaves}
+                    onChange={(e) => setNewSickLeaves(Number(e.target.value))}
+                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                  />
+                </div>
+
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Casual (7/yr)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={newCasualLeaves}
+                    onChange={(e) => setNewCasualLeaves(Number(e.target.value))}
+                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                  />
+                </div>
+
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-600 uppercase">WFH (4/yr)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={newWfhQuota}
+                    onChange={(e) => setNewWfhQuota(Number(e.target.value))}
+                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                  />
+                </div>
+
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Probation (3 max)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="3"
+                    value={newProbationLeaves}
+                    onChange={(e) => setNewProbationLeaves(Number(e.target.value))}
+                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-tight">
+                Probation leaves apply during 1st 3 months from joining (max 1/month). Standard leaves apply after probation.
+              </p>
+            </div>
+
             <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg text-xs text-slate-500 space-y-1">
               <p className="font-semibold text-slate-700">Automatic ID Assignment:</p>
               <p>
@@ -789,6 +905,82 @@ export default function EmployeesPage() {
                 onChange={(e) => setEditSalary(e.target.value)}
                 className="text-sm border-slate-200 font-mono"
               />
+            </div>
+
+            {/* Remaining Leave Quotas Section */}
+            <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[#003D5C] uppercase tracking-wider">
+                  <Calendar className="w-3.5 h-3.5 text-[#009D9E]" />
+                  <span>Remaining Leave Balances</span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-medium">Annual Quotas</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Annual (6/yr)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={editAnnualLeaves}
+                    onChange={(e) => setEditAnnualLeaves(Number(e.target.value))}
+                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                  />
+                </div>
+
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Sick (7/yr)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={editSickLeaves}
+                    onChange={(e) => setEditSickLeaves(Number(e.target.value))}
+                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                  />
+                </div>
+
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Casual (7/yr)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={editCasualLeaves}
+                    onChange={(e) => setEditCasualLeaves(Number(e.target.value))}
+                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                  />
+                </div>
+
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-600 uppercase">WFH (4/yr)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={editWfhQuota}
+                    onChange={(e) => setEditWfhQuota(Number(e.target.value))}
+                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                  />
+                </div>
+
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Probation (3 max)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="3"
+                    value={editProbationLeaves}
+                    onChange={(e) => setEditProbationLeaves(Number(e.target.value))}
+                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-tight">
+                Probation leaves apply during 1st 3 months from joining (max 1/month). Standard leaves apply after probation.
+              </p>
             </div>
 
             <div className="flex items-center gap-2 pt-1">

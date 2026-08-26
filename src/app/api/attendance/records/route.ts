@@ -93,13 +93,14 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, in_time, out_time, attendance_date, arrival_status, departure_status, notes } = body
+    const { id, employee_id, in_time, out_time, attendance_date, arrival_status, departure_status, notes } = body
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Record ID is required.' }, { status: 400 })
     }
 
     const updated = await updateAttendanceRecord(id, {
+      employee_id: employee_id || body.employee?.id,
       in_time,
       out_time,
       attendance_date,

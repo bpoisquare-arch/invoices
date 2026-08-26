@@ -13,6 +13,7 @@ import {
   calculateDepartureStatus,
   calculateWorkingDuration,
   parseDateString,
+  LEAVE_TYPES,
 } from './attendance-calculator'
 import {
   readAllEmployeeMetadata,
@@ -122,9 +123,9 @@ export async function updateAttendanceSettings(
 
 // ----------------------------------------------------
 // 2. EMPLOYEE SERVICES & METADATA SYNC
-// ----------------------------------------------------
+import { EmployeeLeaveQuotas } from '@/lib/supabase/database.types'
 
-export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?: string; salary?: number | null; joining_date?: string }>> {
+export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?: string; salary?: number | null; joining_date?: string; leave_quotas?: EmployeeLeaveQuotas }>> {
   const fileMeta = readAllEmployeeMetadata()
 
   try {
@@ -151,7 +152,7 @@ export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?
 
 export async function saveEmployeeMetadata(
   idOrEmpId: string,
-  meta: { branch?: string | null; salary?: number | null; joining_date?: string | null }
+  meta: { branch?: string | null; salary?: number | null; joining_date?: string | null; leave_quotas?: EmployeeLeaveQuotas }
 ): Promise<void> {
   // 1. Write immediately to server-side permanent file store
   writeEmployeeMetadata(idOrEmpId, meta)
@@ -165,6 +166,7 @@ export async function saveEmployeeMetadata(
       ...(meta.branch !== undefined ? { branch: meta.branch || 'Multan' } : {}),
       ...(meta.salary !== undefined ? { salary: meta.salary } : {}),
       ...(meta.joining_date !== undefined ? { joining_date: meta.joining_date || undefined } : {}),
+      ...(meta.leave_quotas !== undefined ? { leave_quotas: meta.leave_quotas } : {}),
     }
 
     const supabase = createClient()
@@ -183,6 +185,14 @@ export function cleanDesignation(desig?: string | null): string {
     .replace(/[–—\-]\s*(Multan|Lahore)(\s+Office)?/gi, '')
     .replace(/\s*(Multan|Lahore)\s*Office/gi, '')
     .trim()
+}
+
+export const DEFAULT_EMPLOYEE_LEAVE_QUOTAS: EmployeeLeaveQuotas = {
+  annual_leaves: 6,
+  sick_leaves: 7,
+  casual_leaves: 7,
+  wfh_quota: 4,
+  probation_leaves: 3,
 }
 
 export async function getEmployees(params?: {
@@ -214,6 +224,13 @@ export async function getEmployees(params?: {
         branch: meta.branch || emp.branch || 'Multan',
         salary: meta.salary !== undefined && meta.salary !== null ? meta.salary : (emp.salary !== undefined && emp.salary !== null ? emp.salary : null),
         joining_date: meta.joining_date || emp.joining_date || emp.created_at,
+        leave_quotas: {
+          annual_leaves: meta.leave_quotas?.annual_leaves !== undefined ? Number(meta.leave_quotas.annual_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.annual_leaves,
+          sick_leaves: meta.leave_quotas?.sick_leaves !== undefined ? Number(meta.leave_quotas.sick_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.sick_leaves,
+          casual_leaves: meta.leave_quotas?.casual_leaves !== undefined ? Number(meta.leave_quotas.casual_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.casual_leaves,
+          wfh_quota: meta.leave_quotas?.wfh_quota !== undefined ? Number(meta.leave_quotas.wfh_quota) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.wfh_quota,
+          probation_leaves: meta.leave_quotas?.probation_leaves !== undefined ? Number(meta.leave_quotas.probation_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.probation_leaves,
+        },
       }
     })
 
@@ -257,6 +274,13 @@ export async function getEmployeeById(id: string): Promise<Employee | null> {
       branch: data.branch || meta.branch || 'Multan',
       salary: data.salary !== undefined && data.salary !== null ? data.salary : (meta.salary !== undefined ? meta.salary : null),
       joining_date: data.joining_date || meta.joining_date || data.created_at,
+      leave_quotas: {
+        annual_leaves: meta.leave_quotas?.annual_leaves !== undefined ? Number(meta.leave_quotas.annual_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.annual_leaves,
+        sick_leaves: meta.leave_quotas?.sick_leaves !== undefined ? Number(meta.leave_quotas.sick_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.sick_leaves,
+        casual_leaves: meta.leave_quotas?.casual_leaves !== undefined ? Number(meta.leave_quotas.casual_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.casual_leaves,
+        wfh_quota: meta.leave_quotas?.wfh_quota !== undefined ? Number(meta.leave_quotas.wfh_quota) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.wfh_quota,
+        probation_leaves: meta.leave_quotas?.probation_leaves !== undefined ? Number(meta.leave_quotas.probation_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.probation_leaves,
+      },
     }
   } catch (err) {
     return null
@@ -312,6 +336,7 @@ export async function createEmployee(params: {
   branch?: string | null
   salary?: number | string | null
   joining_date?: string | null
+  leave_quotas?: EmployeeLeaveQuotas
 }): Promise<{ employee: Employee; warning?: string }> {
   const name = params.name.trim()
   const designation = cleanDesignation(params.designation)
@@ -319,6 +344,13 @@ export async function createEmployee(params: {
   const salary = params.salary !== undefined && params.salary !== null && params.salary !== '' ? Number(params.salary) : null
   const joiningDate = params.joining_date && params.joining_date.trim() ? params.joining_date.trim() : new Date().toISOString().split('T')[0]
   const normalizedName = normalizeEmployeeName(name)
+  const leaveQuotas: EmployeeLeaveQuotas = {
+    annual_leaves: params.leave_quotas?.annual_leaves !== undefined ? Number(params.leave_quotas.annual_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.annual_leaves,
+    sick_leaves: params.leave_quotas?.sick_leaves !== undefined ? Number(params.leave_quotas.sick_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.sick_leaves,
+    casual_leaves: params.leave_quotas?.casual_leaves !== undefined ? Number(params.leave_quotas.casual_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.casual_leaves,
+    wfh_quota: params.leave_quotas?.wfh_quota !== undefined ? Number(params.leave_quotas.wfh_quota) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.wfh_quota,
+    probation_leaves: params.leave_quotas?.probation_leaves !== undefined ? Number(params.leave_quotas.probation_leaves) : DEFAULT_EMPLOYEE_LEAVE_QUOTAS.probation_leaves,
+  }
 
   if (!name) throw new Error('Employee name is required.')
   if (!designation) throw new Error('Designation is required.')
@@ -362,15 +394,15 @@ export async function createEmployee(params: {
   }
 
   if (data) {
-    await saveEmployeeMetadata(data.id, { branch, salary, joining_date: joiningDate })
-    await saveEmployeeMetadata(data.employee_id, { branch, salary, joining_date: joiningDate })
+    await saveEmployeeMetadata(data.id, { branch, salary, joining_date: joiningDate, leave_quotas: leaveQuotas })
+    await saveEmployeeMetadata(data.employee_id, { branch, salary, joining_date: joiningDate, leave_quotas: leaveQuotas })
   }
 
   if (!data) {
     throw new Error('Failed to create employee in database')
   }
 
-  return { employee: { ...data, branch, salary, joining_date: joiningDate, designation }, warning }
+  return { employee: { ...data, branch, salary, joining_date: joiningDate, designation, leave_quotas: leaveQuotas }, warning }
 }
 
 export async function updateEmployee(
@@ -382,6 +414,7 @@ export async function updateEmployee(
     salary?: number | string | null
     joining_date?: string | null
     is_active?: boolean
+    leave_quotas?: EmployeeLeaveQuotas
   }
 ): Promise<Employee> {
   const supabase = createClient()
@@ -435,12 +468,14 @@ export async function updateEmployee(
     branch: params.branch,
     salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : undefined,
     joining_date: params.joining_date,
+    leave_quotas: params.leave_quotas,
   })
   if (data?.employee_id) {
     await saveEmployeeMetadata(data.employee_id, {
       branch: params.branch,
       salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : undefined,
       joining_date: params.joining_date,
+      leave_quotas: params.leave_quotas,
     })
   }
 
@@ -448,11 +483,14 @@ export async function updateEmployee(
     throw new Error('Failed to update employee in database')
   }
 
+  const existingMeta = (await getEmployeeMetadataMap())[id] || {}
+
   return {
     ...data,
     branch: params.branch !== undefined ? params.branch : (data.branch || 'Multan'),
     salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : (data.salary ?? null),
     joining_date: params.joining_date !== undefined ? params.joining_date : (data.joining_date || data.created_at),
+    leave_quotas: params.leave_quotas !== undefined ? params.leave_quotas : (existingMeta.leave_quotas || DEFAULT_EMPLOYEE_LEAVE_QUOTAS),
   }
 }
 
@@ -947,20 +985,189 @@ export async function saveImportedAttendanceBatch(
   }
 }
 
-/**
- * Updates an attendance record's in/out times and date, recalculating statuses on the server
- */
-export const LEAVE_TYPES = [
-  'Sick Leave',
-  'Casual Leave',
-  'Annual Leave',
-  'Probation Leave',
-  'Gazetted Leave',
-] as const
+export async function getEmployeeLeaveBalanceSummary(
+  employeeIdOrUuid: string,
+  targetDate?: string,
+  excludeRecordId?: string
+): Promise<{
+  isProbation: boolean
+  joiningDate: string | null
+  quotas: EmployeeLeaveQuotas
+  used: {
+    probation_leaves: number
+    annual_leaves: number
+    sick_leaves: number
+    casual_leaves: number
+    wfh_quota: number
+  }
+  remaining: {
+    probation_leaves: number
+    annual_leaves: number
+    sick_leaves: number
+    casual_leaves: number
+    wfh_quota: number
+  }
+  probationDates: string[]
+  hasProbationInTargetMonth: boolean
+}> {
+  const emp = await getEmployeeById(employeeIdOrUuid)
+  const joiningDate = emp?.joining_date || emp?.created_at || null
+  const quotas: EmployeeLeaveQuotas = emp?.leave_quotas || {
+    annual_leaves: 6,
+    sick_leaves: 7,
+    casual_leaves: 7,
+    wfh_quota: 4,
+    probation_leaves: 3,
+  }
+
+  const supabase = createClient()
+  const { data: allRecords } = await supabase
+    .from('attendance_records')
+    .select('id, attendance_date, arrival_status, departure_status')
+    .or(`employee_id.eq.${employeeIdOrUuid}${emp?.id ? `,employee_id.eq.${emp.id}` : ''}${emp?.employee_id ? `,employee_id.eq.${emp.employee_id}` : ''}`)
+
+  const probationDates: string[] = []
+  let used_annual = 0
+  let used_sick = 0
+  let used_casual = 0
+  let used_probation = 0
+  let used_wfh = 0
+
+  const targetDateStr = targetDate ? targetDate.split('T')[0] : ''
+  const targetMonthStr = targetDateStr ? targetDateStr.substring(0, 7) : ''
+
+  if (allRecords && allRecords.length > 0) {
+    for (const r of allRecords) {
+      if (excludeRecordId && r.id === excludeRecordId) continue
+      if (targetDateStr && r.attendance_date === targetDateStr) continue
+
+      const arrStatus = r.arrival_status || ''
+      const depStatus = r.departure_status || ''
+
+      const isLeave = arrStatus === 'Leave' || depStatus.includes('Leave') || ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Probation Leaves'].includes(depStatus)
+      const isWfh = depStatus === 'Work From Home' || arrStatus === 'Work From Home'
+
+      if (isWfh) {
+        used_wfh++
+      } else if (isLeave) {
+        if (depStatus.includes('Probation') || arrStatus.includes('Probation')) {
+          used_probation++
+          if (r.attendance_date) {
+            probationDates.push(r.attendance_date.split('T')[0])
+          }
+        } else if (depStatus.includes('Annual') || arrStatus.includes('Annual')) {
+          used_annual++
+        } else if (depStatus.includes('Sick') || arrStatus.includes('Sick')) {
+          used_sick++
+        } else if (depStatus.includes('Casual') || arrStatus.includes('Casual')) {
+          used_casual++
+        }
+      }
+    }
+  }
+
+  // Calculate probation status
+  let isProbation = false
+  if (joiningDate && targetDateStr) {
+    const j = new Date(joiningDate.split('T')[0])
+    const t = new Date(targetDateStr)
+    if (!isNaN(j.getTime()) && !isNaN(t.getTime())) {
+      const monthsDiff = (t.getFullYear() - j.getFullYear()) * 12 + (t.getMonth() - j.getMonth())
+      const daysDiff = Math.floor((t.getTime() - j.getTime()) / (1000 * 60 * 60 * 24))
+      isProbation = daysDiff >= 0 && monthsDiff < 3
+    }
+  }
+
+  const hasProbationInTargetMonth = targetMonthStr
+    ? probationDates.some((d) => d.startsWith(targetMonthStr))
+    : false
+
+  const initial_prob = quotas.probation_leaves !== undefined ? Number(quotas.probation_leaves) : 3
+  const initial_ann = quotas.annual_leaves !== undefined ? Number(quotas.annual_leaves) : 6
+  const initial_sick = quotas.sick_leaves !== undefined ? Number(quotas.sick_leaves) : 7
+  const initial_cas = quotas.casual_leaves !== undefined ? Number(quotas.casual_leaves) : 7
+  const initial_wfh = quotas.wfh_quota !== undefined ? Number(quotas.wfh_quota) : 4
+
+  return {
+    isProbation,
+    joiningDate,
+    quotas,
+    used: {
+      probation_leaves: used_probation,
+      annual_leaves: used_annual,
+      sick_leaves: used_sick,
+      casual_leaves: used_casual,
+      wfh_quota: used_wfh,
+    },
+    remaining: {
+      probation_leaves: Math.max(0, initial_prob - used_probation),
+      annual_leaves: Math.max(0, initial_ann - used_annual),
+      sick_leaves: Math.max(0, initial_sick - used_sick),
+      casual_leaves: Math.max(0, initial_cas - used_casual),
+      wfh_quota: Math.max(0, initial_wfh - used_wfh),
+    },
+    probationDates,
+    hasProbationInTargetMonth,
+  }
+}
+
+export async function validateEmployeeLeaveQuotas(
+  employeeIdOrUuid: string,
+  attendanceDate: string,
+  leaveOrWfhType: string,
+  excludeRecordId?: string
+): Promise<void> {
+  const summary = await getEmployeeLeaveBalanceSummary(employeeIdOrUuid, attendanceDate, excludeRecordId)
+  const isProbationLeave = leaveOrWfhType.includes('Probation')
+  const isAnnualLeave = leaveOrWfhType.includes('Annual')
+  const isSickLeave = leaveOrWfhType.includes('Sick')
+  const isCasualLeave = leaveOrWfhType.includes('Casual')
+  const isWfh = leaveOrWfhType === 'Work From Home'
+
+  if (isProbationLeave) {
+    if (!summary.isProbation) {
+      throw new Error('Probation period has completed (> 3 months from joining). Only Annual, Sick, or Casual Leaves can be applied.')
+    }
+    if (summary.hasProbationInTargetMonth) {
+      const monthStr = attendanceDate.substring(0, 7)
+      const existingDates = summary.probationDates.filter((d) => d.startsWith(monthStr)).join(', ')
+      throw new Error(`Monthly Limit Exceeded: Only 1 Probation Leave is allowed per calendar month. This employee already has a Probation Leave recorded in ${monthStr} (${existingDates}).`)
+    }
+    if (summary.remaining.probation_leaves <= 0) {
+      throw new Error(`Probation Leaves Quota Exceeded: No remaining probation leaves available for this employee (Configured Limit: ${summary.quotas.probation_leaves ?? 3}, Already Used: ${summary.used.probation_leaves}).`)
+    }
+  } else if (isAnnualLeave) {
+    if (summary.isProbation) {
+      throw new Error('Employee is currently in 3-month probation period. Only Probation Leaves (max 1/month) can be applied during probation.')
+    }
+    if (summary.remaining.annual_leaves <= 0) {
+      throw new Error(`Annual Leaves Quota Exceeded: No remaining annual leaves available (Quota: ${summary.quotas.annual_leaves ?? 6}, Already Used: ${summary.used.annual_leaves}).`)
+    }
+  } else if (isSickLeave) {
+    if (summary.isProbation) {
+      throw new Error('Employee is currently in 3-month probation period. Only Probation Leaves (max 1/month) can be applied during probation.')
+    }
+    if (summary.remaining.sick_leaves <= 0) {
+      throw new Error(`Sick Leaves Quota Exceeded: No remaining sick leaves available (Quota: ${summary.quotas.sick_leaves ?? 7}, Already Used: ${summary.used.sick_leaves}).`)
+    }
+  } else if (isCasualLeave) {
+    if (summary.isProbation) {
+      throw new Error('Employee is currently in 3-month probation period. Only Probation Leaves (max 1/month) can be applied during probation.')
+    }
+    if (summary.remaining.casual_leaves <= 0) {
+      throw new Error(`Casual Leaves Quota Exceeded: No remaining casual leaves available (Quota: ${summary.quotas.casual_leaves ?? 7}, Already Used: ${summary.used.casual_leaves}).`)
+    }
+  } else if (isWfh) {
+    if (summary.remaining.wfh_quota <= 0) {
+      throw new Error(`Work From Home (WFH) Quota Exceeded: No remaining WFH days available (Quota: ${summary.quotas.wfh_quota ?? 4}, Already Used: ${summary.used.wfh_quota}).`)
+    }
+  }
+}
 
 export async function updateAttendanceRecord(
   id: string,
   params: {
+    employee_id?: string
     in_time?: string | null
     out_time?: string | null
     attendance_date?: string
@@ -970,19 +1177,64 @@ export async function updateAttendanceRecord(
   }
 ): Promise<AttendanceRecord> {
   const supabase = createClient()
-  const { data: current, error: fetchErr } = await supabase
-    .from('attendance_records')
-    .select('*')
-    .eq('id', id)
-    .single()
 
-  if (fetchErr || !current) {
+  // If this is a synthetic absent record ID or missing ID, fallback to creating a manual record
+  const isSynthetic = !id || id.startsWith('absent-') || id.startsWith('holiday-') || id.startsWith('dummy-')
+  if (isSynthetic && params.employee_id && params.attendance_date) {
+    return createManualAttendanceRecord({
+      employee_id: params.employee_id,
+      attendance_date: params.attendance_date,
+      in_time: params.in_time,
+      out_time: params.out_time,
+      arrival_status: params.arrival_status,
+      departure_status: params.departure_status,
+      notes: params.notes,
+    })
+  }
+
+  let current: AttendanceRecord | null = null
+  if (!isSynthetic) {
+    const { data, error: fetchErr } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+    
+    if (!fetchErr && data) {
+      current = data
+    }
+  }
+
+  // If record was not found by ID, try finding by employee_id + attendance_date or upsert
+  if (!current) {
+    if (params.employee_id && params.attendance_date) {
+      return createManualAttendanceRecord({
+        employee_id: params.employee_id,
+        attendance_date: params.attendance_date,
+        in_time: params.in_time,
+        out_time: params.out_time,
+        arrival_status: params.arrival_status,
+        departure_status: params.departure_status,
+        notes: params.notes,
+      })
+    }
     throw new Error('Attendance record not found in database.')
+  }
+
+  const effectiveEmpId = params.employee_id || current.employee_id
+  const dateToUse = params.attendance_date !== undefined ? params.attendance_date : current.attendance_date
+
+  // Validate Leave or WFH Quotas before updating
+  const isLeave = params.arrival_status === 'Leave' || (params.departure_status && params.departure_status.includes('Leave'))
+  const isWfh = params.departure_status === 'Work From Home' || params.arrival_status === 'Work From Home' || params.notes === 'Work From Home'
+
+  if (effectiveEmpId && (isLeave || isWfh)) {
+    const leaveTypeToValidate = isWfh ? 'Work From Home' : (params.departure_status || 'Casual Leave')
+    await validateEmployeeLeaveQuotas(effectiveEmpId, dateToUse, leaveTypeToValidate, id)
   }
 
   const settings = await getAttendanceSettings()
 
-  const dateToUse = params.attendance_date !== undefined ? params.attendance_date : current.attendance_date
   const inTimeToUse = params.in_time !== undefined ? params.in_time : current.in_time
   const outTimeToUse = params.out_time !== undefined ? params.out_time : current.out_time
 
@@ -994,11 +1246,6 @@ export async function updateAttendanceRecord(
   let departureStatus = params.departure_status || current.departure_status
   let totalMinutes = 0
   let formatted = '00:00'
-
-  const isWfh =
-    params.departure_status === 'Work From Home' ||
-    params.arrival_status === 'Work From Home' ||
-    params.notes === 'Work From Home'
 
   if (params.arrival_status === 'Absent' || params.departure_status === 'Absent') {
     arrivalStatus = 'Absent'
@@ -1086,6 +1333,16 @@ export async function createManualAttendanceRecord(params: {
     params.departure_status === 'Work From Home' ||
     params.arrival_status === 'Work From Home' ||
     params.notes === 'Work From Home'
+
+  const isLeave =
+    params.arrival_status === 'Leave' ||
+    params.departure_status?.includes('Leave') ||
+    LEAVE_TYPES.includes(params.departure_status as any)
+
+  if (params.employee_id && (isLeave || isWfh)) {
+    const leaveTypeToValidate = isWfh ? 'Work From Home' : (params.departure_status || 'Casual Leave')
+    await validateEmployeeLeaveQuotas(params.employee_id, params.attendance_date, leaveTypeToValidate)
+  }
 
   if (params.arrival_status === 'Absent' || params.departure_status === 'Absent') {
     arrivalStatus = 'Absent'

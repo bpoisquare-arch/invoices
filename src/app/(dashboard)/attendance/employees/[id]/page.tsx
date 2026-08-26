@@ -22,6 +22,9 @@ import {
   ShieldCheck,
   AlertCircle,
   Sparkles,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -64,10 +67,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
   })
   const [isCommissionModalOpen, setIsCommissionModalOpen] = useState(false)
 
-  // Filters
+  // Filters & Sorting
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [arrivalStatus, setArrivalStatus] = useState('all')
+  const [dateSortOrder, setDateSortOrder] = useState<'asc' | 'desc'>('asc')
 
   // Summary Metrics
   const [summary, setSummary] = useState<{
@@ -156,11 +160,21 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       const holMap: Record<string, string> = holData.success && holData.holidays ? holData.holidays : {}
       setHolidays(holMap)
 
+      // Determine effective date range (from filter inputs or default to selectedMonth)
+      let rangeStart = startDate
+      let rangeEnd = endDate
+      if (!rangeStart || !rangeEnd) {
+        const [y, m] = selectedMonth.split('-').map(Number)
+        const lastDay = new Date(y, m, 0).getDate()
+        rangeStart = `${selectedMonth}-01`
+        rangeEnd = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`
+      }
+
       // Fetch employee records
       const queryParams = new URLSearchParams()
       queryParams.set('employeeId', employeeId)
-      if (startDate) queryParams.set('startDate', startDate)
-      if (endDate) queryParams.set('endDate', endDate)
+      queryParams.set('startDate', rangeStart)
+      queryParams.set('endDate', rangeEnd)
       if (arrivalStatus && arrivalStatus !== 'all') queryParams.set('arrivalStatus', arrivalStatus)
       queryParams.set('pageSize', '1000')
 
@@ -169,102 +183,117 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       const fetchedRecords: AttendanceRecordWithEmployee[] =
         recordsData.success && recordsData.records ? recordsData.records : []
 
-      // If user selected a date range (startDate to endDate), generate full list of days in range:
-      if (startDate && endDate) {
-        const sParts = startDate.split('-').map(Number)
-        const eParts = endDate.split('-').map(Number)
+      // Generate full calendar grid for the range
+      const sParts = rangeStart.split('-').map(Number)
+      const eParts = rangeEnd.split('-').map(Number)
+      const cur = new Date(sParts[0], sParts[1] - 1, sParts[2], 12, 0, 0)
+      const end = new Date(eParts[0], eParts[1] - 1, eParts[2], 12, 0, 0)
 
-        if (sParts.length === 3 && eParts.length === 3) {
-          const cur = new Date(sParts[0], sParts[1] - 1, sParts[2], 12, 0, 0)
-          const end = new Date(eParts[0], eParts[1] - 1, eParts[2], 12, 0, 0)
-
-          const recordsByDate = new Map<string, AttendanceRecordWithEmployee>()
-          fetchedRecords.forEach((r) => {
-            if (r.attendance_date) {
-              recordsByDate.set(r.attendance_date.split('T')[0], r)
-            }
-          })
-
-          const fullGridRows: AttendanceRecordWithEmployee[] = []
-
-          while (cur <= end) {
-            const year = cur.getFullYear()
-            const month = String(cur.getMonth() + 1).padStart(2, '0')
-            const day = String(cur.getDate()).padStart(2, '0')
-            const dStr = `${year}-${month}-${day}`
-
-            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-            const dayName = dayNames[cur.getDay()]
-            const isSunday = cur.getDay() === 0
-            const isGazettedHoliday = Boolean(holMap[dStr])
-
-            const existing = recordsByDate.get(dStr)
-
-            if (existing) {
-              fullGridRows.push(existing)
-            } else if (isSunday || isGazettedHoliday) {
-              fullGridRows.push({
-                id: `holiday-${dStr}`,
-                employee_id: currentEmp?.id || employeeId,
-                attendance_date: dStr,
-                day_of_week: dayName,
-                in_time: null,
-                out_time: null,
-                arrival_status: isGazettedHoliday ? 'Gazetted Holiday' : 'Holiday',
-                departure_status: isGazettedHoliday ? (holMap[dStr] ? `Gazetted Holiday (${holMap[dStr]})` : 'Gazetted Holiday') : 'Sunday Holiday',
-                total_working_minutes: 0,
-                total_working_hours_formatted: '00:00',
-                raw_punches: [],
-                notes: isGazettedHoliday ? `Gazetted Holiday: ${holMap[dStr]}` : 'Sunday Holiday',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                employee: currentEmp || undefined,
-              } as any)
-            } else {
-              fullGridRows.push({
-                id: `absent-${dStr}`,
-                employee_id: currentEmp?.id || employeeId,
-                attendance_date: dStr,
-                day_of_week: dayName,
-                in_time: null,
-                out_time: null,
-                arrival_status: 'Absent',
-                departure_status: 'Absent',
-                total_working_minutes: 0,
-                total_working_hours_formatted: '00:00',
-                raw_punches: [],
-                notes: 'Absent (No punches recorded)',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                employee: currentEmp || undefined,
-              } as any)
-            }
-
-            cur.setDate(cur.getDate() + 1)
-          }
-
-          // Sort descending (newest date first)
-          fullGridRows.sort((a, b) => b.attendance_date.localeCompare(a.attendance_date))
-
-          // Filter by arrival status if selected
-          let displayRows = fullGridRows
-          if (arrivalStatus && arrivalStatus !== 'all') {
-            displayRows = fullGridRows.filter((r) => r.arrival_status === arrivalStatus)
-          }
-
-          setRecords(displayRows)
-        } else {
-          setRecords(fetchedRecords)
+      const recordsByDate = new Map<string, AttendanceRecordWithEmployee>()
+      fetchedRecords.forEach((r) => {
+        if (r.attendance_date) {
+          recordsByDate.set(r.attendance_date.split('T')[0], r)
         }
-      } else {
-        setRecords(fetchedRecords)
+      })
+
+      const fullGridRows: AttendanceRecordWithEmployee[] = []
+
+      const now = new Date()
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+      while (cur <= end) {
+        const year = cur.getFullYear()
+        const month = String(cur.getMonth() + 1).padStart(2, '0')
+        const day = String(cur.getDate()).padStart(2, '0')
+        const dStr = `${year}-${month}-${day}`
+
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        const dayName = dayNames[cur.getDay()]
+        const isSunday = cur.getDay() === 0
+        const isGazettedHoliday = Boolean(holMap[dStr])
+
+        const existing = recordsByDate.get(dStr)
+
+        if (existing) {
+          fullGridRows.push(existing)
+        } else if (isSunday || isGazettedHoliday) {
+          fullGridRows.push({
+            id: `holiday-${dStr}`,
+            employee_id: currentEmp?.id || employeeId,
+            attendance_date: dStr,
+            day_of_week: dayName,
+            in_time: null,
+            out_time: null,
+            arrival_status: isGazettedHoliday ? 'Gazetted Holiday' : 'Holiday',
+            departure_status: isGazettedHoliday ? (holMap[dStr] ? `Gazetted Holiday (${holMap[dStr]})` : 'Gazetted Holiday') : 'Sunday Holiday',
+            total_working_minutes: 0,
+            total_working_hours_formatted: '00:00',
+            raw_punches: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            employee: currentEmp || undefined,
+          } as any)
+        } else if (dStr >= todayStr) {
+          // Today (not yet uploaded/passed) or Future date -> neutral '--'
+          fullGridRows.push({
+            id: `future-${dStr}`,
+            employee_id: currentEmp?.id || employeeId,
+            attendance_date: dStr,
+            day_of_week: dayName,
+            in_time: null,
+            out_time: null,
+            arrival_status: '--',
+            departure_status: '--',
+            total_working_minutes: 0,
+            total_working_hours_formatted: '--',
+            raw_punches: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            employee: currentEmp || undefined,
+          } as any)
+        } else {
+          // Past Date without punch -> Absent
+          fullGridRows.push({
+            id: `absent-${dStr}`,
+            employee_id: currentEmp?.id || employeeId,
+            attendance_date: dStr,
+            day_of_week: dayName,
+            in_time: null,
+            out_time: null,
+            arrival_status: 'Absent',
+            departure_status: 'Absent',
+            total_working_minutes: 0,
+            total_working_hours_formatted: '00:00',
+            raw_punches: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            employee: currentEmp || undefined,
+          } as any)
+        }
+
+        cur.setDate(cur.getDate() + 1)
       }
+
+      // Sort based on dateSortOrder (asc = 1st date at top, desc = newest date at top)
+      if (dateSortOrder === 'asc') {
+        fullGridRows.sort((a, b) => a.attendance_date.localeCompare(b.attendance_date))
+      } else {
+        fullGridRows.sort((a, b) => b.attendance_date.localeCompare(a.attendance_date))
+      }
+
+      // Filter by arrival status if selected
+      let displayRows = fullGridRows
+      if (arrivalStatus && arrivalStatus !== 'all') {
+        displayRows = fullGridRows.filter((r) => r.arrival_status === arrivalStatus)
+      }
+
+      setRecords(displayRows)
 
       // Fetch summary
       const summaryParams = new URLSearchParams()
       summaryParams.set('employeeId', employeeId)
-      if (startDate) summaryParams.set('startDate', startDate)
-      if (endDate) summaryParams.set('endDate', endDate)
+      summaryParams.set('startDate', rangeStart)
+      summaryParams.set('endDate', rangeEnd)
       summaryParams.set('mode', 'summary')
 
       const summaryRes = await fetch(`/api/attendance/records?${summaryParams.toString()}`)
@@ -284,7 +313,21 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
   useEffect(() => {
     loadData()
-  }, [employeeId, startDate, endDate, arrivalStatus, selectedMonth])
+  }, [employeeId, startDate, endDate, arrivalStatus, selectedMonth, dateSortOrder])
+
+  const toggleDateSortOrder = () => {
+    const nextOrder = dateSortOrder === 'asc' ? 'desc' : 'asc'
+    setDateSortOrder(nextOrder)
+    setRecords((prev) => {
+      const copy = [...prev]
+      if (nextOrder === 'asc') {
+        copy.sort((a, b) => a.attendance_date.localeCompare(b.attendance_date))
+      } else {
+        copy.sort((a, b) => b.attendance_date.localeCompare(a.attendance_date))
+      }
+      return copy
+    })
+  }
 
   const handleExportExcel = () => {
     if (records.length === 0) {
@@ -308,62 +351,97 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     XLSX.writeFile(wb, `${employee?.name || 'Employee'}_Attendance_History.xlsx`)
   }
 
-  // Calculate attendance status breakdown & earned salary (including monthly commission)
+  // Calculate attendance status breakdown & earned salary (including monthly commission, leave rules, WFH, and absent deductions)
   const salaryStats = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0]
+    const now = new Date()
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
     let presentDays = 0
+    let wfhDays = 0
     let leaveDays = 0
     let holidayDays = 0
     let absentDays = 0
+    let futureDays = 0
 
     records.forEach((r) => {
       const isSunday = (r.day_of_week || '').toLowerCase() === 'sunday'
       const isGazettedHoliday = Boolean(r.attendance_date && holidays[r.attendance_date.split('T')[0]])
       const isHoliday = isSunday || isGazettedHoliday || r.arrival_status === 'Holiday' || r.arrival_status === 'Gazetted Holiday'
 
+      const isWfh =
+        r.departure_status === 'Work From Home' ||
+        r.arrival_status === 'Work From Home' ||
+        r.notes?.includes('Work From Home')
+
       const isLeave =
         r.arrival_status === 'Leave' ||
         (r.departure_status || '').includes('Leave') ||
-        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(r.departure_status as any) ||
-        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(r.arrival_status as any)
+        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(r.departure_status as any) ||
+        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(r.arrival_status as any)
 
       const hasPunches =
         Boolean(r.in_time && r.in_time !== '---') ||
         Boolean(r.out_time && r.out_time !== '---') ||
         (r.total_working_minutes ? r.total_working_minutes > 0 : false)
 
-      const isExplicitAbsent =
-        r.arrival_status === 'Absent' ||
-        r.departure_status === 'Absent' ||
-        (!hasPunches && !isLeave && !isHoliday)
+      const isNeutralPlaceholder = r.arrival_status === '--' || r.departure_status === '--'
 
-      if (isLeave) {
-        leaveDays++
-      } else if (hasPunches) {
-        presentDays++
-      } else if (isHoliday) {
+      if (isHoliday) {
         holidayDays++
-      } else if (isExplicitAbsent) {
-        if (r.attendance_date && r.attendance_date <= todayStr) {
-          absentDays++
-        }
+      } else if (isWfh) {
+        wfhDays++
+        presentDays++ // WFH is counted as 100% Present
+      } else if (isLeave) {
+        leaveDays++ // Approved Paid Leave
+      } else if (hasPunches) {
+        presentDays++ // Physical In-Office Present
+      } else if (isNeutralPlaceholder || (r.attendance_date && r.attendance_date >= todayStr)) {
+        futureDays++
+      } else {
+        absentDays++ // Past unpunched working day
       }
     })
 
+    const totalDaysInMonth = records.length || 31
+    // Total working days in month = Total days - (Sundays + Gazetted Holidays)
+    const totalWorkingDays = Math.max(1, totalDaysInMonth - holidayDays)
+    
+    // Approved leaves reduce the required working days count (e.g. 28 working days - 1 leave = 27 required working days)
+    const effectiveWorkingDays = Math.max(1, totalWorkingDays - leaveDays)
+
     const baseSalary = employee?.salary ? Number(employee.salary) : null
     const commissionAmount = monthlyCommission.amount || 0
-    const totalEarnedSalary = baseSalary !== null ? baseSalary + commissionAmount : commissionAmount > 0 ? commissionAmount : null
+    const grossMonthlySalary = baseSalary !== null ? baseSalary + commissionAmount : commissionAmount > 0 ? commissionAmount : 0
+
+    // Daily Rate = Total Gross Monthly Salary / Total Working Days in Month
+    const perDaySalary = totalWorkingDays > 0 && grossMonthlySalary > 0 ? grossMonthlySalary / totalWorkingDays : 0
+
+    // Absent Deduction = Absent Days * Daily Rate
+    const absentDeduction = Math.round(absentDays * perDaySalary)
+
+    // Net Payable Salary = Gross Monthly Salary - Absent Deduction
+    const totalEarnedSalary = Math.max(0, Math.round(grossMonthlySalary - absentDeduction))
+
+    const hasSalaryConfigured = (baseSalary !== null && baseSalary > 0) || commissionAmount > 0
 
     return {
       presentDays,
+      wfhDays,
       leaveDays,
       holidayDays,
       absentDays,
+      futureDays,
+      totalDaysInMonth,
+      totalWorkingDays,
+      effectiveWorkingDays,
       baseSalary,
       commissionAmount,
+      grossMonthlySalary,
+      perDaySalary: Math.round(perDaySalary),
+      absentDeduction,
       totalEarnedSalary,
-      hasSalaryConfigured: (baseSalary !== null && baseSalary > 0) || commissionAmount > 0,
-      isFullSalaryPayable: absentDays === 0 && ((baseSalary !== null && baseSalary > 0) || commissionAmount > 0),
+      hasSalaryConfigured,
+      isFullSalaryPayable: absentDays === 0 && hasSalaryConfigured,
       hasAbsents: absentDays > 0,
     }
   }, [records, employee, holidays, monthlyCommission])
@@ -526,50 +604,52 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         {/* 8. Earned / Payable Salary Card */}
         <div
           className={`bg-white border rounded-xl p-4 shadow-2xs transition-all ${
-            salaryStats.isFullSalaryPayable
+            !salaryStats.hasSalaryConfigured
+              ? 'border-slate-200/80'
+              : salaryStats.absentDays === 0
               ? 'border-emerald-200/80 bg-emerald-50/20'
-              : salaryStats.hasAbsents
-              ? 'border-rose-200/80 bg-rose-50/15'
-              : 'border-slate-200/80'
+              : 'border-amber-200/80 bg-amber-50/20'
           }`}
         >
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Earned Salary</p>
             <span
               className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                salaryStats.isFullSalaryPayable
+                !salaryStats.hasSalaryConfigured
+                  ? 'bg-slate-100 text-slate-600'
+                  : salaryStats.absentDays === 0
                   ? 'bg-emerald-100 text-emerald-800'
-                  : salaryStats.hasAbsents
-                  ? 'bg-amber-100 text-amber-800'
-                  : 'bg-slate-100 text-slate-600'
+                  : 'bg-amber-100 text-amber-900'
               }`}
             >
-              {salaryStats.isFullSalaryPayable ? '100% Payable' : salaryStats.hasAbsents ? 'On Hold' : 'Not Set'}
+              {!salaryStats.hasSalaryConfigured
+                ? 'Not Set'
+                : salaryStats.absentDays === 0
+                ? '100% Payable'
+                : `${salaryStats.absentDays} Absent(s) Deducted`}
             </span>
           </div>
           <p className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1 font-mono tracking-tight truncate">
-            {salaryStats.isFullSalaryPayable
-              ? `PKR ${salaryStats.totalEarnedSalary?.toLocaleString()}`
-              : salaryStats.hasAbsents
-              ? '--'
+            {salaryStats.hasSalaryConfigured
+              ? `PKR ${salaryStats.totalEarnedSalary.toLocaleString()}`
               : 'Not Set'}
           </p>
           <p
             className={`text-[11px] font-semibold mt-1 truncate ${
-              salaryStats.isFullSalaryPayable
+              !salaryStats.hasSalaryConfigured
+                ? 'text-slate-400'
+                : salaryStats.absentDays === 0
                 ? 'text-emerald-700'
-                : salaryStats.hasAbsents
-                ? 'text-amber-700'
-                : 'text-slate-400'
+                : 'text-amber-700'
             }`}
           >
-            {salaryStats.isFullSalaryPayable
+            {!salaryStats.hasSalaryConfigured
+              ? 'Salary not configured'
+              : salaryStats.absentDays === 0
               ? salaryStats.commissionAmount > 0
-                ? `Includes PKR ${salaryStats.commissionAmount.toLocaleString()} commission • 0 Absents`
+                ? `Base + PKR ${salaryStats.commissionAmount.toLocaleString()} Commission • 0 Absents`
                 : '0 Absents • Full Base Salary'
-              : salaryStats.hasAbsents
-              ? `${salaryStats.absentDays} Absent(s) • Pending`
-              : 'Salary not configured'}
+              : `-PKR ${salaryStats.absentDeduction.toLocaleString()} deducted (${salaryStats.absentDays}d × PKR ${salaryStats.perDaySalary}/d)`}
           </p>
         </div>
       </div>
@@ -655,9 +735,13 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
             <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
               Attended: <strong className="font-mono">{salaryStats.presentDays} Days</strong>
+              {salaryStats.wfhDays > 0 && (
+                <span className="text-cyan-700 ml-1">({salaryStats.wfhDays} WFH)</span>
+              )}
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 text-xs font-semibold border border-indigo-200">
               Approved Leaves: <strong className="font-mono">{salaryStats.leaveDays} Days</strong>
+              <span className="text-indigo-600 ml-1">(Paid • {salaryStats.effectiveWorkingDays} req. days)</span>
             </span>
             <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${
               salaryStats.absentDays > 0
@@ -665,38 +749,48 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                 : 'bg-slate-50 text-slate-600 border-slate-200'
             }`}>
               Absents: <strong className="font-mono">{salaryStats.absentDays} Days</strong>
+              {salaryStats.absentDays > 0 && (
+                <span className="text-rose-600 ml-1">(-PKR {salaryStats.absentDeduction.toLocaleString()})</span>
+              )}
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
+              Daily Rate: <strong className="font-mono text-slate-900">PKR {salaryStats.perDaySalary.toLocaleString()}/day</strong>
             </span>
           </div>
         </div>
 
         {/* Right Status Banner */}
-        <div className="lg:text-right border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 lg:pl-6 shrink-0 min-w-56">
+        <div className="lg:text-right border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 lg:pl-6 shrink-0 min-w-64">
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
             Total Net Payable Salary
           </p>
-          {salaryStats.isFullSalaryPayable ? (
+          {salaryStats.hasSalaryConfigured ? (
             <div>
               <p className="text-2xl sm:text-3xl font-extrabold text-emerald-600 font-mono tracking-tight mt-0.5">
-                PKR {salaryStats.totalEarnedSalary?.toLocaleString()}
+                PKR {salaryStats.totalEarnedSalary.toLocaleString()}
               </p>
-              <div className="flex items-center lg:justify-end gap-1.5 text-xs text-emerald-700 font-bold mt-1">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>
-                  {salaryStats.commissionAmount > 0
-                    ? `Base (${salaryStats.baseSalary?.toLocaleString()}) + Comm (${salaryStats.commissionAmount.toLocaleString()})`
-                    : 'Full Base Salary (0 Absents)'}
-                </span>
+              <div className="flex items-center lg:justify-end gap-1.5 text-xs font-bold mt-1">
+                {salaryStats.absentDays === 0 ? (
+                  <div className="flex items-center gap-1 text-emerald-700">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      {salaryStats.commissionAmount > 0
+                        ? `Base (${salaryStats.baseSalary?.toLocaleString()}) + Comm (${salaryStats.commissionAmount.toLocaleString()})`
+                        : 'Full Base Salary (0 Absents)'}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-amber-800">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      -PKR {salaryStats.absentDeduction.toLocaleString()} ({salaryStats.absentDays} Absent Day{salaryStats.absentDays > 1 ? 's' : ''})
+                    </span>
+                  </div>
+                )}
               </div>
-            </div>
-          ) : salaryStats.hasAbsents ? (
-            <div>
-              <p className="text-2xl sm:text-3xl font-extrabold text-amber-600 font-mono tracking-tight mt-0.5">
-                -- <span className="text-sm font-sans font-bold text-amber-700">(On Hold)</span>
+              <p className="text-[10px] text-slate-500 font-mono mt-1">
+                Rate: PKR {salaryStats.perDaySalary.toLocaleString()}/working day ({salaryStats.totalWorkingDays} total working days)
               </p>
-              <div className="flex items-center lg:justify-end gap-1.5 text-xs text-amber-700 font-bold mt-1">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>{salaryStats.absentDays} Absent Day(s) — Calculation Pending</span>
-              </div>
             </div>
           ) : (
             <div>
@@ -747,6 +841,21 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               </SelectContent>
             </Select>
           </div>
+
+          <div>
+            <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Date Order</label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={toggleDateSortOrder}
+              className="text-xs font-semibold h-9 px-3 border-slate-200 gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-800"
+              title="Click to toggle Ascending (1st → 31st) or Descending (31st → 1st)"
+            >
+              <ArrowUpDown className="w-3.5 h-3.5 text-[#009D9E]" />
+              <span>{dateSortOrder === 'asc' ? '1st → 31st (Asc)' : '31st → 1st (Desc)'}</span>
+            </Button>
+          </div>
         </div>
 
         {(startDate || endDate || arrivalStatus !== 'all') && (
@@ -777,7 +886,19 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider">
               <tr>
-                <th className="py-3 px-4">Date</th>
+                <th
+                  onClick={toggleDateSortOrder}
+                  className="py-3 px-4 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                  title="Click to sort Ascending / Descending"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Date</span>
+                    <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#003D5C]" />
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-200 text-slate-700 font-mono font-bold">
+                      {dateSortOrder === 'asc' ? '1 → 31' : '31 → 1'}
+                    </span>
+                  </div>
+                </th>
                 <th className="py-3 px-4">Day</th>
                 <th className="py-3 px-4">In Time</th>
                 <th className="py-3 px-4">Arrival Status</th>
@@ -818,32 +939,36 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
                     {/* Arrival Status */}
                     <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
-                            record.arrival_status === 'Holiday'
-                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                              : record.arrival_status === 'Absent'
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                              : record.arrival_status === 'Leave' || record.arrival_status?.toLowerCase().includes('leave')
-                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                              : record.arrival_status === 'On Time Arrival'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                              : record.arrival_status === 'Late Arrival'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                              : 'bg-slate-100 text-slate-600 border border-slate-200'
-                          }`}
-                        >
-                          {record.arrival_status}
-                        </span>
-                        {(record.departure_status === 'Work From Home' ||
-                          record.arrival_status === 'Work From Home' ||
-                          record.notes?.includes('Work From Home')) && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase bg-cyan-100 text-cyan-800 border border-cyan-300">
-                            WFH
+                      {record.arrival_status === '--' ? (
+                        <span className="text-slate-400 font-mono text-xs font-semibold">--</span>
+                      ) : (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
+                              record.arrival_status === 'Holiday'
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                : record.arrival_status === 'Absent'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : record.arrival_status === 'Leave' || record.arrival_status?.toLowerCase().includes('leave')
+                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                : record.arrival_status === 'On Time Arrival'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                : record.arrival_status === 'Late Arrival'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                : 'bg-slate-100 text-slate-600 border border-slate-200'
+                            }`}
+                          >
+                            {record.arrival_status}
                           </span>
-                        )}
-                      </div>
+                          {(record.departure_status === 'Work From Home' ||
+                            record.arrival_status === 'Work From Home' ||
+                            record.notes?.includes('Work From Home')) && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase bg-cyan-100 text-cyan-800 border border-cyan-300">
+                              WFH
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
 
                     {/* Out Time */}
@@ -853,28 +978,34 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
                     {/* Departure Status */}
                     <td className="py-3.5 px-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
-                          record.departure_status === 'Holiday' || record.departure_status?.includes('Holiday')
-                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                            : record.departure_status === 'Absent'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : record.departure_status?.toLowerCase().includes('leave')
-                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                            : record.departure_status === 'On Time Departure'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                            : record.departure_status === 'Early Departure'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                            : 'bg-slate-100 text-slate-600 border border-slate-200'
-                        }`}
-                      >
-                        {record.departure_status}
-                      </span>
+                      {record.departure_status === '--' ? (
+                        <span className="text-slate-400 font-mono text-xs font-semibold">--</span>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
+                            record.departure_status === 'Holiday' || record.departure_status?.includes('Holiday')
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : record.departure_status === 'Absent'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : record.departure_status?.toLowerCase().includes('leave')
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                              : record.departure_status === 'On Time Departure'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                              : record.departure_status === 'Early Departure'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          {record.departure_status}
+                        </span>
+                      )}
                     </td>
 
                     {/* Working Time */}
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                      {record.total_working_hours_formatted || '--'}
+                      {record.arrival_status === '--' || record.total_working_hours_formatted === '--'
+                        ? '--'
+                        : record.total_working_hours_formatted || '00:00'}
                     </td>
 
                     {/* Actions */}
@@ -932,8 +1063,14 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         month={selectedMonth}
         currentCommission={monthlyCommission.amount}
         currentNotes={monthlyCommission.notes}
-        onSaveSuccess={({ amount, notes }) => {
-          setMonthlyCommission({ amount, notes })
+        onSaveSuccess={({ month: savedMonth, amount, notes }) => {
+          if (savedMonth === selectedMonth) {
+            setMonthlyCommission({ amount, notes })
+          } else {
+            setSelectedMonth(savedMonth)
+            setMonthlyCommission({ amount, notes })
+          }
+          loadData()
         }}
       />
     </div>

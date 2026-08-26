@@ -11,7 +11,31 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Sparkles, DollarSign, Loader2, Save, AlertCircle, CheckCircle2 } from 'lucide-react'
+import {
+  Sparkles,
+  DollarSign,
+  Loader2,
+  Save,
+  AlertCircle,
+  Calendar,
+  ChevronDown,
+  CheckCircle2,
+} from 'lucide-react'
+
+const MONTH_NAMES = [
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+]
 
 interface EmployeeCommissionModalProps {
   isOpen: boolean
@@ -26,7 +50,7 @@ interface EmployeeCommissionModalProps {
   month: string // e.g. "2026-08"
   currentCommission: number
   currentNotes?: string
-  onSaveSuccess: (updatedCommission: { amount: number; notes: string }) => void
+  onSaveSuccess: (updatedCommission: { month: string; amount: number; notes: string }) => void
 }
 
 export default function EmployeeCommissionModal({
@@ -38,18 +62,88 @@ export default function EmployeeCommissionModal({
   currentNotes = '',
   onSaveSuccess,
 }: EmployeeCommissionModalProps) {
+  // Parse incoming month prop into year and month parts
+  const parseMonthStr = (mStr: string) => {
+    if (mStr && mStr.includes('-')) {
+      const parts = mStr.split('-')
+      return { year: parts[0], month: parts[1].padStart(2, '0') }
+    }
+    const now = new Date()
+    return {
+      year: String(now.getFullYear()),
+      month: String(now.getMonth() + 1).padStart(2, '0'),
+    }
+  }
+
+  const initial = parseMonthStr(month)
+  const [selectedYear, setSelectedYear] = useState<string>(initial.year)
+  const [selectedMonthNum, setSelectedMonthNum] = useState<string>(initial.month)
   const [amount, setAmount] = useState<string>('')
   const [notes, setNotes] = useState<string>('')
+  const [isLoadingMonth, setIsLoadingMonth] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [savedSuccessMsg, setSavedSuccessMsg] = useState<string | null>(null)
 
+  // Computed combined month key e.g. "2026-08"
+  const selectedMonthKey = `${selectedYear}-${selectedMonthNum}`
+
+  // Year options (current year +/- 3 years)
+  const currentYearNum = new Date().getFullYear()
+  const yearOptions = [
+    currentYearNum - 2,
+    currentYearNum - 1,
+    currentYearNum,
+    currentYearNum + 1,
+    currentYearNum + 2,
+  ]
+
+  // Initialize or reset when modal opens or initial month prop changes
   useEffect(() => {
     if (isOpen) {
+      const parsed = parseMonthStr(month)
+      setSelectedYear(parsed.year)
+      setSelectedMonthNum(parsed.month)
       setAmount(currentCommission ? String(currentCommission) : '0')
       setNotes(currentNotes || '')
       setError(null)
+      setSavedSuccessMsg(null)
     }
-  }, [isOpen, currentCommission, currentNotes])
+  }, [isOpen, month, currentCommission, currentNotes])
+
+  // Fetch commission data whenever the user switches month or year inside the modal
+  const fetchCommissionForPeriod = async (targetMonthKey: string) => {
+    if (!employee?.id) return
+    setIsLoadingMonth(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/attendance/commissions?employeeId=${employee.id}&month=${targetMonthKey}`)
+      const data = await res.json()
+      if (data.success && data.commission) {
+        setAmount(data.commission.amount ? String(data.commission.amount) : '0')
+        setNotes(data.commission.notes || '')
+      } else {
+        setAmount('0')
+        setNotes('')
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch commission for period:', err)
+    } finally {
+      setIsLoadingMonth(false)
+    }
+  }
+
+  const handleMonthChange = (newMonth: string) => {
+    setSelectedMonthNum(newMonth)
+    const newKey = `${selectedYear}-${newMonth}`
+    fetchCommissionForPeriod(newKey)
+  }
+
+  const handleYearChange = (newYear: string) => {
+    setSelectedYear(newYear)
+    const newKey = `${newYear}-${selectedMonthNum}`
+    fetchCommissionForPeriod(newKey)
+  }
 
   if (!employee) return null
 
@@ -57,19 +151,14 @@ export default function EmployeeCommissionModal({
   const baseSalary = employee.salary || 0
   const totalWithCommission = baseSalary + numAmount
 
-  // Format month for display (e.g. "2026-08" -> "August 2026")
-  let monthLabel = month
-  try {
-    const [y, m] = month.split('-')
-    const dateObj = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1)
-    monthLabel = dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' })
-  } catch (e) {
-    monthLabel = month
-  }
+  // Friendly month label
+  const monthObj = MONTH_NAMES.find((m) => m.value === selectedMonthNum)
+  const formattedMonthLabel = `${monthObj?.label || 'Month'} ${selectedYear}`
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setSavedSuccessMsg(null)
     setIsSaving(true)
 
     try {
@@ -78,7 +167,7 @@ export default function EmployeeCommissionModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employeeId: employee.id,
-          month,
+          month: selectedMonthKey,
           amount: numAmount,
           notes: notes.trim(),
         }),
@@ -90,6 +179,7 @@ export default function EmployeeCommissionModal({
       }
 
       onSaveSuccess({
+        month: selectedMonthKey,
         amount: numAmount,
         notes: notes.trim(),
       })
@@ -104,13 +194,13 @@ export default function EmployeeCommissionModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md bg-white border border-slate-200 shadow-2xl rounded-2xl p-6">
-        <DialogHeader className="border-b border-slate-100 pb-4">
+        <DialogHeader className="border-b border-slate-100 pb-3">
           <DialogTitle className="text-lg font-bold text-[#003D5C] flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-500" />
             Monthly Employee Commission
           </DialogTitle>
           <p className="text-xs text-slate-500 mt-0.5">
-            Set or update monthly bonus & commission for <strong className="text-slate-700">{monthLabel}</strong>.
+            Select the target <strong className="text-slate-700">Month & Year</strong> to assign or update commission.
           </p>
         </DialogHeader>
 
@@ -122,29 +212,85 @@ export default function EmployeeCommissionModal({
         )}
 
         <form onSubmit={handleSave} className="space-y-4 py-1">
-          {/* Employee & Month Info Box */}
-          <div className="bg-slate-50 border border-slate-200/70 p-3.5 rounded-xl flex items-center justify-between">
+          {/* Employee Info Header */}
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#003D5C] text-[#81F5F5] font-bold text-sm flex items-center justify-center shadow-2xs">
                 {employee.name?.charAt(0) || 'E'}
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-900">{employee.name}</p>
-                <p className="text-xs text-slate-500 font-mono">{employee.employee_id || 'N/A'}</p>
+                <p className="text-sm font-bold text-slate-900 leading-tight">{employee.name}</p>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">{employee.employee_id || 'N/A'}</p>
               </div>
             </div>
             <div className="text-right">
-              <span className="text-[11px] font-bold px-2.5 py-1 bg-amber-100 text-amber-900 border border-amber-300/80 rounded-md">
-                {monthLabel}
+              <span className="text-[11px] font-bold px-2.5 py-1 bg-amber-100 text-amber-900 border border-amber-300/80 rounded-md inline-flex items-center gap-1">
+                <Calendar className="w-3 h-3 text-amber-700" />
+                {formattedMonthLabel}
               </span>
             </div>
           </div>
 
+          {/* Month & Year Selection Row */}
+          <div className="bg-amber-50/50 border border-amber-200/70 p-3 rounded-xl space-y-2">
+            <Label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-amber-600" />
+              Target Month & Year
+            </Label>
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* Month Dropdown */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-semibold text-slate-500 uppercase">Month</span>
+                <select
+                  value={selectedMonthNum}
+                  onChange={(e) => handleMonthChange(e.target.value)}
+                  disabled={isLoadingMonth || isSaving}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#003D5C] focus:border-transparent transition-all"
+                >
+                  {MONTH_NAMES.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label} ({m.value})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Year Dropdown */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-semibold text-slate-500 uppercase">Year</span>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => handleYearChange(e.target.value)}
+                  disabled={isLoadingMonth || isSaving}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#003D5C] focus:border-transparent transition-all"
+                >
+                  {yearOptions.map((yr) => (
+                    <option key={yr} value={String(yr)}>
+                      {yr}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {isLoadingMonth && (
+              <p className="text-[11px] text-amber-700 font-medium flex items-center gap-1.5 pt-0.5 animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
+                Loading commission record for {formattedMonthLabel}...
+              </p>
+            )}
+          </div>
+
           {/* Commission Amount Input */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-              Commission Amount (PKR)
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                Commission Amount (PKR)
+              </Label>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                For {formattedMonthLabel}
+              </span>
+            </div>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 font-mono">
                 PKR
@@ -161,9 +307,28 @@ export default function EmployeeCommissionModal({
                 autoFocus
               />
             </div>
-            <p className="text-[11px] text-slate-400 font-medium">
-              Enter the total commission / bonus earned by the employee in {monthLabel}.
-            </p>
+
+            {/* Quick Amount Chips */}
+            <div className="flex items-center gap-1.5 pt-1 overflow-x-auto">
+              <span className="text-[10px] text-slate-400 font-medium">Quick add:</span>
+              {[5000, 10000, 20000, 30000, 50000].map((val) => (
+                <button
+                  type="button"
+                  key={val}
+                  onClick={() => setAmount(String((parseFloat(amount) || 0) + val))}
+                  className="px-2 py-0.5 text-[10px] font-semibold rounded bg-slate-100 hover:bg-amber-100 hover:text-amber-900 text-slate-700 border border-slate-200 transition-colors"
+                >
+                  +{val.toLocaleString()}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setAmount('0')}
+                className="px-2 py-0.5 text-[10px] font-semibold rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
           </div>
 
           {/* Commission Notes / Reason */}
@@ -181,9 +346,9 @@ export default function EmployeeCommissionModal({
           </div>
 
           {/* Live Salary Calculation Preview */}
-          <div className="bg-gradient-to-br from-slate-50 to-emerald-50/40 border border-slate-200/80 rounded-xl p-4 space-y-2.5">
+          <div className="bg-gradient-to-br from-slate-50 to-emerald-50/40 border border-slate-200/80 rounded-xl p-3.5 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Salary Breakdown Preview ({monthLabel})
+              Salary Breakdown Preview ({formattedMonthLabel})
             </p>
             <div className="space-y-1.5 text-xs">
               <div className="flex items-center justify-between text-slate-600">
@@ -201,7 +366,7 @@ export default function EmployeeCommissionModal({
                   + PKR {numAmount.toLocaleString()}
                 </span>
               </div>
-              <div className="border-t border-slate-200/80 pt-2 flex items-center justify-between font-bold">
+              <div className="border-t border-slate-200/80 pt-1.5 flex items-center justify-between font-bold">
                 <span className="text-slate-900">Total Monthly Payable:</span>
                 <span className="text-emerald-700 text-sm font-mono font-extrabold">
                   PKR {totalWithCommission.toLocaleString()}
@@ -210,7 +375,7 @@ export default function EmployeeCommissionModal({
             </div>
           </div>
 
-          <DialogFooter className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <DialogFooter className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
             <Button
               type="button"
               variant="outline"
@@ -222,11 +387,11 @@ export default function EmployeeCommissionModal({
             </Button>
             <Button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || isLoadingMonth}
               className="bg-[#003D5C] hover:bg-[#002B40] text-white text-xs font-bold uppercase tracking-wider gap-1.5 shadow-sm"
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Commission
+              Save Commission ({selectedMonthKey})
             </Button>
           </DialogFooter>
         </form>

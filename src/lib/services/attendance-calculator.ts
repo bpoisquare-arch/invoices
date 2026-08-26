@@ -15,9 +15,15 @@ export const DEFAULT_ATTENDANCE_SETTINGS: AttendanceSettings = {
 }
 
 export const LEAVE_TYPES = [
-  'Official Leave',
+  'Probation Leaves',
+  'Annual Leaves',
+  'Sick Leaves',
+  'Casual Leaves',
+  'Probation Leave',
+  'Annual Leave',
   'Sick Leave',
   'Casual Leave',
+  'Official Leave',
   'Half Day',
   'Unpaid Leave',
 ]

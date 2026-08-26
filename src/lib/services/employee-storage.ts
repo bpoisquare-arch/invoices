@@ -1,3 +1,5 @@
+import { EmployeeLeaveQuotas } from '@/lib/supabase/database.types'
+
 export interface EmployeeMetadata {
   branch?: string | null
   salary?: number | null
@@ -5,6 +7,7 @@ export interface EmployeeMetadata {
   name?: string
   designation?: string
   is_active?: boolean
+  leave_quotas?: EmployeeLeaveQuotas
 }
 
 function getFsAndPath() {
@@ -55,6 +58,7 @@ export function writeEmployeeMetadata(
     name?: string
     designation?: string
     is_active?: boolean
+    leave_quotas?: EmployeeLeaveQuotas
   }
 ): void {
   const tools = getFsAndPath()
@@ -77,6 +81,7 @@ export function writeEmployeeMetadata(
       ...(meta.name !== undefined ? { name: meta.name } : {}),
       ...(meta.designation !== undefined ? { designation: meta.designation } : {}),
       ...(meta.is_active !== undefined ? { is_active: meta.is_active } : {}),
+      ...(meta.leave_quotas !== undefined ? { leave_quotas: meta.leave_quotas } : {}),
     }
 
     all[idOrEmpId] = updated

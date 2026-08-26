@@ -354,9 +354,25 @@ export default function AttendanceRecordsPage() {
     return getDatesInRange(startDate, endDate)
   }, [startDate, endDate])
 
-  // Filter Employees based on Search and Designation
+  // Filter Employees based on Search, Designation, and presence of at least 1 attendance/leave record in range
   const filteredEmployees = useMemo(() => {
+    // Collect all employee IDs/keys that have at least 1 uploaded/saved attendance, leave, or WFH record
+    const recordedEmployeeIds = new Set<string>()
+    records.forEach((rec) => {
+      if (rec.employee_id) recordedEmployeeIds.add(rec.employee_id)
+      if (rec.employee?.id) recordedEmployeeIds.add(rec.employee.id)
+      if (rec.employee?.employee_id) recordedEmployeeIds.add(rec.employee.employee_id)
+    })
+
     let list = employees.filter((emp) => {
+      // Must have at least 1 attendance / leave / WFH record in the active date range
+      const hasRecordInRange =
+        recordedEmployeeIds.has(emp.id) ||
+        recordedEmployeeIds.has(emp.employee_id)
+      if (!hasRecordInRange) {
+        return false
+      }
+
       // Designation filter
       if (selectedDesignation !== 'all' && emp.designation?.trim().toLowerCase() !== selectedDesignation.toLowerCase()) {
         return false
@@ -381,7 +397,7 @@ export default function AttendanceRecordsPage() {
     }
 
     return list
-  }, [employees, selectedDesignation, selectedEmployeeId, search, pageSize])
+  }, [employees, records, selectedDesignation, selectedEmployeeId, search, pageSize])
 
   // Fast Lookup Map: (employeeId_date) -> AttendanceRecordWithEmployee
   const recordMatrixMap = useMemo(() => {
