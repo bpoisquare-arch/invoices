@@ -124,6 +124,8 @@ export default function EditAttendanceModal({
 }: EditAttendanceModalProps) {
   const [attendanceStatus, setAttendanceStatus] = useState<AttendanceStatusType>('present')
   const [selectedLeaveType, setSelectedLeaveType] = useState<string>('Casual Leave')
+  const [leaveDays, setLeaveDays] = useState<string>('1')
+  const [wfhDays, setWfhDays] = useState<string>('1')
   const [date, setDate] = useState('')
   const [inTime, setInTime] = useState('')
   const [outTime, setOutTime] = useState('')
@@ -189,6 +191,12 @@ export default function EditAttendanceModal({
       setInTime(record.in_time || '')
       setOutTime(record.out_time || '')
       setError(null)
+
+      // Parse existing leave value from notes
+      const existingValMatch = record.notes ? record.notes.match(/\(([0-9]+(?:\.[0-9]+)?)\s*day/i) || record.notes.match(/([0-9]+(?:\.[0-9]+)?)\s*day/i) : null
+      const initialDays = existingValMatch ? existingValMatch[1] : '1'
+      setLeaveDays(initialDays)
+      setWfhDays(initialDays)
 
       if (empId) {
         fetchLiveBalance(empId, recDate, record.id)
@@ -264,19 +272,42 @@ export default function EditAttendanceModal({
     outTime.trim() || null
   )
 
+  const isCasualExhausted = (effectiveRemaining.casual_leaves || 0) <= 0
+  const isSickExhausted = (effectiveRemaining.sick_leaves || 0) <= 0
+  const isAnnualExhausted = (effectiveRemaining.annual_leaves || 0) <= 0
+  const isProbationExhausted = (effectiveRemaining.probation_leaves || 0) <= 0
+  const isWfhExhausted = (effectiveRemaining.wfh_quota || 0) <= 0
+  const isAllStandardExhausted = isCasualExhausted && isSickExhausted && isAnnualExhausted
+
   const handleStatusChange = (newStatus: AttendanceStatusType) => {
-    setAttendanceStatus(newStatus)
     setError(null)
     if (newStatus === 'wfh') {
+      if (isWfhExhausted) {
+        setError('Work From Home quota is exhausted (0 remaining). Cannot apply WFH.')
+        return
+      }
+      setAttendanceStatus('wfh')
       const wfh = getWfhTimes(date, settings)
       setInTime(wfh.inTime)
       setOutTime(wfh.outTime)
     } else if (newStatus === 'leave') {
       if (isProbation) {
+        if (isProbationExhausted) {
+          setError('Probation leave quota is exhausted (0 remaining).')
+        }
         setSelectedLeaveType('Probation Leaves')
-      } else if (selectedLeaveType === 'Probation Leaves' || selectedLeaveType === 'Probation Leave') {
-        setSelectedLeaveType('Casual Leave')
+      } else {
+        if (isAllStandardExhausted) {
+          setError('All standard leave balances are 0 (Exhausted).')
+        }
+        if (!isCasualExhausted) setSelectedLeaveType('Casual Leave')
+        else if (!isSickExhausted) setSelectedLeaveType('Sick Leave')
+        else if (!isAnnualExhausted) setSelectedLeaveType('Annual Leave')
+        else setSelectedLeaveType('Casual Leave')
       }
+      setAttendanceStatus('leave')
+    } else {
+      setAttendanceStatus(newStatus)
     }
   }
 
@@ -305,6 +336,19 @@ export default function EditAttendanceModal({
     e.preventDefault()
     setError(null)
 
+    const numLeaveDays = parseFloat(leaveDays) || 1
+    const numWfhDays = parseFloat(wfhDays) || 1
+
+    if (attendanceStatus === 'leave' && (isNaN(numLeaveDays) || numLeaveDays <= 0)) {
+      setError('Please enter a valid leave value greater than 0.')
+      return
+    }
+
+    if (attendanceStatus === 'wfh' && (isNaN(numWfhDays) || numWfhDays <= 0)) {
+      setError('Please enter a valid WFH value greater than 0.')
+      return
+    }
+
     // Validation 1: Probation Rule Enforcement
     if (attendanceStatus === 'leave') {
       if (isProbation) {
@@ -319,9 +363,9 @@ export default function EditAttendanceModal({
           )
           return
         }
-        if ((effectiveRemaining.probation_leaves || 0) <= 0) {
+        if ((effectiveRemaining.probation_leaves || 0) < numLeaveDays) {
           setError(
-            `Probation Leaves Quota Exceeded: No remaining probation leaves available for this employee (Configured Limit: ${effectiveQuotas.probation_leaves ?? 3}).`
+            `Probation Leaves Quota Exceeded: Only ${effectiveRemaining.probation_leaves ?? 0} remaining, but ${numLeaveDays} day(s) requested.`
           )
           return
         }
@@ -330,16 +374,16 @@ export default function EditAttendanceModal({
           setError('Probation period has ended (3 months completed). Please select Annual, Sick, or Casual Leave.')
           return
         }
-        if ((selectedLeaveType === 'Annual Leaves' || selectedLeaveType === 'Annual Leave') && (effectiveRemaining.annual_leaves || 0) <= 0) {
-          setError(`Annual Leaves Quota Exceeded: No remaining annual leaves available (Quota: ${effectiveQuotas.annual_leaves ?? 6}).`)
+        if ((selectedLeaveType === 'Annual Leaves' || selectedLeaveType === 'Annual Leave') && (effectiveRemaining.annual_leaves || 0) < numLeaveDays) {
+          setError(`Annual Leaves Quota Exceeded: Only ${effectiveRemaining.annual_leaves ?? 0} remaining, but ${numLeaveDays} day(s) requested.`)
           return
         }
-        if ((selectedLeaveType === 'Sick Leaves' || selectedLeaveType === 'Sick Leave') && (effectiveRemaining.sick_leaves || 0) <= 0) {
-          setError(`Sick Leaves Quota Exceeded: No remaining sick leaves available (Quota: ${effectiveQuotas.sick_leaves ?? 7}).`)
+        if ((selectedLeaveType === 'Sick Leaves' || selectedLeaveType === 'Sick Leave') && (effectiveRemaining.sick_leaves || 0) < numLeaveDays) {
+          setError(`Sick Leaves Quota Exceeded: Only ${effectiveRemaining.sick_leaves ?? 0} remaining, but ${numLeaveDays} day(s) requested.`)
           return
         }
-        if ((selectedLeaveType === 'Casual Leaves' || selectedLeaveType === 'Casual Leave') && (effectiveRemaining.casual_leaves || 0) <= 0) {
-          setError(`Casual Leaves Quota Exceeded: No remaining casual leaves available (Quota: ${effectiveQuotas.casual_leaves ?? 7}).`)
+        if ((selectedLeaveType === 'Casual Leaves' || selectedLeaveType === 'Casual Leave') && (effectiveRemaining.casual_leaves || 0) < numLeaveDays) {
+          setError(`Casual Leaves Quota Exceeded: Only ${effectiveRemaining.casual_leaves ?? 0} remaining, but ${numLeaveDays} day(s) requested.`)
           return
         }
       }
@@ -347,8 +391,8 @@ export default function EditAttendanceModal({
 
     // Validation 2: WFH Quota Enforcement
     if (attendanceStatus === 'wfh') {
-      if ((effectiveRemaining.wfh_quota || 0) <= 0) {
-        setError(`Work From Home (WFH) Quota Exceeded: No remaining WFH quota available (Quota: ${effectiveQuotas.wfh_quota ?? 4}).`)
+      if ((effectiveRemaining.wfh_quota || 0) < numWfhDays) {
+        setError(`Work From Home (WFH) Quota Exceeded: Only ${effectiveRemaining.wfh_quota ?? 0} remaining, but ${numWfhDays} day(s) requested.`)
         return
       }
     }
@@ -373,13 +417,13 @@ export default function EditAttendanceModal({
         payloadDepartureStatus = selectedLeaveType
         payloadInTime = null
         payloadOutTime = null
-        payloadNotes = selectedLeaveType
+        payloadNotes = `${selectedLeaveType} (${numLeaveDays} day${numLeaveDays === 1 ? '' : 's'})`
       } else if (attendanceStatus === 'wfh') {
         payloadInTime = wfhTimes.inTime
         payloadOutTime = wfhTimes.outTime
         payloadArrivalStatus = 'On Time Arrival'
         payloadDepartureStatus = 'Work From Home'
-        payloadNotes = 'Work From Home'
+        payloadNotes = `Work From Home (${numWfhDays} day${numWfhDays === 1 ? '' : 's'})`
       }
 
       const isSyntheticRecord =
@@ -552,14 +596,18 @@ export default function EditAttendanceModal({
               <button
                 type="button"
                 onClick={() => handleStatusChange('wfh')}
+                disabled={isWfhExhausted}
                 className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
-                  attendanceStatus === 'wfh'
+                  isWfhExhausted
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
+                    : attendanceStatus === 'wfh'
                     ? 'bg-cyan-50 text-cyan-800 border-cyan-500 shadow-2xs ring-1 ring-cyan-500'
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                 }`}
+                title={isWfhExhausted ? 'WFH quota exhausted (0 remaining)' : 'Work From Home'}
               >
-                <Laptop className="w-3.5 h-3.5 text-cyan-600" />
-                <span>WFH</span>
+                <Laptop className={`w-3.5 h-3.5 ${isWfhExhausted ? 'text-slate-400' : 'text-cyan-600'}`} />
+                <span>WFH {isWfhExhausted ? '(0)' : ''}</span>
               </button>
             </div>
           </div>
@@ -646,8 +694,8 @@ export default function EditAttendanceModal({
                       <SelectValue placeholder="Select Leave Type" />
                     </SelectTrigger>
                     <SelectContent className="w-[var(--radix-select-trigger-width)] min-w-[320px]">
-                      <SelectItem value="Probation Leaves" className="text-xs font-bold text-indigo-950 py-2">
-                        Probation Leaves ({effectiveRemaining.probation_leaves ?? 3} remaining / {effectiveQuotas.probation_leaves ?? 3} • Max 1/month)
+                      <SelectItem value="Probation Leaves" disabled={isProbationExhausted} className={`text-xs font-bold text-indigo-950 py-2 ${isProbationExhausted ? 'text-slate-400 opacity-50 cursor-not-allowed' : ''}`}>
+                        Probation Leaves ({effectiveRemaining.probation_leaves ?? 3} remaining / {effectiveQuotas.probation_leaves ?? 3}{isProbationExhausted ? ' • Exhausted (0)' : ' • Max 1/month'})
                       </SelectItem>
                       <SelectItem value="Annual Leaves" disabled className="text-xs text-slate-400 opacity-60 py-2">
                         Annual Leaves (Locked — Available after 3 months)
@@ -674,14 +722,14 @@ export default function EditAttendanceModal({
                       <SelectValue placeholder="Select Leave Type" />
                     </SelectTrigger>
                     <SelectContent className="w-[var(--radix-select-trigger-width)] min-w-[320px]">
-                      <SelectItem value="Casual Leave" className="text-xs font-medium py-2">
-                        Casual Leaves ({effectiveRemaining.casual_leaves ?? 7} remaining / {effectiveQuotas.casual_leaves ?? 7})
+                      <SelectItem value="Casual Leave" disabled={isCasualExhausted} className={`text-xs font-medium py-2 ${isCasualExhausted ? 'text-slate-400 opacity-50 cursor-not-allowed' : ''}`}>
+                        Casual Leaves ({effectiveRemaining.casual_leaves ?? 7} remaining / {effectiveQuotas.casual_leaves ?? 7}{isCasualExhausted ? ' • Exhausted (0)' : ''})
                       </SelectItem>
-                      <SelectItem value="Sick Leave" className="text-xs font-medium py-2">
-                        Sick Leaves ({effectiveRemaining.sick_leaves ?? 7} remaining / {effectiveQuotas.sick_leaves ?? 7})
+                      <SelectItem value="Sick Leave" disabled={isSickExhausted} className={`text-xs font-medium py-2 ${isSickExhausted ? 'text-slate-400 opacity-50 cursor-not-allowed' : ''}`}>
+                        Sick Leaves ({effectiveRemaining.sick_leaves ?? 7} remaining / {effectiveQuotas.sick_leaves ?? 7}{isSickExhausted ? ' • Exhausted (0)' : ''})
                       </SelectItem>
-                      <SelectItem value="Annual Leave" className="text-xs font-medium py-2">
-                        Annual Leaves ({effectiveRemaining.annual_leaves ?? 6} remaining / {effectiveQuotas.annual_leaves ?? 6})
+                      <SelectItem value="Annual Leave" disabled={isAnnualExhausted} className={`text-xs font-medium py-2 ${isAnnualExhausted ? 'text-slate-400 opacity-50 cursor-not-allowed' : ''}`}>
+                        Annual Leaves ({effectiveRemaining.annual_leaves ?? 6} remaining / {effectiveQuotas.annual_leaves ?? 6}{isAnnualExhausted ? ' • Exhausted (0)' : ''})
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -690,6 +738,74 @@ export default function EditAttendanceModal({
                   </p>
                 </div>
               )}
+
+              {/* Dynamic Leave Value / Days Input & Real-time Deduction Preview */}
+              <div className="space-y-1.5 pt-2.5 mt-2 border-t border-indigo-200/60">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Leave Value / Duration</span>
+                  </Label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setLeaveDays('0.5')}
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded border transition-colors cursor-pointer ${
+                        leaveDays === '0.5'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                          : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+                      }`}
+                    >
+                      0.5 (Half Day)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLeaveDays('1')}
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded border transition-colors cursor-pointer ${
+                        leaveDays === '1'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                          : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+                      }`}
+                    >
+                      1.0 (Full Day)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0.1"
+                    max="30"
+                    value={leaveDays}
+                    onChange={(e) => setLeaveDays(e.target.value)}
+                    required
+                    placeholder="e.g. 0.5 or 1"
+                    className="text-xs font-mono font-bold text-slate-800 bg-white border-indigo-200 h-9"
+                  />
+                  <span className="text-xs text-slate-500 font-medium shrink-0">day(s)</span>
+                </div>
+
+                {/* Real-time Dynamic Balance Deduction Display */}
+                {(() => {
+                  const val = parseFloat(leaveDays) || 0
+                  let currentRem = 0
+                  if (selectedLeaveType.includes('Annual')) currentRem = effectiveRemaining.annual_leaves ?? 0
+                  else if (selectedLeaveType.includes('Sick')) currentRem = effectiveRemaining.sick_leaves ?? 0
+                  else if (selectedLeaveType.includes('Probation')) currentRem = effectiveRemaining.probation_leaves ?? 0
+                  else currentRem = effectiveRemaining.casual_leaves ?? 0
+
+                  const projected = Math.max(0, Number((currentRem - val).toFixed(2)))
+                  const isOver = val > currentRem
+                  return (
+                    <div className={`text-[11px] p-2 rounded-md border flex items-center justify-between font-medium ${isOver ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-indigo-100 text-indigo-900'}`}>
+                      <span>Available Balance: <strong>{currentRem}</strong></span>
+                      <span className="text-slate-400">→</span>
+                      <span>After Deduction: <strong className={isOver ? 'text-rose-600 font-bold' : 'text-emerald-700 font-bold'}>{projected}</strong></span>
+                    </div>
+                  )
+                })()}
+              </div>
             </div>
           )}
 

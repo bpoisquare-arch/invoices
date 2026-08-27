@@ -618,6 +618,18 @@ export default function AppSidebar() {
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
 
+                          {/* Payslip */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/attendance/payslips" onClick={handleNavClick} />}
+                              isActive={pathname.startsWith('/attendance/payslips')}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <Receipt className="size-3.5 shrink-0" />
+                              <span>Payslip</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+
                           {/* Settings */}
                           <SidebarMenuSubItem>
                             <SidebarMenuSubButton

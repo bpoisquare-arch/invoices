@@ -4,9 +4,9 @@
     "salary": 75000,
     "joining_date": null,
     "leave_quotas": {
-      "annual_leaves": 5,
+      "annual_leaves": 6,
       "sick_leaves": 7,
-      "casual_leaves": 7,
+      "casual_leaves": 6,
       "wfh_quota": 2,
       "probation_leaves": 0
     },
@@ -17,9 +17,9 @@
     "salary": 75000,
     "joining_date": null,
     "leave_quotas": {
-      "annual_leaves": 5,
+      "annual_leaves": 6,
       "sick_leaves": 7,
-      "casual_leaves": 7,
+      "casual_leaves": 6,
       "wfh_quota": 2,
       "probation_leaves": 0
     },
@@ -31,10 +31,10 @@
     "joining_date": null,
     "is_old_staff": true,
     "leave_quotas": {
-      "annual_leaves": 6,
+      "annual_leaves": 7,
       "sick_leaves": 7,
-      "casual_leaves": 7,
-      "wfh_quota": 4,
+      "casual_leaves": 6,
+      "wfh_quota": 2,
       "probation_leaves": 0
     }
   },
@@ -44,36 +44,38 @@
     "joining_date": null,
     "is_old_staff": true,
     "leave_quotas": {
-      "annual_leaves": 6,
+      "annual_leaves": 7,
       "sick_leaves": 7,
-      "casual_leaves": 7,
-      "wfh_quota": 4,
+      "casual_leaves": 6,
+      "wfh_quota": 2,
       "probation_leaves": 0
     }
   },
   "3823d7df-5be6-4932-ab0c-0bdbf252338e": {
     "branch": "Multan",
     "salary": null,
-    "joining_date": "2026-06-17",
+    "joining_date": "2025-09-01",
     "leave_quotas": {
       "annual_leaves": 6,
       "sick_leaves": 7,
       "casual_leaves": 7,
-      "wfh_quota": 4,
-      "probation_leaves": 1
-    }
+      "wfh_quota": 1,
+      "probation_leaves": 0
+    },
+    "is_old_staff": false
   },
   "EMP-0004": {
     "branch": "Multan",
     "salary": null,
-    "joining_date": "2026-06-17",
+    "joining_date": "2025-09-01",
     "leave_quotas": {
       "annual_leaves": 6,
       "sick_leaves": 7,
       "casual_leaves": 7,
-      "wfh_quota": 4,
-      "probation_leaves": 1
-    }
+      "wfh_quota": 1,
+      "probation_leaves": 0
+    },
+    "is_old_staff": false
   },
   "ad15c7a8-b660-475a-90e0-cbf7bd4f12ee": {
     "branch": "Multan",
@@ -83,8 +85,8 @@
     "leave_quotas": {
       "annual_leaves": 6,
       "sick_leaves": 7,
-      "casual_leaves": 7,
-      "wfh_quota": 4,
+      "casual_leaves": 5.5,
+      "wfh_quota": 2,
       "probation_leaves": 0
     }
   },
@@ -96,8 +98,112 @@
     "leave_quotas": {
       "annual_leaves": 6,
       "sick_leaves": 7,
+      "casual_leaves": 5.5,
+      "wfh_quota": 2,
+      "probation_leaves": 0
+    }
+  },
+  "7fa77f7b-5dc4-4d7c-a079-9c5e9414c052": {
+    "branch": "Multan",
+    "salary": null,
+    "joining_date": "2025-06-14",
+    "is_old_staff": false,
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 5,
+      "wfh_quota": 2,
+      "probation_leaves": 0
+    }
+  },
+  "EMP-0012": {
+    "branch": "Multan",
+    "salary": null,
+    "joining_date": "2025-06-14",
+    "is_old_staff": false,
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 5,
+      "wfh_quota": 2,
+      "probation_leaves": 0
+    }
+  },
+  "b18d48d1-0aa2-4218-b076-83d1903f1e2d": {
+    "branch": "Lahore",
+    "salary": null,
+    "joining_date": null,
+    "is_old_staff": true,
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 3,
+      "wfh_quota": 2,
+      "probation_leaves": 0
+    }
+  },
+  "EMP-0009": {
+    "branch": "Lahore",
+    "salary": null,
+    "joining_date": null,
+    "is_old_staff": true,
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 3,
+      "wfh_quota": 2,
+      "probation_leaves": 0
+    }
+  },
+  "b9f44a0d-205d-40d4-a9fd-13676d90a615": {
+    "branch": "Lahore",
+    "salary": null,
+    "joining_date": "2024-12-10",
+    "is_old_staff": false,
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 6,
       "casual_leaves": 7,
-      "wfh_quota": 4,
+      "wfh_quota": 1,
+      "probation_leaves": 0
+    }
+  },
+  "EMP-0008": {
+    "branch": "Lahore",
+    "salary": null,
+    "joining_date": "2024-12-10",
+    "is_old_staff": false,
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 6,
+      "casual_leaves": 7,
+      "wfh_quota": 1,
+      "probation_leaves": 0
+    }
+  },
+  "065b96de-d728-4e12-8a2e-e5dfea65a209": {
+    "branch": "Lahore",
+    "salary": null,
+    "joining_date": "2025-08-05",
+    "is_old_staff": false,
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 5.5,
+      "wfh_quota": 2,
+      "probation_leaves": 0
+    }
+  },
+  "EMP-0013": {
+    "branch": "Lahore",
+    "salary": null,
+    "joining_date": "2025-08-05",
+    "is_old_staff": false,
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 5.5,
+      "wfh_quota": 2,
       "probation_leaves": 0
     }
   }

@@ -679,14 +679,17 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
             (l) => l === rec.departure_status || l === rec.arrival_status
           ) || 'Leave'
 
+        const match = rec.notes?.match(/\(([0-9]+(?:\.[0-9]+)?)\s*day/i) || rec.notes?.match(/([0-9]+(?:\.[0-9]+)?)\s*day/i)
+        const daysSuffix = match && match[1] !== '1' ? ` (${match[1]}d)` : ''
+
         return (
           <div
             onClick={() => setEditingRecord(rec)}
             className="group/cell cursor-pointer p-1.5 rounded-md transition-all flex items-center justify-center text-center border bg-indigo-50/80 hover:bg-indigo-100 border-indigo-200 text-indigo-950 shadow-2xs hover:shadow-xs"
-            title={`Click to edit leave (${leaveLabel})`}
+            title={`Click to edit leave (${leaveLabel}${daysSuffix})`}
           >
             <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-tight shadow-2xs">
-              {leaveLabel}
+              {leaveLabel}{daysSuffix}
             </span>
           </div>
         )

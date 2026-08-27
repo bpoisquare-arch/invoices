@@ -166,42 +166,42 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
 
   const isAnonymous = Boolean(
     input.is_anonymous ||
-      input.company_id === 'anonymous-company-id' ||
-      companyName.toLowerCase() === 'anonymous'
+    input.company_id === 'anonymous-company-id' ||
+    companyName.toLowerCase() === 'anonymous'
   )
 
   const templateSnapshot: TemplateSnapshot = isAnonymous
     ? {
-        company_name: input.custom_company_name?.trim() || 'Company Name',
-        address: input.custom_address || '',
-        phone: input.custom_phone || '',
-        email: input.custom_email || '',
-        payment_details: input.custom_payment_details || '',
-        currency: input.currency || 'AUD',
-        footer_terms: input.footer_terms || 'Thank you for getting services from us',
-        primary_color: '#2563eb',
-        logo_url: input.custom_logo_url || null,
-        layout_type: 'anonymous_v1',
-        header_mode: input.header_mode || (input.custom_logo_url ? 'logo' : 'text'),
-        bill_to_label: input.bill_to_label || 'Issued to:',
-        is_anonymous: true,
-        logo_size: input.logo_size || 60,
-      }
+      company_name: input.custom_company_name?.trim() || 'Company Name',
+      address: input.custom_address || '',
+      phone: input.custom_phone || '',
+      email: input.custom_email || '',
+      payment_details: input.custom_payment_details || '',
+      currency: input.currency || 'AUD',
+      footer_terms: input.footer_terms || 'Thank you for getting services from us',
+      primary_color: '#2563eb',
+      logo_url: input.custom_logo_url || null,
+      layout_type: 'anonymous_v1',
+      header_mode: input.header_mode || (input.custom_logo_url ? 'logo' : 'text'),
+      bill_to_label: input.bill_to_label || 'Issued to:',
+      is_anonymous: true,
+      logo_size: input.logo_size || 60,
+    }
     : {
-        company_name: companyName,
-        address,
-        phone,
-        email,
-        payment_details: paymentDetails,
-        currency: input.currency || 'AUD',
-        footer_terms: 'Thank you for getting services from us',
-        primary_color: '#2563eb',
-        layout_type: 'edlink_v1',
-        logo_url: '/edlink-logo.png',
-        header_mode: 'logo',
-        bill_to_label: 'BILL TO',
-        is_anonymous: false,
-      }
+      company_name: companyName,
+      address,
+      phone,
+      email,
+      payment_details: paymentDetails,
+      currency: input.currency || 'AUD',
+      footer_terms: 'Thank you for getting services from us',
+      primary_color: '#2563eb',
+      layout_type: 'edlink_v1',
+      logo_url: '/edlink-logo.png',
+      header_mode: 'logo',
+      bill_to_label: 'BILL TO',
+      is_anonymous: false,
+    }
 
   const invoiceNumber = input.invoice_number || (await generateNextInvoiceNumber(resolvedCompanyId))
 
@@ -404,7 +404,7 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
 
   try {
     const supabase = createClient()
-    
+
     // Optimized select: omit redundant templates join which triggers Postgres timeout
     let query = supabase
       .from('invoices')
@@ -469,7 +469,7 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
 
     if (error) {
       console.warn('Primary invoice fetch failed, running fallback query:', error.message)
-      
+
       // Fallback query without count: 'exact' to prevent statement timeout
       const fallback = await supabase
         .from('invoices')

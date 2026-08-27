@@ -996,7 +996,9 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                               : 'bg-slate-100 text-slate-600 border border-slate-200'
                           }`}
                         >
-                          {record.departure_status}
+                          {record.departure_status?.toLowerCase().includes('leave') && record.notes?.includes('day')
+                            ? record.notes
+                            : record.departure_status}
                         </span>
                       )}
                     </td>

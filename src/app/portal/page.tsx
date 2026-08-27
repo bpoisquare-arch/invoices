@@ -5,20 +5,15 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   Building2,
   ArrowRight,
   Sparkles,
-  GraduationCap,
-  Briefcase,
-  Layers,
   LogOut,
-  Settings,
   ShieldCheck,
-  Headphones,
   CheckCircle2,
+  ExternalLink,
 } from 'lucide-react'
 
 interface EntityPortal {
@@ -28,8 +23,9 @@ interface EntityPortal {
   subtitle: string
   logo: string
   route: string
-  badgeColor: string
-  subtitleColor: string
+  tag: string
+  badgeColor?: string
+  subtitleColor?: string
   isPrimary?: boolean
 }
 
@@ -41,8 +37,7 @@ const ENTITIES: EntityPortal[] = [
     subtitle: 'Education & Visa Services',
     logo: '/edlink-logo.png',
     route: '/invoices',
-    badgeColor: 'bg-teal-50 text-teal-800 border-teal-200',
-    subtitleColor: 'text-[#008080]',
+    tag: 'Education & Visa (PK)',
     isPrimary: true,
   },
   {
@@ -52,8 +47,7 @@ const ENTITIES: EntityPortal[] = [
     subtitle: 'Education & Visa Services',
     logo: '/edlink-logo.png',
     route: '/invoices',
-    badgeColor: 'bg-teal-50 text-teal-800 border-teal-200',
-    subtitleColor: 'text-[#008080]',
+    tag: 'Education & Visa (AU)',
   },
   {
     id: 'aimt',
@@ -62,8 +56,7 @@ const ENTITIES: EntityPortal[] = [
     subtitle: 'Vocational & Academic College',
     logo: '/aimt-logo.png',
     route: '/installments',
-    badgeColor: 'bg-red-50 text-red-800 border-red-200',
-    subtitleColor: 'text-[#9B1C1C]',
+    tag: 'Higher Education & VET',
   },
   {
     id: 'nsc',
@@ -72,8 +65,7 @@ const ENTITIES: EntityPortal[] = [
     subtitle: 'Cleaning & Maintenance Services',
     logo: '/Neighbourhood-Shine.png',
     route: '/invoices?entity=nsc',
-    badgeColor: 'bg-sky-50 text-sky-800 border-sky-200',
-    subtitleColor: 'text-[#0284C7]',
+    tag: 'Facility & Maintenance',
   },
   {
     id: 'isquare-bpo',
@@ -82,8 +74,7 @@ const ENTITIES: EntityPortal[] = [
     subtitle: 'BPO & IT Outsourcing',
     logo: '/isquarebpo.png',
     route: '/invoices?entity=isq',
-    badgeColor: 'bg-indigo-50 text-indigo-800 border-indigo-200',
-    subtitleColor: 'text-[#4338CA]',
+    tag: 'Business Process Outsourcing',
   },
 ]
 
@@ -118,18 +109,27 @@ export default function EntityPortalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans flex flex-col justify-between">
+    <div className="min-h-screen bg-[#F0FDF9] text-[#0F1F18] font-sans flex flex-col justify-between selection:bg-[#06D6A0]/20 selection:text-[#002D27]">
       {/* Top Portal Header */}
-      <header className="h-16 border-b border-slate-200 bg-white px-4 sm:px-8 flex items-center justify-between shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#003D5C] text-[#81F5F5] flex items-center justify-center font-bold font-['Montserrat'] shadow-xs">
-            CRM
+      <header className="h-20 border-b border-[#002D27]/10 bg-white/85 backdrop-blur-md px-4 sm:px-8 flex items-center justify-between shadow-xs sticky top-0 z-40">
+        <div className="flex items-center gap-3.5">
+          <div className="w-13 h-13 rounded-2xl bg-white p-1.5 flex items-center justify-center border border-[#002D27]/15 shadow-sm shrink-0 overflow-hidden group hover:border-[#00BF8F] transition-all">
+            <img
+              src="/isquarebpo.png"
+              alt="iSquare BPO"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
-            <h1 className="font-['Montserrat'] text-base font-bold text-[#003D5C] tracking-tight">
-              Client Management System
-            </h1>
-            <p className="text-[10px] text-slate-400 font-medium">
+            <div className="flex items-center gap-2">
+              <h1 className="font-['Montserrat'] text-base sm:text-lg font-extrabold text-[#002D27] tracking-tight">
+                Client Management System
+              </h1>
+              <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#00BF8F]/10 text-[#002D27] border border-[#00BF8F]/25">
+                ISquare BPO
+              </span>
+            </div>
+            <p className="text-xs text-[#5C7B73] font-medium">
               Multi-Entity Business System
             </p>
           </div>
@@ -138,22 +138,24 @@ export default function EntityPortalPage() {
         {/* User profile & logout */}
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex flex-col text-right">
-            <span className="text-xs font-bold text-slate-900">{email}</span>
-            <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">
+            <span className="text-xs font-bold text-[#0F1F18]">{email}</span>
+            <span className="text-[10px] font-bold text-[#00BF8F] uppercase tracking-wider flex items-center justify-end gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-pulse" />
               Administrator
             </span>
           </div>
-          <div className="w-8 h-8 rounded-lg bg-[#0E3E5B] text-[#81F5F5] text-xs font-bold flex items-center justify-center border border-slate-200 shadow-2xs">
+          <div className="w-9 h-9 rounded-xl bg-[#002D27] text-[#06D6A0] text-xs font-extrabold flex items-center justify-center border border-[#002D27]/20 shadow-xs">
             {initials}
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleLogout}
-            className="h-8 px-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+            className="h-9 px-2.5 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
             title="Log out"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-4 h-4 mr-1 sm:mr-0" />
+            <span className="sm:hidden">Logout</span>
           </Button>
         </div>
       </header>
@@ -161,56 +163,78 @@ export default function EntityPortalPage() {
       {/* Main Portal Body */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 sm:py-14 space-y-10">
         {/* Title and Intro */}
-        <div className="text-center max-w-xl mx-auto space-y-2">
-          <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-3 shadow-xs">
-            <Building2 className="w-6 h-6" />
+        <div className="text-center max-w-xl mx-auto space-y-3">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[#002D27] to-[#1A2F26] text-[#06D6A0] shadow-lg shadow-[#002D27]/15 mb-1 border border-[#002D27]/20">
+            <Building2 className="w-7 h-7" />
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-['Montserrat']">
-            Select Workspace
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500">
-            Choose which workspace you wish to manage.
+          <div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#002D27]/5 border border-[#002D27]/10 text-xs font-bold text-[#002D27] mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-[#00BF8F]" />
+              Enterprise Workspaces
+            </span>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#002D27] tracking-tight font-['Montserrat']">
+              Select Workspace
+            </h2>
+          </div>
+          <p className="text-xs sm:text-sm text-[#5C7B73] font-medium leading-relaxed">
+            Choose which client workspace you wish to access and manage.
           </p>
         </div>
 
         {/* 5 Entities Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
           {ENTITIES.map((entity) => {
             return (
               <div
                 key={entity.id}
                 onClick={() => handleSelectEntity(entity)}
-                className={`relative group bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-xl hover:border-slate-300 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden p-6 sm:p-7 min-h-[220px] ${
-                  entity.isPrimary ? 'ring-2 ring-teal-500/20' : ''
+                className={`group relative bg-gradient-to-b from-[#002D27] via-[#0F1F18] to-[#0A1611] rounded-2xl border border-white/10 shadow-lg shadow-[#002D27]/20 hover:shadow-2xl hover:shadow-[#00BF8F]/20 hover:border-[#00BF8F] hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden p-6 sm:p-7 min-h-[250px] ${
+                  entity.isPrimary ? 'ring-2 ring-[#00BF8F]/40 border-[#00BF8F]/60' : ''
                 }`}
               >
-                {/* Top Badge */}
-                <div className="flex items-center justify-end">
-                  <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-[11px] border border-slate-200 uppercase tracking-wider font-mono">
+                {/* Top Corner Radial Glow on Hover */}
+                <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-[#00BF8F]/25 via-[#06D6A0]/10 to-transparent rounded-bl-full pointer-events-none opacity-40 group-hover:opacity-100 transition-opacity duration-300" />
+
+                {/* Top Meta Bar */}
+                <div className="flex items-center justify-between relative z-10">
+                  <span className="px-2.5 py-0.5 rounded-md bg-[#1A2F26] text-[#06D6A0] font-extrabold text-[11px] border border-[#06D6A0]/30 uppercase tracking-wider font-mono shadow-xs">
                     {entity.prefix}
                   </span>
+                  <div className="w-8 h-8 rounded-full bg-white/10 text-slate-300 group-hover:bg-[#00BF8F] group-hover:text-[#0F1F18] flex items-center justify-center transition-all duration-300 shadow-sm">
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform font-bold" />
+                  </div>
                 </div>
 
-                {/* Card Main Content (matching 1st attachment design) */}
-                <div className="flex flex-col items-center text-center my-auto py-2">
-                  {/* Centered Logo Box */}
-                  <div className="h-20 sm:h-24 w-full flex items-center justify-center px-4 mb-2 group-hover:scale-105 transition-transform duration-300">
+                {/* Card Main Content */}
+                <div className="flex flex-col items-center text-center my-auto py-3 relative z-10">
+                  {/* Crisp White Logo Box for Optimal Visibility */}
+                  <div className="h-20 sm:h-22 w-full max-w-[240px] rounded-xl bg-white p-2.5 flex items-center justify-center mb-3.5 shadow-md border border-white/20 group-hover:scale-105 transition-transform duration-300">
                     <img
                       src={entity.logo}
                       alt={entity.name}
-                      className="max-h-full max-w-[220px] object-contain"
+                      className="max-h-full max-w-full object-contain"
                     />
                   </div>
 
                   {/* Company Name */}
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight font-sans leading-snug">
+                  <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight font-sans leading-snug group-hover:text-[#81F5F5] transition-colors">
                     {entity.name}
                   </h3>
 
-                  {/* Subtitle in Brand Color */}
-                  <p className={`text-sm sm:text-base font-semibold mt-1 ${entity.subtitleColor}`}>
+                  {/* Subtitle */}
+                  <p className="text-xs sm:text-sm font-semibold mt-1 text-[#06D6A0] group-hover:text-[#25D366] transition-colors">
                     {entity.subtitle}
                   </p>
+                </div>
+
+                {/* Bottom Tag & Enter Action */}
+                <div className="pt-3.5 border-t border-white/10 flex items-center justify-between text-xs relative z-10">
+                  <span className="text-[11px] font-medium text-slate-400 truncate max-w-[160px]">
+                    {entity.tag}
+                  </span>
+                  <span className="text-[11px] font-bold text-[#06D6A0] group-hover:text-[#81F5F5] flex items-center gap-1 transition-colors">
+                    Open Workspace <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </span>
                 </div>
               </div>
             )
@@ -219,8 +243,12 @@ export default function EntityPortalPage() {
       </main>
 
       {/* Footer */}
-      <footer className="py-5 text-center text-xs text-slate-400 border-t border-slate-200 bg-white">
-        Enterprise Management Portal • All Rights Reserved
+      <footer className="py-5 text-center text-xs font-medium text-[#5C7B73] border-t border-[#002D27]/10 bg-white/70 backdrop-blur-xs">
+        <div className="flex items-center justify-center gap-2">
+          <span>Client Management System by <strong className="text-[#002D27] font-bold">ISquareBPO</strong></span>
+          <span>•</span>
+          <span>All Rights Reserved</span>
+        </div>
       </footer>
     </div>
   )

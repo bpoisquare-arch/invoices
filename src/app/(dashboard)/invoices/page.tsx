@@ -338,9 +338,8 @@ export default function InvoicesPage() {
                 type="button"
                 variant={dateFilter === df.id ? 'default' : 'outline'}
                 size="sm"
-                className={`h-7 px-2.5 text-xs ${
-                  dateFilter === df.id ? 'bg-slate-900 text-white' : 'text-slate-600'
-                }`}
+                className={`h-7 px-2.5 text-xs ${dateFilter === df.id ? 'bg-slate-900 text-white' : 'text-slate-600'
+                  }`}
                 onClick={() => { setDateFilter(df.id as any); setPage(1); }}
               >
                 {df.label}

@@ -18,6 +18,7 @@ import {
   Loader2,
   FileSpreadsheet,
   MoreHorizontal,
+  Lock,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -242,7 +243,6 @@ export default function EmployeesPage() {
           is_old_staff: editIsOldStaff,
           salary: targetSalary,
           is_active: editActive,
-          leave_quotas,
         }),
       })
 
@@ -257,6 +257,7 @@ export default function EmployeesPage() {
           emp.id === editingEmployee.id || emp.employee_id === editingEmployee.employee_id
             ? {
                 ...emp,
+                ...(data.employee || {}),
                 name: editName.trim(),
                 designation: editDesignation.trim(),
                 branch: editBranch,
@@ -264,7 +265,6 @@ export default function EmployeesPage() {
                 is_old_staff: editIsOldStaff,
                 salary: targetSalary,
                 is_active: editActive,
-                leave_quotas,
               }
             : emp
         )
@@ -768,6 +768,7 @@ export default function EmployeesPage() {
                   <Label className="text-[10px] font-bold text-slate-600 uppercase">Annual (6/yr)</Label>
                   <Input
                     type="number"
+                    step="any"
                     min="0"
                     max="365"
                     value={newAnnualLeaves}
@@ -780,6 +781,7 @@ export default function EmployeesPage() {
                   <Label className="text-[10px] font-bold text-slate-600 uppercase">Sick (7/yr)</Label>
                   <Input
                     type="number"
+                    step="any"
                     min="0"
                     max="365"
                     value={newSickLeaves}
@@ -792,6 +794,7 @@ export default function EmployeesPage() {
                   <Label className="text-[10px] font-bold text-slate-600 uppercase">Casual (7/yr)</Label>
                   <Input
                     type="number"
+                    step="any"
                     min="0"
                     max="365"
                     value={newCasualLeaves}
@@ -804,6 +807,7 @@ export default function EmployeesPage() {
                   <Label className="text-[10px] font-bold text-slate-600 uppercase">WFH (4/yr)</Label>
                   <Input
                     type="number"
+                    step="any"
                     min="0"
                     max="365"
                     value={newWfhQuota}
@@ -817,6 +821,7 @@ export default function EmployeesPage() {
                     <Label className="text-[10px] font-bold text-slate-600 uppercase">Probation (3 max)</Label>
                     <Input
                       type="number"
+                      step="any"
                       min="0"
                       max="3"
                       value={newProbationLeaves}
@@ -1013,91 +1018,80 @@ export default function EmployeesPage() {
               />
             </div>
 
-            {/* Remaining Leave Quotas Section */}
+            {/* Locked Remaining Leave Balances Section */}
             <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[#003D5C] uppercase tracking-wider">
-                  <Calendar className="w-3.5 h-3.5 text-[#009D9E]" />
-                  <span>Remaining Leave Balances</span>
+                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Remaining Leave Balances (Locked)</span>
                 </div>
-                <span className="text-[10px] text-slate-500 font-medium">Annual Quotas</span>
+                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  Non-Editable
+                </span>
               </div>
 
               <div className={`grid grid-cols-2 ${!showEditProbation ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-2`}>
-                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
-                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Annual (6/yr)</Label>
+                <div className="space-y-1 bg-slate-100/80 p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Annual (6/yr)</Label>
                   <Input
                     type="number"
-                    min="0"
-                    max="365"
+                    disabled
+                    readOnly
                     value={editAnnualLeaves}
-                    onChange={(e) => setEditAnnualLeaves(Number(e.target.value))}
-                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                    className="h-7 text-xs font-mono font-bold text-slate-700 bg-white/70 border-slate-200 cursor-not-allowed"
                   />
                 </div>
 
-                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
-                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Sick (7/yr)</Label>
+                <div className="space-y-1 bg-slate-100/80 p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Sick (7/yr)</Label>
                   <Input
                     type="number"
-                    min="0"
-                    max="365"
+                    disabled
+                    readOnly
                     value={editSickLeaves}
-                    onChange={(e) => setEditSickLeaves(Number(e.target.value))}
-                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                    className="h-7 text-xs font-mono font-bold text-slate-700 bg-white/70 border-slate-200 cursor-not-allowed"
                   />
                 </div>
 
-                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
-                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Casual (7/yr)</Label>
+                <div className="space-y-1 bg-slate-100/80 p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Casual (7/yr)</Label>
                   <Input
                     type="number"
-                    min="0"
-                    max="365"
+                    disabled
+                    readOnly
                     value={editCasualLeaves}
-                    onChange={(e) => setEditCasualLeaves(Number(e.target.value))}
-                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                    className="h-7 text-xs font-mono font-bold text-slate-700 bg-white/70 border-slate-200 cursor-not-allowed"
                   />
                 </div>
 
-                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
-                  <Label className="text-[10px] font-bold text-slate-600 uppercase">WFH (4/yr)</Label>
+                <div className="space-y-1 bg-slate-100/80 p-2 rounded-lg border border-slate-200">
+                  <Label className="text-[10px] font-bold text-slate-500 uppercase">WFH (4/yr)</Label>
                   <Input
                     type="number"
-                    min="0"
-                    max="365"
+                    disabled
+                    readOnly
                     value={editWfhQuota}
-                    onChange={(e) => setEditWfhQuota(Number(e.target.value))}
-                    className="h-7 text-xs font-mono font-bold text-slate-800"
+                    className="h-7 text-xs font-mono font-bold text-slate-700 bg-white/70 border-slate-200 cursor-not-allowed"
                   />
                 </div>
 
                 {showEditProbation && (
-                  <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
-                    <Label className="text-[10px] font-bold text-slate-600 uppercase">Probation (3 max)</Label>
+                  <div className="space-y-1 bg-slate-100/80 p-2 rounded-lg border border-slate-200">
+                    <Label className="text-[10px] font-bold text-slate-500 uppercase">Probation (3 max)</Label>
                     <Input
                       type="number"
-                      min="0"
-                      max="3"
+                      disabled
+                      readOnly
                       value={editProbationLeaves}
-                      onChange={(e) => setEditProbationLeaves(Number(e.target.value))}
-                      className="h-7 text-xs font-mono font-bold text-slate-800"
+                      className="h-7 text-xs font-mono font-bold text-slate-700 bg-white/70 border-slate-200 cursor-not-allowed"
                     />
                   </div>
                 )}
               </div>
-              {showEditProbation ? (
-                <p className="text-[10px] text-slate-500 leading-tight">
-                  Probation leaves apply during 1st 3 months from joining (max 1/month). Standard leaves apply after probation.
-                </p>
-              ) : (
-                <p className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  {editIsOldStaff
-                    ? 'Old Staff: Probation leaves disabled. Standard leaves (Annual, Sick, Casual, WFH) active.'
-                    : 'Probation completed (> 3 months from joining): Probation leaves disabled. Standard leaves active.'}
-                </p>
-              )}
+              <p className="text-[10px] text-slate-500 leading-tight">
+                🔒 Remaining leaves are locked and will be automatically deducted when leaves (or WFH) are applied in Attendance Records.
+              </p>
             </div>
 
             <div className="flex items-center gap-2 pt-1">
