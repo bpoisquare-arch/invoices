@@ -616,6 +616,7 @@ export type Employee = Database['public']['Tables']['employees']['Row'] & {
   branch?: string | null
   salary?: number | null
   joining_date?: string | null
+  is_old_staff?: boolean | null
   leave_quotas?: EmployeeLeaveQuotas
 }
 export type EmployeeInsert = Database['public']['Tables']['employees']['Insert']

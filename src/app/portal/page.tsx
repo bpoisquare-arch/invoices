@@ -123,11 +123,11 @@ export default function EntityPortalPage() {
       <header className="h-16 border-b border-slate-200 bg-white px-4 sm:px-8 flex items-center justify-between shadow-2xs">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-[#003D5C] text-[#81F5F5] flex items-center justify-center font-bold font-['Montserrat'] shadow-xs">
-            EP
+            CRM
           </div>
           <div>
             <h1 className="font-['Montserrat'] text-base font-bold text-[#003D5C] tracking-tight">
-              Enterprise Management Portal
+              Client Management System
             </h1>
             <p className="text-[10px] text-slate-400 font-medium">
               Multi-Entity Business System

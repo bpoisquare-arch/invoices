@@ -46,6 +46,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface EntityItem {
   id: string
@@ -635,27 +642,65 @@ export default function AppSidebar() {
 
       {/* 3. Footer: User Profile & Quick Actions */}
       <SidebarFooter className="p-2.5 border-t border-white/10 bg-[#001724]">
-        <div className="flex items-center gap-2.5 p-2 rounded-lg bg-white/5 border border-white/5 select-none">
-          <div className="size-8 rounded-lg bg-[#0E3E5B] text-[#81F5F5] font-bold text-xs flex items-center justify-center shrink-0 border border-white/10 shadow-xs">
-            {initials}
-          </div>
-          <div className="grid flex-1 text-left text-xs leading-tight group-data-[collapsible=icon]:hidden min-w-0">
-            <span className="truncate font-semibold text-white">
-              {email}
-            </span>
-            <span className="truncate text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-              Administrator
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            title="Log out"
-            className="text-slate-400 hover:text-rose-400 p-1.5 rounded-md hover:bg-rose-500/10 transition-colors group-data-[collapsible=icon]:hidden cursor-pointer"
+        <DropdownMenu>
+          <DropdownMenuTrigger className="w-full flex items-center gap-2.5 p-2 rounded-lg bg-white/5 border border-white/5 hover:bg-[#0E3E5B]/80 text-slate-200 hover:text-white transition-all cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/30 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1.5 data-popup-open:bg-[#0E3E5B] data-popup-open:text-white">
+            <div className="size-8 rounded-lg bg-[#0E3E5B] text-[#81F5F5] font-bold text-xs flex items-center justify-center shrink-0 border border-white/10 shadow-xs">
+              {initials}
+            </div>
+            <div className="grid flex-1 text-left text-xs leading-tight group-data-[collapsible=icon]:hidden min-w-0">
+              <span className="truncate font-semibold text-white">
+                {email}
+              </span>
+              <span className="truncate text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+                Administrator
+              </span>
+            </div>
+            <ChevronsUpDown className="ml-auto size-4 text-slate-400 group-data-[collapsible=icon]:hidden shrink-0" />
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent
+            side="top"
+            align="end"
+            sideOffset={8}
+            className="w-64 rounded-xl bg-[#001E2F] border border-slate-700 text-slate-100 shadow-2xl p-1.5 z-50 animate-in fade-in-0 zoom-in-95"
           >
-            <LogOut className="size-4" />
-          </button>
-        </div>
+            {/* User Profile Header inside Dropdown */}
+            <div className="flex items-center gap-2.5 p-2 rounded-lg bg-white/5 border border-white/5 select-none mb-1">
+              <div className="size-8 rounded-lg bg-[#0E3E5B] text-[#81F5F5] font-bold text-xs flex items-center justify-center shrink-0 border border-white/10">
+                {initials}
+              </div>
+              <div className="grid flex-1 text-left text-xs leading-tight min-w-0">
+                <span className="truncate font-semibold text-white">
+                  {email}
+                </span>
+                <span className="truncate text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+                  Administrator
+                </span>
+              </div>
+            </div>
+
+            <DropdownMenuSeparator className="bg-white/10 my-1" />
+
+            {/* Settings Option (No link for now per request) */}
+            <DropdownMenuItem
+              className="flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B] rounded-lg cursor-pointer transition-colors"
+            >
+              <Settings className="size-4 text-slate-400" />
+              <span>Settings</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator className="bg-white/10 my-1" />
+
+            {/* Logout Option */}
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/15 rounded-lg cursor-pointer transition-colors"
+            >
+              <LogOut className="size-4 text-rose-400" />
+              <span>Log out</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
 
       {/* 4. Rail for resizing / collapsing */}

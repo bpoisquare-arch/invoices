@@ -96,11 +96,12 @@ function getWfhTimes(dateStr: string, settings?: AttendanceSettings) {
 
 type AttendanceStatusType = 'present' | 'absent' | 'leave' | 'wfh'
 
-function checkProbationStatus(joiningDateStr?: string | null, targetDateStr?: string): {
+function checkProbationStatus(joiningDateStr?: string | null, targetDateStr?: string, isOldStaff?: boolean | null): {
   isProbation: boolean
   monthsPassed: number
   daysPassed: number
 } {
+  if (isOldStaff) return { isProbation: false, monthsPassed: 99, daysPassed: 999 }
   if (!joiningDateStr || !targetDateStr) return { isProbation: false, monthsPassed: 99, daysPassed: 999 }
   const j = new Date(joiningDateStr.split('T')[0])
   const t = new Date(targetDateStr.split('T')[0])
@@ -140,16 +141,17 @@ export default function EditAttendanceModal({
   } | null>(null)
   const [isLoadingBalance, setIsLoadingBalance] = useState(false)
 
-  const employeeJoiningDate = record?.employee?.joining_date || record?.employee?.created_at || null
-  const localProbation = checkProbationStatus(employeeJoiningDate, date || record?.attendance_date)
-  const isProbation = balanceSummary !== null ? balanceSummary.isProbation : localProbation.isProbation
+  const isOldStaff = Boolean(record?.employee?.is_old_staff)
+  const employeeJoiningDate = isOldStaff ? null : (record?.employee?.joining_date || record?.employee?.created_at || null)
+  const localProbation = isOldStaff ? { isProbation: false, monthsPassed: 99, daysPassed: 999 } : checkProbationStatus(employeeJoiningDate, date || record?.attendance_date, isOldStaff)
+  const isProbation = !isOldStaff && (balanceSummary !== null ? balanceSummary.isProbation : localProbation.isProbation)
 
   const effectiveRemaining = balanceSummary?.remaining || {
     annual_leaves: record?.employee?.leave_quotas?.annual_leaves ?? 6,
     sick_leaves: record?.employee?.leave_quotas?.sick_leaves ?? 7,
     casual_leaves: record?.employee?.leave_quotas?.casual_leaves ?? 7,
     wfh_quota: record?.employee?.leave_quotas?.wfh_quota ?? 4,
-    probation_leaves: record?.employee?.leave_quotas?.probation_leaves ?? 3,
+    probation_leaves: isOldStaff ? 0 : (record?.employee?.leave_quotas?.probation_leaves ?? 3),
   }
 
   const effectiveQuotas = balanceSummary?.quotas || record?.employee?.leave_quotas || {
@@ -157,7 +159,7 @@ export default function EditAttendanceModal({
     sick_leaves: 7,
     casual_leaves: 7,
     wfh_quota: 4,
-    probation_leaves: 3,
+    probation_leaves: isOldStaff ? 0 : 3,
   }
 
   const fetchLiveBalance = async (empId: string, targetDate: string, recId?: string) => {
@@ -484,7 +486,7 @@ export default function EditAttendanceModal({
                 <p className="text-sm font-bold text-slate-800">{record.employee?.name || 'Employee'}</p>
                 <p className="text-xs text-slate-500 font-mono">
                   {record.employee?.employee_id || 'N/A'}
-                  {employeeJoiningDate && ` • Joined: ${employeeJoiningDate.split('T')[0]}`}
+                  {isOldStaff ? ' • Old Staff (Confirmed)' : (employeeJoiningDate && ` • Joined: ${employeeJoiningDate.split('T')[0]}`)}
                 </p>
               </div>
             </div>
@@ -493,7 +495,7 @@ export default function EditAttendanceModal({
                 {record.employee?.designation || 'Staff'}
               </span>
               <span className={`text-[10px] font-bold mt-1 inline-block ${isProbation ? 'text-amber-600' : 'text-emerald-600'}`}>
-                {isProbation ? 'Probation Active' : 'Confirmed Staff'}
+                {isProbation ? 'Probation Active' : (isOldStaff ? 'Old Staff (Confirmed)' : 'Confirmed Staff')}
               </span>
             </div>
           </div>
@@ -665,7 +667,7 @@ export default function EditAttendanceModal({
               ) : (
                 <div className="space-y-1.5">
                   <Select
-                    value={selectedLeaveType}
+                    value={selectedLeaveType === 'Probation Leaves' ? 'Casual Leave' : selectedLeaveType}
                     onValueChange={(val) => setSelectedLeaveType(val || 'Casual Leave')}
                   >
                     <SelectTrigger className="w-full text-xs bg-white border-indigo-300 font-bold text-indigo-950 h-10 px-3">
@@ -681,13 +683,10 @@ export default function EditAttendanceModal({
                       <SelectItem value="Annual Leave" className="text-xs font-medium py-2">
                         Annual Leaves ({effectiveRemaining.annual_leaves ?? 6} remaining / {effectiveQuotas.annual_leaves ?? 6})
                       </SelectItem>
-                      <SelectItem value="Probation Leaves" disabled className="text-xs text-slate-400 opacity-60 py-2">
-                        Probation Leaves (Disabled — Probation Completed)
-                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-[11px] text-indigo-700">
-                    Employee recorded under <span className="font-bold">{selectedLeaveType}</span> (Paid approved leave).
+                    Employee recorded under <span className="font-bold">{selectedLeaveType === 'Probation Leaves' ? 'Casual Leave' : selectedLeaveType}</span> (Paid approved leave).
                   </p>
                 </div>
               )}

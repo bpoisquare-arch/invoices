@@ -4,6 +4,7 @@ export interface EmployeeMetadata {
   branch?: string | null
   salary?: number | null
   joining_date?: string | null
+  is_old_staff?: boolean | null
   name?: string
   designation?: string
   is_active?: boolean
@@ -55,6 +56,7 @@ export function writeEmployeeMetadata(
     branch?: string | null
     salary?: number | null
     joining_date?: string | null
+    is_old_staff?: boolean | null
     name?: string
     designation?: string
     is_active?: boolean
@@ -78,6 +80,7 @@ export function writeEmployeeMetadata(
       ...(meta.branch !== undefined ? { branch: meta.branch } : {}),
       ...(meta.salary !== undefined ? { salary: meta.salary } : {}),
       ...(meta.joining_date !== undefined ? { joining_date: meta.joining_date } : {}),
+      ...(meta.is_old_staff !== undefined ? { is_old_staff: meta.is_old_staff } : {}),
       ...(meta.name !== undefined ? { name: meta.name } : {}),
       ...(meta.designation !== undefined ? { designation: meta.designation } : {}),
       ...(meta.is_active !== undefined ? { is_active: meta.is_active } : {}),

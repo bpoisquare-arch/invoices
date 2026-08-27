@@ -75,6 +75,7 @@ export default function EmployeeOverviewPage() {
   const [newDesignation, setNewDesignation] = useState('')
   const [newBranch, setNewBranch] = useState('Multan')
   const [newJoiningDate, setNewJoiningDate] = useState(todayStr)
+  const [newIsOldStaff, setNewIsOldStaff] = useState(false)
   const [newSalary, setNewSalary] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [addWarning, setAddWarning] = useState<string | null>(null)
@@ -86,6 +87,7 @@ export default function EmployeeOverviewPage() {
   const [editDesignation, setEditDesignation] = useState('')
   const [editBranch, setEditBranch] = useState('Multan')
   const [editJoiningDate, setEditJoiningDate] = useState(todayStr)
+  const [editIsOldStaff, setEditIsOldStaff] = useState(false)
   const [editSalary, setEditSalary] = useState('')
   const [editActive, setEditActive] = useState(true)
   const [editError, setEditError] = useState<string | null>(null)
@@ -148,6 +150,20 @@ export default function EmployeeOverviewPage() {
     }
   }
 
+  const isDateWithinProbation = (joiningDateStr?: string | null, isOld?: boolean) => {
+    if (isOld) return false
+    if (!joiningDateStr) return false
+    const j = new Date(joiningDateStr.split('T')[0])
+    const today = new Date()
+    if (isNaN(j.getTime())) return false
+    const monthsDiff = (today.getFullYear() - j.getFullYear()) * 12 + (today.getMonth() - j.getMonth())
+    const daysDiff = Math.floor((today.getTime() - j.getTime()) / (1000 * 60 * 60 * 24))
+    return daysDiff >= 0 && monthsDiff < 3
+  }
+
+  const showNewProbation = isDateWithinProbation(newJoiningDate, newIsOldStaff)
+  const showEditProbation = isDateWithinProbation(editJoiningDate, editIsOldStaff)
+
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault()
     setAddError(null)
@@ -161,14 +177,15 @@ export default function EmployeeOverviewPage() {
           name: newName.trim(),
           designation: newDesignation.trim(),
           branch: newBranch,
-          joining_date: newJoiningDate,
+          joining_date: newIsOldStaff ? null : newJoiningDate,
+          is_old_staff: newIsOldStaff,
           salary: newSalary ? Number(newSalary) : null,
           leave_quotas: {
             annual_leaves: Number(newAnnualLeaves) || 0,
             sick_leaves: Number(newSickLeaves) || 0,
             casual_leaves: Number(newCasualLeaves) || 0,
             wfh_quota: Number(newWfhQuota) || 0,
-            probation_leaves: Number(newProbationLeaves) || 0,
+            probation_leaves: showNewProbation ? (Number(newProbationLeaves) || 0) : 0,
           },
         }),
       })
@@ -183,6 +200,7 @@ export default function EmployeeOverviewPage() {
       setNewDesignation('')
       setNewBranch('Multan')
       setNewJoiningDate(todayStr)
+      setNewIsOldStaff(false)
       setNewSalary('')
       setNewAnnualLeaves(6)
       setNewSickLeaves(7)
@@ -204,15 +222,13 @@ export default function EmployeeOverviewPage() {
     setEditError(null)
     setIsSaving(true)
 
-    const targetBranch = newBranch || editBranch || 'Multan'
-    const targetJoiningDate = editJoiningDate || todayStr
     const targetSalary = editSalary ? Number(editSalary) : null
     const leave_quotas = {
       annual_leaves: Number(editAnnualLeaves) || 0,
       sick_leaves: Number(editSickLeaves) || 0,
       casual_leaves: Number(editCasualLeaves) || 0,
       wfh_quota: Number(editWfhQuota) || 0,
-      probation_leaves: Number(editProbationLeaves) || 0,
+      probation_leaves: showEditProbation ? (Number(editProbationLeaves) || 0) : 0,
     }
 
     try {
@@ -224,7 +240,8 @@ export default function EmployeeOverviewPage() {
           name: editName.trim(),
           designation: editDesignation.trim(),
           branch: editBranch,
-          joining_date: editJoiningDate,
+          joining_date: editIsOldStaff ? null : editJoiningDate,
+          is_old_staff: editIsOldStaff,
           salary: targetSalary,
           is_active: editActive,
           leave_quotas,
@@ -245,7 +262,8 @@ export default function EmployeeOverviewPage() {
                 name: editName.trim(),
                 designation: editDesignation.trim(),
                 branch: editBranch,
-                joining_date: editJoiningDate,
+                joining_date: editIsOldStaff ? null : editJoiningDate,
+                is_old_staff: editIsOldStaff,
                 salary: targetSalary,
                 is_active: editActive,
                 leave_quotas,
@@ -264,11 +282,13 @@ export default function EmployeeOverviewPage() {
   }
 
   const openEditModal = (emp: Employee) => {
+    const isOld = Boolean(emp.is_old_staff)
     setEditingEmployee(emp)
     setEditName(emp.name)
     setEditDesignation(emp.designation)
     setEditBranch(emp.branch || 'Multan')
-    const rawDate = emp.joining_date || emp.created_at
+    setEditIsOldStaff(isOld)
+    const rawDate = emp.joining_date || (!isOld ? emp.created_at : null)
     setEditJoiningDate(rawDate ? rawDate.split('T')[0] : todayStr)
     setEditSalary(emp.salary !== undefined && emp.salary !== null ? String(emp.salary) : '')
     setEditActive(emp.is_active)
@@ -277,7 +297,7 @@ export default function EmployeeOverviewPage() {
     setEditSickLeaves(q.sick_leaves !== undefined ? Number(q.sick_leaves) : 7)
     setEditCasualLeaves(q.casual_leaves !== undefined ? Number(q.casual_leaves) : 7)
     setEditWfhQuota(q.wfh_quota !== undefined ? Number(q.wfh_quota) : 4)
-    setEditProbationLeaves(q.probation_leaves !== undefined ? Number(q.probation_leaves) : 3)
+    setEditProbationLeaves(isOld ? 0 : (q.probation_leaves !== undefined ? Number(q.probation_leaves) : 3))
     setEditError(null)
   }
 
@@ -522,7 +542,13 @@ export default function EmployeeOverviewPage() {
 
                       {/* Joining Date */}
                       <td className="py-4 px-4 text-slate-600 font-medium text-xs">
-                        {formatJoiningDate(emp.joining_date || emp.created_at)}
+                        {emp.is_old_staff ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            Old Staff
+                          </span>
+                        ) : (
+                          formatJoiningDate(emp.joining_date || emp.created_at)
+                        )}
                       </td>
 
                       {/* Actions */}
@@ -673,15 +699,43 @@ export default function EmployeeOverviewPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Joining Date (Optional)
-                </Label>
-                <Input
-                  type="date"
-                  value={newJoiningDate}
-                  onChange={(e) => setNewJoiningDate(e.target.value)}
-                  className="text-sm border-slate-200 font-mono"
-                />
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Joining Date
+                  </Label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-[#003D5C] hover:text-[#009D9E]">
+                    <input
+                      type="checkbox"
+                      checked={newIsOldStaff}
+                      onChange={(e) => {
+                        const checked = e.target.checked
+                        setNewIsOldStaff(checked)
+                        if (checked) {
+                          setNewProbationLeaves(0)
+                        } else {
+                          setNewProbationLeaves(3)
+                        }
+                      }}
+                      className="w-3.5 h-3.5 rounded border-slate-300 text-[#009D9E] focus:ring-[#009D9E]"
+                    />
+                    <span>Old Staff</span>
+                  </label>
+                </div>
+                {newIsOldStaff ? (
+                  <div className="h-9 px-3 rounded-md border border-dashed border-amber-300 bg-amber-50/70 flex items-center justify-between text-xs text-amber-800 font-medium">
+                    <span>Old Staff (Unknown date)</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-200/80 px-2 py-0.5 rounded text-amber-900">
+                      Probation N/A
+                    </span>
+                  </div>
+                ) : (
+                  <Input
+                    type="date"
+                    value={newJoiningDate}
+                    onChange={(e) => setNewJoiningDate(e.target.value)}
+                    className="text-sm border-slate-200 font-mono"
+                  />
+                )}
               </div>
             </div>
 
@@ -711,7 +765,7 @@ export default function EmployeeOverviewPage() {
                 <span className="text-[10px] text-slate-500 font-medium">Annual Quotas</span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className={`grid grid-cols-2 ${!showNewProbation ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-2`}>
                 <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
                   <Label className="text-[10px] font-bold text-slate-600 uppercase">Annual (6/yr)</Label>
                   <Input
@@ -760,21 +814,32 @@ export default function EmployeeOverviewPage() {
                   />
                 </div>
 
-                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
-                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Probation (3 max)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="3"
-                    value={newProbationLeaves}
-                    onChange={(e) => setNewProbationLeaves(Number(e.target.value))}
-                    className="h-7 text-xs font-mono font-bold text-slate-800"
-                  />
-                </div>
+                {showNewProbation && (
+                  <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                    <Label className="text-[10px] font-bold text-slate-600 uppercase">Probation (3 max)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="3"
+                      value={newProbationLeaves}
+                      onChange={(e) => setNewProbationLeaves(Number(e.target.value))}
+                      className="h-7 text-xs font-mono font-bold text-slate-800"
+                    />
+                  </div>
+                )}
               </div>
-              <p className="text-[10px] text-slate-500 leading-tight">
-                Probation leaves apply during 1st 3 months from joining (max 1/month). Standard leaves apply after probation.
-              </p>
+              {showNewProbation ? (
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Probation leaves apply during 1st 3 months from joining (max 1/month). Standard leaves apply after probation.
+                </p>
+              ) : (
+                <p className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  {newIsOldStaff
+                    ? 'Old Staff: Probation leaves disabled. Standard leaves (Annual, Sick, Casual, WFH) active.'
+                    : 'Probation completed (> 3 months from joining): Probation leaves disabled. Standard leaves active.'}
+                </p>
+              )}
             </div>
 
             <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg text-xs text-slate-500 space-y-1">
@@ -788,19 +853,30 @@ export default function EmployeeOverviewPage() {
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => setIsAddOpen(false)}
                 disabled={isSaving}
-                className="text-xs font-bold"
+                className="text-xs"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                disabled={isSaving || !newDesignation}
-                className="bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5"
+                size="sm"
+                disabled={isSaving}
+                className="bg-[#003D5C] hover:bg-[#002D44] text-white text-xs font-bold"
               >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                Create Employee
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-3.5 h-3.5 mr-1.5" />
+                    Create Employee
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -808,15 +884,15 @@ export default function EmployeeOverviewPage() {
       </Dialog>
 
       {/* Edit Employee Modal */}
-      <Dialog open={!!editingEmployee} onOpenChange={(open: boolean) => !open && setEditingEmployee(null)}>
+      <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
         <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl rounded-xl">
           <DialogHeader className="border-b border-slate-100 pb-3">
-            <DialogTitle className="text-base font-bold text-[#003D5C] flex items-center gap-2">
+            <DialogTitle className="text-lg font-bold text-[#003D5C] flex items-center gap-2">
               <Edit2 className="w-5 h-5 text-[#009D9E]" />
               Edit Employee
             </DialogTitle>
-            <p className="text-xs text-slate-500 font-mono">
-              ID: {editingEmployee?.employee_id} (Immutable)
+            <p className="text-xs text-slate-500 mt-0.5">
+              ID: <span className="font-mono font-bold text-slate-700">{editingEmployee?.employee_id}</span> (Immutable)
             </p>
           </DialogHeader>
 
@@ -883,15 +959,43 @@ export default function EmployeeOverviewPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Joining Date (Optional)
-                </Label>
-                <Input
-                  type="date"
-                  value={editJoiningDate}
-                  onChange={(e) => setEditJoiningDate(e.target.value)}
-                  className="text-sm border-slate-200 font-mono"
-                />
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Joining Date
+                  </Label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-[#003D5C] hover:text-[#009D9E]">
+                    <input
+                      type="checkbox"
+                      checked={editIsOldStaff}
+                      onChange={(e) => {
+                        const checked = e.target.checked
+                        setEditIsOldStaff(checked)
+                        if (checked) {
+                          setEditProbationLeaves(0)
+                        } else {
+                          setEditProbationLeaves(3)
+                        }
+                      }}
+                      className="w-3.5 h-3.5 rounded border-slate-300 text-[#009D9E] focus:ring-[#009D9E]"
+                    />
+                    <span>Old Staff</span>
+                  </label>
+                </div>
+                {editIsOldStaff ? (
+                  <div className="h-9 px-3 rounded-md border border-dashed border-amber-300 bg-amber-50/70 flex items-center justify-between text-xs text-amber-800 font-medium">
+                    <span>Old Staff (Unknown date)</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-200/80 px-2 py-0.5 rounded text-amber-900">
+                      Probation N/A
+                    </span>
+                  </div>
+                ) : (
+                  <Input
+                    type="date"
+                    value={editJoiningDate}
+                    onChange={(e) => setEditJoiningDate(e.target.value)}
+                    className="text-sm border-slate-200 font-mono"
+                  />
+                )}
               </div>
             </div>
 
@@ -921,7 +1025,7 @@ export default function EmployeeOverviewPage() {
                 <span className="text-[10px] text-slate-500 font-medium">Annual Quotas</span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className={`grid grid-cols-2 ${!showEditProbation ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-2`}>
                 <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
                   <Label className="text-[10px] font-bold text-slate-600 uppercase">Annual (6/yr)</Label>
                   <Input
@@ -970,21 +1074,32 @@ export default function EmployeeOverviewPage() {
                   />
                 </div>
 
-                <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
-                  <Label className="text-[10px] font-bold text-slate-600 uppercase">Probation (3 max)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="3"
-                    value={editProbationLeaves}
-                    onChange={(e) => setEditProbationLeaves(Number(e.target.value))}
-                    className="h-7 text-xs font-mono font-bold text-slate-800"
-                  />
-                </div>
+                {showEditProbation && (
+                  <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200">
+                    <Label className="text-[10px] font-bold text-slate-600 uppercase">Probation (3 max)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="3"
+                      value={editProbationLeaves}
+                      onChange={(e) => setEditProbationLeaves(Number(e.target.value))}
+                      className="h-7 text-xs font-mono font-bold text-slate-800"
+                    />
+                  </div>
+                )}
               </div>
-              <p className="text-[10px] text-slate-500 leading-tight">
-                Probation leaves apply during 1st 3 months from joining (max 1/month). Standard leaves apply after probation.
-              </p>
+              {showEditProbation ? (
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Probation leaves apply during 1st 3 months from joining (max 1/month). Standard leaves apply after probation.
+                </p>
+              ) : (
+                <p className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  {editIsOldStaff
+                    ? 'Old Staff: Probation leaves disabled. Standard leaves (Annual, Sick, Casual, WFH) active.'
+                    : 'Probation completed (> 3 months from joining): Probation leaves disabled. Standard leaves active.'}
+                </p>
+              )}
             </div>
 
             <div className="flex items-center gap-2 pt-1">
