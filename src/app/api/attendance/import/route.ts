@@ -10,11 +10,22 @@ import {
   parseExcelAttendanceWorkbook,
   ParsedAttendancePreviewItem,
 } from '@/lib/services/attendance-calculator'
+import { createClient } from '@/lib/supabase/server'
+import { logAuditEventServer } from '@/lib/services/audit-server'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
+    // Session Verification
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const devSession = request.cookies.get('dev-auth-session')?.value === 'true'
+
+    if (!user && !devSession) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Valid session required.' }, { status: 401 })
+    }
+
     const contentType = request.headers.get('content-type') || ''
 
     if (contentType.includes('multipart/form-data')) {
@@ -120,6 +131,17 @@ export async function POST(request: NextRequest) {
         saveItems,
         duplicateStrategy === 'skip' ? 'skip' : 'overwrite'
       )
+
+      await logAuditEventServer({
+        action: 'Import Attendance Excel',
+        module: 'attendance',
+        metadata: {
+          totalSubmitted: items.length,
+          savedCount: batchResult.savedCount,
+          skippedDuplicates: batchResult.skippedDuplicates,
+          duplicateStrategy
+        }
+      })
 
       return NextResponse.json({
         success: true,

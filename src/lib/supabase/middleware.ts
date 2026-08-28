@@ -41,23 +41,45 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
   const isPublicRoute = request.nextUrl.pathname.startsWith('/auth') || request.nextUrl.pathname === '/'
 
+  // Enforce session access control redirects
   if (!isAuthenticated && !isAuthRoute && !isPublicRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = '/login'
+    return NextResponse.redirect(redirectUrl)
   }
 
   if (isAuthenticated && isAuthRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/portal'
-    return NextResponse.redirect(url)
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = '/portal'
+    return NextResponse.redirect(redirectUrl)
   }
 
   if (isAuthenticated && request.nextUrl.pathname === '/') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/portal'
-    return NextResponse.redirect(url)
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = '/portal'
+    return NextResponse.redirect(redirectUrl)
   }
+
+  // Inject Production-Grade Security Headers
+  const headers = supabaseResponse.headers
+  headers.set('X-Frame-Options', 'DENY') // Prevent clickjacking
+  headers.set('X-Content-Type-Options', 'nosniff') // Prevent mime sniffing
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()')
+  headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
+
+  // Tailored Content Security Policy (CSP)
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://lh5.googleusercontent.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    `connect-src 'self' ${url} wss://*.supabase.co https://api.resend.com`,
+    "frame-ancestors 'none'", // Clickjacking protection (CSP Level 2)
+  ].join('; ')
+
+  headers.set('Content-Security-Policy', csp)
 
   return supabaseResponse
 }
