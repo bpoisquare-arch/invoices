@@ -748,7 +748,7 @@ export default function EmployeeOverviewPage() {
                 type="number"
                 placeholder="e.g. 75000"
                 min="0"
-                step="1000"
+                step="any"
                 value={newSalary}
                 onChange={(e) => setNewSalary(e.target.value)}
                 className="text-sm border-slate-200 font-mono"
@@ -1013,7 +1013,7 @@ export default function EmployeeOverviewPage() {
                 type="number"
                 placeholder="e.g. 75000"
                 min="0"
-                step="1000"
+                step="any"
                 value={editSalary}
                 onChange={(e) => setEditSalary(e.target.value)}
                 className="text-sm border-slate-200 font-mono"

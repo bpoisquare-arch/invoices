@@ -206,5 +206,17 @@
       "wfh_quota": 2,
       "probation_leaves": 0
     }
+  },
+  "99467505-916d-41f5-967a-5a40bc47b2b9": {
+    "branch": "Multan",
+    "salary": 42500,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "EMP-0010": {
+    "branch": "Multan",
+    "salary": 42500,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
   }
 }

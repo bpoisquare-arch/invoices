@@ -46,6 +46,23 @@ import ViewPunchesModal from '@/components/attendance/view-punches-modal'
 import EmployeeCommissionModal from '@/components/attendance/employee-commission-modal'
 import * as XLSX from 'xlsx'
 
+const MONTH_OPTIONS = [
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+]
+
+const YEAR_OPTIONS = ['2024', '2025', '2026', '2027', '2028', '2029', '2030']
+
 interface PageProps {
   params: Promise<{ id: string }>
 }
@@ -56,6 +73,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
   const [employee, setEmployee] = useState<Employee | null>(null)
   const [records, setRecords] = useState<AttendanceRecordWithEmployee[]>([])
+  const [fullMonthRecords, setFullMonthRecords] = useState<AttendanceRecordWithEmployee[]>([])
   const [settings, setSettings] = useState<AttendanceSettings | undefined>()
   const [isLoading, setIsLoading] = useState(true)
 
@@ -160,22 +178,21 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       const holMap: Record<string, string> = holData.success && holData.holidays ? holData.holidays : {}
       setHolidays(holMap)
 
-      // Determine effective date range (from filter inputs or default to selectedMonth)
-      let rangeStart = startDate
-      let rangeEnd = endDate
-      if (!rangeStart || !rangeEnd) {
-        const [y, m] = selectedMonth.split('-').map(Number)
-        const lastDay = new Date(y, m, 0).getDate()
-        rangeStart = `${selectedMonth}-01`
-        rangeEnd = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`
-      }
+      // Calculate the start and end of the entire selected month
+      const [y, m] = selectedMonth.split('-').map(Number)
+      const lastDay = new Date(y, m, 0).getDate()
+      const monthStart = `${selectedMonth}-01`
+      const monthEnd = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`
 
-      // Fetch employee records
+      // Active date range (defaults to full month)
+      const activeStart = startDate || monthStart
+      const activeEnd = endDate || monthEnd
+
+      // Fetch employee records for the ENTIRE month
       const queryParams = new URLSearchParams()
       queryParams.set('employeeId', employeeId)
-      queryParams.set('startDate', rangeStart)
-      queryParams.set('endDate', rangeEnd)
-      if (arrivalStatus && arrivalStatus !== 'all') queryParams.set('arrivalStatus', arrivalStatus)
+      queryParams.set('startDate', monthStart)
+      queryParams.set('endDate', monthEnd)
       queryParams.set('pageSize', '1000')
 
       const recordsRes = await fetch(`/api/attendance/records?${queryParams.toString()}`)
@@ -183,9 +200,9 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       const fetchedRecords: AttendanceRecordWithEmployee[] =
         recordsData.success && recordsData.records ? recordsData.records : []
 
-      // Generate full calendar grid for the range
-      const sParts = rangeStart.split('-').map(Number)
-      const eParts = rangeEnd.split('-').map(Number)
+      // Generate full calendar grid for the entire month
+      const sParts = monthStart.split('-').map(Number)
+      const eParts = monthEnd.split('-').map(Number)
       const cur = new Date(sParts[0], sParts[1] - 1, sParts[2], 12, 0, 0)
       const end = new Date(eParts[0], eParts[1] - 1, eParts[2], 12, 0, 0)
 
@@ -234,7 +251,6 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             employee: currentEmp || undefined,
           } as any)
         } else if (dStr >= todayStr) {
-          // Today (not yet uploaded/passed) or Future date -> neutral '--'
           fullGridRows.push({
             id: `future-${dStr}`,
             employee_id: currentEmp?.id || employeeId,
@@ -252,7 +268,6 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             employee: currentEmp || undefined,
           } as any)
         } else {
-          // Past Date without punch -> Absent
           fullGridRows.push({
             id: `absent-${dStr}`,
             employee_id: currentEmp?.id || employeeId,
@@ -274,26 +289,33 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         cur.setDate(cur.getDate() + 1)
       }
 
+      setFullMonthRecords(fullGridRows)
+
+      // Filter rows to the active date range for table view
+      let displayRows = fullGridRows.filter((r) => {
+        const d = r.attendance_date?.split('T')[0]
+        return d && d >= activeStart && d <= activeEnd
+      })
+
       // Sort based on dateSortOrder (asc = 1st date at top, desc = newest date at top)
       if (dateSortOrder === 'asc') {
-        fullGridRows.sort((a, b) => a.attendance_date.localeCompare(b.attendance_date))
+        displayRows.sort((a, b) => a.attendance_date.localeCompare(b.attendance_date))
       } else {
-        fullGridRows.sort((a, b) => b.attendance_date.localeCompare(a.attendance_date))
+        displayRows.sort((a, b) => b.attendance_date.localeCompare(a.attendance_date))
       }
 
       // Filter by arrival status if selected
-      let displayRows = fullGridRows
       if (arrivalStatus && arrivalStatus !== 'all') {
-        displayRows = fullGridRows.filter((r) => r.arrival_status === arrivalStatus)
+        displayRows = displayRows.filter((r) => r.arrival_status === arrivalStatus)
       }
 
       setRecords(displayRows)
 
-      // Fetch summary
+      // Fetch summary for the active date range
       const summaryParams = new URLSearchParams()
       summaryParams.set('employeeId', employeeId)
-      summaryParams.set('startDate', rangeStart)
-      summaryParams.set('endDate', rangeEnd)
+      summaryParams.set('startDate', activeStart)
+      summaryParams.set('endDate', activeEnd)
       summaryParams.set('mode', 'summary')
 
       const summaryRes = await fetch(`/api/attendance/records?${summaryParams.toString()}`)
@@ -356,84 +378,118 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     const now = new Date()
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
-    let presentDays = 0
-    let wfhDays = 0
-    let leaveDays = 0
-    let holidayDays = 0
-    let absentDays = 0
-    let futureDays = 0
+    const getStats = (list: typeof records) => {
+      let present = 0
+      let wfh = 0
+      let leave = 0
+      let holiday = 0
+      let absent = 0
+      let future = 0
 
-    records.forEach((r) => {
-      const isSunday = (r.day_of_week || '').toLowerCase() === 'sunday'
-      const isGazettedHoliday = Boolean(r.attendance_date && holidays[r.attendance_date.split('T')[0]])
-      const isHoliday = isSunday || isGazettedHoliday || r.arrival_status === 'Holiday' || r.arrival_status === 'Gazetted Holiday'
+      list.forEach((r) => {
+        const isSunday = (r.day_of_week || '').toLowerCase() === 'sunday'
+        const isGazettedHoliday = Boolean(r.attendance_date && holidays[r.attendance_date.split('T')[0]])
+        const isHoliday = isSunday || isGazettedHoliday || r.arrival_status === 'Holiday' || r.arrival_status === 'Gazetted Holiday'
 
-      const isWfh =
-        r.departure_status === 'Work From Home' ||
-        r.arrival_status === 'Work From Home' ||
-        r.notes?.includes('Work From Home')
+        const isWfh =
+          r.departure_status === 'Work From Home' ||
+          r.arrival_status === 'Work From Home' ||
+          r.notes?.includes('Work From Home')
 
-      const isLeave =
-        r.arrival_status === 'Leave' ||
-        (r.departure_status || '').includes('Leave') ||
-        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(r.departure_status as any) ||
-        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(r.arrival_status as any)
+        const isLeave =
+          r.arrival_status === 'Leave' ||
+          (r.departure_status || '').includes('Leave') ||
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(r.departure_status as any) ||
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(r.arrival_status as any)
 
-      const hasPunches =
-        Boolean(r.in_time && r.in_time !== '---') ||
-        Boolean(r.out_time && r.out_time !== '---') ||
-        (r.total_working_minutes ? r.total_working_minutes > 0 : false)
+        const hasPunches =
+          Boolean(r.in_time && r.in_time !== '---') ||
+          Boolean(r.out_time && r.out_time !== '---') ||
+          (r.total_working_minutes ? r.total_working_minutes > 0 : false)
 
-      const isNeutralPlaceholder = r.arrival_status === '--' || r.departure_status === '--'
+        const isNeutralPlaceholder = r.arrival_status === '--' || r.departure_status === '--'
 
-      if (isHoliday) {
-        holidayDays++
-      } else if (isWfh) {
-        wfhDays++
-        presentDays++ // WFH is counted as 100% Present
-      } else if (isLeave) {
-        leaveDays++ // Approved Paid Leave
-      } else if (hasPunches) {
-        presentDays++ // Physical In-Office Present
-      } else if (isNeutralPlaceholder || (r.attendance_date && r.attendance_date >= todayStr)) {
-        futureDays++
-      } else {
-        absentDays++ // Past unpunched working day
+        if (isHoliday) {
+          holiday++
+        } else if (isWfh) {
+          wfh++
+          present++
+        } else if (isLeave) {
+          leave++
+        } else if (hasPunches) {
+          present++
+        } else if (isNeutralPlaceholder || (r.attendance_date && r.attendance_date >= todayStr)) {
+          future++
+        } else {
+          absent++
+        }
+      })
+
+      const totalDays = list.length
+      const totalWorkingDays = Math.max(0, totalDays - holiday)
+      const effectiveWorkingDays = Math.max(0, totalWorkingDays - leave)
+
+      return {
+        present,
+        wfh,
+        leave,
+        holiday,
+        absent,
+        future,
+        totalDays,
+        totalWorkingDays,
+        effectiveWorkingDays,
       }
-    })
+    }
 
-    const totalDaysInMonth = records.length || 31
-    // Total working days in month = Total days - (Sundays + Gazetted Holidays)
-    const totalWorkingDays = Math.max(1, totalDaysInMonth - holidayDays)
-    
-    // Approved leaves reduce the required working days count (e.g. 28 working days - 1 leave = 27 required working days)
-    const effectiveWorkingDays = Math.max(1, totalWorkingDays - leaveDays)
+    // 1. Full Month Statistics (to determine stable Daily Rate)
+    const fullMonthStats = getStats(fullMonthRecords.length > 0 ? fullMonthRecords : records)
+
+    // 2. Active date range statistics
+    const activeStart = startDate || (fullMonthRecords[0]?.attendance_date?.split('T')[0]) || `${selectedMonth}-01`
+    const activeEnd = endDate || (fullMonthRecords[fullMonthRecords.length - 1]?.attendance_date?.split('T')[0]) || `${selectedMonth}-31`
+
+    const rangeList = fullMonthRecords.length > 0
+      ? fullMonthRecords.filter((r) => {
+          const d = r.attendance_date?.split('T')[0]
+          return d && d >= activeStart && d <= activeEnd
+        })
+      : records
+
+    const rangeStats = getStats(rangeList)
 
     const baseSalary = employee?.salary ? Number(employee.salary) : null
     const commissionAmount = monthlyCommission.amount || 0
     const grossMonthlySalary = baseSalary !== null ? baseSalary + commissionAmount : commissionAmount > 0 ? commissionAmount : 0
 
-    // Daily Rate = Total Gross Monthly Salary / Total Working Days in Month
-    const perDaySalary = totalWorkingDays > 0 && grossMonthlySalary > 0 ? grossMonthlySalary / totalWorkingDays : 0
+    // Daily Rate = Total Gross Monthly Salary / Effective Working Days of the ENTIRE Month (excludes Sundays, Holidays, and Leaves)
+    const perDaySalary = fullMonthStats.effectiveWorkingDays > 0 && grossMonthlySalary > 0
+      ? grossMonthlySalary / fullMonthStats.effectiveWorkingDays
+      : 0
 
-    // Absent Deduction = Absent Days * Daily Rate
-    const absentDeduction = Math.round(absentDays * perDaySalary)
+    // Pro-rated gross salary for the range based on working days in this range
+    const proRatedGross = fullMonthStats.effectiveWorkingDays > 0
+      ? (rangeStats.effectiveWorkingDays / fullMonthStats.effectiveWorkingDays) * grossMonthlySalary
+      : 0
 
-    // Net Payable Salary = Gross Monthly Salary - Absent Deduction
-    const totalEarnedSalary = Math.max(0, Math.round(grossMonthlySalary - absentDeduction))
+    // Absent Deduction = Absent Days in Range * Daily Rate
+    const absentDeduction = Math.round(rangeStats.absent * perDaySalary)
+
+    // Net Payable Salary = Pro-rated gross - absent deduction
+    const totalEarnedSalary = Math.max(0, Math.round(proRatedGross - absentDeduction))
 
     const hasSalaryConfigured = (baseSalary !== null && baseSalary > 0) || commissionAmount > 0
 
     return {
-      presentDays,
-      wfhDays,
-      leaveDays,
-      holidayDays,
-      absentDays,
-      futureDays,
-      totalDaysInMonth,
-      totalWorkingDays,
-      effectiveWorkingDays,
+      presentDays: rangeStats.present,
+      wfhDays: rangeStats.wfh,
+      leaveDays: rangeStats.leave,
+      holidayDays: rangeStats.holiday,
+      absentDays: rangeStats.absent,
+      futureDays: rangeStats.future,
+      totalDaysInMonth: rangeStats.totalDays,
+      totalWorkingDays: rangeStats.totalWorkingDays,
+      effectiveWorkingDays: rangeStats.effectiveWorkingDays,
       baseSalary,
       commissionAmount,
       grossMonthlySalary,
@@ -441,10 +497,10 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       absentDeduction,
       totalEarnedSalary,
       hasSalaryConfigured,
-      isFullSalaryPayable: absentDays === 0 && hasSalaryConfigured,
-      hasAbsents: absentDays > 0,
+      isFullSalaryPayable: rangeStats.absent === 0 && hasSalaryConfigured,
+      hasAbsents: rangeStats.absent > 0,
     }
-  }, [records, employee, holidays, monthlyCommission])
+  }, [fullMonthRecords, records, employee, holidays, monthlyCommission, startDate, endDate, selectedMonth])
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto font-sans">
@@ -526,52 +582,52 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       {/* Metrics Summary Bento Grid (8 Cards) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         {/* 1. Total Working Days */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-2xs">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Days</p>
-          <p className="text-2xl font-extrabold text-[#003D5C] mt-1">{summary.totalDays}</p>
-          <p className="text-[11px] text-slate-400 mt-1">Recorded days</p>
+        <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Working Days</p>
+          <p className="text-2xl font-extrabold text-[#003D5C] mt-1">{salaryStats.effectiveWorkingDays}</p>
+          <p className="text-[11px] text-slate-400 mt-1">Excl. Holidays & Leaves</p>
         </div>
 
         {/* 2. On-Time Arrival */}
-        <div className="bg-white border border-emerald-200/80 rounded-xl p-4 shadow-2xs bg-emerald-50/10">
+        <div className="bg-white border border-emerald-200/80 rounded-xl p-3 shadow-2xs bg-emerald-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">On Time Arrival</p>
           <p className="text-2xl font-extrabold text-emerald-600 mt-1">{summary.onTimeArrivals}</p>
           <p className="text-[11px] text-emerald-700 font-semibold mt-1">{summary.onTimeArrivalRate}% rate</p>
         </div>
 
         {/* 3. Late Arrival */}
-        <div className="bg-white border border-amber-200/80 rounded-xl p-4 shadow-2xs bg-amber-50/10">
+        <div className="bg-white border border-amber-200/80 rounded-xl p-3 shadow-2xs bg-amber-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Late Arrivals</p>
           <p className="text-2xl font-extrabold text-amber-600 mt-1">{summary.lateArrivals}</p>
           <p className="text-[11px] text-amber-700 font-semibold mt-1">After cutoff</p>
         </div>
 
         {/* 4. On-Time Departure */}
-        <div className="bg-white border border-emerald-200/80 rounded-xl p-4 shadow-2xs bg-emerald-50/10">
+        <div className="bg-white border border-emerald-200/80 rounded-xl p-3 shadow-2xs bg-emerald-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">On Time Departure</p>
           <p className="text-2xl font-extrabold text-emerald-600 mt-1">{summary.onTimeDepartures}</p>
           <p className="text-[11px] text-emerald-700 font-semibold mt-1">{summary.onTimeDepartureRate}% rate</p>
         </div>
 
         {/* 5. Early Departure */}
-        <div className="bg-white border border-rose-200/80 rounded-xl p-4 shadow-2xs bg-rose-50/10">
+        <div className="bg-white border border-rose-200/80 rounded-xl p-3 shadow-2xs bg-rose-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Early Departure</p>
           <p className="text-2xl font-extrabold text-rose-600 mt-1">{summary.earlyDepartures}</p>
           <p className="text-[11px] text-rose-700 font-semibold mt-1">Left early</p>
         </div>
 
-        {/* 6. Hours Required */}
-        <div className="bg-white border border-blue-200/80 rounded-xl p-4 shadow-2xs bg-blue-50/15">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Hours Required</p>
+        {/* 6. Attended Days */}
+        <div className="bg-white border border-blue-200/80 rounded-xl p-3 shadow-2xs bg-blue-50/15">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Attended Days</p>
           <p className="text-2xl font-extrabold text-blue-900 mt-1 font-mono">
-            {summary.formattedRequiredHours}
+            {salaryStats.presentDays}
           </p>
-          <p className="text-[11px] text-blue-600/80 font-medium mt-1">Excl. Leaves & Holidays</p>
+          <p className="text-[11px] text-blue-600/80 font-medium mt-1">Days attended</p>
         </div>
 
         {/* 7. Total Hours */}
         <div
-          className={`bg-white border rounded-xl p-4 shadow-2xs transition-all ${
+          className={`bg-white border rounded-xl p-3 shadow-2xs transition-all ${
             summary.differenceMinutes >= 0
               ? 'border-emerald-200/80 bg-emerald-50/20'
               : 'border-amber-200/80 bg-amber-50/20'
@@ -603,7 +659,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
         {/* 8. Earned / Payable Salary Card */}
         <div
-          className={`bg-white border rounded-xl p-4 shadow-2xs transition-all ${
+          className={`bg-white border rounded-xl p-3 shadow-2xs transition-all ${
             !salaryStats.hasSalaryConfigured
               ? 'border-slate-200/80'
               : salaryStats.absentDays === 0
@@ -629,13 +685,13 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                 : `${salaryStats.absentDays} Absent(s) Deducted`}
             </span>
           </div>
-          <p className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1 font-mono tracking-tight truncate">
+          <p className="text-[15px] sm:text-base font-extrabold text-slate-900 mt-1 font-mono tracking-tight whitespace-nowrap">
             {salaryStats.hasSalaryConfigured
               ? `PKR ${salaryStats.totalEarnedSalary.toLocaleString()}`
               : 'Not Set'}
           </p>
           <p
-            className={`text-[11px] font-semibold mt-1 truncate ${
+            className={`text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight break-words ${
               !salaryStats.hasSalaryConfigured
                 ? 'text-slate-400'
                 : salaryStats.absentDays === 0
@@ -672,34 +728,13 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            {/* Month Filter Selector for Salary & Commission */}
-            <div className="flex items-center gap-1.5 self-start sm:self-auto">
+            {/* Month Display for Salary & Commission */}
+            <div className="flex items-center gap-1.5 self-start sm:self-auto bg-slate-50 border border-slate-200 px-3 py-1 rounded-lg">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Month:</span>
-              <Select
-                value={selectedMonth}
-                onValueChange={(val) => {
-                  if (val) {
-                    setSelectedMonth(val)
-                    const [y, m] = val.split('-')
-                    const lastDay = new Date(parseInt(y, 10), parseInt(m, 10), 0).getDate()
-                    setStartDate(`${val}-01`)
-                    setEndDate(`${val}-${String(lastDay).padStart(2, '0')}`)
-                  }
-                }}
-              >
-                <SelectTrigger className="h-8 text-xs font-bold text-[#003D5C] bg-slate-50 border-slate-200 min-w-36">
-                  <SelectValue placeholder="Select Month" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2026-08" className="text-xs font-medium">August 2026</SelectItem>
-                  <SelectItem value="2026-09" className="text-xs font-medium">September 2026</SelectItem>
-                  <SelectItem value="2026-10" className="text-xs font-medium">October 2026</SelectItem>
-                  <SelectItem value="2026-11" className="text-xs font-medium">November 2026</SelectItem>
-                  <SelectItem value="2026-12" className="text-xs font-medium">December 2026</SelectItem>
-                  <SelectItem value="2026-07" className="text-xs font-medium">July 2026</SelectItem>
-                  <SelectItem value="2026-06" className="text-xs font-medium">June 2026</SelectItem>
-                </SelectContent>
-              </Select>
+              <span className="text-xs font-bold text-[#003D5C]">
+                {MONTH_OPTIONS.find(m => m.value === selectedMonth.split('-')[1])?.label}{' '}
+                {selectedMonth.split('-')[0]}
+              </span>
             </div>
           </div>
 
@@ -809,23 +844,59 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-wrap flex-1">
           <div>
-            <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">From Date</label>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="text-xs border-slate-200"
-            />
+            <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Month</label>
+            <Select
+              value={selectedMonth.split('-')[1]}
+              onValueChange={(mVal) => {
+                if (mVal) {
+                  const yVal = selectedMonth.split('-')[0]
+                  const newMonthStr = `${yVal}-${mVal}`
+                  setSelectedMonth(newMonthStr)
+                  const lastDay = new Date(parseInt(yVal, 10), parseInt(mVal, 10), 0).getDate()
+                  setStartDate(`${newMonthStr}-01`)
+                  setEndDate(`${newMonthStr}-${String(lastDay).padStart(2, '0')}`)
+                }
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs font-bold text-[#003D5C] bg-slate-50 border-slate-200 min-w-[120px]">
+                <SelectValue placeholder="Select Month" />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {MONTH_OPTIONS.map((m) => (
+                  <SelectItem key={m.value} value={m.value} className="text-xs font-medium">
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
-            <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">To Date</label>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="text-xs border-slate-200"
-            />
+            <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Year</label>
+            <Select
+              value={selectedMonth.split('-')[0]}
+              onValueChange={(yVal) => {
+                if (yVal) {
+                  const mVal = selectedMonth.split('-')[1]
+                  const newMonthStr = `${yVal}-${mVal}`
+                  setSelectedMonth(newMonthStr)
+                  const lastDay = new Date(parseInt(yVal, 10), parseInt(mVal, 10), 0).getDate()
+                  setStartDate(`${newMonthStr}-01`)
+                  setEndDate(`${newMonthStr}-${String(lastDay).padStart(2, '0')}`)
+                }
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs font-bold text-[#003D5C] bg-slate-50 border-slate-200 min-w-[100px]">
+                <SelectValue placeholder="Select Year" />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {YEAR_OPTIONS.map((y) => (
+                  <SelectItem key={y} value={y} className="text-xs font-medium">
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
@@ -863,11 +934,15 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             variant="ghost"
             size="sm"
             onClick={() => {
-              setStartDate('')
-              setEndDate('')
+              const now = new Date()
+              const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+              setSelectedMonth(currentMonthStr)
+              const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+              setStartDate(`${currentMonthStr}-01`)
+              setEndDate(`${currentMonthStr}-${String(lastDay).padStart(2, '0')}`)
               setArrivalStatus('all')
             }}
-            className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-semibold self-end"
+            className="text-xs text-slate-500 hover:text-slate-900 cursor-pointer"
           >
             Reset Filters
           </Button>
