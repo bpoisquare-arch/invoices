@@ -567,6 +567,79 @@ export interface Database {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          id: string
+          email: string
+          role: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          email: string
+          role?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          role?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      security_audit_logs: {
+        Row: {
+          id: string
+          user_id: string | null
+          user_email: string | null
+          action: string
+          module: string
+          record_id: string | null
+          metadata: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          user_email?: string | null
+          action: string
+          module: string
+          record_id?: string | null
+          metadata?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          user_email?: string | null
+          action?: string
+          module?: string
+          record_id?: string | null
+          metadata?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -626,6 +699,8 @@ export type AttendanceRecord = Database['public']['Tables']['attendance_records'
 export type AttendanceRecordInsert = Database['public']['Tables']['attendance_records']['Insert']
 export type AttendanceRecordUpdate = Database['public']['Tables']['attendance_records']['Update']
 export type AttendanceAuditLog = Database['public']['Tables']['attendance_audit_logs']['Row']
+export type Profile = Database['public']['Tables']['profiles']['Row']
+export type SecurityAuditLog = Database['public']['Tables']['security_audit_logs']['Row']
 
 export interface RawPunch {
   time: string // e.g. "10:43 AM" or "10:43:00"

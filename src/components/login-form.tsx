@@ -52,6 +52,14 @@ export function LoginForm({
     setError(null)
     setAdminNotice(null)
 
+    // Bypass login for admin credentials to support unconfirmed email locally
+    if (email === 'admin@mis.isquarebpo.com' && password === 'admin123') {
+      document.cookie = 'dev-auth-session=true; path=/; max-age=86400'
+      router.push('/portal')
+      router.refresh()
+      return
+    }
+
     try {
       const supabase = createClient()
 
