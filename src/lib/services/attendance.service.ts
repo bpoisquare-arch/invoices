@@ -129,14 +129,19 @@ export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?
   const fileMeta = readAllEmployeeMetadata()
 
   try {
-    const supabase = createClient()
-    const { data } = await supabase
+    const { createClient: createServerClient } = await import('@/lib/supabase/server')
+    const supabase = await createServerClient()
+    const { data, error } = await supabase
       .from('attendance_audit_logs')
       .select('details')
       .eq('action', 'EMPLOYEE_METADATA_STORE')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
+
+    if (error) {
+      console.warn('Database metadata fetch warning:', error.message)
+    }
 
     if (data && data.details && typeof data.details === 'object') {
       return {
@@ -145,7 +150,7 @@ export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?
       }
     }
   } catch (err) {
-    // Ignore
+    console.error('Error fetching employee metadata from database:', err)
   }
   return fileMeta as any
 }
@@ -170,13 +175,17 @@ export async function saveEmployeeMetadata(
       ...(meta.leave_quotas !== undefined ? { leave_quotas: meta.leave_quotas } : {}),
     }
 
-    const supabase = createClient()
-    await supabase.from('attendance_audit_logs').insert({
+    const { createClient: createServerClient } = await import('@/lib/supabase/server')
+    const supabase = await createServerClient()
+    const { error } = await supabase.from('attendance_audit_logs').insert({
       action: 'EMPLOYEE_METADATA_STORE',
       details: currentMap as any,
     })
+    if (error) {
+      console.error('Failed to insert employee metadata to attendance_audit_logs:', error.message)
+    }
   } catch (err) {
-    // DB audit log failed or not permitted, file store handles it
+    console.error('Error in saveEmployeeMetadata db write:', err)
   }
 }
 
