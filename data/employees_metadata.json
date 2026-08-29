@@ -1,7 +1,7 @@
 {
   "72cb861d-a184-4c3a-ac2c-a5e79a9282f0": {
     "branch": "Multan",
-    "salary": 75000,
+    "salary": 60000,
     "joining_date": null,
     "leave_quotas": {
       "annual_leaves": 6,
@@ -14,7 +14,7 @@
   },
   "EMP-0001": {
     "branch": "Multan",
-    "salary": 75000,
+    "salary": 60000,
     "joining_date": null,
     "leave_quotas": {
       "annual_leaves": 6,
@@ -27,7 +27,7 @@
   },
   "6d06d295-7618-4d8e-b48d-7bb3ddeb257e": {
     "branch": "Multan",
-    "salary": 67000,
+    "salary": 75000,
     "joining_date": null,
     "is_old_staff": true,
     "leave_quotas": {
@@ -40,7 +40,7 @@
   },
   "EMP-0002": {
     "branch": "Multan",
-    "salary": 67000,
+    "salary": 75000,
     "joining_date": null,
     "is_old_staff": true,
     "leave_quotas": {
@@ -53,7 +53,7 @@
   },
   "3823d7df-5be6-4932-ab0c-0bdbf252338e": {
     "branch": "Multan",
-    "salary": null,
+    "salary": 55000,
     "joining_date": "2025-09-01",
     "leave_quotas": {
       "annual_leaves": 6,
@@ -66,7 +66,7 @@
   },
   "EMP-0004": {
     "branch": "Multan",
-    "salary": null,
+    "salary": 55000,
     "joining_date": "2025-09-01",
     "leave_quotas": {
       "annual_leaves": 6,
@@ -79,7 +79,7 @@
   },
   "ad15c7a8-b660-475a-90e0-cbf7bd4f12ee": {
     "branch": "Multan",
-    "salary": null,
+    "salary": 55000,
     "joining_date": "2025-06-15",
     "is_old_staff": false,
     "leave_quotas": {
@@ -92,7 +92,7 @@
   },
   "EMP-0003": {
     "branch": "Multan",
-    "salary": null,
+    "salary": 55000,
     "joining_date": "2025-06-15",
     "is_old_staff": false,
     "leave_quotas": {
@@ -105,7 +105,7 @@
   },
   "7fa77f7b-5dc4-4d7c-a079-9c5e9414c052": {
     "branch": "Multan",
-    "salary": null,
+    "salary": 75000,
     "joining_date": "2025-06-14",
     "is_old_staff": false,
     "leave_quotas": {
@@ -118,7 +118,7 @@
   },
   "EMP-0012": {
     "branch": "Multan",
-    "salary": null,
+    "salary": 75000,
     "joining_date": "2025-06-14",
     "is_old_staff": false,
     "leave_quotas": {
@@ -131,7 +131,7 @@
   },
   "b18d48d1-0aa2-4218-b076-83d1903f1e2d": {
     "branch": "Lahore",
-    "salary": null,
+    "salary": 75000,
     "joining_date": null,
     "is_old_staff": true,
     "leave_quotas": {
@@ -144,7 +144,7 @@
   },
   "EMP-0009": {
     "branch": "Lahore",
-    "salary": null,
+    "salary": 75000,
     "joining_date": null,
     "is_old_staff": true,
     "leave_quotas": {
@@ -157,7 +157,7 @@
   },
   "b9f44a0d-205d-40d4-a9fd-13676d90a615": {
     "branch": "Lahore",
-    "salary": null,
+    "salary": 52000,
     "joining_date": "2024-12-10",
     "is_old_staff": false,
     "leave_quotas": {
@@ -170,7 +170,7 @@
   },
   "EMP-0008": {
     "branch": "Lahore",
-    "salary": null,
+    "salary": 52000,
     "joining_date": "2024-12-10",
     "is_old_staff": false,
     "leave_quotas": {
@@ -183,7 +183,7 @@
   },
   "065b96de-d728-4e12-8a2e-e5dfea65a209": {
     "branch": "Lahore",
-    "salary": null,
+    "salary": 100000,
     "joining_date": "2025-08-05",
     "is_old_staff": false,
     "leave_quotas": {
@@ -196,7 +196,7 @@
   },
   "EMP-0013": {
     "branch": "Lahore",
-    "salary": null,
+    "salary": 100000,
     "joining_date": "2025-08-05",
     "is_old_staff": false,
     "leave_quotas": {
@@ -216,6 +216,188 @@
   "EMP-0010": {
     "branch": "Multan",
     "salary": 42500,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "93d5c952-48e0-4ea5-8724-701c6b32bddd": {
+    "branch": "Multan",
+    "salary": 37000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "EMP-0029": {
+    "branch": "Multan",
+    "salary": 37000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "3b12a0b5-a9a1-4676-a99b-61630ded92ac": {
+    "branch": "Multan",
+    "salary": 100000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "EMP-0007": {
+    "branch": "Multan",
+    "salary": 100000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "61f4c5e2-895d-4d9c-b3fe-4a94238972f6": {
+    "branch": "Multan",
+    "salary": 60000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "EMP-0006": {
+    "branch": "Multan",
+    "salary": 60000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "788ecf40-f162-4fcb-b122-0b7d18802a66": {
+    "branch": "Multan",
+    "salary": 33000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "EMP-0033": {
+    "branch": "Multan",
+    "salary": 33000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "915f3c54-ce42-4504-9b7e-e278bdc5fb2c": {
+    "branch": "Multan",
+    "salary": 42500,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false,
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 7,
+      "wfh_quota": 4,
+      "probation_leaves": 3
+    }
+  },
+  "EMP-0037": {
+    "branch": "Multan",
+    "salary": 42500,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false,
+    "leave_quotas": {
+      "annual_leaves": 6,
+      "sick_leaves": 7,
+      "casual_leaves": 7,
+      "wfh_quota": 4,
+      "probation_leaves": 3
+    }
+  },
+  "52ad0cdf-0a9c-4b06-951a-36ebb4ee9b13": {
+    "branch": "Multan",
+    "salary": 75000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "EMP-0014": {
+    "branch": "Multan",
+    "salary": 75000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "a3c33561-8ce7-48c3-a9cc-0ea351346e29": {
+    "branch": "Multan",
+    "salary": 60000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "EMP-0026": {
+    "branch": "Multan",
+    "salary": 60000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "5399a1b6-b047-42d8-90fc-7a5e54e0e193": {
+    "branch": "Multan",
+    "salary": 20000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "EMP-0027": {
+    "branch": "Multan",
+    "salary": 20000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "489e770b-ad67-476c-9598-d8d10c13f5f7": {
+    "branch": "Multan",
+    "salary": 100000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "EMP-0016": {
+    "branch": "Multan",
+    "salary": 100000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "78915d00-57b0-40d3-ad1d-a8d11a2c5188": {
+    "branch": "Multan",
+    "salary": 60000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "EMP-0024": {
+    "branch": "Multan",
+    "salary": 60000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "6c12514c-91d7-4e5f-9a8a-c88c53cc883d": {
+    "branch": "Multan",
+    "salary": 30000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "EMP-0023": {
+    "branch": "Multan",
+    "salary": 30000,
+    "joining_date": "2026-08-29",
+    "is_old_staff": false
+  },
+  "d4aa7858-259a-434c-b5b7-31b96143c72f": {
+    "branch": "Multan",
+    "salary": 50000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "EMP-0011": {
+    "branch": "Multan",
+    "salary": 50000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "34daf1a5-c378-4329-8352-b5ab1baecaad": {
+    "branch": "Multan",
+    "salary": 300000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "EMP-0017": {
+    "branch": "Multan",
+    "salary": 300000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "10e34a37-2fa5-45f8-9c14-43a464bd4857": {
+    "branch": "Multan",
+    "salary": 100000,
+    "joining_date": "2026-08-24",
+    "is_old_staff": false
+  },
+  "EMP-0005": {
+    "branch": "Multan",
+    "salary": 100000,
     "joining_date": "2026-08-24",
     "is_old_staff": false
   }
