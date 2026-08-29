@@ -1,4 +1,8 @@
-import { createClient } from '@/lib/supabase/client'
+import { createClient as createServerClient } from '@/lib/supabase/server'
+
+async function getSupabase() {
+  return await createServerClient()
+}
 import {
   Employee,
   AttendanceRecord,
@@ -75,7 +79,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
 
 export async function getAttendanceSettings(): Promise<AttendanceSettings> {
   try {
-    const supabase = createClient()
+    const supabase = await getSupabase()
     const { data, error } = await supabase
       .from('attendance_settings')
       .select('*')
@@ -104,7 +108,7 @@ export async function updateAttendanceSettings(
   }
 
   try {
-    const supabase = createClient()
+    const supabase = await getSupabase()
     const { data, error } = await supabase
       .from('attendance_settings')
       .upsert(updated)
@@ -276,7 +280,7 @@ export async function getEmployees(params?: {
   isActiveOnly?: boolean
 }): Promise<Employee[]> {
   try {
-    const supabase = createClient()
+    const supabase = await getSupabase()
     let query = supabase.from('employees').select('*').order('employee_id', { ascending: true })
 
     if (params?.isActiveOnly !== false) {
@@ -343,7 +347,7 @@ export async function getEmployees(params?: {
 
 export async function getEmployeeById(id: string): Promise<Employee | null> {
   try {
-    const supabase = createClient()
+    const supabase = await getSupabase()
     const { data, error } = await supabase
       .from('employees')
       .select('*')
@@ -413,7 +417,7 @@ export async function generateNextEmployeeId(): Promise<string> {
   let maxSeq = 0
 
   try {
-    const supabase = createClient()
+    const supabase = await getSupabase()
     const { data } = await supabase.from('employees').select('employee_id')
     if (data && data.length > 0) {
       for (const emp of data) {
@@ -479,7 +483,7 @@ export async function createEmployee(params: {
   }
 
   const employeeId = await generateNextEmployeeId()
-  const supabase = createClient()
+  const supabase = await getSupabase()
   
   const insertPayload: any = {
     employee_id: employeeId,
@@ -535,7 +539,7 @@ export async function updateEmployee(
     leave_quotas?: EmployeeLeaveQuotas
   }
 ): Promise<Employee> {
-  const supabase = createClient()
+  const supabase = await getSupabase()
   const updateData: any = {
     updated_at: new Date().toISOString(),
   }
@@ -642,7 +646,7 @@ export async function updateEmployee(
 }
 
 export async function deleteEmployee(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = await getSupabase()
   // 1. Delete associated attendance records
   await supabase
     .from('attendance_records')
@@ -695,7 +699,7 @@ export async function getAttendanceRecords(
   let allRecords: AttendanceRecord[] = []
 
   try {
-    const supabase = createClient()
+    const supabase = await getSupabase()
     let query = supabase.from('attendance_records').select('*')
 
     if (params.employeeId && params.employeeId !== 'all') {
@@ -1063,7 +1067,7 @@ export async function saveImportedAttendanceBatch(
     return { savedCount: 0, skippedDuplicates: 0, errors: [] }
   }
 
-  const supabase = createClient()
+  const supabase = await getSupabase()
   let savedCount = 0
   let skippedDuplicates = 0
   const errors: string[] = []
@@ -1183,7 +1187,7 @@ export async function getEmployeeLeaveBalanceSummary(
     probation_leaves: isOldStaff ? 0 : 3,
   }
 
-  const supabase = createClient()
+  const supabase = await getSupabase()
   const { data: allRecords } = await supabase
     .from('attendance_records')
     .select('id, attendance_date, arrival_status, departure_status, raw_punches')
@@ -1347,7 +1351,7 @@ export async function updateAttendanceRecord(
     notes?: string | null
   }
 ): Promise<AttendanceRecord> {
-  const supabase = createClient()
+  const supabase = await getSupabase()
 
   // If this is a synthetic absent record ID or missing ID, fallback to creating a manual record
   const isSynthetic = !id || id.startsWith('absent-') || id.startsWith('holiday-') || id.startsWith('dummy-')
@@ -1497,7 +1501,7 @@ export async function createManualAttendanceRecord(params: {
   departure_status?: string
   notes?: string | null
 }): Promise<AttendanceRecord> {
-  const supabase = createClient()
+  const supabase = await getSupabase()
   const settings = await getAttendanceSettings()
 
   const parsedDate = parseDateString(params.attendance_date)
@@ -1588,7 +1592,7 @@ export async function createManualAttendanceRecord(params: {
 }
 
 export async function deleteAttendanceRecord(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = await getSupabase()
   const { error } = await supabase.from('attendance_records').delete().eq('id', id)
   if (error) {
     throw new Error(error.message || 'Failed to delete attendance record from database')
@@ -1600,7 +1604,7 @@ export async function bulkDeleteAttendanceRecords(params: {
   endDate: string
   employeeId?: string
 }): Promise<{ deletedCount: number }> {
-  const supabase = createClient()
+  const supabase = await getSupabase()
   let query = supabase
     .from('attendance_records')
     .delete({ count: 'exact' })
