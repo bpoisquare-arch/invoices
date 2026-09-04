@@ -245,6 +245,7 @@ export default function EmployeeOverviewPage() {
           is_old_staff: editIsOldStaff,
           salary: targetSalary,
           is_active: editActive,
+          leave_quotas,
         }),
       })
 

@@ -24,6 +24,8 @@ import {
   writeEmployeeMetadata,
   readAllHolidays,
   writeHoliday,
+  getGazettedHolidays,
+  saveGazettedHoliday,
 } from './employee-storage'
 
 // Clean up stale localStorage cache from previous offline sync versions
@@ -133,8 +135,7 @@ export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?
   const fileMeta = readAllEmployeeMetadata()
 
   try {
-    const { createClient: createServerClient } = await import('@/lib/supabase/server')
-    const supabase = await createServerClient()
+    const supabase = await getSupabase()
     const { data, error } = await supabase
       .from('attendance_audit_logs')
       .select('details')
@@ -148,9 +149,10 @@ export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?
     }
 
     if (data && data.details && typeof data.details === 'object') {
+      const dbMeta = data.details as Record<string, any>
       return {
-        ...(data.details as Record<string, any>),
         ...fileMeta,
+        ...dbMeta, // DB metadata MUST override initial static file metadata
       }
     }
   } catch (err) {
@@ -163,10 +165,10 @@ export async function saveEmployeeMetadata(
   idOrEmpId: string,
   meta: { branch?: string | null; salary?: number | null; joining_date?: string | null; is_old_staff?: boolean | null; leave_quotas?: EmployeeLeaveQuotas }
 ): Promise<void> {
-  // 1. Write immediately to server-side permanent file store
+  // 1. Write immediately to server-side in-memory & file store
   writeEmployeeMetadata(idOrEmpId, meta)
 
-  // 2. Also attempt DB audit logs store
+  // 2. Also persist to Supabase attendance_audit_logs store
   try {
     const currentMap = await getEmployeeMetadataMap()
     const existing = currentMap[idOrEmpId] || {}
@@ -179,8 +181,7 @@ export async function saveEmployeeMetadata(
       ...(meta.leave_quotas !== undefined ? { leave_quotas: meta.leave_quotas } : {}),
     }
 
-    const { createClient: createServerClient } = await import('@/lib/supabase/server')
-    const supabase = await createServerClient()
+    const supabase = await getSupabase()
     const { error } = await supabase.from('attendance_audit_logs').insert({
       action: 'EMPLOYEE_METADATA_STORE',
       details: currentMap as any,
@@ -864,7 +865,7 @@ export async function getAttendanceSummary(params?: {
   let totalWorkingMinutes = 0
   let requiredWorkingMinutes = 0
 
-  const holidaysMap = readAllHolidays()
+  const holidaysMap = await getGazettedHolidays()
 
   // Helper to check if a record represents an approved leave (case-insensitive)
   const isLeaveRecord = (rec?: AttendanceRecordWithEmployee | null): boolean => {
@@ -1103,7 +1104,7 @@ export async function saveImportedAttendanceBatch(
 
   for (const d of datesWithPresence) {
     try {
-      writeHoliday(d, undefined, false)
+      await saveGazettedHoliday(d, undefined, false)
     } catch {
       // ignore
     }

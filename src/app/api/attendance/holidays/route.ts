@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readAllHolidays, writeHoliday } from '@/lib/services/employee-storage'
+import { getGazettedHolidays, saveGazettedHoliday } from '@/lib/services/employee-storage'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    const holidays = readAllHolidays()
+    const holidays = await getGazettedHolidays()
     return NextResponse.json({ success: true, holidays })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const updatedHolidays = writeHoliday(
+    const updatedHolidays = await saveGazettedHoliday(
       date.trim(),
       name,
       isHoliday !== undefined ? Boolean(isHoliday) : true
@@ -35,3 +35,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
+
