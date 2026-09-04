@@ -413,7 +413,6 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           holiday++
         } else if (isWfh) {
           wfh++
-          present++
         } else if (isLeave) {
           leave++
         } else if (hasPunches) {
@@ -427,7 +426,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
       const totalDays = list.length
       const totalWorkingDays = Math.max(0, totalDays - holiday)
-      const effectiveWorkingDays = Math.max(0, totalWorkingDays - leave)
+      const paidDays = present + wfh + leave
 
       return {
         present,
@@ -438,11 +437,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         future,
         totalDays,
         totalWorkingDays,
-        effectiveWorkingDays,
+        paidDays,
       }
     }
 
-    // 1. Full Month Statistics (to determine stable Daily Rate)
+    // 1. Full Month Statistics (to determine stable Daily Rate across full month working days)
     const fullMonthStats = getStats(fullMonthRecords.length > 0 ? fullMonthRecords : records)
 
     // 2. Active date range statistics
@@ -462,21 +461,22 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     const commissionAmount = monthlyCommission.amount || 0
     const grossMonthlySalary = baseSalary !== null ? baseSalary + commissionAmount : commissionAmount > 0 ? commissionAmount : 0
 
-    // Daily Rate = Total Gross Monthly Salary / Effective Working Days of the ENTIRE Month (excludes Sundays, Holidays, and Leaves)
-    const perDaySalary = fullMonthStats.effectiveWorkingDays > 0 && grossMonthlySalary > 0
-      ? grossMonthlySalary / fullMonthStats.effectiveWorkingDays
+    // Daily Rate = Total Gross Monthly Salary / Total Working Days of the ENTIRE Month (excludes Sundays and Gazetted Holidays)
+    const monthWorkingDays = fullMonthStats.totalWorkingDays > 0 ? fullMonthStats.totalWorkingDays : 26
+    const perDaySalary = monthWorkingDays > 0 && grossMonthlySalary > 0
+      ? grossMonthlySalary / monthWorkingDays
       : 0
 
-    // Pro-rated gross salary for the range based on working days in this range
-    const proRatedGross = fullMonthStats.effectiveWorkingDays > 0
-      ? (rangeStats.effectiveWorkingDays / fullMonthStats.effectiveWorkingDays) * grossMonthlySalary
-      : 0
+    // Paid Days in active range (Present + WFH + Leaves)
+    const paidDays = rangeStats.paidDays
+    const absentDays = rangeStats.absent
+    const absentDeduction = Math.round(absentDays * perDaySalary)
 
-    // Absent Deduction = Absent Days in Range * Daily Rate
-    const absentDeduction = Math.round(rangeStats.absent * perDaySalary)
-
-    // Net Payable Salary = Pro-rated gross - absent deduction
-    const totalEarnedSalary = Math.max(0, Math.round(proRatedGross - absentDeduction))
+    // Earned Salary = Paid Days * Per Day Salary (capped at grossMonthlySalary if all month days paid)
+    const isFullMonthCompleted = rangeStats.future === 0 && rangeStats.totalDays === fullMonthStats.totalDays
+    const totalEarnedSalary = isFullMonthCompleted
+      ? Math.max(0, Math.round(grossMonthlySalary - absentDeduction))
+      : Math.min(grossMonthlySalary, Math.round(paidDays * perDaySalary))
 
     const hasSalaryConfigured = (baseSalary !== null && baseSalary > 0) || commissionAmount > 0
 
@@ -487,9 +487,10 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       holidayDays: rangeStats.holiday,
       absentDays: rangeStats.absent,
       futureDays: rangeStats.future,
+      paidDays,
       totalDaysInMonth: rangeStats.totalDays,
       totalWorkingDays: rangeStats.totalWorkingDays,
-      effectiveWorkingDays: rangeStats.effectiveWorkingDays,
+      monthWorkingDays,
       baseSalary,
       commissionAmount,
       grossMonthlySalary,
@@ -497,7 +498,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       absentDeduction,
       totalEarnedSalary,
       hasSalaryConfigured,
-      isFullSalaryPayable: rangeStats.absent === 0 && hasSalaryConfigured,
+      isFullSalaryPayable: rangeStats.absent === 0 && rangeStats.future === 0 && hasSalaryConfigured,
       hasAbsents: rangeStats.absent > 0,
     }
   }, [fullMonthRecords, records, employee, holidays, monthlyCommission, startDate, endDate, selectedMonth])
@@ -583,9 +584,9 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 xl:grid-cols-8 gap-3">
         {/* 1. Total Working Days */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Working Days</p>
-          <p className="text-2xl font-extrabold text-[#003D5C] mt-1">{salaryStats.effectiveWorkingDays}</p>
-          <p className="text-[11px] text-slate-400 mt-1">Excl. Holidays & Leaves</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Month Working Days</p>
+          <p className="text-2xl font-extrabold text-[#003D5C] mt-1">{salaryStats.monthWorkingDays}</p>
+          <p className="text-[11px] text-slate-400 mt-1">Excl. Sundays & Holidays</p>
         </div>
 
         {/* 2. On-Time Arrival */}
@@ -680,9 +681,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             >
               {!salaryStats.hasSalaryConfigured
                 ? 'Not Set'
-                : salaryStats.absentDays === 0
-                ? '100% Payable'
-                : `${salaryStats.absentDays} Absent(s) Deducted`}
+                : `${salaryStats.paidDays}/${salaryStats.monthWorkingDays} Paid Days`}
             </span>
           </div>
           <p className="text-[15px] sm:text-base font-extrabold text-slate-900 mt-1 font-mono tracking-tight whitespace-nowrap">
@@ -701,11 +700,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           >
             {!salaryStats.hasSalaryConfigured
               ? 'Salary not configured'
-              : salaryStats.absentDays === 0
-              ? salaryStats.commissionAmount > 0
-                ? `Base + PKR ${salaryStats.commissionAmount.toLocaleString()} Commission • 0 Absents`
-                : '0 Absents • Full Base Salary'
-              : `-PKR ${salaryStats.absentDeduction.toLocaleString()} deducted (${salaryStats.absentDays}d × PKR ${salaryStats.perDaySalary}/d)`}
+              : `PKR ${salaryStats.grossMonthlySalary.toLocaleString()} Total Gross • ${
+                  salaryStats.absentDays > 0
+                    ? `-${salaryStats.absentDeduction.toLocaleString()} (${salaryStats.absentDays}d Absent)`
+                    : `PKR ${salaryStats.perDaySalary}/d`
+                }`}
           </p>
         </div>
       </div>
@@ -723,7 +722,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                   Salary & Commission Status
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Monthly payable earnings including attendance & custom commission.
+                  Monthly package, daily rate, and earned salary to-date.
                 </p>
               </div>
             </div>
@@ -741,7 +740,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           {/* Quick Metrics Badges & Commission Button */}
           <div className="flex items-center gap-2 flex-wrap pt-1">
             <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
-              Base Salary: <strong className="text-slate-900 font-mono">{salaryStats.baseSalary ? `PKR ${salaryStats.baseSalary.toLocaleString()}` : 'Not Configured'}</strong>
+              Total Package: <strong className="text-slate-900 font-mono">{salaryStats.grossMonthlySalary ? `PKR ${salaryStats.grossMonthlySalary.toLocaleString()}` : 'Not Set'}</strong>
             </span>
 
             {/* Monthly Commission Badge + Action Button */}
@@ -769,14 +768,8 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             </div>
 
             <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
-              Attended: <strong className="font-mono">{salaryStats.presentDays} Days</strong>
-              {salaryStats.wfhDays > 0 && (
-                <span className="text-cyan-700 ml-1">({salaryStats.wfhDays} WFH)</span>
-              )}
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 text-xs font-semibold border border-indigo-200">
-              Approved Leaves: <strong className="font-mono">{salaryStats.leaveDays} Days</strong>
-              <span className="text-indigo-600 ml-1">(Paid • {salaryStats.effectiveWorkingDays} req. days)</span>
+              Earned Days: <strong className="font-mono">{salaryStats.paidDays} Days</strong>
+              <span className="text-emerald-700 ml-1">({salaryStats.presentDays} Pres{salaryStats.wfhDays > 0 ? `, ${salaryStats.wfhDays} WFH` : ''}{salaryStats.leaveDays > 0 ? `, ${salaryStats.leaveDays} Leaves` : ''})</span>
             </span>
             <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${
               salaryStats.absentDays > 0
@@ -785,11 +778,12 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             }`}>
               Absents: <strong className="font-mono">{salaryStats.absentDays} Days</strong>
               {salaryStats.absentDays > 0 && (
-                <span className="text-rose-600 ml-1">(-PKR {salaryStats.absentDeduction.toLocaleString()})</span>
+                <span className="text-rose-600 ml-1">(-PKR ${salaryStats.absentDeduction.toLocaleString()})</span>
               )}
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
               Daily Rate: <strong className="font-mono text-slate-900">PKR {salaryStats.perDaySalary.toLocaleString()}/day</strong>
+              <span className="text-slate-500 ml-1">({salaryStats.monthWorkingDays} Working Days)</span>
             </span>
           </div>
         </div>
@@ -797,7 +791,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         {/* Right Status Banner */}
         <div className="lg:text-right border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 lg:pl-6 shrink-0 min-w-64">
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Total Net Payable Salary
+            Earned Salary (To-Date)
           </p>
           {salaryStats.hasSalaryConfigured ? (
             <div>
@@ -809,9 +803,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                   <div className="flex items-center gap-1 text-emerald-700">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     <span>
-                      {salaryStats.commissionAmount > 0
-                        ? `Base (${salaryStats.baseSalary?.toLocaleString()}) + Comm (${salaryStats.commissionAmount.toLocaleString()})`
-                        : 'Full Base Salary (0 Absents)'}
+                      PKR {salaryStats.grossMonthlySalary.toLocaleString()} Total Package ({salaryStats.paidDays}/{salaryStats.monthWorkingDays} Days Paid)
                     </span>
                   </div>
                 ) : (
@@ -824,7 +816,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                 )}
               </div>
               <p className="text-[10px] text-slate-500 font-mono mt-1">
-                Rate: PKR {salaryStats.perDaySalary.toLocaleString()}/working day ({salaryStats.totalWorkingDays} total working days)
+                Rate: PKR {salaryStats.perDaySalary.toLocaleString()}/day • Total Gross: PKR {salaryStats.grossMonthlySalary.toLocaleString()}
               </p>
             </div>
           ) : (
