@@ -93,22 +93,44 @@ export default function InstallmentsPage() {
   async function handleDownloadPDF(schedule: StudentInstallmentSchedule) {
     try {
       setDownloadingId(schedule.id)
+      const studentNameStr = schedule.student_name
+        ? schedule.student_name.trim().replace(/[/\\?%*:|"<>]/g, '').replace(/\s+/g, '-')
+        : (schedule.student_id || 'AIMT')
+      const fileName = `Installment-Schedule-${studentNameStr}.pdf`
+
+      // 1. Try server-side streaming PDF route first
+      try {
+        const response = await fetch(`/api/installments-pdf/${schedule.id}`)
+        if (response.ok) {
+          const blob = await response.blob()
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = fileName
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+          return
+        }
+      } catch (serverErr) {
+        console.warn('Server PDF streaming failed, trying client-side renderer:', serverErr)
+      }
+
+      // 2. Client-side @react-pdf/renderer fallback
       const fixedInfo = getAimtFixedInfo()
       const blob = await pdf(<AimtSchedulePDFTemplate schedule={schedule} fixedInfo={fixedInfo} />).toBlob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const studentNameStr = schedule.student_name
-        ? schedule.student_name.trim().replace(/[/\\?%*:|"<>]/g, '').replace(/\s+/g, '-')
-        : (schedule.student_id || 'AIMT')
-      a.download = `Installment-Schedule-${studentNameStr}.pdf`
+      a.download = fileName
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (err: any) {
-      console.error('PDF generation failed:', err)
-      alert(`Failed to generate PDF: ${err?.message || 'Unknown error'}`)
+      console.error('PDF generation failed, opening direct link:', err)
+      window.open(`/api/installments-pdf/${schedule.id}`, '_blank')
     } finally {
       setDownloadingId(null)
     }

@@ -183,6 +183,20 @@ interface AimtSchedulePDFTemplateProps {
 }
 
 export default function AimtSchedulePDFTemplate({ schedule, fixedInfo = DEFAULT_AIMT_FIXED_INFO }: AimtSchedulePDFTemplateProps) {
+  const getFullUrl = (url?: string) => {
+    if (!url) return undefined
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+      return url
+    }
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`
+    }
+    return url
+  }
+
+  const elementsSrc = getFullUrl('/elements.png') || '/elements.png'
+  const logoSrc = getFullUrl(fixedInfo.logo_url || '/aimt-logo.png') || '/aimt-logo.png'
+
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A'
     const parts = dateStr.split('-')
@@ -204,13 +218,13 @@ export default function AimtSchedulePDFTemplate({ schedule, fixedInfo = DEFAULT_
       <Page size="A4" style={[styles.page, { position: 'relative' }]}>
         {/* Top-Right Corner Accent Image (Matching Web Preview 1:1 scale and bleed) */}
         <Image
-          src="/elements.png"
+          src={elementsSrc}
           style={{ position: 'absolute', top: -10, right: -36, width: 175, height: 165, objectFit: 'contain' }}
         />
 
         {/* Bottom-Left Corner Accent Image (Matching Web Preview 1:1 scale and bleed) */}
         <Image
-          src="/elements.png"
+          src={elementsSrc}
           style={{ position: 'absolute', bottom: -10, left: -36, width: 175, height: 165, objectFit: 'contain', transform: 'rotate(180deg)' }}
         />
 
@@ -218,7 +232,7 @@ export default function AimtSchedulePDFTemplate({ schedule, fixedInfo = DEFAULT_
         <View style={styles.headerRow}>
           {/* Left Side: Logo + Fixed Info */}
           <View style={{ width: 250, alignItems: 'flex-start' }}>
-            <Image src={fixedInfo.logo_url || '/aimt-logo.png'} style={styles.logoImage} />
+            <Image src={logoSrc} style={styles.logoImage} />
             <Text style={styles.collegeName}>{fixedInfo.college_name}</Text>
             <Text style={[styles.collegeMeta, { textAlign: 'left' }]}>Address: {fixedInfo.address}</Text>
             <Text style={[styles.collegeMeta, { textAlign: 'left' }]}>RTO: {fixedInfo.rto}, CRICOS: {fixedInfo.cricos}</Text>
@@ -333,7 +347,7 @@ export default function AimtSchedulePDFTemplate({ schedule, fixedInfo = DEFAULT_
         {/* Center Page Background Watermark Logo (Placed LAST in JSX to render ON TOP of table rows with opacity) */}
         <View style={{ position: 'absolute', top: 220, left: 100, width: 390, height: 280, opacity: 0.12 }}>
           <Image
-            src={fixedInfo.logo_url || '/aimt-logo.png'}
+            src={logoSrc}
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           />
         </View>
