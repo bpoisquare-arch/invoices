@@ -503,7 +503,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
   }, [fullMonthRecords, records, employee, holidays, monthlyCommission, startDate, endDate, selectedMonth])
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto font-sans">
+    <div className="space-y-6 max-w-full mx-auto font-sans">
       {/* Back Button */}
       <div>
         <Link
@@ -580,7 +580,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       </div>
 
       {/* Metrics Summary Bento Grid (8 Cards) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 xl:grid-cols-8 gap-3">
         {/* 1. Total Working Days */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Working Days</p>

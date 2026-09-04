@@ -1,19 +1,11 @@
 import type { Metadata } from "next";
-import { Poppins, Montserrat } from "next/font/google";
+import { Geist } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const poppins = Poppins({
+const geist = Geist({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-poppins",
-  display: "swap",
-});
-
-const montserrat = Montserrat({
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
-  variable: "--font-montserrat",
+  variable: "--font-geist",
   display: "swap",
 });
 
@@ -28,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`h-full antialiased ${poppins.variable} ${montserrat.variable}`}>
-      <body className={`min-h-full flex flex-col bg-[#F8FAFC] text-slate-900 ${poppins.className}`}>
+    <html lang="en" className={`h-full antialiased ${geist.variable}`}>
+      <body className={`min-h-full flex flex-col bg-[#F8FAFC] text-slate-900 font-sans ${geist.className}`}>
         <TooltipProvider delay={0}>
           {children}
         </TooltipProvider>
@@ -37,3 +29,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+
