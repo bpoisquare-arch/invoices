@@ -26,7 +26,16 @@ import {
   ArrowUp,
   ArrowDown,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -231,8 +240,39 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
         const existing = recordsByDate.get(dStr)
 
+        const hasPunches =
+          Boolean(existing?.in_time && existing.in_time !== '---') ||
+          Boolean(existing?.out_time && existing.out_time !== '---') ||
+          (existing?.total_working_minutes ? existing.total_working_minutes > 0 : false)
+
+        const isExplicitLeaveOrWfh =
+          existing?.arrival_status === 'Leave' ||
+          existing?.arrival_status === 'Work From Home' ||
+          existing?.departure_status === 'Work From Home' ||
+          existing?.notes?.includes('Work From Home') ||
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(existing?.departure_status as any) ||
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(existing?.arrival_status as any)
+
         if (existing) {
-          fullGridRows.push(existing)
+          if (isGazettedHoliday && !hasPunches && !isExplicitLeaveOrWfh) {
+            fullGridRows.push({
+              ...existing,
+              arrival_status: 'Gazetted Holiday',
+              departure_status: holMap[dStr] ? `Gazetted Holiday (${holMap[dStr]})` : 'Gazetted Holiday',
+              total_working_minutes: 0,
+              total_working_hours_formatted: '00:00',
+            })
+          } else if (isSunday && !hasPunches && !isExplicitLeaveOrWfh) {
+            fullGridRows.push({
+              ...existing,
+              arrival_status: 'Holiday',
+              departure_status: 'Sunday Holiday',
+              total_working_minutes: 0,
+              total_working_hours_formatted: '00:00',
+            })
+          } else {
+            fullGridRows.push(existing)
+          }
         } else if (isSunday || isGazettedHoliday) {
           fullGridRows.push({
             id: `holiday-${dStr}`,
@@ -389,7 +429,20 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       list.forEach((r) => {
         const isSunday = (r.day_of_week || '').toLowerCase() === 'sunday'
         const isGazettedHoliday = Boolean(r.attendance_date && holidays[r.attendance_date.split('T')[0]])
-        const isHoliday = isSunday || isGazettedHoliday || r.arrival_status === 'Holiday' || r.arrival_status === 'Gazetted Holiday'
+        const hasPunches =
+          Boolean(r.in_time && r.in_time !== '---') ||
+          Boolean(r.out_time && r.out_time !== '---') ||
+          (r.total_working_minutes ? r.total_working_minutes > 0 : false)
+
+        const isHoliday =
+          (isSunday && !hasPunches) ||
+          (isGazettedHoliday && !hasPunches) ||
+          r.arrival_status === 'Holiday' ||
+          r.arrival_status === 'Gazetted Holiday' ||
+          r.arrival_status?.toLowerCase().includes('holiday') ||
+          r.departure_status === 'Holiday' ||
+          r.departure_status === 'Gazetted Holiday' ||
+          r.departure_status?.toLowerCase().includes('holiday')
 
         const isWfh =
           r.departure_status === 'Work From Home' ||
@@ -402,17 +455,13 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(r.departure_status as any) ||
           ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(r.arrival_status as any)
 
-        const hasPunches =
-          Boolean(r.in_time && r.in_time !== '---') ||
-          Boolean(r.out_time && r.out_time !== '---') ||
-          (r.total_working_minutes ? r.total_working_minutes > 0 : false)
-
         const isNeutralPlaceholder = r.arrival_status === '--' || r.departure_status === '--'
 
         if (isHoliday) {
           holiday++
         } else if (isWfh) {
           wfh++
+          present++
         } else if (isLeave) {
           leave++
         } else if (hasPunches) {
@@ -517,32 +566,33 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       </div>
 
       {/* Employee Profile Header Card */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-6 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <Card className="p-6 shadow-2xs border-slate-200/90 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-[#001E2F] text-[#81F5F5] font-extrabold text-2xl flex items-center justify-center shadow-xs">
             {employee?.name?.charAt(0) || 'E'}
           </div>
           <div>
             <div className="flex items-center gap-3 flex-wrap">
-              <h2 className="font-['Montserrat'] text-2xl font-extrabold text-[#003D5C] tracking-tight">
+              <h2 className="text-2xl font-extrabold text-[#003D5C] tracking-tight">
                 {employee?.name || 'Employee'}
               </h2>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#009D9E]/10 text-[#009D9E]">
+              <Badge variant="outline" className="font-mono text-xs font-bold bg-[#009D9E]/10 text-[#009D9E] border-[#009D9E]/30">
                 {employee?.employee_id || 'N/A'}
-              </span>
-              <span
-                className={`px-2.5 py-0.5 rounded text-xs font-bold ${
+              </Badge>
+              <Badge
+                variant={
                   (employee?.branch || '').toLowerCase() === 'lahore'
-                    ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                    ? 'purple'
                     : (employee?.branch || '').toLowerCase() === 'onshore'
-                    ? 'bg-teal-100 text-teal-800 border border-teal-200'
+                    ? 'info'
                     : (employee?.branch || '').toLowerCase() === 'aimt'
-                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                    : 'bg-blue-100 text-blue-800 border border-blue-200'
-                }`}
+                    ? 'warning'
+                    : 'info'
+                }
+                className="text-xs font-bold"
               >
                 {employee?.branch || 'Multan'} Branch
-              </span>
+              </Badge>
             </div>
             <p className="text-sm font-semibold text-slate-500 mt-0.5">
               {(employee?.designation || 'Staff')
@@ -551,10 +601,10 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                 .trim()}
               {employee?.joining_date
                 ? ` • Joined: ${new Date(employee.joining_date).toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                  })}`
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                })}`
                 : ''}
               {employee?.salary ? ` • Salary: PKR ${Number(employee.salary).toLocaleString()}` : ''}
             </p>
@@ -578,57 +628,57 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             </Button>
           </Link>
         </div>
-      </div>
+      </Card>
 
       {/* Metrics Summary Bento Grid (8 Cards) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 xl:grid-cols-8 gap-3">
         {/* 1. Total Working Days */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+        <Card className="p-3 shadow-2xs border-slate-200/80">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Month Working Days</p>
           <p className="text-2xl font-extrabold text-[#003D5C] mt-1">{salaryStats.monthWorkingDays}</p>
           <p className="text-[11px] text-slate-400 mt-1">Excl. Sundays & Holidays</p>
-        </div>
+        </Card>
 
         {/* 2. On-Time Arrival */}
-        <div className="bg-white border border-emerald-200/80 rounded-xl p-3 shadow-2xs bg-emerald-50/10">
+        <Card className="p-3 shadow-2xs border-emerald-200/80 bg-emerald-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">On Time Arrival</p>
           <p className="text-2xl font-extrabold text-emerald-600 mt-1">{summary.onTimeArrivals}</p>
           <p className="text-[11px] text-emerald-700 font-semibold mt-1">{summary.onTimeArrivalRate}% rate</p>
-        </div>
+        </Card>
 
         {/* 3. Late Arrival */}
-        <div className="bg-white border border-amber-200/80 rounded-xl p-3 shadow-2xs bg-amber-50/10">
+        <Card className="p-3 shadow-2xs border-amber-200/80 bg-amber-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Late Arrivals</p>
           <p className="text-2xl font-extrabold text-amber-600 mt-1">{summary.lateArrivals}</p>
           <p className="text-[11px] text-amber-700 font-semibold mt-1">After cutoff</p>
-        </div>
+        </Card>
 
         {/* 4. On-Time Departure */}
-        <div className="bg-white border border-emerald-200/80 rounded-xl p-3 shadow-2xs bg-emerald-50/10">
+        <Card className="p-3 shadow-2xs border-emerald-200/80 bg-emerald-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">On Time Departure</p>
           <p className="text-2xl font-extrabold text-emerald-600 mt-1">{summary.onTimeDepartures}</p>
           <p className="text-[11px] text-emerald-700 font-semibold mt-1">{summary.onTimeDepartureRate}% rate</p>
-        </div>
+        </Card>
 
         {/* 5. Early Departure */}
-        <div className="bg-white border border-rose-200/80 rounded-xl p-3 shadow-2xs bg-rose-50/10">
+        <Card className="p-3 shadow-2xs border-rose-200/80 bg-rose-50/10">
           <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Early Departure</p>
           <p className="text-2xl font-extrabold text-rose-600 mt-1">{summary.earlyDepartures}</p>
           <p className="text-[11px] text-rose-700 font-semibold mt-1">Left early</p>
-        </div>
+        </Card>
 
         {/* 6. Attended Days */}
-        <div className="bg-white border border-blue-200/80 rounded-xl p-3 shadow-2xs bg-blue-50/15">
+        <Card className="p-3 shadow-2xs border-blue-200/80 bg-blue-50/15">
           <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Attended Days</p>
           <p className="text-2xl font-extrabold text-blue-900 mt-1 font-mono">
             {salaryStats.presentDays}
           </p>
           <p className="text-[11px] text-blue-600/80 font-medium mt-1">Days attended</p>
-        </div>
+        </Card>
 
         {/* 7. Total Hours */}
-        <div
-          className={`bg-white border rounded-xl p-3 shadow-2xs transition-all ${
+        <Card
+          className={`p-3 shadow-2xs transition-all ${
             summary.differenceMinutes >= 0
               ? 'border-emerald-200/80 bg-emerald-50/20'
               : 'border-amber-200/80 bg-amber-50/20'
@@ -636,15 +686,12 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         >
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Hours</p>
-            <span
-              className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${
-                summary.differenceMinutes >= 0
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-amber-100 text-amber-800'
-              }`}
+            <Badge
+              variant={summary.differenceMinutes >= 0 ? 'success' : 'warning'}
+              className="text-[10px] font-bold px-1.5 py-0.2 font-mono"
             >
               {summary.formattedDifference}
-            </span>
+            </Badge>
           </div>
           <p className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">
             {summary.formattedTotalHours}
@@ -656,11 +703,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           >
             {summary.hoursCompletionRate}% completed
           </p>
-        </div>
+        </Card>
 
         {/* 8. Earned / Payable Salary Card */}
-        <div
-          className={`bg-white border rounded-xl p-3 shadow-2xs transition-all ${
+        <Card
+          className={`p-3 shadow-2xs transition-all ${
             !salaryStats.hasSalaryConfigured
               ? 'border-slate-200/80'
               : salaryStats.absentDays === 0
@@ -670,19 +717,14 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         >
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Earned Salary</p>
-            <span
-              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                !salaryStats.hasSalaryConfigured
-                  ? 'bg-slate-100 text-slate-600'
-                  : salaryStats.absentDays === 0
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-amber-100 text-amber-900'
-              }`}
+            <Badge
+              variant={!salaryStats.hasSalaryConfigured ? 'secondary' : salaryStats.absentDays === 0 ? 'success' : 'warning'}
+              className="text-[9px] font-bold px-1.5 py-0.2"
             >
               {!salaryStats.hasSalaryConfigured
                 ? 'Not Set'
                 : `${salaryStats.paidDays}/${salaryStats.monthWorkingDays} Paid Days`}
-            </span>
+            </Badge>
           </div>
           <p className="text-[15px] sm:text-base font-extrabold text-slate-900 mt-1 font-mono tracking-tight whitespace-nowrap">
             {salaryStats.hasSalaryConfigured
@@ -706,11 +748,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                     : `PKR ${salaryStats.perDaySalary}/d`
                 }`}
           </p>
-        </div>
+        </Card>
       </div>
 
       {/* Dedicated Salary & Attendance Section (with Month Selection & Commission) */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+      <Card className="p-5 shadow-2xs border-slate-200/90 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
         <div className="space-y-3 flex-1">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
@@ -718,7 +760,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                 <Banknote className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-['Montserrat'] text-sm sm:text-base font-bold text-[#003D5C] tracking-tight">
+                <h3 className="text-sm sm:text-base font-bold text-[#003D5C] tracking-tight">
                   Salary & Commission Status
                 </h3>
                 <p className="text-xs text-slate-500">
@@ -745,7 +787,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
             {/* Monthly Commission Badge + Action Button */}
             <div className="flex items-center gap-1.5">
-              <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 text-xs font-semibold border border-amber-200/90 flex items-center gap-1.5 shadow-2xs">
+              <Badge variant="warning" className="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 Commission:{' '}
                 <strong className="font-mono text-amber-950 font-bold">
@@ -753,7 +795,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                     ? `+ PKR ${salaryStats.commissionAmount.toLocaleString()}`
                     : 'PKR 0'}
                 </strong>
-              </span>
+              </Badge>
               <Button
                 type="button"
                 variant="outline"
@@ -767,20 +809,21 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               </Button>
             </div>
 
-            <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
-              Earned Days: <strong className="font-mono">{salaryStats.paidDays} Days</strong>
+            <Badge variant="success" className="px-2.5 py-1 text-xs font-semibold">
+              Earned Days: <strong className="font-mono ml-1">{salaryStats.paidDays} Days</strong>
               <span className="text-emerald-700 ml-1">({salaryStats.presentDays} Pres{salaryStats.wfhDays > 0 ? `, ${salaryStats.wfhDays} WFH` : ''}{salaryStats.leaveDays > 0 ? `, ${salaryStats.leaveDays} Leaves` : ''})</span>
-            </span>
-            <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${
-              salaryStats.absentDays > 0
-                ? 'bg-rose-50 text-rose-800 border-rose-200'
-                : 'bg-slate-50 text-slate-600 border-slate-200'
-            }`}>
-              Absents: <strong className="font-mono">{salaryStats.absentDays} Days</strong>
+            </Badge>
+
+            <Badge
+              variant={salaryStats.absentDays > 0 ? 'destructive' : 'secondary'}
+              className="px-2.5 py-1 text-xs font-semibold"
+            >
+              Absents: <strong className="font-mono ml-1">{salaryStats.absentDays} Days</strong>
               {salaryStats.absentDays > 0 && (
-                <span className="text-rose-600 ml-1">(-PKR ${salaryStats.absentDeduction.toLocaleString()})</span>
+                <span className="text-rose-600 ml-1">(-PKR {salaryStats.absentDeduction.toLocaleString()})</span>
               )}
-            </span>
+            </Badge>
+
             <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
               Daily Rate: <strong className="font-mono text-slate-900">PKR {salaryStats.perDaySalary.toLocaleString()}/day</strong>
               <span className="text-slate-500 ml-1">({salaryStats.monthWorkingDays} Working Days)</span>
@@ -830,10 +873,10 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             </div>
           )}
         </div>
-      </div>
+      </Card>
 
-      {/* Filter Bar */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Filter Bar with Month, Year, Status & Sort */}
+      <Card className="p-4 shadow-2xs border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-wrap flex-1">
           <div>
             <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Month</label>
@@ -850,7 +893,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                 }
               }}
             >
-              <SelectTrigger className="h-8 text-xs font-bold text-[#003D5C] bg-slate-50 border-slate-200 min-w-[120px]">
+              <SelectTrigger className="h-9 text-xs font-bold text-[#003D5C] bg-slate-50 border-slate-200 min-w-[120px]">
                 <SelectValue placeholder="Select Month" />
               </SelectTrigger>
               <SelectContent className="max-h-60">
@@ -878,7 +921,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                 }
               }}
             >
-              <SelectTrigger className="h-8 text-xs font-bold text-[#003D5C] bg-slate-50 border-slate-200 min-w-[100px]">
+              <SelectTrigger className="h-9 text-xs font-bold text-[#003D5C] bg-slate-50 border-slate-200 min-w-[100px]">
                 <SelectValue placeholder="Select Year" />
               </SelectTrigger>
               <SelectContent className="max-h-60">
@@ -894,7 +937,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           <div>
             <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Status</label>
             <Select value={arrivalStatus} onValueChange={(val) => setArrivalStatus(val || 'all')}>
-              <SelectTrigger className="text-xs border-slate-200 min-w-36">
+              <SelectTrigger className="h-9 text-xs border-slate-200 min-w-36">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
@@ -939,174 +982,179 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             Reset Filters
           </Button>
         )}
-      </div>
+      </Card>
 
-      {/* Daily Attendance History Table */}
-      <div className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
+      {/* Daily Attendance History Table using Shadcn Table */}
+      <Card className="shadow-2xs border-slate-200/90 overflow-hidden">
         <div className="p-4 border-b border-slate-100">
-          <h3 className="font-['Montserrat'] text-sm font-bold text-[#003D5C]">
+          <h3 className="text-sm font-bold text-[#003D5C]">
             Daily Attendance Records
           </h3>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider">
-              <tr>
-                <th
-                  onClick={toggleDateSortOrder}
-                  className="py-3 px-4 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
-                  title="Click to sort Ascending / Descending"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span>Date</span>
-                    <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#003D5C]" />
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-200 text-slate-700 font-mono font-bold">
-                      {dateSortOrder === 'asc' ? '1 → 31' : '31 → 1'}
-                    </span>
-                  </div>
-                </th>
-                <th className="py-3 px-4">Day</th>
-                <th className="py-3 px-4">In Time</th>
-                <th className="py-3 px-4">Arrival Status</th>
-                <th className="py-3 px-4">Out Time</th>
-                <th className="py-3 px-4">Departure Status</th>
-                <th className="py-3 px-4">Working Time</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#009D9E]" />
-                    Loading attendance history...
-                  </td>
-                </tr>
-              ) : records.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400">
-                    <Calendar className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    No attendance records found for this employee matching active filters.
-                  </td>
-                </tr>
-              ) : (
-                records.map((record) => (
-                  <tr key={record.id} className="hover:bg-slate-50/70 transition-colors">
-                    {/* Date */}
-                    <td className="py-3.5 px-4 font-bold text-slate-900">{record.attendance_date}</td>
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-slate-50/80">
+              <TableHead
+                onClick={toggleDateSortOrder}
+                className="cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                title="Click to sort Ascending / Descending"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>Date</span>
+                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#003D5C]" />
+                  <Badge variant="secondary" className="text-[9px] px-1 py-0 font-mono font-bold">
+                    {dateSortOrder === 'asc' ? '1 → 31' : '31 → 1'}
+                  </Badge>
+                </div>
+              </TableHead>
+              <TableHead>Day</TableHead>
+              <TableHead>In Time</TableHead>
+              <TableHead>Arrival Status</TableHead>
+              <TableHead>Out Time</TableHead>
+              <TableHead>Departure Status</TableHead>
+              <TableHead>Working Time</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="py-16 text-center text-slate-400">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#009D9E]" />
+                  Loading attendance history...
+                </TableCell>
+              </TableRow>
+            ) : records.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="py-16 text-center text-slate-400">
+                  <Calendar className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  No attendance records found for this employee matching active filters.
+                </TableCell>
+              </TableRow>
+            ) : (
+              records.map((record) => (
+                <TableRow key={record.id} className="hover:bg-slate-50/70 transition-colors">
+                  {/* Date */}
+                  <TableCell className="font-bold text-slate-900">{record.attendance_date}</TableCell>
 
-                    {/* Day */}
-                    <td className="py-3.5 px-4 font-medium text-slate-500">{record.day_of_week}</td>
+                  {/* Day */}
+                  <TableCell className="font-medium text-slate-500">{record.day_of_week}</TableCell>
 
-                    {/* In Time */}
-                    <td className="py-3.5 px-4 font-mono font-medium text-slate-900">
-                      {record.in_time || '--'}
-                    </td>
+                  {/* In Time */}
+                  <TableCell className="font-mono font-medium text-slate-900">
+                    {record.in_time || '--'}
+                  </TableCell>
 
-                    {/* Arrival Status */}
-                    <td className="py-3.5 px-4">
-                      {record.arrival_status === '--' ? (
-                        <span className="text-slate-400 font-mono text-xs font-semibold">--</span>
-                      ) : (
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
-                              record.arrival_status === 'Holiday'
-                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                : record.arrival_status === 'Absent'
-                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                : record.arrival_status === 'Leave' || record.arrival_status?.toLowerCase().includes('leave')
-                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                : record.arrival_status === 'On Time Arrival'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                                : record.arrival_status === 'Late Arrival'
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                                : 'bg-slate-100 text-slate-600 border border-slate-200'
-                            }`}
-                          >
-                            {record.arrival_status}
-                          </span>
-                          {(record.departure_status === 'Work From Home' ||
-                            record.arrival_status === 'Work From Home' ||
-                            record.notes?.includes('Work From Home')) && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase bg-cyan-100 text-cyan-800 border border-cyan-300">
-                              WFH
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Out Time */}
-                    <td className="py-3.5 px-4 font-mono font-medium text-slate-900">
-                      {record.out_time || '--'}
-                    </td>
-
-                    {/* Departure Status */}
-                    <td className="py-3.5 px-4">
-                      {record.departure_status === '--' ? (
-                        <span className="text-slate-400 font-mono text-xs font-semibold">--</span>
-                      ) : (
-                        <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
-                            record.departure_status === 'Holiday' || record.departure_status?.includes('Holiday')
-                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                              : record.departure_status === 'Absent'
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                              : record.departure_status?.toLowerCase().includes('leave')
-                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                              : record.departure_status === 'On Time Departure'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                              : record.departure_status === 'Early Departure'
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                              : 'bg-slate-100 text-slate-600 border border-slate-200'
-                          }`}
+                  {/* Arrival Status */}
+                  <TableCell>
+                    {record.arrival_status === '--' ? (
+                      <span className="text-slate-400 font-mono text-xs font-semibold">--</span>
+                    ) : (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge
+                          variant={
+                            record.arrival_status === 'Holiday' ||
+                            record.arrival_status === 'Gazetted Holiday' ||
+                            record.arrival_status?.toLowerCase().includes('holiday')
+                              ? 'warning'
+                              : record.arrival_status === 'Absent'
+                              ? 'destructive'
+                              : record.arrival_status === 'Leave' || record.arrival_status?.toLowerCase().includes('leave')
+                              ? 'purple'
+                              : record.arrival_status === 'On Time Arrival'
+                              ? 'success'
+                              : record.arrival_status === 'Late Arrival'
+                              ? 'warning'
+                              : 'secondary'
+                          }
+                          className="text-[11px] font-bold uppercase tracking-wider"
                         >
-                          {record.departure_status?.toLowerCase().includes('leave') && record.notes?.includes('day')
-                            ? record.notes
-                            : record.departure_status}
-                        </span>
-                      )}
-                    </td>
+                          {record.arrival_status}
+                        </Badge>
+                        {(record.departure_status === 'Work From Home' ||
+                          record.arrival_status === 'Work From Home' ||
+                          record.notes?.includes('Work From Home')) && (
+                          <Badge variant="info" className="text-[10px] font-extrabold uppercase">
+                            WFH
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </TableCell>
 
-                    {/* Working Time */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                      {record.arrival_status === '--' || record.total_working_hours_formatted === '--'
-                        ? '--'
-                        : record.total_working_hours_formatted || '00:00'}
-                    </td>
+                  {/* Out Time */}
+                  <TableCell className="font-mono font-medium text-slate-900">
+                    {record.out_time || '--'}
+                  </TableCell>
 
-                    {/* Actions */}
-                    <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+                  {/* Departure Status */}
+                  <TableCell>
+                    {record.departure_status === '--' ? (
+                      <span className="text-slate-400 font-mono text-xs font-semibold">--</span>
+                    ) : (
+                      <Badge
+                        variant={
+                          record.departure_status === 'Holiday' ||
+                          record.departure_status?.includes('Holiday') ||
+                          record.departure_status === 'Gazetted Holiday' ||
+                          record.departure_status?.includes('Gazetted Holiday')
+                            ? 'warning'
+                            : record.departure_status === 'Absent'
+                            ? 'destructive'
+                            : record.departure_status?.toLowerCase().includes('leave')
+                            ? 'purple'
+                            : record.departure_status === 'On Time Departure'
+                            ? 'success'
+                            : record.departure_status === 'Early Departure'
+                            ? 'destructive'
+                            : 'secondary'
+                        }
+                        className="text-[11px] font-bold uppercase tracking-wider"
+                      >
+                        {record.departure_status?.toLowerCase().includes('leave') && record.notes?.includes('day')
+                          ? record.notes
+                          : record.departure_status}
+                      </Badge>
+                    )}
+                  </TableCell>
+
+                  {/* Working Time */}
+                  <TableCell className="font-mono font-bold text-slate-900">
+                    {record.arrival_status === '--' || record.total_working_hours_formatted === '--'
+                      ? '--'
+                      : record.total_working_hours_formatted || '00:00'}
+                  </TableCell>
+
+                  {/* Actions */}
+                  <TableCell className="text-right space-x-1 whitespace-nowrap">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setViewingPunchesRecord(record)}
+                      title="View Raw Punches"
+                      className="text-slate-500 hover:text-[#009D9E] hover:bg-[#009D9E]/10"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </Button>
+                    {record.day_of_week !== 'Sunday' && (
                       <Button
                         variant="ghost"
-                        size="sm"
-                        onClick={() => setViewingPunchesRecord(record)}
-                        title="View Raw Punches"
-                        className="h-8 w-8 p-0 text-slate-500 hover:text-[#009D9E] hover:bg-[#009D9E]/10"
+                        size="icon-sm"
+                        onClick={() => setEditingRecord(record)}
+                        title="Edit Attendance"
+                        className="text-slate-500 hover:text-[#003D5C] hover:bg-slate-100"
                       >
-                        <Eye className="w-3.5 h-3.5" />
+                        <Edit2 className="w-3.5 h-3.5" />
                       </Button>
-                      {record.day_of_week !== 'Sunday' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setEditingRecord(record)}
-                          title="Edit Attendance"
-                          className="h-8 w-8 p-0 text-slate-500 hover:text-[#003D5C] hover:bg-slate-100"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
 
       {/* Edit Modal */}
       <EditAttendanceModal

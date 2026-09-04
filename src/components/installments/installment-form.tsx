@@ -48,10 +48,27 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     existingSchedule?.course_name || 'Advanced Diploma of Leadership and Management'
   )
   const [duration, setDuration] = useState(existingSchedule?.duration || '60 weeks')
+  
+  // 1. Course Header Display Dates (Certificate / Header only)
   const [startDate, setStartDate] = useState(existingSchedule?.start_date || defaultStart)
   const [endDate, setEndDate] = useState(existingSchedule?.end_date || defaultEnd)
-  const [startMonthYear, setStartMonthYear] = useState<string>(existingSchedule?.start_month_year || '2026-09')
-  const [endMonthOffset, setEndMonthOffset] = useState<number>(existingSchedule?.end_month_offset ?? 3)
+
+  // 2. Installment Schedule Timeline (Controls table rows & months)
+  const [scheduleStartMonth, setScheduleStartMonth] = useState<string>(
+    existingSchedule?.schedule_start_month || (existingSchedule?.start_date ? existingSchedule.start_date.substring(0, 7) : '2026-09')
+  )
+  const [scheduleEndMonth, setScheduleEndMonth] = useState<string>(
+    existingSchedule?.schedule_end_month || '2027-08'
+  )
+
+  // 3. Optional 1st Installment Custom Month Override
+  const initialCustomMonth = existingSchedule?.first_installment_custom_month || (
+    existingSchedule?.start_month_year && existingSchedule.start_month_year !== (existingSchedule.schedule_start_month || existingSchedule.start_date?.substring(0, 7))
+      ? existingSchedule.start_month_year
+      : ''
+  )
+  const [customFirstMonth, setCustomFirstMonth] = useState<string>(initialCustomMonth)
+  const [showCustomFirstMonth, setShowCustomFirstMonth] = useState<boolean>(Boolean(initialCustomMonth))
 
   const [adminFee, setAdminFee] = useState<number>(existingSchedule?.admin_fee ?? 500)
   const [resourcesFee, setResourcesFee] = useState<number>(existingSchedule?.resources_fee ?? 800)
@@ -107,11 +124,14 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
 
   const totalInitialPayment = initialFees.reduce((acc, n) => acc + (Number(n) || 0), 0)
 
+  const effectiveCustomFirstMonth = (showCustomFirstMonth && customFirstMonth.trim()) ? customFirstMonth.trim() : undefined
+
   const { scheduleItems, totalAmount } = calculateInstallmentScheduleItems({
     start_date: startDate,
     end_date: endDate,
-    start_month_year: startMonthYear,
-    end_month_offset: endMonthOffset,
+    schedule_start_month: scheduleStartMonth,
+    schedule_end_month: scheduleEndMonth,
+    first_installment_custom_month: effectiveCustomFirstMonth,
     admin_fee: adminFee,
     resources_fee: resourcesFee,
     material_fee: activeMaterialFee,
@@ -130,8 +150,10 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     duration: duration,
     start_date: startDate,
     end_date: endDate,
-    start_month_year: startMonthYear,
-    end_month_offset: endMonthOffset,
+    schedule_start_month: scheduleStartMonth,
+    schedule_end_month: scheduleEndMonth,
+    first_installment_custom_month: effectiveCustomFirstMonth,
+    start_month_year: effectiveCustomFirstMonth || scheduleStartMonth,
     admin_fee: adminFee,
     resources_fee: resourcesFee,
     material_fee: activeMaterialFee > 0 ? activeMaterialFee : undefined,
@@ -156,7 +178,11 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
       return
     }
     if (!startDate || !endDate) {
-      setError('Start Date and End Date are required.')
+      setError('Course Start Date and End Date are required.')
+      return
+    }
+    if (!scheduleStartMonth || !scheduleEndMonth) {
+      setError('Schedule Start Month and End Month are required.')
       return
     }
 
@@ -173,8 +199,10 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
         duration: duration,
         start_date: startDate,
         end_date: endDate,
-        start_month_year: startMonthYear,
-        end_month_offset: endMonthOffset,
+        schedule_start_month: scheduleStartMonth,
+        schedule_end_month: scheduleEndMonth,
+        first_installment_custom_month: effectiveCustomFirstMonth,
+        start_month_year: effectiveCustomFirstMonth || scheduleStartMonth,
         admin_fee: Number(adminFee) || 0,
         resources_fee: Number(resourcesFee) || 0,
         material_fee: activeMaterialFee > 0 ? Number(activeMaterialFee) : undefined,
@@ -334,13 +362,15 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
             </CardContent>
           </Card>
 
+          {/* Card 2: Course Header Display Dates */}
           <Card className="bg-white border border-[#E2E8F0] shadow-2xs rounded-lg">
             <CardHeader className="py-4 border-b border-[#E2E8F0]">
-              <CardTitle className="font-['Montserrat'] text-base font-bold text-[#003D5C]">
-                Course Dates & Installment Timing
+              <CardTitle className="font-['Montserrat'] text-base font-bold text-[#003D5C] flex items-center justify-between">
+                <span>Course Dates (Header Display)</span>
+                <span className="text-[11px] font-normal text-slate-400">Header Only</span>
               </CardTitle>
               <p className="text-[11px] text-slate-400 font-medium">
-                Set course duration dates and first installment month
+                Controls Start Date & End Date printed on the document header
               </p>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
@@ -353,9 +383,12 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="mt-1.5 h-9 text-xs font-medium"
+                    className="mt-1.5 h-9 text-xs font-medium text-slate-900"
                     required
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    e.g. 21/09/2026 (shows on header)
+                  </p>
                 </div>
 
                 <div>
@@ -366,50 +399,109 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="mt-1.5 h-9 text-xs font-medium"
+                    className="mt-1.5 h-9 text-xs font-medium text-slate-900"
                     required
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    e.g. 14/11/2027 (shows on header)
+                  </p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+          {/* Card 3: Installment Schedule Timeline */}
+          <Card className="bg-white border border-[#E2E8F0] shadow-2xs rounded-lg">
+            <CardHeader className="py-4 border-b border-[#E2E8F0]">
+              <CardTitle className="font-['Montserrat'] text-base font-bold text-[#003D5C] flex items-center justify-between">
+                <span>Installment Schedule Timeline</span>
+                <span className="text-[11px] font-bold text-[#009D9E] bg-[#009D9E]/10 px-2 py-0.5 rounded">
+                  {scheduleItems.length} Installment{scheduleItems.length !== 1 ? 's' : ''}
+                </span>
+              </CardTitle>
+              <p className="text-[11px] text-slate-400 font-medium">
+                Set start and end months for installment schedule table generation
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-                    1ST INSTALLMENT MONTH
+                    SCHEDULE START MONTH *
                   </Label>
                   <Input
                     type="month"
-                    value={startMonthYear}
-                    onChange={(e) => setStartMonthYear(e.target.value)}
-                    className="mt-1.5 h-9 text-xs font-semibold text-slate-800"
+                    value={scheduleStartMonth}
+                    onChange={(e) => setScheduleStartMonth(e.target.value)}
+                    className="mt-1.5 h-9 text-xs font-semibold text-slate-900"
+                    required
                   />
                   <p className="text-[10px] text-slate-400 mt-1">
-                    Override label (e.g. Dec-25)
+                    Timeline starting month (e.g. Sep 2026)
                   </p>
                 </div>
 
                 <div>
                   <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-                    LAST INSTALLMENT OFFSET (MONTHS)
+                    SCHEDULE END MONTH *
                   </Label>
                   <Input
-                    type="number"
-                    min={0}
-                    max={24}
-                    value={isNaN(endMonthOffset) ? '' : endMonthOffset}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      setEndMonthOffset(val === '' ? 0 : Number(val))
-                    }}
-                    placeholder="e.g. 2"
-                    className="mt-1.5 h-9 text-xs font-semibold text-slate-800"
+                    type="month"
+                    value={scheduleEndMonth}
+                    onChange={(e) => setScheduleEndMonth(e.target.value)}
+                    className="mt-1.5 h-9 text-xs font-semibold text-slate-900"
+                    required
                   />
                   <p className="text-[10px] text-slate-400 mt-1">
-                    {endMonthOffset > 0
-                      ? `${endMonthOffset} month${endMonthOffset > 1 ? 's' : ''} before course end`
-                      : 'Ends in course end month'}
+                    Timeline ending month (e.g. Aug 2027)
                   </p>
                 </div>
+              </div>
+
+              {/* Optional 1st Installment Custom Month Override */}
+              <div className="pt-2 border-t border-slate-100">
+                {!showCustomFirstMonth ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCustomFirstMonth(true)}
+                    className="h-8 text-[11px] font-semibold text-slate-600 border-dashed border-slate-300 hover:text-[#009D9E] hover:border-[#009D9E]"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    + Override 1st Installment Month Only (Optional)
+                  </Button>
+                ) : (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-md">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                        1ST INSTALLMENT CUSTOM MONTH (OVERRIDE)
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setShowCustomFirstMonth(false)
+                          setCustomFirstMonth('')
+                        }}
+                        className="h-6 text-[11px] text-rose-600 hover:text-rose-800 p-0"
+                      >
+                        Reset / Cancel
+                      </Button>
+                    </div>
+                    <Input
+                      type="month"
+                      value={customFirstMonth}
+                      onChange={(e) => setCustomFirstMonth(e.target.value)}
+                      placeholder="e.g. 2026-08"
+                      className="h-9 text-xs font-semibold text-slate-900 bg-white"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1.5 leading-tight">
+                      * Modifies only the 1st installment row label. 2nd, 3rd, and subsequent installments will remain strictly on the schedule timeline.
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

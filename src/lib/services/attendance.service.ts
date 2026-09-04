@@ -879,35 +879,40 @@ export async function getAttendanceSummary(params?: {
   const recordsByDate = new Map<string, AttendanceRecordWithEmployee>()
 
   for (const r of records) {
+    const cleanDate = r.attendance_date ? r.attendance_date.split('T')[0] : ''
+    const dayName = (r.day_of_week || '').toLowerCase()
+    let dayNum = -1
+    if (cleanDate) {
+      const parts = cleanDate.split('-').map(Number)
+      if (parts.length === 3) {
+        const dt = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0)
+        dayNum = dt.getDay()
+      }
+    }
+    const isSunday = dayNum === 0 || dayName.includes('sun')
+    const isGazettedHoliday = Boolean(cleanDate && holidaysMap[cleanDate])
+    const hasPunches =
+      Boolean(r.in_time && r.in_time !== '---') ||
+      Boolean(r.out_time && r.out_time !== '---') ||
+      (r.total_working_minutes ? r.total_working_minutes > 0 : false)
+
     if (r.arrival_status === 'On Time Arrival') onTimeArrivals++
-    else if (r.arrival_status === 'Late Arrival') lateArrivals++
-    else if (r.arrival_status === 'Missing In Time') missingInTimes++
+    else if (r.arrival_status === 'Late Arrival' && (!isSunday && !isGazettedHoliday || hasPunches)) lateArrivals++
+    else if (r.arrival_status === 'Missing In Time' && (!isSunday && !isGazettedHoliday || hasPunches)) missingInTimes++
 
     if (r.departure_status === 'On Time Departure') onTimeDepartures++
-    else if (r.departure_status === 'Early Departure') earlyDepartures++
-    else if (r.departure_status === 'Missing Out Time') missingOutTimes++
+    else if (r.departure_status === 'Early Departure' && (!isSunday && !isGazettedHoliday || hasPunches)) earlyDepartures++
+    else if (r.departure_status === 'Missing Out Time' && (!isSunday && !isGazettedHoliday || hasPunches)) missingOutTimes++
 
     totalWorkingMinutes += r.total_working_minutes || 0
 
     if (r.attendance_date) {
-      const cleanDate = r.attendance_date.split('T')[0]
       recordsByDate.set(cleanDate, r)
     }
 
     // If no explicit startDate & endDate range provided, calculate directly per record:
     if (!params?.startDate || !params?.endDate) {
       const isLeave = isLeaveRecord(r)
-      const cleanDate = r.attendance_date ? r.attendance_date.split('T')[0] : ''
-      const dayName = (r.day_of_week || '').toLowerCase()
-      let dayNum = -1
-      if (cleanDate) {
-        const parts = cleanDate.split('-').map(Number)
-        if (parts.length === 3) {
-          const dt = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0)
-          dayNum = dt.getDay()
-        }
-      }
-
       const isSaturday = dayNum === 6 || dayName.includes('sat')
       const isSunday = dayNum === 0 || dayName.includes('sun')
       const isGazettedHoliday = Boolean(cleanDate && holidaysMap[cleanDate])

@@ -21,6 +21,15 @@ import {
   Lock,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -61,6 +70,8 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [branchFilter, setBranchFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -324,14 +335,35 @@ export default function EmployeesPage() {
     }
   }
 
+  const allBranches = React.useMemo(() => {
+    const list = new Set<string>(BRANCHES)
+    employees.forEach((emp) => {
+      if (emp.branch && emp.branch.trim()) {
+        list.add(emp.branch.trim())
+      }
+    })
+    return Array.from(list)
+  }, [employees])
+
   const filteredEmployees = employees.filter((emp) => {
-    const q = search.toLowerCase()
-    return (
+    const q = search.toLowerCase().trim()
+    const matchesSearch =
+      !q ||
       emp.name.toLowerCase().includes(q) ||
       emp.employee_id.toLowerCase().includes(q) ||
       emp.designation.toLowerCase().includes(q) ||
       (emp.branch && emp.branch.toLowerCase().includes(q))
-    )
+
+    const matchesBranch =
+      branchFilter === 'all' ||
+      (emp.branch && emp.branch.toLowerCase() === branchFilter.toLowerCase())
+
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && emp.is_active) ||
+      (statusFilter === 'inactive' && !emp.is_active)
+
+    return matchesSearch && matchesBranch && matchesStatus
   })
 
   const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / pageSize))
@@ -406,75 +438,128 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* Search & Counter Bar */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-          <Input
-            type="text"
-            placeholder="Search by Employee Name, Employee ID, Designation, Branch..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
-            className="pl-9 text-xs border-slate-200"
-          />
+      {/* Search, Filter & Counter Bar */}
+      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-3xl">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+            <Input
+              type="text"
+              placeholder="Search by Employee Name, ID, Designation..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
+              className="pl-9 text-xs border-slate-200 h-9"
+            />
+          </div>
+
+          {/* Branch Filter */}
+          <div className="w-full sm:w-44">
+            <Select
+              value={branchFilter}
+              onValueChange={(val) => {
+                setBranchFilter(val || 'all')
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="h-9 w-full text-xs border-slate-200 bg-white">
+                <SelectValue placeholder="All Branches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
+                {allBranches.map((b) => (
+                  <SelectItem key={b} value={b}>
+                    {b}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="w-full sm:w-36">
+            <Select
+              value={statusFilter}
+              onValueChange={(val) => {
+                setStatusFilter(val || 'all')
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="h-9 w-full text-xs border-slate-200 bg-white">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active Only</SelectItem>
+                <SelectItem value="inactive">Inactive Only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-slate-500 font-semibold">
-          <span>Total Staff: <strong className="text-slate-900">{employees.length}</strong></span>
+        {/* Counter Info */}
+        <div className="flex items-center gap-3 text-xs text-slate-500 font-semibold shrink-0 pt-1 lg:pt-0">
+          <span>Total Staff: <strong className="text-slate-900">{filteredEmployees.length}</strong></span>
           <span>•</span>
-          <span>Active: <strong className="text-emerald-600">{employees.filter((e) => e.is_active).length}</strong></span>
+          <span>Active: <strong className="text-emerald-600">{filteredEmployees.filter((e) => e.is_active).length}</strong></span>
+          {filteredEmployees.filter((e) => !e.is_active).length > 0 && (
+            <>
+              <span>•</span>
+              <span>Inactive: <strong className="text-slate-500">{filteredEmployees.filter((e) => !e.is_active).length}</strong></span>
+            </>
+          )}
         </div>
       </div>
 
       {/* Data Table Card */}
       <div className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="py-3.5 px-4">EMPLOYEE ID</th>
-                <th className="py-3.5 px-4">EMPLOYEE NAME</th>
-                <th className="py-3.5 px-4">DESIGNATION</th>
-                <th className="py-3.5 px-3 text-center">BRANCH</th>
-                <th className="py-3.5 px-4 text-right">SALARY</th>
-                <th className="py-3.5 px-4">ATTENDANCE</th>
-                <th className="py-3.5 px-3 text-center">STATUS</th>
-                <th className="py-3.5 px-4">JOINING DATE</th>
-                <th className="py-3.5 px-4 text-right">ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+        <div className="overflow-x-auto w-full">
+          <Table className="w-full text-left text-xs min-w-[850px]">
+            <TableHeader className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="py-3.5 px-4 font-bold text-slate-500">EMPLOYEE ID</TableHead>
+                <TableHead className="py-3.5 px-4 font-bold text-slate-500">EMPLOYEE NAME</TableHead>
+                <TableHead className="py-3.5 px-4 font-bold text-slate-500">DESIGNATION</TableHead>
+                <TableHead className="py-3.5 px-3 text-center font-bold text-slate-500">BRANCH</TableHead>
+                <TableHead className="py-3.5 px-4 text-right font-bold text-slate-500">SALARY</TableHead>
+                <TableHead className="py-3.5 px-4 font-bold text-slate-500">ATTENDANCE</TableHead>
+                <TableHead className="py-3.5 px-3 text-center font-bold text-slate-500">STATUS</TableHead>
+                <TableHead className="py-3.5 px-4 font-bold text-slate-500">JOINING DATE</TableHead>
+                <TableHead className="py-3.5 px-4 text-right font-bold text-slate-500">ACTIONS</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100 text-slate-700">
               {isLoading ? (
-                <tr>
-                  <td colSpan={9} className="py-16 text-center text-slate-400">
+                <TableRow>
+                  <TableCell colSpan={9} className="py-16 text-center text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#009D9E]" />
                     Loading employees...
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : filteredEmployees.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-16 text-center text-slate-400">
+                <TableRow>
+                  <TableCell colSpan={9} className="py-16 text-center text-slate-400">
                     <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    No employees found matching your search query.
-                  </td>
-                </tr>
+                    No employees found matching your filters.
+                  </TableCell>
+                </TableRow>
               ) : (
                 paginatedEmployees.map((emp) => {
                   const initial = emp.name.trim().charAt(0).toUpperCase() || 'E'
                   const avatarColor = getAvatarColor(emp.name)
                   const branch = emp.branch || 'Multan'
                   return (
-                    <tr key={emp.id} className="hover:bg-slate-50/80 transition-colors group">
+                    <TableRow key={emp.id} className="hover:bg-slate-50/80 transition-colors group">
                       {/* Employee ID */}
-                      <td className="py-4 px-4 font-mono font-bold text-xs text-slate-600">
+                      <TableCell className="py-4 px-4 font-mono font-bold text-xs text-slate-600">
                         {emp.employee_id}
-                      </td>
+                      </TableCell>
 
                       {/* Employee Name with Initial Badge */}
-                      <td className="py-4 px-4">
+                      <TableCell className="py-4 px-4">
                         <div className="flex items-center gap-3">
                           <div
                             className={`w-8 h-8 rounded-full ${avatarColor} font-extrabold text-xs flex items-center justify-center shrink-0 shadow-2xs`}
@@ -488,15 +573,15 @@ export default function EmployeesPage() {
                             {emp.name}
                           </Link>
                         </div>
-                      </td>
+                      </TableCell>
 
                       {/* Designation */}
-                      <td className="py-4 px-4 font-medium text-slate-600 text-xs">
+                      <TableCell className="py-4 px-4 font-medium text-slate-600 text-xs">
                         {emp.designation}
-                      </td>
+                      </TableCell>
 
                       {/* Branch */}
-                      <td className="py-4 px-3 text-center">
+                      <TableCell className="py-4 px-3 text-center">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold ${getBranchBadgeClass(
                             branch
@@ -504,19 +589,19 @@ export default function EmployeesPage() {
                         >
                           {branch}
                         </span>
-                      </td>
+                      </TableCell>
 
                       {/* Salary */}
-                      <td className="py-4 px-4 text-right font-mono font-bold text-slate-800 text-xs">
+                      <TableCell className="py-4 px-4 text-right font-mono font-bold text-slate-800 text-xs">
                         {emp.salary ? (
                           <span>PKR {Number(emp.salary).toLocaleString()}</span>
                         ) : (
                           <span className="text-slate-400 font-normal">—</span>
                         )}
-                      </td>
+                      </TableCell>
 
                       {/* Attendance */}
-                      <td className="py-4 px-4">
+                      <TableCell className="py-4 px-4">
                         <Link
                           href={`/attendance/employees/${emp.id}`}
                           className="text-[#0058BE] hover:text-[#004395] font-semibold text-xs inline-flex items-center gap-1.5 hover:underline"
@@ -524,34 +609,31 @@ export default function EmployeesPage() {
                           <Eye className="w-3.5 h-3.5 text-[#0058BE]" />
                           View Attendance
                         </Link>
-                      </td>
+                      </TableCell>
 
                       {/* Status */}
-                      <td className="py-4 px-3 text-center">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
-                            emp.is_active
-                              ? 'bg-[#D1FAE5] text-[#065F46]'
-                              : 'bg-slate-200 text-slate-700'
-                          }`}
+                      <TableCell className="py-4 px-3 text-center">
+                        <Badge
+                          variant={emp.is_active ? 'success' : 'secondary'}
+                          className="text-xs font-bold"
                         >
                           {emp.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
+                        </Badge>
+                      </TableCell>
 
                       {/* Joining Date */}
-                      <td className="py-4 px-4 text-slate-600 font-medium text-xs">
+                      <TableCell className="py-4 px-4 text-slate-600 font-medium text-xs">
                         {emp.is_old_staff ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          <Badge variant="warning" className="text-[11px] font-bold">
                             Old Staff
-                          </span>
+                          </Badge>
                         ) : (
                           formatJoiningDate(emp.joining_date || emp.created_at)
                         )}
-                      </td>
+                      </TableCell>
 
                       {/* Actions */}
-                      <td className="py-4 px-4 text-right whitespace-nowrap">
+                      <TableCell className="py-4 px-4 text-right whitespace-nowrap">
                         <DropdownMenu>
                           <DropdownMenuTrigger className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300 transition-colors shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 data-popup-open:bg-slate-100">
                             <MoreHorizontal className="w-4 h-4" />
@@ -578,13 +660,13 @@ export default function EmployeesPage() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 })
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
 
         {/* Pagination Footer */}

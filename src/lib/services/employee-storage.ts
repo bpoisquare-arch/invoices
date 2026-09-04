@@ -197,12 +197,8 @@ export async function getGazettedHolidays(): Promise<Record<string, string>> {
 
     if (data && data.details && typeof data.details === 'object') {
       const dbHolidays = data.details as Record<string, string>
-      const merged = {
-        ...fileHolidays,
-        ...dbHolidays,
-      }
-      inMemoryHolidays = merged
-      return merged
+      inMemoryHolidays = dbHolidays
+      return dbHolidays
     }
   } catch (err) {
     console.error('Error fetching gazetted holidays from database:', err)

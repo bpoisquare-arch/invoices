@@ -52,8 +52,11 @@ export interface StudentInstallmentSchedule {
   duration: string
   start_date: string // YYYY-MM-DD
   end_date: string // YYYY-MM-DD
-  start_month_year?: string // YYYY-MM manual selection
-  end_month_offset?: number // Months to subtract before end date (default 3)
+  schedule_start_month?: string // YYYY-MM schedule table start month
+  schedule_end_month?: string // YYYY-MM schedule table end month
+  first_installment_custom_month?: string // Optional YYYY-MM 1st installment override
+  start_month_year?: string // Legacy YYYY-MM manual selection
+  end_month_offset?: number // Legacy Months to subtract before end date
   admin_fee: number
   resources_fee: number
   material_fee?: number
@@ -116,10 +119,13 @@ export function updateAimtFixedInfo(info: Partial<AIMTFixedInfo>): AIMTFixedInfo
 }
 
 export interface InstallmentCalculationParams {
-  start_date: string
-  end_date: string
-  start_month_year?: string // YYYY-MM
-  end_month_offset?: number // default 3
+  start_date?: string
+  end_date?: string
+  schedule_start_month?: string // YYYY-MM
+  schedule_end_month?: string // YYYY-MM
+  first_installment_custom_month?: string // YYYY-MM override for 1st installment only
+  start_month_year?: string // Legacy YYYY-MM
+  end_month_offset?: number // Legacy
   admin_fee: number
   resources_fee: number
   material_fee?: number
@@ -138,33 +144,58 @@ export function calculateInstallmentScheduleItems(params: InstallmentCalculation
   const material = Number(params.material_fee) || 0
   const tuition = Number(params.tuition_fee) || 0
   const scholarship = Number(params.scholarship) || 0
-  const offsetMonths = typeof params.end_month_offset === 'number' ? params.end_month_offset : 3
 
   const totalAmount = Math.max(0, Math.round(admin + resources + material + tuition - scholarship))
 
-  if (!params.start_date || !params.end_date) {
-    return { scheduleItems: [], totalAmount }
-  }
-
   try {
-    // Start date base
-    let startD = parseISO(params.start_date)
+    // 1. Determine Schedule Start Month & Year
+    let schStartYear = 2026
+    let schStartMonth = 8 // Sep (0-indexed)
 
-    // If manual Month & Year picker selected, override month and year for 1st installment
-    if (params.start_month_year && params.start_month_year.length === 7) {
-      const [y, m] = params.start_month_year.split('-').map(Number)
+    if (params.schedule_start_month && params.schedule_start_month.length === 7) {
+      const [y, m] = params.schedule_start_month.split('-').map(Number)
       if (!isNaN(y) && !isNaN(m)) {
-        startD = new Date(y, m - 1, 1)
+        schStartYear = y
+        schStartMonth = m - 1
+      }
+    } else if (params.start_date) {
+      const parsedStart = parseISO(params.start_date)
+      if (!isNaN(parsedStart.getTime())) {
+        schStartYear = parsedStart.getFullYear()
+        schStartMonth = parsedStart.getMonth()
       }
     }
 
-    const endD = parseISO(params.end_date)
-
-    if (isNaN(startD.getTime()) || isNaN(endD.getTime())) {
-      return { scheduleItems: [], totalAmount }
+    // 2. Determine Schedule End Month & Year
+    let schEndYear = schStartYear + 1
+    let schEndMonth = schStartMonth - 1 // 12 months total default
+    if (schEndMonth < 0) {
+      schEndMonth += 12
+      schEndYear -= 1
     }
 
-    // Resolve initial fee inputs array
+    if (params.schedule_end_month && params.schedule_end_month.length === 7) {
+      const [y, m] = params.schedule_end_month.split('-').map(Number)
+      if (!isNaN(y) && !isNaN(m)) {
+        schEndYear = y
+        schEndMonth = m - 1
+      }
+    } else if (params.end_date) {
+      const parsedEnd = parseISO(params.end_date)
+      if (!isNaN(parsedEnd.getTime())) {
+        const offset = typeof params.end_month_offset === 'number' ? params.end_month_offset : 3
+        const rawEndIdx = parsedEnd.getFullYear() * 12 + parsedEnd.getMonth() - offset
+        schEndYear = Math.floor(rawEndIdx / 12)
+        schEndMonth = rawEndIdx % 12
+      }
+    }
+
+    const startMonthIndex = schStartYear * 12 + schStartMonth
+    const targetEndMonthIndex = Math.max(startMonthIndex, schEndYear * 12 + schEndMonth)
+    let totalScheduleMonths = targetEndMonthIndex - startMonthIndex + 1
+    if (totalScheduleMonths < 1) totalScheduleMonths = 1
+
+    // 3. Resolve initial fee inputs array
     let initialFees: number[] = []
     if (Array.isArray(params.initial_fees) && params.initial_fees.length > 0) {
       initialFees = params.initial_fees.map((n) => Math.max(0, Math.round(Number(n) || 0)))
@@ -183,19 +214,15 @@ export function calculateInstallmentScheduleItems(params: InstallmentCalculation
       installmentCounter: 0,
     }
 
-    // Course Start Date base
-    const courseStartD = parseISO(params.start_date)
-    const validCourseStart = !isNaN(courseStartD.getTime()) ? courseStartD : startD
-    const startYear = validCourseStart.getFullYear()
-    const startMonth = validCourseStart.getMonth()
-    const endYear = endD.getFullYear()
-    const endMonth = endD.getMonth()
-
-    const startMonthIndex = startYear * 12 + startMonth
-    const rawTargetEndMonthIndex = (endYear * 12 + endMonth) - offsetMonths
-    const targetEndMonthIndex = Math.max(startMonthIndex, rawTargetEndMonthIndex)
-    let totalCourseMonthsCount = targetEndMonthIndex - startMonthIndex + 1
-    if (totalCourseMonthsCount < 1) totalCourseMonthsCount = 1
+    // 4. Resolve 1st Installment custom month override (if provided)
+    let firstRowCustomDate: Date | null = null
+    const customFirst = params.first_installment_custom_month || (params.start_month_year && params.start_month_year !== params.schedule_start_month ? params.start_month_year : undefined)
+    if (customFirst && customFirst.length === 7) {
+      const [cy, cm] = customFirst.split('-').map(Number)
+      if (!isNaN(cy) && !isNaN(cm)) {
+        firstRowCustomDate = new Date(cy, cm - 1, 1)
+      }
+    }
 
     let sumInitialFees = 0
 
@@ -204,10 +231,13 @@ export function calculateInstallmentScheduleItems(params: InstallmentCalculation
       const amt = initialFees[k]
       sumInitialFees += amt
 
-      const monthLabel =
-        k === 0
-          ? format(startD, 'MMM-yy')
-          : format(new Date(startYear, startMonth + k, 1), 'MMM-yy')
+      let monthLabel = ''
+      if (k === 0 && firstRowCustomDate) {
+        monthLabel = format(firstRowCustomDate, 'MMM-yy')
+      } else {
+        const d = new Date(schStartYear, schStartMonth + k, 1)
+        monthLabel = format(d, 'MMM-yy')
+      }
 
       const description = getRowDescription(amt, admin, resources, material, feeState)
 
@@ -218,17 +248,17 @@ export function calculateInstallmentScheduleItems(params: InstallmentCalculation
       })
     }
 
-    // Remaining total to divide
+    // Remaining total to divide across remaining schedule months
     const remainingTotal = Math.max(0, totalAmount - sumInitialFees)
-    const remainingMonths = totalCourseMonthsCount - initialFees.length
+    const remainingMonths = Math.max(0, totalScheduleMonths - initialFees.length)
 
     if (remainingMonths > 0 && remainingTotal > 0) {
       const basePerMonth = Math.floor(remainingTotal / remainingMonths)
       const remainder = remainingTotal - basePerMonth * remainingMonths
 
       for (let i = 1; i <= remainingMonths; i++) {
-        const monthIndex = initialFees.length + i - 1
-        const currentDate = new Date(startYear, startMonth + monthIndex, 1)
+        const monthOffset = initialFees.length + i - 1
+        const currentDate = new Date(schStartYear, schStartMonth + monthOffset, 1)
         const monthLabel = format(currentDate, 'MMM-yy')
 
         const amt = i === remainingMonths ? basePerMonth + remainder : basePerMonth
@@ -365,6 +395,9 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
   let extraMaterialFee: number | undefined = undefined
   let extraInitialFees: number[] | undefined = undefined
   let extraAgency: string | undefined = undefined
+  let extraScheduleStartMonth: string | undefined = undefined
+  let extraScheduleEndMonth: string | undefined = undefined
+  let extraFirstCustomMonth: string | undefined = undefined
 
   if (typeof row.schedule_items === 'string') {
     try {
@@ -376,6 +409,9 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
         extraMaterialFee = parsed.__material_fee
         extraInitialFees = parsed.__initial_fees
         extraAgency = parsed.__agency
+        extraScheduleStartMonth = parsed.__schedule_start_month
+        extraScheduleEndMonth = parsed.__schedule_end_month
+        extraFirstCustomMonth = parsed.__first_installment_custom_month
       }
     } catch {
       scheduleItems = []
@@ -385,6 +421,9 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
     extraMaterialFee = row.schedule_items.__material_fee
     extraInitialFees = row.schedule_items.__initial_fees
     extraAgency = row.schedule_items.__agency
+    extraScheduleStartMonth = row.schedule_items.__schedule_start_month
+    extraScheduleEndMonth = row.schedule_items.__schedule_end_month
+    extraFirstCustomMonth = row.schedule_items.__first_installment_custom_month
   } else if (Array.isArray(row.schedule_items)) {
     scheduleItems = row.schedule_items
   }
@@ -400,6 +439,20 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
     matFee = total - (admin + resources + tuition - scholarship)
   }
 
+  // Fallback resolution for schedule timeline if not explicitly saved
+  const scheduleStartMonth = extraScheduleStartMonth || (row.start_date ? row.start_date.substring(0, 7) : undefined)
+  let scheduleEndMonth = extraScheduleEndMonth
+  if (!scheduleEndMonth && row.end_date) {
+    const endParts = row.end_date.split('-').map(Number)
+    if (endParts.length >= 2) {
+      const offset = row.end_month_offset ?? 3
+      const rawEndIdx = endParts[0] * 12 + (endParts[1] - 1) - offset
+      const ey = Math.floor(rawEndIdx / 12)
+      const em = (rawEndIdx % 12) + 1
+      scheduleEndMonth = `${ey}-${em < 10 ? '0' : ''}${em}`
+    }
+  }
+
   return {
     id: row.id,
     date: row.date,
@@ -409,6 +462,9 @@ function mapDbRowToSchedule(row: any): StudentInstallmentSchedule {
     duration: row.duration,
     start_date: row.start_date,
     end_date: row.end_date,
+    schedule_start_month: scheduleStartMonth,
+    schedule_end_month: scheduleEndMonth,
+    first_installment_custom_month: extraFirstCustomMonth || row.start_month_year || undefined,
     start_month_year: row.start_month_year || undefined,
     end_month_offset: row.end_month_offset ?? 3,
     admin_fee: admin,
@@ -445,7 +501,7 @@ function mapScheduleToDbRow(schedule: StudentInstallmentSchedule): any {
     duration: schedule.duration,
     start_date: schedule.start_date,
     end_date: schedule.end_date,
-    start_month_year: schedule.start_month_year || null,
+    start_month_year: schedule.first_installment_custom_month || schedule.start_month_year || null,
     end_month_offset: schedule.end_month_offset ?? 3,
     admin_fee: Number(schedule.admin_fee) || 0,
     resources_fee: Number(schedule.resources_fee) || 0,
@@ -458,6 +514,9 @@ function mapScheduleToDbRow(schedule: StudentInstallmentSchedule): any {
       __material_fee: schedule.material_fee,
       __initial_fees: schedule.initial_fees,
       __agency: schedule.agency || null,
+      __schedule_start_month: schedule.schedule_start_month,
+      __schedule_end_month: schedule.schedule_end_month,
+      __first_installment_custom_month: schedule.first_installment_custom_month,
     },
     recipient_email: schedule.recipient_email || null,
     from_email: schedule.from_email || null,

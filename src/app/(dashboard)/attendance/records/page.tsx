@@ -26,6 +26,8 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
@@ -868,7 +870,7 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="font-['Montserrat'] text-2xl font-bold text-[#003D5C] tracking-tight flex items-center gap-2.5">
+          <h2 className="text-2xl font-bold text-[#003D5C] tracking-tight flex items-center gap-2.5">
             Attendance Records
           </h2>
           <p className="text-xs text-slate-500 mt-1">
@@ -904,74 +906,27 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
         </div>
       </div>
 
-      {/* Top Unified Filter Bar (Single Responsive Line) */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs">
+      {/* Top Unified Filter Bar with DateRangePicker */}
+      <Card className="p-3.5 shadow-xs border-slate-200/90">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-3 items-end">
-          {/* 1. From Date (Shadcn Popover Calendar) */}
-          <div className="lg:col-span-2 space-y-1">
+          {/* 1. Date Range Picker (Unified Start & End) */}
+          <div className="lg:col-span-4 space-y-1">
             <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
-              From:
+              Date Range:
             </label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="w-full h-9.5 px-3 flex items-center justify-between text-xs font-mono font-bold text-slate-800 bg-slate-50/50 hover:bg-white hover:border-[#009D9E] border border-slate-300 rounded-lg shadow-2xs transition-all text-left focus:outline-none focus:ring-2 focus:ring-[#003D5C]"
-                >
-                  <span>{startDate ? startDate.split('-').reverse().join('/') : 'Select date'}</span>
-                  <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-white border border-slate-200 shadow-xl rounded-xl" align="start">
-                <CalendarComponent
-                  mode="single"
-                  selected={startDate ? new Date(startDate + 'T00:00:00') : undefined}
-                  onSelect={(d) => {
-                    if (d) {
-                      const y = d.getFullYear()
-                      const m = String(d.getMonth() + 1).padStart(2, '0')
-                      const day = String(d.getDate()).padStart(2, '0')
-                      setStartDate(`${y}-${m}-${day}`)
-                    }
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={(s) => setStartDate(s)}
+              onEndDateChange={(e) => setEndDate(e)}
+              onRangeChange={(s, e) => {
+                setStartDate(s)
+                setEndDate(e)
+              }}
+            />
           </div>
 
-          {/* 2. To Date (Shadcn Popover Calendar) */}
-          <div className="lg:col-span-2 space-y-1">
-            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
-              To:
-            </label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="w-full h-9.5 px-3 flex items-center justify-between text-xs font-mono font-bold text-slate-800 bg-slate-50/50 hover:bg-white hover:border-[#009D9E] border border-slate-300 rounded-lg shadow-2xs transition-all text-left focus:outline-none focus:ring-2 focus:ring-[#003D5C]"
-                >
-                  <span>{endDate ? endDate.split('-').reverse().join('/') : 'Select date'}</span>
-                  <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-white border border-slate-200 shadow-xl rounded-xl" align="start">
-                <CalendarComponent
-                  mode="single"
-                  selected={endDate ? new Date(endDate + 'T00:00:00') : undefined}
-                  onSelect={(d) => {
-                    if (d) {
-                      const y = d.getFullYear()
-                      const m = String(d.getMonth() + 1).padStart(2, '0')
-                      const day = String(d.getDate()).padStart(2, '0')
-                      setEndDate(`${y}-${m}-${day}`)
-                    }
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* 3. Select Designation */}
+          {/* 2. Select Designation */}
           <div className="lg:col-span-3 space-y-1">
             <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
               Select Designation
@@ -996,7 +951,7 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
             </Select>
           </div>
 
-          {/* 4. Branch Filter */}
+          {/* 3. Branch Filter */}
           <div className="lg:col-span-2 space-y-1">
             <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
               Branch
@@ -1021,7 +976,7 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
             </Select>
           </div>
 
-          {/* 5. Search Bar */}
+          {/* 4. Search Bar */}
           <div className="lg:col-span-3 space-y-1">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
@@ -1065,38 +1020,38 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Summary KPI Counters (7 cards) */}
+      {/* Summary KPI Counters (7 cards) using Shadcn Card */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
-        <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-2xs">
+        <Card className="p-3 shadow-2xs border-slate-200">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Employees</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-[#003D5C] mt-0.5">{kpiStats.totalEmployees}</p>
-        </div>
-        <div className="bg-white border border-slate-200 border-l-4 border-l-emerald-500 rounded-lg p-3 shadow-2xs">
+          <p className="text-lg font-extrabold text-[#003D5C] mt-0.5">{kpiStats.totalEmployees}</p>
+        </Card>
+        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-emerald-500">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">On Time Arrival</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-emerald-600 mt-0.5">{kpiStats.onTimeArrivals}</p>
-        </div>
-        <div className="bg-white border border-slate-200 border-l-4 border-l-amber-500 rounded-lg p-3 shadow-2xs">
+          <p className="text-lg font-extrabold text-emerald-600 mt-0.5">{kpiStats.onTimeArrivals}</p>
+        </Card>
+        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-amber-500">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Late Arrival</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-amber-600 mt-0.5">{kpiStats.lateArrivals}</p>
-        </div>
-        <div className="bg-white border border-slate-200 border-l-4 border-l-teal-500 rounded-lg p-3 shadow-2xs">
+          <p className="text-lg font-extrabold text-amber-600 mt-0.5">{kpiStats.lateArrivals}</p>
+        </Card>
+        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-teal-500">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">On Time Departure</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-teal-600 mt-0.5">{kpiStats.onTimeDepartures}</p>
-        </div>
-        <div className="bg-white border border-slate-200 border-l-4 border-l-rose-400 rounded-lg p-3 shadow-2xs">
+          <p className="text-lg font-extrabold text-teal-600 mt-0.5">{kpiStats.onTimeDepartures}</p>
+        </Card>
+        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-rose-400">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Early Departure</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-rose-500 mt-0.5">{kpiStats.earlyDepartures}</p>
-        </div>
-        <div className="bg-white border border-slate-200 border-l-4 border-l-rose-600 rounded-lg p-3 shadow-2xs">
+          <p className="text-lg font-extrabold text-rose-500 mt-0.5">{kpiStats.earlyDepartures}</p>
+        </Card>
+        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-rose-600">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Absent</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-rose-600 mt-0.5">{kpiStats.totalAbsent}</p>
-        </div>
-        <div className="bg-white border border-slate-200 border-l-4 border-l-indigo-600 rounded-lg p-3 shadow-2xs">
+          <p className="text-lg font-extrabold text-rose-600 mt-0.5">{kpiStats.totalAbsent}</p>
+        </Card>
+        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-indigo-600">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Leave</p>
-          <p className="font-['Montserrat'] text-lg font-extrabold text-indigo-600 mt-0.5">{kpiStats.totalLeaves}</p>
-        </div>
+          <p className="text-lg font-extrabold text-indigo-600 mt-0.5">{kpiStats.totalLeaves}</p>
+        </Card>
       </div>
 
       {/* MATRIX / GRID TIMESHEET */}
