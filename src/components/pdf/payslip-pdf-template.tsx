@@ -1,74 +1,107 @@
 import React from 'react'
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer'
 import { Employee } from '@/lib/supabase/database.types'
+
+// Register Geist Font Family
+Font.register({
+  family: 'Geist',
+  fonts: [
+    {
+      src:
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/fonts/Geist-Regular.ttf`
+          : 'https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Regular.ttf',
+      fontWeight: 'normal',
+    },
+    {
+      src:
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/fonts/Geist-Bold.ttf`
+          : 'https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Bold.ttf',
+      fontWeight: 'bold',
+    },
+  ],
+})
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
-    fontSize: 9,
-    fontFamily: 'Helvetica',
+    paddingTop: 36,
+    paddingBottom: 36,
+    paddingHorizontal: 38,
+    fontSize: 9.5,
+    fontFamily: 'Geist',
     color: '#1e293b',
     backgroundColor: '#ffffff',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
   },
   headerTitle: {
-    fontSize: 22,
-    fontFamily: 'Helvetica-Bold',
+    fontSize: 24,
+    fontFamily: 'Geist',
+    fontWeight: 'bold',
     color: '#007A78',
     textAlign: 'center',
-    marginBottom: 20,
-    letterSpacing: 0.5,
+    marginBottom: 16,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   metaGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 22,
+    marginBottom: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
   metaCol: {
     width: '48%',
   },
   metaRow: {
     flexDirection: 'row',
-    marginBottom: 5,
+    marginBottom: 6,
   },
   metaLabel: {
     width: 95,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Geist',
+    fontWeight: 'bold',
     color: '#003D5C',
-    fontSize: 9,
+    fontSize: 9.5,
   },
   metaColon: {
     width: 10,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Geist',
+    fontWeight: 'bold',
     color: '#003D5C',
-    fontSize: 9,
+    fontSize: 9.5,
   },
   metaValue: {
     flex: 1,
     color: '#0f172a',
-    fontSize: 9,
+    fontSize: 9.5,
   },
   sectionTitle: {
     fontSize: 12,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Geist',
+    fontWeight: 'bold',
     color: '#007A78',
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: 5,
     marginTop: 10,
     letterSpacing: 0.5,
   },
   table: {
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 2,
-    marginBottom: 10,
+    borderRadius: 4,
+    overflow: 'hidden',
   },
   tableRowEven: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#efefef',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -76,8 +109,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#ffffff',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -85,50 +118,58 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#e5e5e5',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
   },
   rowLabel: {
-    fontSize: 8.5,
+    fontSize: 9.5,
     color: '#1e293b',
   },
   rowLabelBold: {
-    fontSize: 8.5,
-    fontFamily: 'Helvetica-Bold',
+    fontSize: 9.5,
+    fontFamily: 'Geist',
+    fontWeight: 'bold',
     color: '#0f172a',
   },
   rowValue: {
-    fontSize: 8.5,
+    fontSize: 9.5,
     color: '#1e293b',
   },
   rowValueBold: {
-    fontSize: 8.5,
-    fontFamily: 'Helvetica-Bold',
+    fontSize: 9.5,
+    fontFamily: 'Geist',
+    fontWeight: 'bold',
     color: '#0f172a',
   },
   amountInWordsRow: {
     flexDirection: 'row',
-    marginTop: 16,
-    marginBottom: 16,
+    marginTop: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 4,
   },
   amountInWordsLabel: {
     width: 110,
-    fontFamily: 'Helvetica-Bold',
-    fontSize: 8.5,
+    fontFamily: 'Geist',
+    fontWeight: 'bold',
+    fontSize: 9.5,
     color: '#0f172a',
   },
   amountInWordsValue: {
     flex: 1,
-    fontSize: 8.5,
+    fontSize: 9.5,
     color: '#334155',
   },
   disclaimer: {
-    fontSize: 7.5,
-    fontFamily: 'Helvetica-Bold',
-    color: '#475569',
+    fontSize: 8.5,
+    fontFamily: 'Geist',
+    color: '#64748b',
     textAlign: 'center',
-    lineHeight: 1.4,
-    marginTop: 8,
+    lineHeight: 1.5,
+    marginTop: 14,
   },
 })
 
@@ -142,6 +183,7 @@ interface PayslipData {
   unpaidDays: number
   totalPaidDays: number
   basicPay: number
+  perDaySalary: number
   commission: number
   adjustments: number
   totalEarnings: number
@@ -162,8 +204,13 @@ export default function PayslipPDFTemplate({
   payslipData,
   payPeriod,
 }: PayslipPDFTemplateProps) {
+  const safeEmpName = (employee.name || employee.employee_id || 'Staff')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+
   return (
-    <Document title={`Payslip_${employee.employee_id || 'Staff'}_${employee.name || ''}`}>
+    <Document title={`Payslip_${safeEmpName}`}>
       <Page size="A4" style={styles.page}>
         {/* Title */}
         <Text style={styles.headerTitle}>EMPLOYEE PAYSLIP</Text>
@@ -202,11 +249,11 @@ export default function PayslipPDFTemplate({
         <View style={styles.table}>
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Monthly Total Days</Text>
-            <Text style={styles.rowValue}>{payslipData.totalWorkingDays.toFixed(2)}</Text>
+            <Text style={styles.rowValue}>{payslipData.totalWorkingDays}</Text>
           </View>
           <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabel}>Present Days</Text>
-            <Text style={styles.rowValue}>{payslipData.presentDays ?? '--'}</Text>
+            <Text style={styles.rowValue}>{payslipData.presentDays ?? 0}</Text>
           </View>
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>A/L Days</Text>
@@ -230,7 +277,7 @@ export default function PayslipPDFTemplate({
           </View>
           <View style={styles.tableRowHighlight}>
             <Text style={styles.rowLabelBold}>Total Paid Days</Text>
-            <Text style={styles.rowValueBold}>{payslipData.totalPaidDays.toFixed(2)}</Text>
+            <Text style={styles.rowValueBold}>{payslipData.totalPaidDays}</Text>
           </View>
         </View>
 
@@ -240,25 +287,25 @@ export default function PayslipPDFTemplate({
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Basic Pay</Text>
             <Text style={styles.rowValue}>
-              PKR {payslipData.basicPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {Math.round(payslipData.basicPay).toLocaleString('en-US')}
             </Text>
           </View>
           <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabel}>Commission</Text>
             <Text style={styles.rowValue}>
-              PKR {payslipData.commission.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {Math.round(payslipData.commission).toLocaleString('en-US')}
             </Text>
           </View>
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Adjustments</Text>
             <Text style={styles.rowValue}>
-              PKR {payslipData.adjustments.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {Math.round(payslipData.adjustments).toLocaleString('en-US')}
             </Text>
           </View>
           <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabelBold}>Total Earnings</Text>
             <Text style={styles.rowValueBold}>
-              PKR {payslipData.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {Math.round(payslipData.totalEarnings).toLocaleString('en-US')}
             </Text>
           </View>
         </View>
@@ -269,19 +316,21 @@ export default function PayslipPDFTemplate({
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Unpaid Days</Text>
             <Text style={styles.rowValue}>
-              PKR {payslipData.unpaidDeduction.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              {payslipData.unpaidDays > 0
+                ? `${payslipData.unpaidDays} * PKR ${Math.round(payslipData.perDaySalary).toLocaleString('en-US')}`
+                : 'PKR 0'}
             </Text>
           </View>
           <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabelBold}>Total Deduction</Text>
             <Text style={styles.rowValueBold}>
-              PKR {payslipData.totalDeduction.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {Math.round(payslipData.totalDeduction).toLocaleString('en-US')}
             </Text>
           </View>
           <View style={styles.tableRowHighlight}>
             <Text style={styles.rowLabelBold}>Net Pay</Text>
             <Text style={styles.rowValueBold}>
-              PKR {payslipData.netPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {Math.round(payslipData.netPay).toLocaleString('en-US')}
             </Text>
           </View>
         </View>

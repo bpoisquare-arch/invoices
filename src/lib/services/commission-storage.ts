@@ -158,3 +158,51 @@ export async function getCommissionsForMonth(monthYear: string): Promise<Employe
   return commissions.filter((c) => c.month_year === monthYear)
 }
 
+export async function getEmployeeAllCommissions(employeeId: string): Promise<EmployeeCommission[]> {
+  const commissions = await getAllCommissions()
+  const target = (employeeId || '').toLowerCase().trim()
+  return commissions
+    .filter((c) => (c.employee_id || '').toLowerCase().trim() === target)
+    .sort((a, b) => b.month_year.localeCompare(a.month_year))
+}
+
+export async function deleteEmployeeCommission(
+  employeeId: string,
+  monthYear: string
+): Promise<boolean> {
+  const commissions = await getAllCommissions()
+  const targetEmp = (employeeId || '').toLowerCase().trim()
+  const targetMonth = (monthYear || '').trim()
+
+  const filtered = commissions.filter(
+    (c) =>
+      !((c.employee_id || '').toLowerCase().trim() === targetEmp && (c.month_year || '').trim() === targetMonth)
+  )
+
+  if (filtered.length === commissions.length) {
+    return false // Nothing deleted
+  }
+
+  inMemoryCommissions = filtered
+  writeCommissionsFile(filtered)
+
+  // Persist deletion to Supabase Database
+  try {
+    const { createClient } = await import('@/lib/supabase/server')
+    const supabase = await createClient()
+    const { error } = await supabase.from('attendance_audit_logs').insert({
+      action: 'EMPLOYEE_COMMISSIONS_STORE',
+      details: filtered as any,
+    })
+
+    if (error) {
+      console.error('Failed to update employee commissions after delete in attendance_audit_logs:', error.message)
+    }
+  } catch (err) {
+    console.error('Error in deleteEmployeeCommission db write:', err)
+  }
+
+  return true
+}
+
+

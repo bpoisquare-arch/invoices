@@ -52,7 +52,6 @@ import {
 } from '@/lib/supabase/database.types'
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
-import EmployeeCommissionModal from '@/components/attendance/employee-commission-modal'
 import * as XLSX from 'xlsx'
 
 const MONTH_OPTIONS = [
@@ -92,7 +91,6 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     amount: 0,
     notes: '',
   })
-  const [isCommissionModalOpen, setIsCommissionModalOpen] = useState(false)
 
   // Filters & Sorting
   const [startDate, setStartDate] = useState('')
@@ -847,29 +845,16 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               Total Package: <strong className="text-slate-900 font-mono">{salaryStats.grossMonthlySalary ? `PKR ${salaryStats.grossMonthlySalary.toLocaleString()}` : 'Not Set'}</strong>
             </span>
 
-            {/* Monthly Commission Badge + Action Button */}
-            <div className="flex items-center gap-1.5">
-              <Badge variant="warning" className="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                Commission:{' '}
-                <strong className="font-mono text-amber-950 font-bold">
-                  {salaryStats.commissionAmount > 0
-                    ? `+ PKR ${salaryStats.commissionAmount.toLocaleString()}`
-                    : 'PKR 0'}
-                </strong>
-              </Badge>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsCommissionModalOpen(true)}
-                className="h-7 px-2.5 text-xs font-bold text-amber-800 bg-amber-50/60 border-amber-300 hover:bg-amber-100 hover:text-amber-950 gap-1 rounded-lg shadow-2xs transition-colors"
-                title="Add or update monthly commission for this employee"
-              >
-                <Sparkles className="w-3 h-3 text-amber-600" />
-                <span>{salaryStats.commissionAmount > 0 ? 'Edit' : 'Add Commission'}</span>
-              </Button>
-            </div>
+            {/* Monthly Commission Badge */}
+            <Badge variant="warning" className="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              Commission:{' '}
+              <strong className="font-mono text-amber-950 font-bold">
+                {salaryStats.commissionAmount > 0
+                  ? `+ PKR ${salaryStats.commissionAmount.toLocaleString()}`
+                  : 'PKR 0'}
+              </strong>
+            </Badge>
 
             <Badge variant="success" className="px-2.5 py-1 text-xs font-semibold">
               Paid Days: <strong className="font-mono ml-1">{salaryStats.paidDays}/{salaryStats.monthTotalDays} Days</strong>
@@ -956,7 +941,9 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               }}
             >
               <SelectTrigger className="h-9 text-xs font-bold text-[#003D5C] bg-slate-50 border-slate-200 min-w-[120px]">
-                <SelectValue placeholder="Select Month" />
+                <SelectValue placeholder="Select Month">
+                  {MONTH_OPTIONS.find((m) => m.value === selectedMonth.split('-')[1])?.label || 'Select Month'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="max-h-60">
                 {MONTH_OPTIONS.map((m) => (
@@ -984,7 +971,9 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               }}
             >
               <SelectTrigger className="h-9 text-xs font-bold text-[#003D5C] bg-slate-50 border-slate-200 min-w-[100px]">
-                <SelectValue placeholder="Select Year" />
+                <SelectValue placeholder="Select Year">
+                  {selectedMonth.split('-')[0] || 'Select Year'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="max-h-60">
                 {YEAR_OPTIONS.map((y) => (
@@ -1235,25 +1224,6 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         isOpen={!!viewingPunchesRecord}
         onClose={() => setViewingPunchesRecord(null)}
         record={viewingPunchesRecord}
-      />
-
-      {/* Monthly Commission Modal */}
-      <EmployeeCommissionModal
-        isOpen={isCommissionModalOpen}
-        onClose={() => setIsCommissionModalOpen(false)}
-        employee={employee}
-        month={selectedMonth}
-        currentCommission={monthlyCommission.amount}
-        currentNotes={monthlyCommission.notes}
-        onSaveSuccess={({ month: savedMonth, amount, notes }) => {
-          if (savedMonth === selectedMonth) {
-            setMonthlyCommission({ amount, notes })
-          } else {
-            setSelectedMonth(savedMonth)
-            setMonthlyCommission({ amount, notes })
-          }
-          loadData()
-        }}
       />
     </div>
   )

@@ -50,21 +50,21 @@ import { pdf } from '@react-pdf/renderer'
 import PayslipPDFTemplate from '@/components/pdf/payslip-pdf-template'
 
 const MONTHS = [
-  { value: '0', label: 'January' },
-  { value: '1', label: 'February' },
-  { value: '2', label: 'March' },
-  { value: '3', label: 'April' },
-  { value: '4', label: 'May' },
-  { value: '5', label: 'June' },
-  { value: '6', label: 'July' },
-  { value: '7', label: 'August' },
-  { value: '8', label: 'September' },
-  { value: '9', label: 'October' },
-  { value: '10', label: 'November' },
-  { value: '11', label: 'December' },
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
 ]
 
-const YEARS = ['2024', '2025', '2026', '2027', '2028']
+const YEARS = ['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030']
 
 // Helper to convert number to words for Pakistani Rupees
 function numberToWordsPKR(num: number): string {
@@ -143,13 +143,14 @@ function numberToWordsPKR(num: number): string {
 export default function PayslipsPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([])
+  const [holidays, setHolidays] = useState<Record<string, string>>({})
   const [commissionsMap, setCommissionsMap] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
 
   // Current Date Defaults
   const now = new Date()
-  const [selectedMonth, setSelectedMonth] = useState<string>(String(now.getMonth()))
+  const [selectedMonth, setSelectedMonth] = useState<string>(String(now.getMonth() + 1).padStart(2, '0'))
   const [selectedYear, setSelectedYear] = useState<string>(String(now.getFullYear()))
   const [selectedDesignation, setSelectedDesignation] = useState<string>('all')
   const [selectedBranch, setSelectedBranch] = useState<string>('all')
@@ -165,22 +166,23 @@ export default function PayslipsPage() {
   const { startDate, endDate, daysInMonth, monthLabel, monthKey } = useMemo(() => {
     const m = parseInt(selectedMonth, 10)
     const y = parseInt(selectedYear, 10)
-    const totalDays = new Date(y, m + 1, 0).getDate()
-    const sDate = `${y}-${String(m + 1).padStart(2, '0')}-01`
-    const eDate = `${y}-${String(m + 1).padStart(2, '0')}-${String(totalDays).padStart(2, '0')}`
+    const totalDays = new Date(y, m, 0).getDate()
+    const sDate = `${y}-${String(m).padStart(2, '0')}-01`
+    const eDate = `${y}-${String(m).padStart(2, '0')}-${String(totalDays).padStart(2, '0')}`
     const label = `${MONTHS.find((item) => item.value === selectedMonth)?.label || 'Month'} ${y}`
-    const key = `${y}-${String(m + 1).padStart(2, '0')}`
+    const key = `${y}-${String(m).padStart(2, '0')}`
     return { startDate: sDate, endDate: eDate, daysInMonth: totalDays, monthLabel: label, monthKey: key }
   }, [selectedMonth, selectedYear])
 
-  // Fetch employees, attendance records, and monthly commissions for selected month
+  // Fetch employees, attendance records, holidays, and monthly commissions for selected month
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const [empRes, attRes, commRes] = await Promise.all([
+      const [empRes, attRes, commRes, holRes] = await Promise.all([
         fetch('/api/attendance/employees?isActiveOnly=false'),
-        fetch(`/api/attendance/records?startDate=${startDate}&endDate=${endDate}`),
+        fetch(`/api/attendance/records?startDate=${startDate}&endDate=${endDate}&pageSize=10000`),
         fetch(`/api/attendance/commissions?month=${monthKey}`),
+        fetch('/api/attendance/holidays'),
       ])
 
       const empData = await empRes.json()
@@ -191,6 +193,13 @@ export default function PayslipsPage() {
       const attData = await attRes.json()
       if (attData.success && Array.isArray(attData.records)) {
         setAttendanceRecords(attData.records)
+      }
+
+      const holData = await holRes.json()
+      if (holData.success && holData.holidays) {
+        setHolidays(holData.holidays)
+      } else {
+        setHolidays({})
       }
 
       const commData = await commRes.json()
@@ -235,7 +244,7 @@ export default function PayslipsPage() {
     return Array.from(s).sort()
   }, [employees])
 
-  // Attendance aggregates per employee for the selected month
+  // Exact real-time attendance aggregates per employee for the selected month across all calendar days
   const employeeAttendanceStats = useMemo(() => {
     const map: Record<
       string,
@@ -249,55 +258,168 @@ export default function PayslipsPage() {
       }
     > = {}
 
+    // Map records by all possible employee keys and date
+    const recordsByEmpKey: Record<string, Record<string, any>> = {}
+
     for (const rec of attendanceRecords) {
-      const empId = rec.employee_id || rec.employee?.id || rec.employee?.employee_id
-      if (!empId) continue
+      const keys = [
+        rec.employee_id,
+        rec.employee?.id,
+        rec.employee?.employee_id,
+        rec.employee_id?.toLowerCase?.(),
+        rec.employee?.id?.toLowerCase?.(),
+        rec.employee?.employee_id?.toLowerCase?.(),
+        rec.employee?.name?.toLowerCase?.().trim(),
+      ].filter(Boolean)
 
-      if (!map[empId]) {
-        map[empId] = { presentDays: 0, alDays: 0, clDays: 0, slDays: 0, wfhDays: 0, unpaidDays: 0 }
-      }
+      const dStr = rec.attendance_date ? rec.attendance_date.split('T')[0] : null
+      if (!dStr) continue
 
-      const arrStatus = rec.arrival_status || ''
-      const depStatus = rec.departure_status || ''
-      const isLeave = arrStatus === 'Leave' || depStatus.includes('Leave') || ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Probation Leaves'].includes(depStatus)
-      const isWfh = depStatus === 'Work From Home' || arrStatus === 'Work From Home'
-      const isAbsent = arrStatus === 'Absent' || depStatus === 'Absent'
-      const hasPunches = Boolean(rec.in_time && rec.in_time !== '---') || Boolean(rec.out_time && rec.out_time !== '---') || (rec.total_working_minutes ? rec.total_working_minutes > 0 : false)
-
-      // Check leave duration notes
-      let leaveVal = 1
-      if (Array.isArray(rec.raw_punches)) {
-        const found = (rec.raw_punches as any[]).find((p) => p && typeof p === 'object' && p.notes)
-        if (found && found.notes) {
-          const match = found.notes.match(/([\d.]+)\s*day/i)
-          if (match && match[1]) {
-            leaveVal = parseFloat(match[1]) || 1
-          }
-        }
-      }
-
-      if (isWfh) {
-        map[empId].wfhDays += 1
-        map[empId].presentDays += 1
-      } else if (isAbsent) {
-        map[empId].unpaidDays += 1
-      } else if (isLeave) {
-        if (depStatus.includes('Annual') || arrStatus.includes('Annual')) {
-          map[empId].alDays += leaveVal
-        } else if (depStatus.includes('Casual') || arrStatus.includes('Casual')) {
-          map[empId].clDays += leaveVal
-        } else if (depStatus.includes('Sick') || arrStatus.includes('Sick')) {
-          map[empId].slDays += leaveVal
-        } else {
-          map[empId].alDays += leaveVal
-        }
-      } else if (hasPunches || arrStatus === 'On Time Arrival' || arrStatus === 'Late Arrival') {
-        map[empId].presentDays += 1
+      for (const k of keys) {
+        if (!recordsByEmpKey[k]) recordsByEmpKey[k] = {}
+        recordsByEmpKey[k][dStr] = rec
       }
     }
 
+    const todayDate = new Date()
+    const todayStr = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`
+    const y = parseInt(selectedYear, 10)
+    const m = parseInt(selectedMonth, 10)
+
+    for (const emp of employees) {
+      const empKeys = [
+        emp.id,
+        emp.employee_id,
+        emp.id?.toLowerCase?.(),
+        emp.employee_id?.toLowerCase?.(),
+        emp.name?.toLowerCase?.().trim(),
+      ].filter(Boolean)
+
+      let presentDays = 0
+      let alDays = 0
+      let clDays = 0
+      let slDays = 0
+      let wfhDays = 0
+      let unpaidDays = 0
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0')
+        const dStr = `${y}-${String(m).padStart(2, '0')}-${dayStr}`
+        const dateObj = new Date(y, m - 1, day, 12, 0, 0)
+        const isSunday = dateObj.getDay() === 0
+        const isGazettedHoliday = Boolean(holidays[dStr])
+        const isFuture = dStr > todayStr
+        const isBeforeJoining =
+          !emp.is_old_staff && emp.joining_date
+            ? dStr < emp.joining_date.split('T')[0]
+            : false
+
+        // Look for record for this employee on dStr
+        let rec: any = null
+        for (const k of empKeys) {
+          if (recordsByEmpKey[k] && recordsByEmpKey[k][dStr]) {
+            rec = recordsByEmpKey[k][dStr]
+            break
+          }
+        }
+
+        const arrStatus = rec?.arrival_status || ''
+        const depStatus = rec?.departure_status || ''
+
+        let noteStr: string | null = rec?.notes || null
+        if (Array.isArray(rec?.raw_punches)) {
+          const found = (rec.raw_punches as any[]).find((p) => p && typeof p === 'object' && p.notes)
+          if (found && found.notes) noteStr = found.notes
+        }
+
+        let leaveVal = 1
+        if (noteStr) {
+          const match = noteStr.match(/\(([0-9]+(?:\.[0-9]+)?)\s*day/i) || noteStr.match(/([0-9]+(?:\.[0-9]+)?)\s*day/i)
+          if (match && match[1]) {
+            const v = parseFloat(match[1])
+            if (!isNaN(v) && v > 0) leaveVal = v
+          }
+        }
+
+        const hasPunches =
+          Boolean(rec?.in_time && rec.in_time !== '---') ||
+          Boolean(rec?.out_time && rec.out_time !== '---') ||
+          (rec?.total_working_minutes ? rec.total_working_minutes > 0 : false) ||
+          arrStatus === 'On Time Arrival' ||
+          arrStatus === 'Late Arrival'
+
+        const isWfh =
+          arrStatus === 'Work From Home' ||
+          depStatus === 'Work From Home' ||
+          (noteStr ? noteStr.toLowerCase().includes('work from home') || noteStr.toLowerCase().includes('wfh') : false)
+
+        const isAnnualLeave =
+          depStatus.includes('Annual') ||
+          arrStatus.includes('Annual') ||
+          (noteStr ? noteStr.toLowerCase().includes('annual') : false)
+
+        const isCasualLeave =
+          depStatus.includes('Casual') ||
+          arrStatus.includes('Casual') ||
+          (noteStr ? noteStr.toLowerCase().includes('casual') : false)
+
+        const isSickLeave =
+          depStatus.includes('Sick') ||
+          arrStatus.includes('Sick') ||
+          (noteStr ? noteStr.toLowerCase().includes('sick') : false)
+
+        const isProbationLeave =
+          depStatus.includes('Probation') ||
+          arrStatus.includes('Probation') ||
+          (noteStr ? noteStr.toLowerCase().includes('probation') : false)
+
+        const isGenericLeave =
+          arrStatus === 'Leave' ||
+          depStatus.includes('Leave') ||
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Probation Leaves'].includes(depStatus)
+
+        const isExplicitHoliday =
+          isSunday ||
+          isGazettedHoliday ||
+          arrStatus === 'Holiday' ||
+          arrStatus === 'Gazetted Holiday' ||
+          arrStatus.toLowerCase().includes('holiday') ||
+          depStatus === 'Holiday' ||
+          depStatus === 'Gazetted Holiday' ||
+          depStatus.toLowerCase().includes('holiday')
+
+        if (isWfh) {
+          wfhDays += leaveVal
+          presentDays += leaveVal
+        } else if (isAnnualLeave) {
+          alDays += leaveVal
+        } else if (isCasualLeave) {
+          clDays += leaveVal
+        } else if (isSickLeave || isProbationLeave) {
+          slDays += leaveVal
+        } else if (isGenericLeave) {
+          alDays += leaveVal
+        } else if (hasPunches) {
+          presentDays += 1
+        } else if (isExplicitHoliday) {
+          // Paid Sunday or Paid Gazetted Holiday (not absent)
+        } else if (isFuture || isBeforeJoining || arrStatus === '--' || depStatus === '--') {
+          // Future day or before joining date (not absent)
+        } else {
+          // Past normal working day with no punch/leave/wfh -> Absent (Unpaid day)
+          unpaidDays += 1
+        }
+      }
+
+      const statsObj = { presentDays, alDays, clDays, slDays, wfhDays, unpaidDays }
+      if (emp.id) map[emp.id] = statsObj
+      if (emp.employee_id) map[emp.employee_id] = statsObj
+      if (emp.id) map[emp.id.toLowerCase()] = statsObj
+      if (emp.employee_id) map[emp.employee_id.toLowerCase()] = statsObj
+    }
+
     return map
-  }, [attendanceRecords])
+  }, [attendanceRecords, employees, holidays, selectedYear, selectedMonth, daysInMonth])
 
   // Filtered employees list
   const filteredEmployees = useMemo(() => {
@@ -369,6 +491,7 @@ export default function PayslipsPage() {
       unpaidDays,
       totalPaidDays,
       basicPay,
+      perDaySalary,
       commission,
       adjustments,
       totalEarnings,
@@ -398,7 +521,11 @@ export default function PayslipsPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `Payslip_${emp.employee_id || 'Staff'}_${monthLabel.replace(/\s+/g, '_')}.pdf`
+      const safeEmpName = (emp.name || emp.employee_id || 'Staff')
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/_+/g, '_')
+      a.download = `Payslip_${safeEmpName}_${monthLabel.replace(/\s+/g, '_')}.pdf`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -465,9 +592,11 @@ export default function PayslipsPage() {
             <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
               SELECT MONTH
             </label>
-            <Select value={selectedMonth} onValueChange={(val) => setSelectedMonth(val || '0')}>
+            <Select value={selectedMonth} onValueChange={(val) => setSelectedMonth(val || '01')}>
               <SelectTrigger className="text-xs border-slate-300 h-9.5 font-semibold rounded-lg bg-slate-50/50 focus:bg-white w-full">
-                <SelectValue placeholder="Select Month" />
+                <SelectValue placeholder="Select Month">
+                  {MONTHS.find((m) => m.value === selectedMonth)?.label || 'Select Month'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="max-h-64 min-w-[160px]">
                 {MONTHS.map((m) => (
@@ -486,7 +615,9 @@ export default function PayslipsPage() {
             </label>
             <Select value={selectedYear} onValueChange={(val) => setSelectedYear(val || '2026')}>
               <SelectTrigger className="text-xs border-slate-300 h-9.5 font-semibold rounded-lg bg-slate-50/50 focus:bg-white w-full">
-                <SelectValue placeholder="Select Year" />
+                <SelectValue placeholder="Select Year">
+                  {selectedYear || 'Select Year'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="max-h-64 min-w-[120px]">
                 {YEARS.map((yr) => (
@@ -802,7 +933,7 @@ export default function PayslipsPage() {
                   <div className="border border-slate-200 overflow-hidden rounded-xs text-xs">
                     <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800 font-medium">
                       <span>Monthly Total Days</span>
-                      <span className="font-mono">{currentPayslipData.totalWorkingDays.toFixed(2)}</span>
+                      <span className="font-mono">{currentPayslipData.totalWorkingDays}</span>
                     </div>
                     <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
                       <span>Present Days</span>
@@ -830,7 +961,7 @@ export default function PayslipsPage() {
                     </div>
                     <div className="bg-[#E5E5E5] px-4 py-2.5 flex justify-between items-center text-slate-900 font-bold">
                       <span>Total Paid Days</span>
-                      <span className="font-mono">{currentPayslipData.totalPaidDays.toFixed(2)}</span>
+                      <span className="font-mono">{currentPayslipData.totalPaidDays}</span>
                     </div>
                   </div>
                 </div>
@@ -844,25 +975,25 @@ export default function PayslipsPage() {
                     <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800 font-medium">
                       <span>Basic Pay</span>
                       <span className="font-mono">
-                        PKR {currentPayslipData.basicPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        PKR {Math.round(currentPayslipData.basicPay).toLocaleString('en-US')}
                       </span>
                     </div>
                     <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
                       <span>Commission</span>
                       <span className="font-mono">
-                        PKR {currentPayslipData.commission.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        PKR {Math.round(currentPayslipData.commission).toLocaleString('en-US')}
                       </span>
                     </div>
                     <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
                       <span>Adjustments</span>
                       <span className="font-mono">
-                        PKR {currentPayslipData.adjustments.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        PKR {Math.round(currentPayslipData.adjustments).toLocaleString('en-US')}
                       </span>
                     </div>
                     <div className="bg-white px-4 py-2.5 flex justify-between items-center text-slate-900 font-bold">
                       <span>Total Earnings</span>
                       <span className="font-mono">
-                        PKR {currentPayslipData.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        PKR {Math.round(currentPayslipData.totalEarnings).toLocaleString('en-US')}
                       </span>
                     </div>
                   </div>
@@ -877,19 +1008,21 @@ export default function PayslipsPage() {
                     <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800 font-medium">
                       <span>Unpaid Days</span>
                       <span className="font-mono">
-                        PKR {currentPayslipData.unpaidDeduction.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        {currentPayslipData.unpaidDays > 0
+                          ? `${currentPayslipData.unpaidDays} * PKR ${Math.round(currentPayslipData.perDaySalary).toLocaleString('en-US')}`
+                          : `PKR 0`}
                       </span>
                     </div>
                     <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-900 font-bold">
                       <span>Total Deduction</span>
                       <span className="font-mono">
-                        PKR {currentPayslipData.totalDeduction.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        PKR {Math.round(currentPayslipData.totalDeduction).toLocaleString('en-US')}
                       </span>
                     </div>
                     <div className="bg-[#E5E5E5] px-4 py-2.5 flex justify-between items-center text-slate-900 font-bold">
                       <span>Net Pay</span>
                       <span className="font-mono">
-                        PKR {currentPayslipData.netPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        PKR {Math.round(currentPayslipData.netPay).toLocaleString('en-US')}
                       </span>
                     </div>
                   </div>

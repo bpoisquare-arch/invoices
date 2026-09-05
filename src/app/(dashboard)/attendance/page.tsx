@@ -21,7 +21,9 @@ import {
   Coins,
   MoreHorizontal,
   Lock,
+  Sparkles,
 } from 'lucide-react'
+import EmployeeCommissionModal from '@/components/attendance/employee-commission-modal'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -74,6 +76,9 @@ export default function EmployeeOverviewPage() {
   const [search, setSearch] = useState('')
   const [branchFilter, setBranchFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+
+  // Commission Modal State
+  const [selectedCommissionEmployee, setSelectedCommissionEmployee] = useState<Employee | null>(null)
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -594,12 +599,21 @@ export default function EmployeeOverviewPage() {
                       </TableCell>
 
                       {/* Salary */}
-                      <TableCell className="py-4 px-4 text-right font-mono font-bold text-slate-800 text-xs">
-                        {emp.salary ? (
-                          <span>PKR {Number(emp.salary).toLocaleString()}</span>
-                        ) : (
-                          <span className="text-slate-400 font-normal">—</span>
-                        )}
+                      <TableCell className="py-4 px-4 text-right font-mono text-xs">
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="font-bold text-slate-800">
+                            {emp.salary ? `PKR ${Number(emp.salary).toLocaleString()}` : '—'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCommissionEmployee(emp)}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 px-1.5 py-0.5 rounded shadow-2xs transition-colors cursor-pointer"
+                            title="View and manage monthly commission"
+                          >
+                            <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+                            <span>+ Commission</span>
+                          </button>
+                        </div>
                       </TableCell>
 
                       {/* Attendance */}
@@ -641,13 +655,20 @@ export default function EmployeeOverviewPage() {
                             <MoreHorizontal className="w-4 h-4" />
                             <span className="sr-only">Actions</span>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-36 bg-white border border-slate-200 shadow-lg rounded-xl p-1 text-xs">
+                          <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 shadow-lg rounded-xl p-1 text-xs">
+                            <DropdownMenuItem
+                              onClick={() => setSelectedCommissionEmployee(emp)}
+                              className="flex items-center gap-2 px-2.5 py-2 text-amber-800 hover:bg-amber-50 hover:text-amber-950 rounded-lg cursor-pointer font-medium transition-colors"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                              <span>View Commission</span>
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => openEditModal(emp)}
                               className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
                             >
                               <Edit2 className="w-3.5 h-3.5 text-slate-500" />
-                              <span>Edit</span>
+                              <span>Edit Profile</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               variant="destructive"
@@ -1301,6 +1322,16 @@ export default function EmployeeOverviewPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Employee Commission Management Modal */}
+      <EmployeeCommissionModal
+        isOpen={!!selectedCommissionEmployee}
+        onClose={() => setSelectedCommissionEmployee(null)}
+        employee={selectedCommissionEmployee}
+        onSaveSuccess={() => {
+          fetchEmployees()
+        }}
+      />
     </div>
   )
 }
