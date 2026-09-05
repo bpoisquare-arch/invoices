@@ -346,7 +346,12 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
       // Filter by arrival status if selected
       if (arrivalStatus && arrivalStatus !== 'all') {
-        displayRows = displayRows.filter((r) => r.arrival_status === arrivalStatus)
+        displayRows = displayRows.filter((r) => {
+          if (arrivalStatus === 'Absent') return r.arrival_status === 'Absent' || r.departure_status === 'Absent'
+          if (arrivalStatus === 'Leave') return r.arrival_status === 'Leave' || (r.departure_status || '').includes('Leave')
+          if (arrivalStatus === 'Work From Home') return r.arrival_status === 'Work From Home' || r.departure_status === 'Work From Home'
+          return r.arrival_status === arrivalStatus
+        })
       }
 
       setRecords(displayRows)
@@ -490,7 +495,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       }
     }
 
-    // 1. Full Month Statistics (to determine stable Daily Rate across full month working days)
+    // 1. Full Month Statistics (to determine stable Daily Rate across full month total days)
     const fullMonthStats = getStats(fullMonthRecords.length > 0 ? fullMonthRecords : records)
 
     // 2. Active date range statistics
@@ -510,22 +515,21 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     const commissionAmount = monthlyCommission.amount || 0
     const grossMonthlySalary = baseSalary !== null ? baseSalary + commissionAmount : commissionAmount > 0 ? commissionAmount : 0
 
-    // Daily Rate = Total Gross Monthly Salary / Total Working Days of the ENTIRE Month (excludes Sundays and Gazetted Holidays)
-    const monthWorkingDays = fullMonthStats.totalWorkingDays > 0 ? fullMonthStats.totalWorkingDays : 26
-    const perDaySalary = monthWorkingDays > 0 && grossMonthlySalary > 0
-      ? grossMonthlySalary / monthWorkingDays
+    // Daily Rate = Base Salary / Total Days of the ENTIRE Month (e.g. 31 days in August)
+    const monthTotalDays = fullMonthStats.totalDays > 0 ? fullMonthStats.totalDays : 31
+    const perDaySalary = monthTotalDays > 0 && baseSalary !== null && baseSalary > 0
+      ? baseSalary / monthTotalDays
       : 0
 
-    // Paid Days in active range (Present + WFH + Leaves)
-    const paidDays = rangeStats.paidDays
+    // Paid Days in active range = Total days - Absent days
     const absentDays = rangeStats.absent
+    const paidDays = Math.max(0, rangeStats.totalDays - absentDays)
     const absentDeduction = Math.round(absentDays * perDaySalary)
 
-    // Earned Salary = Paid Days * Per Day Salary (capped at grossMonthlySalary if all month days paid)
-    const isFullMonthCompleted = rangeStats.future === 0 && rangeStats.totalDays === fullMonthStats.totalDays
-    const totalEarnedSalary = isFullMonthCompleted
-      ? Math.max(0, Math.round(grossMonthlySalary - absentDeduction))
-      : Math.min(grossMonthlySalary, Math.round(paidDays * perDaySalary))
+    // Earned Base Salary = Base Salary - Absent Deduction
+    const earnedBaseSalary = baseSalary !== null ? Math.max(0, Math.round(baseSalary - absentDeduction)) : 0
+    // Total Earned Salary = Earned Base Salary + Full Commission
+    const totalEarnedSalary = earnedBaseSalary + commissionAmount
 
     const hasSalaryConfigured = (baseSalary !== null && baseSalary > 0) || commissionAmount > 0
 
@@ -539,7 +543,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       paidDays,
       totalDaysInMonth: rangeStats.totalDays,
       totalWorkingDays: rangeStats.totalWorkingDays,
-      monthWorkingDays,
+      monthTotalDays,
       baseSalary,
       commissionAmount,
       grossMonthlySalary,
@@ -630,125 +634,183 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         </div>
       </Card>
 
-      {/* Metrics Summary Bento Grid (8 Cards) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 xl:grid-cols-8 gap-3">
-        {/* 1. Total Working Days */}
-        <Card className="p-3 shadow-2xs border-slate-200/80">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Month Working Days</p>
-          <p className="text-2xl font-extrabold text-[#003D5C] mt-1">{salaryStats.monthWorkingDays}</p>
-          <p className="text-[11px] text-slate-400 mt-1">Excl. Sundays & Holidays</p>
-        </Card>
+      {/* Metrics Summary Bento Grid (Spacious & Clean 2-Tier Layout) */}
+      <div className="space-y-3.5">
+        {/* Tier 1: Core Attendance & Salary Status (5 Cards) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          {/* 1. Monthly Total Days */}
+          <Card className="p-4 bg-white shadow-2xs border-slate-200/90 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Monthly Total Days</p>
+              <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-slate-600">
+                <Calendar className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className="text-3xl sm:text-4xl font-black text-[#003D5C] font-mono tracking-tight my-2">
+              {salaryStats.monthTotalDays}
+            </p>
+            <p className="text-xs text-slate-400 font-medium">Calendar days in month</p>
+          </Card>
 
-        {/* 2. On-Time Arrival */}
-        <Card className="p-3 shadow-2xs border-emerald-200/80 bg-emerald-50/10">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">On Time Arrival</p>
-          <p className="text-2xl font-extrabold text-emerald-600 mt-1">{summary.onTimeArrivals}</p>
-          <p className="text-[11px] text-emerald-700 font-semibold mt-1">{summary.onTimeArrivalRate}% rate</p>
-        </Card>
+          {/* 2. Present Days */}
+          <Card className="p-4 bg-blue-50/20 shadow-2xs border-blue-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Present Days</p>
+              <div className="w-6 h-6 rounded-md bg-blue-100/80 flex items-center justify-center text-blue-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className="text-3xl sm:text-4xl font-black text-blue-900 font-mono tracking-tight my-2">
+              {salaryStats.presentDays}
+            </p>
+            <p className="text-xs text-blue-600/80 font-medium">Days attended / WFH</p>
+          </Card>
 
-        {/* 3. Late Arrival */}
-        <Card className="p-3 shadow-2xs border-amber-200/80 bg-amber-50/10">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Late Arrivals</p>
-          <p className="text-2xl font-extrabold text-amber-600 mt-1">{summary.lateArrivals}</p>
-          <p className="text-[11px] text-amber-700 font-semibold mt-1">After cutoff</p>
-        </Card>
+          {/* 3. Absents */}
+          <Card className="p-4 bg-rose-50/20 shadow-2xs border-rose-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-rose-600">Absents</p>
+              <div className="w-6 h-6 rounded-md bg-rose-100/80 flex items-center justify-center text-rose-600">
+                <AlertCircle className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className="text-3xl sm:text-4xl font-black text-rose-700 font-mono tracking-tight my-2">
+              {salaryStats.absentDays}
+            </p>
+            <p className="text-xs text-rose-600 font-semibold truncate">
+              {salaryStats.absentDays > 0 ? `-PKR ${salaryStats.absentDeduction.toLocaleString()} (Deduction)` : '0 deductions'}
+            </p>
+          </Card>
 
-        {/* 4. On-Time Departure */}
-        <Card className="p-3 shadow-2xs border-emerald-200/80 bg-emerald-50/10">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">On Time Departure</p>
-          <p className="text-2xl font-extrabold text-emerald-600 mt-1">{summary.onTimeDepartures}</p>
-          <p className="text-[11px] text-emerald-700 font-semibold mt-1">{summary.onTimeDepartureRate}% rate</p>
-        </Card>
-
-        {/* 5. Early Departure */}
-        <Card className="p-3 shadow-2xs border-rose-200/80 bg-rose-50/10">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Early Departure</p>
-          <p className="text-2xl font-extrabold text-rose-600 mt-1">{summary.earlyDepartures}</p>
-          <p className="text-[11px] text-rose-700 font-semibold mt-1">Left early</p>
-        </Card>
-
-        {/* 6. Attended Days */}
-        <Card className="p-3 shadow-2xs border-blue-200/80 bg-blue-50/15">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Attended Days</p>
-          <p className="text-2xl font-extrabold text-blue-900 mt-1 font-mono">
-            {salaryStats.presentDays}
-          </p>
-          <p className="text-[11px] text-blue-600/80 font-medium mt-1">Days attended</p>
-        </Card>
-
-        {/* 7. Total Hours */}
-        <Card
-          className={`p-3 shadow-2xs transition-all ${
-            summary.differenceMinutes >= 0
-              ? 'border-emerald-200/80 bg-emerald-50/20'
-              : 'border-amber-200/80 bg-amber-50/20'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Hours</p>
-            <Badge
-              variant={summary.differenceMinutes >= 0 ? 'success' : 'warning'}
-              className="text-[10px] font-bold px-1.5 py-0.2 font-mono"
-            >
-              {summary.formattedDifference}
-            </Badge>
-          </div>
-          <p className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">
-            {summary.formattedTotalHours}
-          </p>
-          <p
-            className={`text-[11px] font-semibold mt-1 ${
-              summary.hoursCompletionRate >= 100 ? 'text-emerald-700' : 'text-amber-700'
+          {/* 4. Total Hours */}
+          <Card
+            className={`p-4 shadow-2xs rounded-xl hover:shadow-xs transition-all flex flex-col justify-between ${
+              summary.differenceMinutes >= 0
+                ? 'border-emerald-200/80 bg-emerald-50/20'
+                : 'border-amber-200/80 bg-amber-50/20'
             }`}
           >
-            {summary.hoursCompletionRate}% completed
-          </p>
-        </Card>
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Hours</p>
+              <Badge
+                variant={summary.differenceMinutes >= 0 ? 'success' : 'warning'}
+                className="text-[10px] font-bold px-1.5 py-0.5 font-mono"
+              >
+                {summary.formattedDifference}
+              </Badge>
+            </div>
+            <p className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tracking-tight my-2">
+              {summary.formattedTotalHours}
+            </p>
+            <p
+              className={`text-xs font-semibold ${
+                summary.hoursCompletionRate >= 100 ? 'text-emerald-700' : 'text-amber-700'
+              }`}
+            >
+              {summary.hoursCompletionRate}% completed
+            </p>
+          </Card>
 
-        {/* 8. Earned / Payable Salary Card */}
-        <Card
-          className={`p-3 shadow-2xs transition-all ${
-            !salaryStats.hasSalaryConfigured
-              ? 'border-slate-200/80'
-              : salaryStats.absentDays === 0
-              ? 'border-emerald-200/80 bg-emerald-50/20'
-              : 'border-amber-200/80 bg-amber-50/20'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Earned Salary</p>
-            <Badge
-              variant={!salaryStats.hasSalaryConfigured ? 'secondary' : salaryStats.absentDays === 0 ? 'success' : 'warning'}
-              className="text-[9px] font-bold px-1.5 py-0.2"
+          {/* 5. Earned / Payable Salary Card */}
+          <Card
+            className={`p-4 shadow-2xs rounded-xl hover:shadow-xs transition-all flex flex-col justify-between ${
+              !salaryStats.hasSalaryConfigured
+                ? 'border-slate-200/90 bg-white'
+                : salaryStats.absentDays === 0
+                ? 'border-emerald-200/80 bg-emerald-50/20'
+                : 'border-amber-200/80 bg-amber-50/20'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600">Earned Salary</p>
+              <Badge
+                variant={!salaryStats.hasSalaryConfigured ? 'secondary' : salaryStats.absentDays === 0 ? 'success' : 'warning'}
+                className="text-[9px] font-bold px-1.5 py-0.5"
+              >
+                {!salaryStats.hasSalaryConfigured
+                  ? 'Not Set'
+                  : `${salaryStats.paidDays}/${salaryStats.monthTotalDays} Paid Days`}
+              </Badge>
+            </div>
+            <p className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tracking-tight my-2 whitespace-nowrap">
+              {salaryStats.hasSalaryConfigured
+                ? `PKR ${salaryStats.totalEarnedSalary.toLocaleString()}`
+                : 'Not Set'}
+            </p>
+            <p
+              className={`text-xs font-semibold leading-tight truncate ${
+                !salaryStats.hasSalaryConfigured
+                  ? 'text-slate-400'
+                  : salaryStats.absentDays === 0
+                  ? 'text-emerald-700'
+                  : 'text-amber-700'
+              }`}
             >
               {!salaryStats.hasSalaryConfigured
-                ? 'Not Set'
-                : `${salaryStats.paidDays}/${salaryStats.monthWorkingDays} Paid Days`}
-            </Badge>
-          </div>
-          <p className="text-[15px] sm:text-base font-extrabold text-slate-900 mt-1 font-mono tracking-tight whitespace-nowrap">
-            {salaryStats.hasSalaryConfigured
-              ? `PKR ${salaryStats.totalEarnedSalary.toLocaleString()}`
-              : 'Not Set'}
-          </p>
-          <p
-            className={`text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight break-words ${
-              !salaryStats.hasSalaryConfigured
-                ? 'text-slate-400'
-                : salaryStats.absentDays === 0
-                ? 'text-emerald-700'
-                : 'text-amber-700'
-            }`}
-          >
-            {!salaryStats.hasSalaryConfigured
-              ? 'Salary not configured'
-              : `PKR ${salaryStats.grossMonthlySalary.toLocaleString()} Total Gross • ${
-                  salaryStats.absentDays > 0
-                    ? `-${salaryStats.absentDeduction.toLocaleString()} (${salaryStats.absentDays}d Absent)`
-                    : `PKR ${salaryStats.perDaySalary}/d`
-                }`}
-          </p>
-        </Card>
+                ? 'Salary not configured'
+                : `PKR ${salaryStats.grossMonthlySalary.toLocaleString()} Total Gross`}
+            </p>
+          </Card>
+        </div>
+
+        {/* Tier 2: Punch & Punctuality Breakdown (4 Equal Cards) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* 1. On-Time Arrival */}
+          <Card className="p-4 shadow-2xs border-emerald-200/80 bg-emerald-50/15 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">On Time Arrival</p>
+              <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className="text-3xl sm:text-4xl font-black text-emerald-600 font-mono tracking-tight my-2">
+              {summary.onTimeArrivals}
+            </p>
+            <p className="text-xs text-emerald-700 font-semibold">{summary.onTimeArrivalRate}% on-time rate</p>
+          </Card>
+
+          {/* 2. Late Arrival */}
+          <Card className="p-4 shadow-2xs border-amber-200/80 bg-amber-50/15 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Late Arrivals</p>
+              <div className="w-6 h-6 rounded-md bg-amber-100 text-amber-700 flex items-center justify-center">
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className="text-3xl sm:text-4xl font-black text-amber-600 font-mono tracking-tight my-2">
+              {summary.lateArrivals}
+            </p>
+            <p className="text-xs text-amber-700 font-semibold">After shift grace cutoff</p>
+          </Card>
+
+          {/* 3. On-Time Departure */}
+          <Card className="p-4 shadow-2xs border-emerald-200/80 bg-emerald-50/15 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">On Time Departure</p>
+              <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className="text-3xl sm:text-4xl font-black text-emerald-600 font-mono tracking-tight my-2">
+              {summary.onTimeDepartures}
+            </p>
+            <p className="text-xs text-emerald-700 font-semibold">{summary.onTimeDepartureRate}% on-time rate</p>
+          </Card>
+
+          {/* 4. Early Departure */}
+          <Card className="p-4 shadow-2xs border-rose-200/80 bg-rose-50/15 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-rose-700">Early Departure</p>
+              <div className="w-6 h-6 rounded-md bg-rose-100 text-rose-700 flex items-center justify-center">
+                <AlertCircle className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className="text-3xl sm:text-4xl font-black text-rose-600 font-mono tracking-tight my-2">
+              {summary.earlyDepartures}
+            </p>
+            <p className="text-xs text-rose-700 font-semibold">Left early before shift end</p>
+          </Card>
+        </div>
       </div>
 
       {/* Dedicated Salary & Attendance Section (with Month Selection & Commission) */}
@@ -764,7 +826,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                   Salary & Commission Status
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Monthly package, daily rate, and earned salary to-date.
+                  Monthly package, daily rate (divided by {salaryStats.monthTotalDays} days), and earned salary to-date.
                 </p>
               </div>
             </div>
@@ -810,7 +872,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             </div>
 
             <Badge variant="success" className="px-2.5 py-1 text-xs font-semibold">
-              Earned Days: <strong className="font-mono ml-1">{salaryStats.paidDays} Days</strong>
+              Paid Days: <strong className="font-mono ml-1">{salaryStats.paidDays}/{salaryStats.monthTotalDays} Days</strong>
               <span className="text-emerald-700 ml-1">({salaryStats.presentDays} Pres{salaryStats.wfhDays > 0 ? `, ${salaryStats.wfhDays} WFH` : ''}{salaryStats.leaveDays > 0 ? `, ${salaryStats.leaveDays} Leaves` : ''})</span>
             </Badge>
 
@@ -826,7 +888,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
             <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
               Daily Rate: <strong className="font-mono text-slate-900">PKR {salaryStats.perDaySalary.toLocaleString()}/day</strong>
-              <span className="text-slate-500 ml-1">({salaryStats.monthWorkingDays} Working Days)</span>
+              <span className="text-slate-500 ml-1">({salaryStats.monthTotalDays} Total Days)</span>
             </span>
           </div>
         </div>
@@ -846,7 +908,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                   <div className="flex items-center gap-1 text-emerald-700">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     <span>
-                      PKR {salaryStats.grossMonthlySalary.toLocaleString()} Total Package ({salaryStats.paidDays}/{salaryStats.monthWorkingDays} Days Paid)
+                      PKR {salaryStats.grossMonthlySalary.toLocaleString()} Total Package ({salaryStats.paidDays}/{salaryStats.monthTotalDays} Days Paid)
                     </span>
                   </div>
                 ) : (
@@ -944,6 +1006,9 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="On Time Arrival">On Time Arrival</SelectItem>
                 <SelectItem value="Late Arrival">Late Arrival</SelectItem>
+                <SelectItem value="Absent">Absent Only</SelectItem>
+                <SelectItem value="Leave">Leave Only</SelectItem>
+                <SelectItem value="Work From Home">Work From Home</SelectItem>
               </SelectContent>
             </Select>
           </div>

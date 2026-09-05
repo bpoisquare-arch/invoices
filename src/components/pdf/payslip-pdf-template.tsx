@@ -133,7 +133,8 @@ const styles = StyleSheet.create({
 })
 
 interface PayslipData {
-  totalWorkingDays: number
+  totalWorkingDays: number // Monthly Total Days
+  presentDays?: number
   alDays: number
   clDays: number
   slDays: number
@@ -196,30 +197,34 @@ export default function PayslipPDFTemplate({
           </View>
         </View>
 
-        {/* 1. ATTENDENCE */}
-        <Text style={styles.sectionTitle}>ATTENDENCE</Text>
+        {/* 1. ATTENDANCE */}
+        <Text style={styles.sectionTitle}>ATTENDANCE</Text>
         <View style={styles.table}>
           <View style={styles.tableRowEven}>
-            <Text style={styles.rowLabel}>Total Wroking Days</Text>
+            <Text style={styles.rowLabel}>Monthly Total Days</Text>
             <Text style={styles.rowValue}>{payslipData.totalWorkingDays.toFixed(2)}</Text>
           </View>
           <View style={styles.tableRowOdd}>
+            <Text style={styles.rowLabel}>Present Days</Text>
+            <Text style={styles.rowValue}>{payslipData.presentDays ?? '--'}</Text>
+          </View>
+          <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>A/L Days</Text>
             <Text style={styles.rowValue}>{payslipData.alDays}</Text>
           </View>
-          <View style={styles.tableRowEven}>
+          <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabel}>C/L Days</Text>
             <Text style={styles.rowValue}>{payslipData.clDays}</Text>
           </View>
-          <View style={styles.tableRowOdd}>
+          <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>S/L Days</Text>
             <Text style={styles.rowValue}>{payslipData.slDays}</Text>
           </View>
-          <View style={styles.tableRowEven}>
+          <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabel}>WFH/L Days</Text>
             <Text style={styles.rowValue}>{payslipData.wfhDays}</Text>
           </View>
-          <View style={styles.tableRowOdd}>
+          <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Unpaid Days</Text>
             <Text style={styles.rowValue}>{payslipData.unpaidDays}</Text>
           </View>
@@ -235,25 +240,25 @@ export default function PayslipPDFTemplate({
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Basic Pay</Text>
             <Text style={styles.rowValue}>
-              ${payslipData.basicPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {payslipData.basicPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </Text>
           </View>
           <View style={styles.tableRowOdd}>
-            <Text style={styles.rowLabel}>Comission</Text>
+            <Text style={styles.rowLabel}>Commission</Text>
             <Text style={styles.rowValue}>
-              ${payslipData.commission.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {payslipData.commission.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </Text>
           </View>
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Adjustments</Text>
             <Text style={styles.rowValue}>
-              ${payslipData.adjustments.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {payslipData.adjustments.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </Text>
           </View>
           <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabelBold}>Total Earnings</Text>
             <Text style={styles.rowValueBold}>
-              ${payslipData.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {payslipData.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </Text>
           </View>
         </View>
@@ -264,19 +269,19 @@ export default function PayslipPDFTemplate({
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Unpaid Days</Text>
             <Text style={styles.rowValue}>
-              ${payslipData.unpaidDeduction.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {payslipData.unpaidDeduction.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </Text>
           </View>
           <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabelBold}>Total Deduction</Text>
             <Text style={styles.rowValueBold}>
-              ${payslipData.totalDeduction.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {payslipData.totalDeduction.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </Text>
           </View>
           <View style={styles.tableRowHighlight}>
             <Text style={styles.rowLabelBold}>Net Pay</Text>
             <Text style={styles.rowValueBold}>
-              ${payslipData.netPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              PKR {payslipData.netPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </Text>
           </View>
         </View>
