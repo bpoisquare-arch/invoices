@@ -274,20 +274,6 @@ export default function AimtSchedulePDFTemplate({
           }}
         />
 
-        {/* Center Page Background Watermark Logo */}
-        <View
-          style={{
-            position: 'absolute',
-            top: 270,
-            left: 110,
-            width: 375,
-            height: 260,
-            opacity: 0.1,
-          }}
-        >
-          <Image src={logoSrc} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-        </View>
-
         {/* Page Content Wrapper with standard padding */}
         <View style={styles.contentWrapper}>
           {/* Top Header Row */}
@@ -428,9 +414,24 @@ export default function AimtSchedulePDFTemplate({
             </Text>
           </View>
         </View>
+
+        {/* Center Page Background Watermark Logo (Rendered LAST in JSX so it floats over table rows with clean transparency) */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 250,
+            left: 118,
+            width: 360,
+            height: 250,
+            opacity: 0.14,
+          }}
+        >
+          <Image src={logoSrc} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        </View>
       </Page>
     </Document>
   )
 }
+
 
 
