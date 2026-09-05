@@ -11,6 +11,7 @@ import {
   getAimtFixedInfo,
   AIMTFixedInfo,
   getOrdinal,
+  getInstallments,
 } from '@/lib/services/installment.service'
 import AimtScheduleWebPreview from '@/components/installments/aimt-schedule-web-preview'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,6 +27,7 @@ import {
   Layers,
   Plus,
   Trash2,
+  CheckCircle2,
 } from 'lucide-react'
 
 interface InstallmentFormProps {
@@ -41,9 +43,10 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
   const defaultEnd = '2027-11-14'
 
   const [fixedInfo, setFixedInfo] = useState<AIMTFixedInfo>(getAimtFixedInfo())
+  const [allSchedules, setAllSchedules] = useState<StudentInstallmentSchedule[]>([])
   const [scheduleDate, setScheduleDate] = useState(existingSchedule?.date || todayStr)
-  const [studentName, setStudentName] = useState(existingSchedule?.student_name || 'Aqsa Bibi')
-  const [studentId, setStudentId] = useState(existingSchedule?.student_id || 'BCP3000465')
+  const [studentName, setStudentName] = useState(existingSchedule?.student_name || (mode === 'edit' ? 'Aqsa Bibi' : ''))
+  const [studentId, setStudentId] = useState(existingSchedule?.student_id || (mode === 'edit' ? 'BCP3000465' : ''))
   const [selectedCourse, setSelectedCourse] = useState(
     existingSchedule?.course_name || 'Advanced Diploma of Leadership and Management'
   )
@@ -96,7 +99,59 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
 
   useEffect(() => {
     setFixedInfo(getAimtFixedInfo())
+    getInstallments().then((data) => {
+      if (Array.isArray(data)) {
+        setAllSchedules(data)
+      }
+    })
   }, [])
+
+  // Identify courses already enrolled by this student ID
+  const enrolledCoursesForStudent = React.useMemo(() => {
+    const trimmed = studentId.trim().toLowerCase()
+    if (!trimmed) return []
+    return allSchedules
+      .filter(
+        (s) => s.student_id?.trim().toLowerCase() === trimmed && (mode !== 'edit' || s.id !== existingSchedule?.id)
+      )
+      .map((s) => s.course_name?.trim().toLowerCase())
+      .filter(Boolean)
+  }, [allSchedules, studentId, mode, existingSchedule?.id])
+
+  // Auto-fill student name and agency when student ID matches an existing student
+  function handleStudentIdChange(val: string) {
+    setStudentId(val)
+    const trimmed = val.trim().toLowerCase()
+    if (trimmed) {
+      const match = allSchedules.find(
+        (s) => s.student_id?.trim().toLowerCase() === trimmed && (mode !== 'edit' || s.id !== existingSchedule?.id)
+      )
+      if (match) {
+        if (match.student_name) {
+          setStudentName(match.student_name)
+        }
+        if (match.agency && !agency) {
+          setAgency(match.agency)
+        }
+      }
+    }
+  }
+
+  // Auto-switch selected course if the currently selected course is already enrolled
+  useEffect(() => {
+    if (enrolledCoursesForStudent.length > 0) {
+      const isCurrentDisabled = enrolledCoursesForStudent.includes(selectedCourse.trim().toLowerCase())
+      if (isCurrentDisabled) {
+        const availableCourse = AIMT_COURSES.find(
+          (c) => !enrolledCoursesForStudent.includes(c.name.trim().toLowerCase())
+        )
+        if (availableCourse) {
+          setSelectedCourse(availableCourse.name)
+          setDuration(availableCourse.duration)
+        }
+      }
+    }
+  }, [enrolledCoursesForStudent, selectedCourse])
 
   function handleCourseChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const courseName = e.target.value
@@ -183,6 +238,24 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     }
     if (!scheduleStartMonth || !scheduleEndMonth) {
       setError('Schedule Start Month and End Month are required.')
+      return
+    }
+
+    // Duplicate check: Same Student ID cannot enroll in the same Course more than once
+    const trimmedId = studentId.trim().toLowerCase()
+    const trimmedCourse = selectedCourse.trim().toLowerCase()
+    const isDuplicate = allSchedules.some(
+      (s) =>
+        s.student_id?.trim().toLowerCase() === trimmedId &&
+        s.course_name?.trim().toLowerCase() === trimmedCourse &&
+        (mode !== 'edit' || s.id !== existingSchedule?.id)
+    )
+
+    if (isDuplicate) {
+      setError(
+        `A schedule already exists for Student ID "${studentId}" and Course "${selectedCourse}". Duplicate schedules for the same course cannot be created.`
+      )
+      setIsSubmitting(false)
       return
     }
 
@@ -277,7 +350,27 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
               </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
+              {/* Row 1: Student ID (1st) & Student Name (2nd) */}
               <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                    STUDENT ID *
+                  </Label>
+                  <Input
+                    placeholder="e.g. BCP3000465"
+                    value={studentId}
+                    onChange={(e) => handleStudentIdChange(e.target.value)}
+                    className="mt-1.5 h-9 text-xs font-mono font-bold text-slate-900"
+                    required
+                  />
+                  {enrolledCoursesForStudent.length > 0 && (
+                    <p className="text-[10.5px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      Auto-filled ({enrolledCoursesForStudent.length} schedule(s) found)
+                    </p>
+                  )}
+                </div>
+
                 <div>
                   <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
                     STUDENT NAME *
@@ -290,38 +383,56 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                     required
                   />
                 </div>
-
-                <div>
-                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-                    STUDENT ID *
-                  </Label>
-                  <Input
-                    placeholder="e.g. BCP3000465"
-                    value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
-                    className="mt-1.5 h-9 text-xs font-mono font-bold text-slate-900"
-                    required
-                  />
-                </div>
               </div>
 
+              {/* Row 2: Agency Name (Before Course Name) */}
               <div>
-                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-                  COURSE NAME *
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px] flex items-center justify-between">
+                  <span>AGENCY NAME (OPTIONAL)</span>
+                  <span className="text-[10px] text-slate-400 font-normal lowercase">(for schedule list only, not on preview/PDF)</span>
                 </Label>
+                <Input
+                  placeholder="e.g. Global Education Services, Nexus Visa, etc."
+                  value={agency}
+                  onChange={(e) => setAgency(e.target.value)}
+                  className="mt-1.5 h-9 text-xs font-medium text-slate-900"
+                />
+              </div>
+
+              {/* Row 3: Course Name */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                    COURSE NAME *
+                  </Label>
+                  {enrolledCoursesForStudent.length > 0 && (
+                    <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                      {enrolledCoursesForStudent.length} course(s) disabled
+                    </span>
+                  )}
+                </div>
                 <select
                   value={selectedCourse}
                   onChange={handleCourseChange}
                   className="mt-1.5 w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#009D9E]"
                 >
-                  {AIMT_COURSES.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name} ({c.duration})
-                    </option>
-                  ))}
+                  {AIMT_COURSES.map((c) => {
+                    const isEnrolled = enrolledCoursesForStudent.includes(c.name.trim().toLowerCase())
+                    return (
+                      <option
+                        key={c.name}
+                        value={c.name}
+                        disabled={isEnrolled}
+                        className={isEnrolled ? 'text-slate-400 bg-slate-100 italic' : ''}
+                      >
+                        {c.name} ({c.duration}) {isEnrolled ? '— [Already Enrolled]' : ''}
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
 
+              {/* Row 4: Duration (Weeks) & Schedule Issue Date */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
@@ -345,19 +456,6 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                     className="mt-1.5 h-9 text-xs"
                   />
                 </div>
-              </div>
-
-              <div>
-                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px] flex items-center justify-between">
-                  <span>AGENCY NAME (OPTIONAL)</span>
-                  <span className="text-[10px] text-slate-400 font-normal lowercase">(for schedule list only, not on preview/PDF)</span>
-                </Label>
-                <Input
-                  placeholder="e.g. Global Education Services, Nexus Visa, etc."
-                  value={agency}
-                  onChange={(e) => setAgency(e.target.value)}
-                  className="mt-1.5 h-9 text-xs font-medium text-slate-900"
-                />
               </div>
             </CardContent>
           </Card>
@@ -664,7 +762,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
           </Card>
 
           <Card className="bg-white border border-[#E2E8F0] shadow-2xs rounded-lg">
-            <CardHeader className="py-3.5 border-b border-[#E2E8F0] flex flex-row items-center justify-between">
+            <CardHeader className="py-3.5 border-b border-[#E2E8F0]">
               <div>
                 <CardTitle className="font-['Montserrat'] text-base font-bold text-[#003D5C]">
                   Initial Fee Breakdown
@@ -673,30 +771,20 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                   Enter upfront fee amounts received from the student
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddInitialFee}
-                className="text-xs h-8 font-semibold border-dashed border-[#009D9E] text-[#009D9E] hover:bg-[#009D9E]/10"
-              >
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                + Add {getOrdinal(initialFees.length + 1)} Initial Fee
-              </Button>
             </CardHeader>
-            <CardContent className="space-y-3 pt-4">
+            <CardContent className="space-y-4 pt-4">
               <div className="space-y-3">
                 {initialFees.map((fee, idx) => (
                   <div
                     key={idx}
-                    className="p-3 bg-slate-50 border border-slate-200 rounded-md flex items-center justify-between gap-3"
+                    className="p-3 bg-slate-50 border border-slate-200 rounded-md"
                   >
-                    <div className="flex-1">
-                      <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-                        {idx === 0
-                          ? '1ST INITIAL FEE (AUD) *'
-                          : `${getOrdinal(idx + 1).toUpperCase()} INITIAL FEE (AUD)`}
-                      </Label>
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px] block mb-1.5">
+                      {idx === 0
+                        ? '1ST INITIAL FEE (AUD) *'
+                        : `${getOrdinal(idx + 1).toUpperCase()} INITIAL FEE (AUD)`}
+                    </Label>
+                    <div className="flex flex-wrap items-center gap-3">
                       <Input
                         type="number"
                         min={0}
@@ -706,25 +794,53 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                           handleUpdateInitialFee(idx, v === '' ? 0 : Number(v))
                         }}
                         placeholder={`e.g. ${idx === 0 ? '400' : '1000'}`}
-                        className="mt-1.5 h-9 text-xs font-mono font-bold text-slate-900 bg-white"
+                        className="w-48 sm:w-56 h-9 text-xs font-mono font-bold text-slate-900 bg-white"
                         required={idx === 0}
                       />
-                    </div>
 
-                    {initialFees.length > 1 && idx > 0 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveInitialFee(idx)}
-                        className="text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 self-end mb-1 h-8 px-2"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 mr-1" />
-                        Remove
-                      </Button>
-                    )}
+                      {idx === 0 && initialFees.length === 1 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAddInitialFee}
+                          className="text-xs h-9 font-semibold border-dashed border-[#009D9E] text-[#009D9E] hover:bg-[#009D9E]/10"
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1" />
+                          + Add 2nd Initial Fee
+                        </Button>
+                      )}
+
+                      {initialFees.length > 1 && idx > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveInitialFee(idx)}
+                          className="text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 h-9 px-2.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-1" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
+
+                {initialFees.length > 1 && (
+                  <div className="pt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddInitialFee}
+                      className="text-xs h-8 font-semibold border-dashed border-[#009D9E] text-[#009D9E] hover:bg-[#009D9E]/10"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      + Add {getOrdinal(initialFees.length + 1)} Initial Fee
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 border-t border-slate-100">

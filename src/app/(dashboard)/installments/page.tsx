@@ -158,7 +158,9 @@ export default function InstallmentsPage() {
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A'
-    const parts = dateStr.split('-')
+    if (dateStr.includes('/')) return dateStr
+    const datePart = dateStr.split('T')[0]
+    const parts = datePart.split('-')
     if (parts.length === 3) {
       return `${parts[2]}/${parts[1]}/${parts[0]}`
     }
@@ -343,39 +345,40 @@ export default function InstallmentsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-left text-xs border-collapse min-w-[850px]">
+            <table className="w-full text-left text-xs border-collapse min-w-[800px] lg:min-w-0">
               <thead>
-                <tr className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[11px] border-y border-slate-200">
-                  <th className="py-3.5 px-5">Student ID</th>
-                  <th className="py-3.5 px-5">Student Name</th>
-                  <th className="py-3.5 px-5">Course Name</th>
-                  <th className="py-3.5 px-4">Agency</th>
-                  <th className="py-3.5 px-4">Start Date</th>
-                  <th className="py-3.5 px-4">End Date</th>
-                  <th className="py-3.5 px-5 text-right">Total Amount</th>
-                  <th className="py-3.5 px-5 text-right">Actions</th>
+                <tr className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] border-y border-slate-200">
+                  <th className="py-3 px-3 sm:px-3.5 whitespace-nowrap">Student ID</th>
+                  <th className="py-3 px-3 sm:px-3.5 whitespace-nowrap">Student Name</th>
+                  <th className="py-3 px-3 sm:px-3.5 whitespace-nowrap">Course Name</th>
+                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap">Agency</th>
+                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap">Issue Date</th>
+                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap">Start Date</th>
+                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap">End Date</th>
+                  <th className="py-3 px-3 sm:px-3.5 text-right whitespace-nowrap">Total Amount</th>
+                  <th className="py-3 px-3 text-right sticky right-0 bg-slate-50 z-20 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredSchedules.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-4 px-5 font-mono font-bold text-blue-700">
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
+                    <td className="py-3.5 px-3 sm:px-3.5 font-mono font-bold text-blue-700 whitespace-nowrap">
                       <Link href={`/installments/${item.id}/preview`} className="hover:underline">
                         {item.student_id}
                       </Link>
                     </td>
 
-                    <td className="py-4 px-5 font-bold text-slate-900">
+                    <td className="py-3.5 px-3 sm:px-3.5 font-bold text-slate-900 max-w-[140px] truncate" title={item.student_name}>
                       {item.student_name}
                     </td>
 
-                    <td className="py-4 px-5 text-slate-700 font-medium max-w-[200px] truncate">
+                    <td className="py-3.5 px-3 sm:px-3.5 text-slate-700 font-medium max-w-[160px] truncate" title={item.course_name}>
                       {item.course_name}
                     </td>
 
-                    <td className="py-4 px-4 text-slate-700 font-medium max-w-[160px] truncate">
+                    <td className="py-3.5 px-2.5 sm:px-3 text-slate-700 font-medium max-w-[130px] truncate" title={item.agency || ''}>
                       {item.agency ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-cyan-50 text-cyan-800 border border-cyan-200">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10.5px] font-semibold bg-cyan-50 text-cyan-800 border border-cyan-200 truncate max-w-full">
                           {item.agency}
                         </span>
                       ) : (
@@ -383,21 +386,25 @@ export default function InstallmentsPage() {
                       )}
                     </td>
 
-                    <td className="py-4 px-4 text-slate-600">
+                    <td className="py-3.5 px-2.5 sm:px-3 text-slate-700 font-medium font-mono text-[11px] whitespace-nowrap">
+                      {formatDate(item.date || item.created_at)}
+                    </td>
+
+                    <td className="py-3.5 px-2.5 sm:px-3 text-slate-600 font-mono text-[11px] whitespace-nowrap">
                       {formatDate(item.start_date)}
                     </td>
 
-                    <td className="py-4 px-4 text-slate-600">
+                    <td className="py-3.5 px-2.5 sm:px-3 text-slate-600 font-mono text-[11px] whitespace-nowrap">
                       {formatDate(item.end_date)}
                     </td>
 
-                    <td className="py-4 px-5 text-right font-extrabold text-slate-900 text-sm font-mono">
+                    <td className="py-3.5 px-3 sm:px-3.5 text-right font-extrabold text-slate-900 text-xs sm:text-sm font-mono whitespace-nowrap">
                       AUD {Number(item.total_amount).toLocaleString()}
                     </td>
 
-                    <td className="py-4 px-5 text-right whitespace-nowrap">
+                    <td className="py-3.5 px-3 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-slate-50 transition-colors z-10 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)]">
                       <DropdownMenu>
-                        <DropdownMenuTrigger className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300 transition-colors shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 data-popup-open:bg-slate-100">
+                        <DropdownMenuTrigger className="h-7 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300 transition-colors shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 data-popup-open:bg-slate-100">
                           <MoreHorizontal className="w-4 h-4" />
                           <span className="sr-only">Actions</span>
                         </DropdownMenuTrigger>
