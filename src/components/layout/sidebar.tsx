@@ -117,6 +117,16 @@ const ENTITIES: EntityItem[] = [
     route: '/invoices?entity=isq',
     shortcut: '⌘5',
   },
+  {
+    id: 'stc',
+    name: 'States College Australia',
+    shortName: 'States College',
+    subtitle: 'Vocational & Academic',
+    prefix: 'STC',
+    logo: '/STC-logo.png',
+    route: '/stc/installments',
+    shortcut: '⌘6',
+  },
 ]
 
 export default function AppSidebar() {
@@ -138,7 +148,10 @@ export default function AppSidebar() {
 
   // Sync entity from pathname or localStorage
   useEffect(() => {
-    if (pathname.startsWith('/installments') || pathname.startsWith('/payslips')) {
+    if (pathname.startsWith('/stc')) {
+      setActiveEntity('stc')
+      if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'stc')
+    } else if (pathname.startsWith('/installments') || pathname.startsWith('/payslips')) {
       setActiveEntity('aimt')
       if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'aimt')
     } else if (pathname.startsWith('/attendance')) {
@@ -147,7 +160,8 @@ export default function AppSidebar() {
     } else {
       if (typeof window !== 'undefined') {
         const stored = localStorage.getItem('active_entity')
-        if (stored === 'aimt') setActiveEntity('aimt')
+        if (stored === 'stc') setActiveEntity('stc')
+        else if (stored === 'aimt') setActiveEntity('aimt')
         else if (stored === 'edlink-au') setActiveEntity('edlink-au')
         else if (stored === 'nsc') setActiveEntity('nsc')
         else if (stored === 'isquare-bpo') setActiveEntity('isquare-bpo')
@@ -206,11 +220,13 @@ export default function AppSidebar() {
 
   const isInstallmentsActive = pathname.startsWith('/installments')
   const isPayslipsActive = pathname.startsWith('/payslips')
+  const isStcInstallmentsActive = pathname.startsWith('/stc/installments') || pathname.startsWith('/stc')
 
   const [invoicesOpen, setInvoicesOpen] = useState(true)
   const [payrollOpen, setPayrollOpen] = useState(true)
   const [installmentsOpen, setInstallmentsOpen] = useState(true)
   const [payslipsOpen, setPayslipsOpen] = useState(true)
+  const [stcInstallmentsOpen, setStcInstallmentsOpen] = useState(true)
 
   useEffect(() => {
     if (isInvoiceActive) setInvoicesOpen(true)
@@ -228,13 +244,18 @@ export default function AppSidebar() {
     if (isPayslipsActive) setPayslipsOpen(true)
   }, [isPayslipsActive])
 
-  const isAimt = activeEntity === 'aimt' || pathname.startsWith('/installments') || pathname.startsWith('/payslips')
-  const isEdLinkAu = activeEntity === 'edlink-au'
-  const isEdLinkPk = !isAimt && !isEdLinkAu && activeEntity !== 'nsc' && activeEntity !== 'isquare-bpo'
+  useEffect(() => {
+    if (isStcInstallmentsActive) setStcInstallmentsOpen(true)
+  }, [isStcInstallmentsActive])
+
+  const isStc = activeEntity === 'stc' || pathname.startsWith('/stc')
+  const isAimt = !isStc && (activeEntity === 'aimt' || pathname.startsWith('/installments') || pathname.startsWith('/payslips'))
+  const isEdLinkAu = !isStc && activeEntity === 'edlink-au'
+  const isEdLinkPk = !isStc && !isAimt && !isEdLinkAu && activeEntity !== 'nsc' && activeEntity !== 'isquare-bpo'
 
   const currentEntityObj =
     ENTITIES.find((e) => e.id === activeEntity) ||
-    (isAimt ? ENTITIES[2] : isEdLinkAu ? ENTITIES[1] : ENTITIES[0])
+    (isStc ? ENTITIES[5] : isAimt ? ENTITIES[2] : isEdLinkAu ? ENTITIES[1] : ENTITIES[0])
 
   return (
     <Sidebar
@@ -341,7 +362,73 @@ export default function AppSidebar() {
 
       {/* 2. Main Navigation Content */}
       <SidebarContent className="px-3 py-4 space-y-4 overflow-y-auto bg-[#001E2F]">
-        {isAimt ? (
+        {isStc ? (
+          /* =========================================================================
+             STC ENTITY: States College Australia Installments Module
+             ========================================================================= */
+          <>
+            <SidebarGroup className="p-0">
+              <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#00BF8F]/80 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
+                STC Installments
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <Collapsible
+                    open={stcInstallmentsOpen}
+                    onOpenChange={setStcInstallmentsOpen}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton
+                            tooltip="Installments"
+                            className={`text-[13px] font-medium transition-all hover:bg-[#00BF8F]/20 hover:text-white rounded-lg px-2.5 py-2 ${
+                              isStcInstallmentsActive
+                                ? 'text-[#00BF8F] bg-[#00BF8F]/15 font-bold'
+                                : 'text-slate-300'
+                            }`}
+                          />
+                        }
+                      >
+                        <GraduationCap className="size-4 shrink-0 text-[#00BF8F]" />
+                        <span className="font-semibold text-slate-200">Installments</span>
+                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
+                          {/* Create Schedule */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/stc/installments/new" onClick={handleNavClick} />}
+                              isActive={pathname === '/stc/installments/new'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#00BF8F]/20 data-[active=true]:bg-[#00BF8F] data-[active=true]:text-[#001E2F] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <PlusCircle className="size-3.5 shrink-0" />
+                              <span>Create Schedule</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+
+                          {/* Schedules */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/stc/installments" onClick={handleNavClick} />}
+                              isActive={pathname === '/stc/installments'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#00BF8F]/20 data-[active=true]:bg-[#00BF8F] data-[active=true]:text-[#001E2F] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <FileText className="size-3.5 shrink-0" />
+                              <span>Schedules</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        ) : isAimt ? (
           /* =========================================================================
              AIMT ENTITY: Installments & Payslips Modules
              ========================================================================= */

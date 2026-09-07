@@ -116,6 +116,56 @@ CREATE TABLE IF NOT EXISTS public.installment_email_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 8. STC INSTALLMENT SCHEDULES TABLE (States College Australia)
+CREATE TABLE IF NOT EXISTS public.stc_installment_schedules (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    date DATE NOT NULL,
+    student_name VARCHAR(255) NOT NULL,
+    student_id VARCHAR(100) NOT NULL,
+    course_name VARCHAR(255) NOT NULL,
+    duration VARCHAR(100) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    start_month_year VARCHAR(20),
+    end_month_offset INT DEFAULT 3,
+    admin_fee NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    resources_fee NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    material_fee NUMERIC(12, 2) DEFAULT 0.00,
+    tuition_fee NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    scholarship NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    first_installment_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    schedule_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+    agency VARCHAR(255),
+    recipient_email VARCHAR(255),
+    from_email VARCHAR(255),
+    email_subject TEXT,
+    email_message TEXT,
+    last_email_sent_at TIMESTAMPTZ,
+    last_email_status VARCHAR(50),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 9. STC INSTALLMENT EMAIL LOGS TABLE
+CREATE TABLE IF NOT EXISTS public.stc_installment_email_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    schedule_id TEXT NOT NULL,
+    from_email VARCHAR(255) NOT NULL,
+    to_email VARCHAR(255) NOT NULL,
+    subject TEXT NOT NULL,
+    message TEXT,
+    email_type VARCHAR(20) NOT NULL, -- 'initial' | 'resend'
+    resend_number INT NOT NULL DEFAULT 0,
+    status VARCHAR(20) NOT NULL, -- 'sent' | 'failed'
+    provider_message_id VARCHAR(255),
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    error_message TEXT,
+    next_resend_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON public.invoices(user_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_company_id ON public.invoices(company_id);
@@ -126,6 +176,9 @@ CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice_id ON public.invoice_items(
 CREATE INDEX IF NOT EXISTS idx_installment_schedules_student_id ON public.installment_schedules(student_id);
 CREATE INDEX IF NOT EXISTS idx_installment_email_logs_schedule_id ON public.installment_email_logs(schedule_id);
 CREATE INDEX IF NOT EXISTS idx_installment_email_logs_sent_at ON public.installment_email_logs(sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_stc_installment_schedules_student_id ON public.stc_installment_schedules(student_id);
+CREATE INDEX IF NOT EXISTS idx_stc_installment_email_logs_schedule_id ON public.stc_installment_email_logs(schedule_id);
+CREATE INDEX IF NOT EXISTS idx_stc_installment_email_logs_sent_at ON public.stc_installment_email_logs(sent_at DESC);
 
 -- FUNCTION FOR SAFE SEQUENTIAL INVOICE NUMBER GENERATION
 CREATE OR REPLACE FUNCTION public.generate_next_invoice_number(p_company_id UUID)

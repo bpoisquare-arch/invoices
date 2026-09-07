@@ -76,6 +76,15 @@ const ENTITIES: EntityPortal[] = [
     route: '/invoices?entity=isq',
     tag: 'Business Process Outsourcing',
   },
+  {
+    id: 'stc',
+    name: 'States College Australia',
+    prefix: 'STC',
+    subtitle: 'Vocational & Academic College',
+    logo: '/STC-logo.png',
+    route: '/stc/installments',
+    tag: 'Higher Education & VET',
+  },
 ]
 
 export default function EntityPortalPage() {
