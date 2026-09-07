@@ -30,18 +30,6 @@ export default function STCScheduleWebPreview({
   const items = schedule.schedule_items || []
   const totalAmt = schedule.total_amount || 0
 
-  const materialFeeVal =
-    Number(schedule.material_fee || 0) > 0
-      ? Number(schedule.material_fee)
-      : Math.max(
-          0,
-          (Number(totalAmt) || 0) -
-            ((Number(schedule.admin_fee) || 0) +
-              (Number(schedule.resources_fee) || 0) +
-              (Number(schedule.tuition_fee) || 0) -
-              (Number(schedule.scholarship) || 0))
-        )
-
   return (
     <div
       id={id}
@@ -154,7 +142,7 @@ export default function STCScheduleWebPreview({
         <div className="flex items-baseline gap-x-2 sm:gap-x-3 pt-1 text-xs sm:text-[13px]">
           <div className="flex items-baseline gap-1 flex-1 min-w-0">
             <span className="font-bold uppercase tracking-wider text-slate-800 shrink-0 whitespace-nowrap">
-              Admin Fee:
+              Application Fee:
             </span>
             <span className="flex-1 border-b-[1.5px] border-slate-900 pb-0.5 font-medium px-1 whitespace-nowrap">
               AUD {schedule.admin_fee ?? 0}
@@ -162,22 +150,12 @@ export default function STCScheduleWebPreview({
           </div>
           <div className="flex items-baseline gap-1 flex-1 min-w-0">
             <span className="font-bold uppercase tracking-wider text-slate-800 shrink-0 whitespace-nowrap">
-              Resources Fee:
+              Material Fee:
             </span>
             <span className="flex-1 border-b-[1.5px] border-slate-900 pb-0.5 font-medium px-1 whitespace-nowrap">
               AUD {schedule.resources_fee ?? 0}
             </span>
           </div>
-          {materialFeeVal > 0 ? (
-            <div className="flex items-baseline gap-1 flex-1 min-w-0">
-              <span className="font-bold uppercase tracking-wider text-slate-800 shrink-0 whitespace-nowrap">
-                Material Fee:
-              </span>
-              <span className="flex-1 border-b-[1.5px] border-slate-900 pb-0.5 font-medium px-1 whitespace-nowrap">
-                AUD {Number(materialFeeVal).toLocaleString()}
-              </span>
-            </div>
-          ) : null}
           <div className="flex items-baseline gap-1 flex-1 min-w-0">
             <span className="font-bold uppercase tracking-wider text-slate-800 shrink-0 whitespace-nowrap">
               Tuition Fee:

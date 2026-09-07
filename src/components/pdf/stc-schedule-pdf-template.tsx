@@ -237,18 +237,6 @@ export default function STCSchedulePDFTemplate({
     : schedule.student_id || 'STC'
   const docTitle = `Installment-Schedule-${studentNameStr}`
 
-  const materialFeeVal =
-    Number(schedule.material_fee || 0) > 0
-      ? Number(schedule.material_fee)
-      : Math.max(
-          0,
-          (Number(totalAmt) || 0) -
-            ((Number(schedule.admin_fee) || 0) +
-              (Number(schedule.resources_fee) || 0) +
-              (Number(schedule.tuition_fee) || 0) -
-              (Number(schedule.scholarship) || 0))
-        )
-
   return (
     <Document title={docTitle}>
       <Page size="A4" style={styles.page}>
@@ -327,16 +315,10 @@ export default function STCSchedulePDFTemplate({
             </View>
 
             <View style={styles.metaRow}>
-              <Text style={styles.boldLabel}>ADMIN FEE: </Text>
+              <Text style={styles.boldLabel}>APPLICATION FEE: </Text>
               <Text style={styles.underlineValue}>AUD {schedule.admin_fee ?? 0}</Text>
-              <Text style={[styles.boldLabel, { marginLeft: 8 }]}>RESOURCES FEE: </Text>
+              <Text style={[styles.boldLabel, { marginLeft: 8 }]}>MATERIAL FEE: </Text>
               <Text style={styles.underlineValue}>AUD {schedule.resources_fee ?? 0}</Text>
-              {materialFeeVal > 0 ? (
-                <>
-                  <Text style={[styles.boldLabel, { marginLeft: 8 }]}>MATERIAL FEE: </Text>
-                  <Text style={styles.underlineValue}>AUD {Number(materialFeeVal).toLocaleString()}</Text>
-                </>
-              ) : null}
               <Text style={[styles.boldLabel, { marginLeft: 8 }]}>TUITION FEE: </Text>
               <Text style={styles.underlineValue}>AUD {Number(schedule.tuition_fee || 0).toLocaleString()}</Text>
             </View>

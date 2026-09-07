@@ -341,14 +341,14 @@ function getRowDescription(
 
   const feeParts: string[] = []
   if (paidAdmin > 0) {
-    if (adminIsPartial) feeParts.push('Partial Admin Fee')
-    else if (adminWasPartial) feeParts.push('Remaining Admin fee')
-    else feeParts.push('Admin fee')
+    if (adminIsPartial) feeParts.push('Partial Application Fee')
+    else if (adminWasPartial) feeParts.push('Remaining Application fee')
+    else feeParts.push('Application Fee')
   }
   if (paidResources > 0) {
-    if (resourceIsPartial) feeParts.push('Partial Resource fee')
-    else if (resourceWasPartial) feeParts.push('Remaining Resource fee')
-    else feeParts.push('Resource fee')
+    if (resourceIsPartial) feeParts.push('Partial Material fee')
+    else if (resourceWasPartial) feeParts.push('Remaining Material fee')
+    else feeParts.push('Material fee')
   }
   if (paidMaterial > 0) {
     if (materialIsPartial) feeParts.push('Partial Material fee')
@@ -380,20 +380,19 @@ function getRowDescription(
 
   if (feeParts.length === 1) {
     const single = feeParts[0]
-    if (single === 'Admin fee') return 'Admin Fee'
-    if (single === 'Resource fee') return 'Resource Fee'
-    if (single === 'Material fee') return 'Material Fee'
-    if (single === 'Partial Resource fee') return 'Partial Resource Fee'
+    if (single === 'Application fee' || single === 'Application Fee') return 'Application Fee'
+    if (single === 'Material fee' || single === 'Material Fee') return 'Material Fee'
     if (single === 'Partial Material fee') return 'Partial Material Fee'
+    if (single === 'Partial Application Fee') return 'Partial Application Fee'
     return single
   }
 
   if (feeParts.length === 2) {
-    if (feeParts[0] === 'Admin fee' && feeParts[1] === 'Partial Resource fee') {
-      return 'Admin Fee including Partial Resource Fee'
+    if (feeParts[0] === 'Application Fee' && (feeParts[1] === 'Partial Material fee' || feeParts[1] === 'Partial Material Fee')) {
+      return 'Application Fee including Partial Material Fee'
     }
-    if (feeParts[0] === 'Remaining Admin fee' && feeParts[1] === 'Partial Resource fee') {
-      return 'Remaining Admin fee including Partial Resource fee'
+    if (feeParts[0] === 'Remaining Application fee' && (feeParts[1] === 'Partial Material fee' || feeParts[1] === 'Partial Material Fee')) {
+      return 'Remaining Application fee including Partial Material fee'
     }
     return `${feeParts[0]} and ${feeParts[1]}`
   }

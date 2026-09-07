@@ -79,8 +79,6 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
   const [adminFee, setAdminFee] = useState<number>(existingSchedule?.admin_fee ?? 500)
   const [resourcesFee, setResourcesFee] = useState<number>(existingSchedule?.resources_fee ?? 800)
   const [agency, setAgency] = useState<string>(existingSchedule?.agency || '')
-  const [showMaterialFee, setShowMaterialFee] = useState<boolean>((existingSchedule?.material_fee || 0) > 0)
-  const [materialFee, setMaterialFee] = useState<number>(existingSchedule?.material_fee || 0)
   const [tuitionFee, setTuitionFee] = useState<number>(existingSchedule?.tuition_fee ?? 10000)
 
   const [showScholarship, setShowScholarship] = useState<boolean>((existingSchedule?.scholarship || 0) > 0)
@@ -138,7 +136,6 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
       first_installment_custom_month: showCustomFirstMonth && customFirstMonth ? customFirstMonth : undefined,
       admin_fee: adminFee,
       resources_fee: resourcesFee,
-      material_fee: showMaterialFee ? materialFee : 0,
       tuition_fee: tuitionFee,
       scholarship: showScholarship ? scholarship : 0,
       initial_fees: initialFees,
@@ -152,8 +149,6 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
     customFirstMonth,
     adminFee,
     resourcesFee,
-    showMaterialFee,
-    materialFee,
     tuitionFee,
     showScholarship,
     scholarship,
@@ -190,7 +185,6 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
     first_installment_custom_month: showCustomFirstMonth && customFirstMonth ? customFirstMonth : undefined,
     admin_fee: adminFee,
     resources_fee: resourcesFee,
-    material_fee: showMaterialFee && materialFee > 0 ? materialFee : undefined,
     tuition_fee: tuitionFee,
     scholarship: showScholarship ? scholarship : 0,
     total_amount: calculationResult.totalAmount,
@@ -234,7 +228,6 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
           showCustomFirstMonth && customFirstMonth ? customFirstMonth : undefined,
         admin_fee: Number(adminFee) || 0,
         resources_fee: Number(resourcesFee) || 0,
-        material_fee: showMaterialFee && Number(materialFee) > 0 ? Number(materialFee) : undefined,
         tuition_fee: Number(tuitionFee) || 0,
         scholarship: showScholarship ? Number(scholarship) || 0 : 0,
         total_amount: calculationResult.totalAmount,
@@ -325,9 +318,9 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
       )}
 
       {/* Main Grid: Form + Live Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
         {/* Left Form Controls */}
-        <div className="lg:col-span-6 space-y-6">
+        <div className="lg:col-span-5 xl:col-span-4 space-y-6">
           <form id="stc-schedule-form" onSubmit={handleSubmit} className="space-y-6">
             {/* 1. Student & Course Details */}
             <Card className="bg-[#001724] border-white/10 text-white rounded-2xl shadow-lg">
@@ -515,7 +508,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
               <CardContent className="pt-4 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">Admin Fee (AUD)</Label>
+                    <Label className="text-xs font-semibold text-slate-300">Application Fee (AUD)</Label>
                     <Input
                       type="number"
                       value={adminFee}
@@ -524,7 +517,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">Resources Fee (AUD)</Label>
+                    <Label className="text-xs font-semibold text-slate-300">Material Fee (AUD)</Label>
                     <Input
                       type="number"
                       value={resourcesFee}
@@ -534,41 +527,14 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">Tuition Fee (AUD)</Label>
-                    <Input
-                      type="number"
-                      value={tuitionFee}
-                      onChange={(e) => setTuitionFee(Number(e.target.value))}
-                      className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-semibold text-slate-300">Material Fee</Label>
-                      <button
-                        type="button"
-                        onClick={() => setShowMaterialFee(!showMaterialFee)}
-                        className="text-[10px] text-[#00BF8F] hover:underline"
-                      >
-                        {showMaterialFee ? 'Remove' : '+ Add Material Fee'}
-                      </button>
-                    </div>
-                    {showMaterialFee ? (
-                      <Input
-                        type="number"
-                        value={materialFee}
-                        onChange={(e) => setMaterialFee(Number(e.target.value))}
-                        className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
-                      />
-                    ) : (
-                      <div className="h-10 flex items-center px-3 text-xs text-slate-500 bg-[#001E2F]/50 border border-white/5 rounded-xl">
-                        Not included
-                      </div>
-                    )}
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-300">Tuition Fee (AUD)</Label>
+                  <Input
+                    type="number"
+                    value={tuitionFee}
+                    onChange={(e) => setTuitionFee(Number(e.target.value))}
+                    className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                  />
                 </div>
 
                 <div className="space-y-1.5 pt-1">
@@ -652,7 +618,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
         </div>
 
         {/* Right Live Preview */}
-        <div className="lg:col-span-6 sticky top-24">
+        <div className="lg:col-span-7 xl:col-span-8 sticky top-24">
           <div className="bg-[#001724] border border-white/10 rounded-2xl p-4 shadow-xl">
             <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
               <div className="flex items-center gap-2">
