@@ -213,4 +213,63 @@ export const aimtPayslipService = {
 
     return { success: true }
   },
+
+  async syncLocalToCloud(): Promise<{ success: boolean; syncedCount: number; totalCount: number; error?: string }> {
+    const locals = getLocalPayslips()
+    if (locals.length === 0) {
+      return { success: true, syncedCount: 0, totalCount: 0 }
+    }
+
+    try {
+      const supabase = createClient()
+      let successCount = 0
+      let lastError: string | null = null
+
+      for (const payslip of locals) {
+        const { error } = await (supabase as any)
+          .from('aimt_payslips')
+          .upsert(payslip, { onConflict: 'id' })
+
+        if (!error) {
+          successCount++
+        } else {
+          lastError = error.message
+        }
+      }
+
+      if (lastError && successCount === 0) {
+        return {
+          success: false,
+          syncedCount: 0,
+          totalCount: locals.length,
+          error: lastError,
+        }
+      }
+
+      // Refresh local cache with latest cloud rows
+      const { data } = await (supabase as any)
+        .from('aimt_payslips')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (data && data.length > 0) {
+        saveLocalPayslips(data as AIMTPayslip[])
+      }
+
+      return {
+        success: true,
+        syncedCount: successCount,
+        totalCount: locals.length,
+        error: lastError || undefined,
+      }
+    } catch (e: any) {
+      return {
+        success: false,
+        syncedCount: 0,
+        totalCount: locals.length,
+        error: e?.message || 'Failed to connect to cloud database',
+      }
+    }
+  },
 }
+

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Image, Svg, Path } from '@react-pdf/renderer'
 import {
   STCStudentInstallmentSchedule,
   STCFixedInfo,
@@ -14,15 +14,15 @@ import {
 const styles = StyleSheet.create({
   page: {
     padding: 0,
-    fontSize: 9,
+    fontSize: 9.5,
     fontFamily: 'Helvetica',
     color: '#1e293b',
     backgroundColor: '#ffffff',
     position: 'relative',
   },
   contentWrapper: {
-    paddingTop: 32,
-    paddingHorizontal: 36,
+    paddingTop: 36,
+    paddingHorizontal: 38,
     paddingBottom: 24,
     position: 'relative',
   },
@@ -30,44 +30,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   leftHeaderBox: {
-    width: 280,
+    width: 290,
     alignItems: 'flex-start',
   },
   logoImage: {
-    height: 48,
-    width: 170,
+    height: 52,
+    width: 185,
     objectFit: 'contain',
     marginBottom: 6,
   },
   collegeName: {
-    fontSize: 8.5,
+    fontSize: 9.5,
     fontFamily: 'Helvetica-Bold',
     color: '#0f172a',
-    marginBottom: 1.5,
+    marginBottom: 2,
   },
   collegeMeta: {
-    fontSize: 7.5,
-    color: '#475569',
-    marginTop: 0.5,
+    fontSize: 8,
+    color: '#334155',
+    marginTop: 1,
     textAlign: 'left',
   },
   rightHeaderBox: {
     alignItems: 'flex-end',
-    paddingTop: 8,
+    paddingTop: 6,
     paddingRight: 76,
   },
   headingLine1: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: 'Helvetica-Bold',
     color: '#1e293b',
     letterSpacing: 0.5,
     textAlign: 'right',
   },
   headingLine2: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: 'Helvetica-Bold',
     color: '#1e293b',
     marginTop: 2,
@@ -75,65 +75,65 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   dateContainer: {
-    marginTop: 8,
+    marginTop: 10,
     alignItems: 'flex-end',
   },
   dateLabel: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontFamily: 'Helvetica-Bold',
     color: '#0f172a',
   },
   dateVal: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontFamily: 'Helvetica-Bold',
     color: '#0f172a',
     marginTop: 1,
   },
   metadataSection: {
-    marginTop: 4,
-    marginBottom: 12,
+    marginTop: 8,
+    marginBottom: 14,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginBottom: 4,
+    marginBottom: 5.5,
   },
   boldLabel: {
     fontFamily: 'Helvetica-Bold',
-    color: '#334155',
-    fontSize: 8,
+    color: '#1e293b',
+    fontSize: 8.5,
     letterSpacing: 0.3,
   },
   underlineValue: {
     flex: 1,
-    borderBottomWidth: 0.8,
+    borderBottomWidth: 1,
     borderBottomColor: '#0f172a',
-    fontSize: 8.5,
+    fontSize: 9,
     paddingLeft: 4,
-    paddingBottom: 1,
+    paddingBottom: 1.5,
     color: '#0f172a',
   },
   scholarshipText: {
     fontFamily: 'Helvetica-Bold',
     color: '#047857',
-    fontSize: 8,
+    fontSize: 8.5,
     letterSpacing: 0.3,
   },
   tableContainer: {
-    marginTop: 8,
-    borderWidth: 1,
+    marginTop: 10,
+    borderWidth: 1.2,
     borderColor: '#0F3A7E',
   },
   tableHeaderBar: {
     backgroundColor: '#0F3A7E',
-    paddingVertical: 5,
+    paddingVertical: 6.5,
     textAlign: 'center',
   },
   tableHeaderText: {
     color: '#ffffff',
     fontFamily: 'Helvetica-Bold',
-    fontSize: 9,
-    letterSpacing: 0.5,
+    fontSize: 10,
+    letterSpacing: 0.8,
     textAlign: 'center',
   },
   tableRowEven: {
@@ -141,8 +141,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#DCE6F1',
     borderBottomWidth: 1,
     borderBottomColor: '#cbd5e1',
-    paddingVertical: 4.5,
-    paddingHorizontal: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     alignItems: 'center',
   },
   tableRowOdd: {
@@ -150,8 +150,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEF4FB',
     borderBottomWidth: 1,
     borderBottomColor: '#cbd5e1',
-    paddingVertical: 4.5,
-    paddingHorizontal: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     alignItems: 'center',
   },
   colMonth: {
@@ -159,13 +159,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
     color: '#0F3A7E',
     textAlign: 'center',
-    fontSize: 8.5,
+    fontSize: 9,
   },
   colDesc: {
     width: '50%',
     color: '#0f172a',
-    fontSize: 8.5,
-    paddingLeft: 6,
+    fontSize: 9,
+    paddingLeft: 8,
     borderLeftWidth: 1,
     borderLeftColor: '#cbd5e1',
   },
@@ -174,17 +174,17 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontFamily: 'Helvetica-Bold',
     color: '#0f172a',
-    fontSize: 8.5,
-    paddingLeft: 6,
-    paddingRight: 4,
+    fontSize: 9,
+    paddingLeft: 8,
+    paddingRight: 6,
     borderLeftWidth: 1,
     borderLeftColor: '#cbd5e1',
   },
   tableFooterRow: {
     flexDirection: 'row',
     backgroundColor: '#0F3A7E',
-    paddingVertical: 5.5,
-    paddingHorizontal: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
     alignItems: 'center',
   },
   footerLabel: {
@@ -192,16 +192,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#ffffff',
     fontFamily: 'Helvetica-Bold',
-    fontSize: 9,
-    letterSpacing: 0.5,
+    fontSize: 10,
+    letterSpacing: 0.8,
   },
   footerVal: {
     width: '25%',
     textAlign: 'right',
     color: '#ffffff',
     fontFamily: 'Helvetica-Bold',
-    fontSize: 9.5,
-    paddingRight: 4,
+    fontSize: 10.5,
+    paddingRight: 6,
     borderLeftWidth: 1,
     borderLeftColor: '#4B6B94',
   },
@@ -259,8 +259,8 @@ export default function STCSchedulePDFTemplate({
             position: 'absolute',
             top: 0,
             right: 0,
-            width: 125,
-            height: 153.5,
+            width: 135,
+            height: 165,
             objectFit: 'fill',
           }}
         />
@@ -272,8 +272,8 @@ export default function STCSchedulePDFTemplate({
             position: 'absolute',
             bottom: 0,
             left: 0,
-            width: 125,
-            height: 153.5,
+            width: 135,
+            height: 165,
             objectFit: 'fill',
           }}
         />
@@ -308,36 +308,36 @@ export default function STCSchedulePDFTemplate({
             <View style={styles.metaRow}>
               <Text style={styles.boldLabel}>STUDENT NAME: </Text>
               <Text style={styles.underlineValue}>{schedule.student_name || ''}</Text>
-              <Text style={[styles.boldLabel, { marginLeft: 10 }]}>STUDENT ID: </Text>
+              <Text style={[styles.boldLabel, { marginLeft: 12 }]}>STUDENT ID: </Text>
               <Text style={[styles.underlineValue, { flex: 0.4 }]}>{schedule.student_id || ''}</Text>
             </View>
 
             <View style={styles.metaRow}>
               <Text style={styles.boldLabel}>COURSE NAME: </Text>
               <Text style={styles.underlineValue}>{schedule.course_name || ''}</Text>
-              <Text style={[styles.boldLabel, { marginLeft: 10 }]}>DURATION: </Text>
+              <Text style={[styles.boldLabel, { marginLeft: 12 }]}>DURATION: </Text>
               <Text style={[styles.underlineValue, { flex: 0.3 }]}>{schedule.duration || ''}</Text>
             </View>
 
             <View style={styles.metaRow}>
               <Text style={styles.boldLabel}>START DATE: </Text>
               <Text style={styles.underlineValue}>{formatDate(schedule.start_date)}</Text>
-              <Text style={[styles.boldLabel, { marginLeft: 10 }]}>END DATE: </Text>
+              <Text style={[styles.boldLabel, { marginLeft: 12 }]}>END DATE: </Text>
               <Text style={styles.underlineValue}>{formatDate(schedule.end_date)}</Text>
             </View>
 
             <View style={styles.metaRow}>
               <Text style={styles.boldLabel}>ADMIN FEE: </Text>
               <Text style={styles.underlineValue}>AUD {schedule.admin_fee ?? 0}</Text>
-              <Text style={[styles.boldLabel, { marginLeft: 6 }]}>RESOURCES FEE: </Text>
+              <Text style={[styles.boldLabel, { marginLeft: 8 }]}>RESOURCES FEE: </Text>
               <Text style={styles.underlineValue}>AUD {schedule.resources_fee ?? 0}</Text>
               {materialFeeVal > 0 ? (
                 <>
-                  <Text style={[styles.boldLabel, { marginLeft: 6 }]}>MATERIAL FEE: </Text>
+                  <Text style={[styles.boldLabel, { marginLeft: 8 }]}>MATERIAL FEE: </Text>
                   <Text style={styles.underlineValue}>AUD {Number(materialFeeVal).toLocaleString()}</Text>
                 </>
               ) : null}
-              <Text style={[styles.boldLabel, { marginLeft: 6 }]}>TUITION FEE: </Text>
+              <Text style={[styles.boldLabel, { marginLeft: 8 }]}>TUITION FEE: </Text>
               <Text style={styles.underlineValue}>AUD {Number(schedule.tuition_fee || 0).toLocaleString()}</Text>
             </View>
 
@@ -348,12 +348,12 @@ export default function STCSchedulePDFTemplate({
               </View>
             ) : null}
 
-            <View style={[styles.metaRow, { marginTop: 2 }]}>
-              <Text style={[styles.boldLabel, { fontSize: 8.5, color: '#0f172a' }]}>TOTAL AMOUNT: </Text>
+            <View style={[styles.metaRow, { marginTop: 3 }]}>
+              <Text style={[styles.boldLabel, { fontSize: 9, color: '#0f172a' }]}>TOTAL AMOUNT: </Text>
               <Text
                 style={[
                   styles.underlineValue,
-                  { fontFamily: 'Helvetica-Bold', borderBottomWidth: 1.5, fontSize: 8.5 },
+                  { fontFamily: 'Helvetica-Bold', borderBottomWidth: 1.8, fontSize: 9.5 },
                 ]}
               >
                 AUD {Number(totalAmt).toLocaleString()}
@@ -363,129 +363,201 @@ export default function STCSchedulePDFTemplate({
 
           {/* Main Installment Table */}
           <View style={styles.tableContainer}>
+            {/* 1. Main Title Bar */}
             <View style={styles.tableHeaderBar}>
               <Text style={styles.tableHeaderText}>INSTALLMENT SCHEDULE</Text>
             </View>
 
+            {/* 2. Column Subheadings Bar */}
+            <View
+              style={{
+                flexDirection: 'row',
+                backgroundColor: '#DCE6F1',
+                borderBottomWidth: 1,
+                borderBottomColor: '#cbd5e1',
+                paddingVertical: 5,
+                paddingHorizontal: 10,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={[styles.colMonth, { color: '#0f172a', fontFamily: 'Helvetica-Bold', fontSize: 8.5 }]}>
+                Date
+              </Text>
+              <Text style={[styles.colDesc, { color: '#0f172a', fontFamily: 'Helvetica-Bold', fontSize: 8.5, textAlign: 'center' }]}>
+                Installment Details
+              </Text>
+              <Text style={[styles.colAmount, { color: '#0f172a', fontFamily: 'Helvetica-Bold', fontSize: 8.5 }]}>
+                Amount (AUD)
+              </Text>
+            </View>
+
+            {/* 3. Installment Rows */}
             {items.map((item, idx) => (
-              <View key={idx} style={idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd}>
+              <View key={idx} style={idx % 2 === 0 ? styles.tableRowOdd : styles.tableRowEven}>
                 <Text style={styles.colMonth}>{item.monthLabel}</Text>
                 <Text style={styles.colDesc}>{item.description}</Text>
                 <Text style={styles.colAmount}>AUD {Number(item.amount).toLocaleString()}</Text>
               </View>
             ))}
 
+            {/* 4. Table Footer Row */}
             <View style={styles.tableFooterRow}>
               <Text style={styles.footerLabel}>TOTAL AMOUNT</Text>
               <Text style={styles.footerVal}>AUD {Number(totalAmt).toLocaleString()}</Text>
             </View>
           </View>
 
-          {/* Footer Payment Details Table (Right Aligned) */}
+          {/* Horizontal Divider Line below Table */}
           <View
             style={{
-              marginTop: 10,
-              paddingTop: 2,
+              marginTop: 12,
+              marginBottom: 10,
+              borderBottomWidth: 0.8,
+              borderBottomColor: '#cbd5e1',
+            }}
+          />
+
+          {/* Footer Payment Details Section matching Reference */}
+          <View
+            style={{
               alignItems: 'flex-end',
             }}
           >
-            <Text
-              style={{
-                fontSize: 8.5,
-                fontFamily: 'Helvetica-Bold',
-                color: '#0F3A7E',
-                marginBottom: 3,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-              }}
-            >
-              PAYMENT DETAILS
-            </Text>
+            <View style={{ width: 260 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontFamily: 'Helvetica-Bold',
+                  color: '#0F3A7E',
+                  marginBottom: 8,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  textAlign: 'right',
+                }}
+              >
+                PAYMENT DETAILS
+              </Text>
 
-            <View style={{ flexDirection: 'row', marginBottom: 1.5 }}>
-              <Text style={{ width: 80, fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#0f172a', textAlign: 'right', paddingRight: 5 }}>
-                Bank:
-              </Text>
-              <Text style={{ width: 160, fontSize: 7, color: '#0f172a', borderLeftWidth: 0.8, borderLeftColor: '#94a3b8', paddingLeft: 5 }}>
-                {fixedInfo.bank || 'Commonwealth Bank of Australia'}
-              </Text>
-            </View>
+              <View style={{ flexDirection: 'row' }}>
+                {/* Left Labels Column */}
+                <View style={{ width: 88 }}>
+                  <Text style={{ fontSize: 8.8, fontFamily: 'Helvetica-Bold', color: '#0f172a', marginBottom: 3.5, textAlign: 'left' }}>
+                    Bank:
+                  </Text>
+                  <Text style={{ fontSize: 8.8, fontFamily: 'Helvetica-Bold', color: '#0f172a', marginBottom: 3.5, textAlign: 'left' }}>
+                    Account Name:
+                  </Text>
+                  <Text style={{ fontSize: 8.8, fontFamily: 'Helvetica-Bold', color: '#0f172a', marginBottom: 3.5, textAlign: 'left' }}>
+                    BSB/Branch No:
+                  </Text>
+                  <Text style={{ fontSize: 8.8, fontFamily: 'Helvetica-Bold', color: '#0f172a', marginBottom: 3.5, textAlign: 'left' }}>
+                    Account No:
+                  </Text>
+                  <Text style={{ fontSize: 8.8, fontFamily: 'Helvetica-Bold', color: '#0f172a', marginBottom: 0, textAlign: 'left' }}>
+                    BIC/SWIFT Code:
+                  </Text>
+                </View>
 
-            <View style={{ flexDirection: 'row', marginBottom: 1.5 }}>
-              <Text style={{ width: 80, fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#0f172a', textAlign: 'right', paddingRight: 5 }}>
-                Account Name:
-              </Text>
-              <Text style={{ width: 160, fontSize: 7, color: '#0f172a', borderLeftWidth: 0.8, borderLeftColor: '#94a3b8', paddingLeft: 5 }}>
-                {fixedInfo.college_name || 'States College Australia Pty Ltd'}
-              </Text>
-            </View>
+                {/* Continuous Vertical Divider Line */}
+                <View
+                  style={{
+                    width: 1.0,
+                    backgroundColor: '#94a3b8',
+                    marginHorizontal: 8,
+                  }}
+                />
 
-            <View style={{ flexDirection: 'row', marginBottom: 1.5 }}>
-              <Text style={{ width: 80, fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#0f172a', textAlign: 'right', paddingRight: 5 }}>
-                BSB/Branch No:
-              </Text>
-              <Text style={{ width: 160, fontSize: 7, color: '#0f172a', borderLeftWidth: 0.8, borderLeftColor: '#94a3b8', paddingLeft: 5 }}>
-                {fixedInfo.bsb || '063-010'}
-              </Text>
+                {/* Right Values Column */}
+                <View style={{ width: 155 }}>
+                  <Text style={{ fontSize: 8.8, color: '#0f172a', marginBottom: 3.5 }}>
+                    {fixedInfo.bank || 'Commonwealth Bank of Australia'}
+                  </Text>
+                  <Text style={{ fontSize: 8.8, color: '#0f172a', marginBottom: 3.5 }}>
+                    {fixedInfo.college_name || 'States College Australia Pty Ltd'}
+                  </Text>
+                  <Text style={{ fontSize: 8.8, color: '#0f172a', marginBottom: 3.5 }}>
+                    {fixedInfo.bsb || '063-010'}
+                  </Text>
+                  <Text style={{ fontSize: 8.8, color: '#0f172a', marginBottom: 3.5 }}>
+                    {fixedInfo.account_no || '1508 2685'}
+                  </Text>
+                  <Text style={{ fontSize: 8.8, color: '#0f172a', marginBottom: 0 }}>
+                    {fixedInfo.swift_code || 'CTBAAU2S'}
+                  </Text>
+                </View>
+              </View>
             </View>
-
-            <View style={{ flexDirection: 'row', marginBottom: 1.5 }}>
-              <Text style={{ width: 80, fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#0f172a', textAlign: 'right', paddingRight: 5 }}>
-                Account No:
-              </Text>
-              <Text style={{ width: 160, fontSize: 7, color: '#0f172a', borderLeftWidth: 0.8, borderLeftColor: '#94a3b8', paddingLeft: 5 }}>
-                {fixedInfo.account_no || '1508 2685'}
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', marginBottom: 1.5 }}>
-              <Text style={{ width: 80, fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#0f172a', textAlign: 'right', paddingRight: 5 }}>
-                BIC/SWIFT Code:
-              </Text>
-              <Text style={{ width: 160, fontSize: 7, color: '#0f172a', borderLeftWidth: 0.8, borderLeftColor: '#94a3b8', paddingLeft: 5 }}>
-                {fixedInfo.swift_code || 'CTBAAU2S'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Bottom Full-Width Contact & Address Bar */}
-          <View
-            style={{
-              marginTop: 10,
-              paddingTop: 5,
-              borderTopWidth: 0.5,
-              borderTopColor: '#cbd5e1',
-              alignItems: 'center',
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 2 }}>
-              <Text style={{ fontSize: 6.5, color: '#0f172a', marginHorizontal: 5 }}>
-                Ph: {fixedInfo.phone || '+61 3 9000 5743'}
-              </Text>
-              <Text style={{ fontSize: 6.5, color: '#0f172a', marginHorizontal: 5 }}>
-                Mob: {fixedInfo.mobile || '+61 466 041 112'}
-              </Text>
-              <Text style={{ fontSize: 6.5, color: '#0f172a', marginHorizontal: 5 }}>
-                Email: {fixedInfo.email || 'admissions@states.edu.au'}
-              </Text>
-              <Text style={{ fontSize: 6.5, color: '#0f172a', marginHorizontal: 5 }}>
-                Web: {fixedInfo.website || 'www.states.edu.au'}
-              </Text>
-            </View>
-            <Text style={{ fontSize: 6, color: '#64748b' }}>
-              {fixedInfo.address || 'Level 3, 301/620 Bourke Street, Melbourne, VIC 3000'} | RTO: {fixedInfo.rto || '45976'} | CRICOS: {fixedInfo.cricos || '04106B'}
-            </Text>
           </View>
         </View>
 
-        {/* Center Page Background Watermark Logo (Rendered LAST in JSX so it floats over table rows with clean transparency) */}
+        {/* Bottom Contact & Address Bar (Positioned at Bottom Edge of Page, shifted right of corner ribbon) */}
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 20,
+            left: 145,
+            right: 38,
+            paddingTop: 6,
+            borderTopWidth: 0.8,
+            borderTopColor: '#cbd5e1',
+            alignItems: 'center',
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 3 }}>
+            {/* Phone Icon & Text */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 5 }}>
+              <Svg width={7.5} height={7.5} viewBox="0 0 24 24" style={{ marginRight: 2.5 }}>
+                <Path fill="#0F3A7E" d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.25 1.02l-2.2 2.2z"/>
+              </Svg>
+              <Text style={{ fontSize: 7, color: '#0f172a' }}>
+                {fixedInfo.phone || '+61 3 9000 5743'}
+              </Text>
+            </View>
+
+            {/* Mobile Icon & Text */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 5 }}>
+              <Svg width={7.5} height={7.5} viewBox="0 0 24 24" style={{ marginRight: 2.5 }}>
+                <Path fill="#0F3A7E" d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/>
+              </Svg>
+              <Text style={{ fontSize: 7, color: '#0f172a' }}>
+                {fixedInfo.mobile || '+61 466 041 112'}
+              </Text>
+            </View>
+
+            {/* Email Icon & Text */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 5 }}>
+              <Svg width={7.5} height={7.5} viewBox="0 0 24 24" style={{ marginRight: 2.5 }}>
+                <Path fill="#0F3A7E" d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+              </Svg>
+              <Text style={{ fontSize: 7, color: '#0f172a' }}>
+                {fixedInfo.email || 'admissions@states.edu.au'}
+              </Text>
+            </View>
+
+            {/* Website Icon & Text */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 5 }}>
+              <Svg width={7.5} height={7.5} viewBox="0 0 24 24" style={{ marginRight: 2.5 }}>
+                <Path fill="#0F3A7E" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+              </Svg>
+              <Text style={{ fontSize: 7, color: '#0f172a' }}>
+                {fixedInfo.website || 'www.states.edu.au'}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={{ fontSize: 6.8, color: '#475569' }}>
+            {fixedInfo.address || 'Level 3, 301/620 Bourke Street, Melbourne, VIC 3000'}   |   RTO: {fixedInfo.rto || '45976'}   |   CRICOS: {fixedInfo.cricos || '04106B'}
+          </Text>
+        </View>
+
+        {/* Center Page Background Watermark Logo */}
         <View
           style={{
             position: 'absolute',
             top: 250,
-            left: 118,
-            width: 360,
-            height: 250,
+            left: 100,
+            width: 400,
+            height: 270,
             opacity: 0.12,
           }}
         >

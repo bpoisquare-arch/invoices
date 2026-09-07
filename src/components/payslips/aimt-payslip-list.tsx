@@ -28,6 +28,9 @@ import {
   Eye,
   X,
   Printer,
+  CloudUpload,
+  CheckCircle2,
+  Cloud,
 } from 'lucide-react'
 
 type FilterPeriod = 'all' | 'today' | '7days' | '30days' | 'month'
@@ -39,6 +42,10 @@ export default function AIMTPayslipList() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<FilterPeriod>('all')
+
+  // Sync to Cloud State
+  const [syncing, setSyncing] = useState(false)
+  const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // Fixed Floating Menu state (detached from table overflow)
   const [menuState, setMenuState] = useState<{
@@ -65,6 +72,39 @@ export default function AIMTPayslipList() {
       console.error('Failed to load payslips:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSyncToCloud = async () => {
+    setSyncing(true)
+    setSyncFeedback(null)
+    try {
+      const res = await aimtPayslipService.syncLocalToCloud()
+      if (res.success) {
+        setSyncFeedback({
+          type: 'success',
+          message:
+            res.syncedCount > 0
+              ? `Successfully synced ${res.syncedCount} payslip(s) to Live Cloud Database!`
+              : 'All payslips are already up to date in Cloud Database!',
+        })
+        await loadData()
+      } else {
+        setSyncFeedback({
+          type: 'error',
+          message: res.error || 'Failed to sync to database. Please make sure the table exists in Supabase.',
+        })
+      }
+    } catch (err: any) {
+      setSyncFeedback({
+        type: 'error',
+        message: err?.message || 'Failed to connect to database.',
+      })
+    } finally {
+      setSyncing(false)
+      setTimeout(() => {
+        setSyncFeedback((prev) => (prev?.type === 'success' ? null : prev))
+      }, 5000)
     }
   }
 
@@ -226,7 +266,23 @@ export default function AIMTPayslipList() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+          {/* Sync Local Storage to Cloud Button */}
+          <button
+            type="button"
+            onClick={handleSyncToCloud}
+            disabled={syncing}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer border border-emerald-500/30 disabled:opacity-50 shadow-xs"
+            title="Upload any local payslips from this laptop into Supabase Live Database"
+          >
+            {syncing ? (
+              <Loader2 className="size-4 animate-spin text-emerald-400" />
+            ) : (
+              <CloudUpload className="size-4 text-emerald-400" />
+            )}
+            <span>{syncing ? 'Syncing...' : 'Sync to Cloud'}</span>
+          </button>
+
           <button
             type="button"
             onClick={loadData}
@@ -246,6 +302,33 @@ export default function AIMTPayslipList() {
           </Link>
         </div>
       </div>
+
+      {/* Sync Feedback Toast / Banner */}
+      {syncFeedback && (
+        <div
+          className={`flex items-center justify-between p-4 rounded-xl text-xs sm:text-sm border shadow-md transition-all ${
+            syncFeedback.type === 'success'
+              ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200'
+              : 'bg-amber-950/80 border-amber-500/40 text-amber-200'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {syncFeedback.type === 'success' ? (
+              <CheckCircle2 className="size-5 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="size-5 text-amber-400 shrink-0" />
+            )}
+            <span>{syncFeedback.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSyncFeedback(null)}
+            className="p-1 hover:bg-white/10 rounded-md transition-colors"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
 
       {/* 2. Search & Filter Ribbon */}
       <div className="bg-[#001E2F] border border-white/10 p-4 rounded-2xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">

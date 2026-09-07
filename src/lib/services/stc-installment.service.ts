@@ -677,3 +677,77 @@ export async function deleteSTCInstallment(id: string): Promise<void> {
     console.warn('STC delete exception:', err)
   }
 }
+
+export async function syncLocalSTCToCloud(): Promise<{
+  success: boolean
+  syncedCount: number
+  totalCount: number
+  error?: string
+}> {
+  const locals = getLocalSchedules()
+  if (locals.length === 0) {
+    return { success: true, syncedCount: 0, totalCount: 0 }
+  }
+
+  try {
+    const supabase = createClient()
+    let successCount = 0
+    let lastError: string | null = null
+
+    for (const schedule of locals) {
+      const dbRow = mapScheduleToDbRow(schedule)
+      let { error } = await (supabase as any)
+        .from('stc_installment_schedules')
+        .upsert(dbRow, { onConflict: 'id' })
+
+      if (error && (error.message.includes('material_fee') || error.code === '42703')) {
+        delete dbRow.material_fee
+        const retry = await (supabase as any)
+          .from('stc_installment_schedules')
+          .upsert(dbRow, { onConflict: 'id' })
+        error = retry.error
+      }
+
+      if (!error) {
+        successCount++
+      } else {
+        lastError = error.message
+      }
+    }
+
+    if (lastError && successCount === 0) {
+      return {
+        success: false,
+        syncedCount: 0,
+        totalCount: locals.length,
+        error: lastError,
+      }
+    }
+
+    // Refresh local cache with latest cloud rows
+    const { data } = await (supabase as any)
+      .from('stc_installment_schedules')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (data && data.length > 0) {
+      const schedules = data.map(mapDbRowToSchedule)
+      saveLocalSchedules(schedules)
+    }
+
+    return {
+      success: true,
+      syncedCount: successCount,
+      totalCount: locals.length,
+      error: lastError || undefined,
+    }
+  } catch (e: any) {
+    return {
+      success: false,
+      syncedCount: 0,
+      totalCount: locals.length,
+      error: e?.message || 'Failed to connect to cloud database',
+    }
+  }
+}
+

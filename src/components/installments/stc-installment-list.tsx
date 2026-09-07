@@ -8,6 +8,7 @@ import {
   getSTCInstallments,
   deleteSTCInstallment,
   getSTCFixedInfo,
+  syncLocalSTCToCloud,
 } from '@/lib/services/stc-installment.service'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -26,6 +27,9 @@ import {
   Mail,
   CheckCircle2,
   AlertCircle,
+  CloudUpload,
+  AlertTriangle,
+  X,
 } from 'lucide-react'
 import {
   Dialog,
@@ -43,6 +47,10 @@ export default function STCInstallmentList() {
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  // Sync to Cloud State
+  const [syncing, setSyncing] = useState(false)
+  const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // Date Filtering State
   const [datePreset, setDatePreset] = useState<'all' | 'today' | '7days' | '30days' | 'thisMonth' | 'custom'>('all')
@@ -65,6 +73,39 @@ export default function STCInstallmentList() {
       console.error('Failed to load STC installment schedules:', err)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  async function handleSyncToCloud() {
+    setSyncing(true)
+    setSyncFeedback(null)
+    try {
+      const res = await syncLocalSTCToCloud()
+      if (res.success) {
+        setSyncFeedback({
+          type: 'success',
+          message:
+            res.syncedCount > 0
+              ? `Successfully synced ${res.syncedCount} STC schedule(s) to Live Cloud Database!`
+              : 'All STC schedules are already up to date in Cloud Database!',
+        })
+        await loadData()
+      } else {
+        setSyncFeedback({
+          type: 'error',
+          message: res.error || 'Failed to sync to database. Please make sure the table exists in Supabase.',
+        })
+      }
+    } catch (err: any) {
+      setSyncFeedback({
+        type: 'error',
+        message: err?.message || 'Failed to connect to database.',
+      })
+    } finally {
+      setSyncing(false)
+      setTimeout(() => {
+        setSyncFeedback((prev) => (prev?.type === 'success' ? null : prev))
+      }, 5000)
     }
   }
 
@@ -231,7 +272,24 @@ export default function STCInstallmentList() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Sync Local Storage to Cloud Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncToCloud}
+            disabled={syncing}
+            className="border-emerald-500/30 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 hover:text-white rounded-xl text-xs font-semibold"
+            title="Upload any local STC schedules from this laptop into Supabase Live Database"
+          >
+            {syncing ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin text-emerald-400" />
+            ) : (
+              <CloudUpload className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />
+            )}
+            {syncing ? 'Syncing...' : 'Sync to Cloud'}
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -254,6 +312,33 @@ export default function STCInstallmentList() {
           </Link>
         </div>
       </div>
+
+      {/* Sync Feedback Toast / Banner */}
+      {syncFeedback && (
+        <div
+          className={`flex items-center justify-between p-4 rounded-xl text-xs sm:text-sm border shadow-md transition-all ${
+            syncFeedback.type === 'success'
+              ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200'
+              : 'bg-amber-950/80 border-amber-500/40 text-amber-200'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {syncFeedback.type === 'success' ? (
+              <CheckCircle2 className="size-5 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="size-5 text-amber-400 shrink-0" />
+            )}
+            <span>{syncFeedback.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSyncFeedback(null)}
+            className="p-1 hover:bg-white/10 rounded-md transition-colors"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
 
       {/* KPI Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
