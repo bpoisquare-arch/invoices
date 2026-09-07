@@ -138,7 +138,7 @@ export default function AppSidebar() {
 
   // Sync entity from pathname or localStorage
   useEffect(() => {
-    if (pathname.startsWith('/installments')) {
+    if (pathname.startsWith('/installments') || pathname.startsWith('/payslips')) {
       setActiveEntity('aimt')
       if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'aimt')
     } else if (pathname.startsWith('/attendance')) {
@@ -205,10 +205,12 @@ export default function AppSidebar() {
     pathname.startsWith('/attendance') || pathname.startsWith('/payroll')
 
   const isInstallmentsActive = pathname.startsWith('/installments')
+  const isPayslipsActive = pathname.startsWith('/payslips')
 
   const [invoicesOpen, setInvoicesOpen] = useState(true)
   const [payrollOpen, setPayrollOpen] = useState(true)
   const [installmentsOpen, setInstallmentsOpen] = useState(true)
+  const [payslipsOpen, setPayslipsOpen] = useState(true)
 
   useEffect(() => {
     if (isInvoiceActive) setInvoicesOpen(true)
@@ -222,7 +224,11 @@ export default function AppSidebar() {
     if (isInstallmentsActive) setInstallmentsOpen(true)
   }, [isInstallmentsActive])
 
-  const isAimt = activeEntity === 'aimt' || pathname.startsWith('/installments')
+  useEffect(() => {
+    if (isPayslipsActive) setPayslipsOpen(true)
+  }, [isPayslipsActive])
+
+  const isAimt = activeEntity === 'aimt' || pathname.startsWith('/installments') || pathname.startsWith('/payslips')
   const isEdLinkAu = activeEntity === 'edlink-au'
   const isEdLinkPk = !isAimt && !isEdLinkAu && activeEntity !== 'nsc' && activeEntity !== 'isquare-bpo'
 
@@ -337,68 +343,133 @@ export default function AppSidebar() {
       <SidebarContent className="px-3 py-4 space-y-4 overflow-y-auto bg-[#001E2F]">
         {isAimt ? (
           /* =========================================================================
-             AIMT ENTITY: Installments Schedule Module
+             AIMT ENTITY: Installments & Payslips Modules
              ========================================================================= */
-          <SidebarGroup className="p-0">
-            <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#81F5F5]/70 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
-              Installments
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-1">
-                <Collapsible
-                  open={installmentsOpen}
-                  onOpenChange={setInstallmentsOpen}
-                  className="group/collapsible"
-                >
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger
-                      render={
-                        <SidebarMenuButton
-                          tooltip="Installments"
-                          className={`text-[13px] font-medium transition-all hover:bg-[#0E3E5B]/80 hover:text-white rounded-lg px-2.5 py-2 ${
-                            isInstallmentsActive
-                              ? 'text-[#81F5F5] bg-[#0E3E5B]'
-                              : 'text-slate-300'
-                          }`}
-                        />
-                      }
-                    >
-                      <GraduationCap className="size-4 shrink-0 text-[#81F5F5]" />
-                      <span className="font-semibold text-slate-200">Installments</span>
-                      <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
-                        {/* Create Schedule */}
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            render={<Link href="/installments/new" onClick={handleNavClick} />}
-                            isActive={pathname === '/installments/new'}
-                            className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                          >
-                            <PlusCircle className="size-3.5 shrink-0" />
-                            <span>Create Schedule</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
+          <>
+            {/* 1. Installments Schedule Module (100% untouched) */}
+            <SidebarGroup className="p-0">
+              <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#81F5F5]/70 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
+                Installments
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <Collapsible
+                    open={installmentsOpen}
+                    onOpenChange={setInstallmentsOpen}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton
+                            tooltip="Installments"
+                            className={`text-[13px] font-medium transition-all hover:bg-[#0E3E5B]/80 hover:text-white rounded-lg px-2.5 py-2 ${
+                              isInstallmentsActive
+                                ? 'text-[#81F5F5] bg-[#0E3E5B]'
+                                : 'text-slate-300'
+                            }`}
+                          />
+                        }
+                      >
+                        <GraduationCap className="size-4 shrink-0 text-[#81F5F5]" />
+                        <span className="font-semibold text-slate-200">Installments</span>
+                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
+                          {/* Create Schedule */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/installments/new" onClick={handleNavClick} />}
+                              isActive={pathname === '/installments/new'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <PlusCircle className="size-3.5 shrink-0" />
+                              <span>Create Schedule</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
 
-                        {/* Schedules */}
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            render={<Link href="/installments" onClick={handleNavClick} />}
-                            isActive={pathname === '/installments'}
-                            className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                          >
-                            <FileText className="size-3.5 shrink-0" />
-                            <span>Schedules</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+                          {/* Schedules */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/installments" onClick={handleNavClick} />}
+                              isActive={pathname === '/installments'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <FileText className="size-3.5 shrink-0" />
+                              <span>Schedules</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* 2. Payslips Module (New) */}
+            <SidebarGroup className="p-0 mt-3">
+              <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#81F5F5]/70 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
+                Payslips
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <Collapsible
+                    open={payslipsOpen}
+                    onOpenChange={setPayslipsOpen}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton
+                            tooltip="Payslips"
+                            className={`text-[13px] font-medium transition-all hover:bg-[#0E3E5B]/80 hover:text-white rounded-lg px-2.5 py-2 ${
+                              isPayslipsActive
+                                ? 'text-[#81F5F5] bg-[#0E3E5B]'
+                                : 'text-slate-300'
+                            }`}
+                          />
+                        }
+                      >
+                        <Banknote className="size-4 shrink-0 text-[#81F5F5]" />
+                        <span className="font-semibold text-slate-200">Payslips</span>
+                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
+                          {/* Generate Payslip */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/payslips/new" onClick={handleNavClick} />}
+                              isActive={pathname === '/payslips/new'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <PlusCircle className="size-3.5 shrink-0" />
+                              <span>Generate Payslip</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+
+                          {/* All Payslips */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/payslips" onClick={handleNavClick} />}
+                              isActive={pathname === '/payslips'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <FileText className="size-3.5 shrink-0" />
+                              <span>All Payslips</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
         ) : isEdLinkAu ? (
           /* =========================================================================
              EDLINK AUSTRALIA ENTITY: Official Invoices + Companies
