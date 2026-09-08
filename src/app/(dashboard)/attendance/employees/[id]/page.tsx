@@ -25,6 +25,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Laptop,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -49,6 +50,7 @@ import {
   AttendanceRecordWithEmployee,
   AttendanceSettings,
   Employee,
+  EmployeeLeaveQuotas,
 } from '@/lib/supabase/database.types'
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
@@ -84,6 +86,17 @@ export default function EmployeeDetailPage({ params }: PageProps) {
   const [fullMonthRecords, setFullMonthRecords] = useState<AttendanceRecordWithEmployee[]>([])
   const [settings, setSettings] = useState<AttendanceSettings | undefined>()
   const [isLoading, setIsLoading] = useState(true)
+
+  // Leave & WFH Live Balances
+  const [balanceSummary, setBalanceSummary] = useState<{
+    isProbation: boolean
+    joiningDate: string | null
+    quotas: EmployeeLeaveQuotas
+    used: { probation_leaves: number; annual_leaves: number; sick_leaves: number; casual_leaves: number; wfh_quota: number }
+    remaining: { probation_leaves: number; annual_leaves: number; sick_leaves: number; casual_leaves: number; wfh_quota: number }
+    probationDates: string[]
+    hasProbationInTargetMonth: boolean
+  } | null>(null)
 
   // Monthly Commission & Month Selector
   const [selectedMonth, setSelectedMonth] = useState<string>('2026-08')
@@ -159,11 +172,12 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     try {
       setIsLoading(true)
 
-      // Fetch employee info, settings, and holidays in parallel
-      const [empRes, settRes, holRes] = await Promise.all([
+      // Fetch employee info, settings, holidays, and live leave balance in parallel
+      const [empRes, settRes, holRes, balRes] = await Promise.all([
         fetch('/api/attendance/employees'),
         fetch('/api/attendance/settings'),
         fetch('/api/attendance/holidays'),
+        fetch(`/api/attendance/leave-balance?employeeId=${encodeURIComponent(employeeId)}`),
       ])
 
       const empData = await empRes.json()
@@ -176,6 +190,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           currentEmp = found
           setEmployee(found)
         }
+      }
+
+      const balData = await balRes.json()
+      if (balData.success) {
+        setBalanceSummary(balData)
       }
 
       const settData = await settRes.json()
@@ -817,6 +836,207 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             </p>
             <p className="text-xs text-rose-700 font-semibold">Left early before shift end</p>
           </Card>
+        </div>
+      </div>
+
+      {/* Leave & Work From Home (WFH) Live Balances Grid */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Leave & Work From Home (WFH) Balances
+          </h3>
+          <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+            WFH has no hard limit & remains flexible (balances can be negative)
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+          {/* 1. Work From Home (WFH) */}
+          <Card className="p-4 bg-cyan-50/25 shadow-2xs border-cyan-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-800">WFH Remaining</p>
+              <div className="w-6 h-6 rounded-md bg-cyan-100 flex items-center justify-center text-cyan-700">
+                <Laptop className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="my-2">
+              <div className="flex items-baseline gap-1.5">
+                <p className={`text-3xl sm:text-4xl font-black font-mono tracking-tight ${
+                  (balanceSummary?.remaining.wfh_quota ?? 4) < 0
+                    ? 'text-amber-600'
+                    : 'text-cyan-900'
+                }`}>
+                  {balanceSummary?.remaining.wfh_quota ?? 4}
+                </p>
+                <span className="text-xs font-bold text-slate-400">
+                  / {balanceSummary?.quotas.wfh_quota ?? 4} Quota
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">
+                {balanceSummary?.used.wfh_quota ?? 0} used
+              </span>
+              {(balanceSummary?.remaining.wfh_quota ?? 4) < 0 ? (
+                <Badge variant="warning" className="text-[9px] px-1 py-0 font-bold">
+                  Negative ({balanceSummary?.remaining.wfh_quota})
+                </Badge>
+              ) : (
+                <Badge variant="info" className="text-[9px] px-1 py-0 font-bold">
+                  Unlimited
+                </Badge>
+              )}
+            </div>
+          </Card>
+
+          {/* 2. Annual Leaves */}
+          <Card className="p-4 bg-purple-50/25 shadow-2xs border-purple-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-purple-800">Annual Leaves</p>
+              <div className="w-6 h-6 rounded-md bg-purple-100 flex items-center justify-center text-purple-700">
+                <Calendar className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="my-2">
+              <div className="flex items-baseline gap-1.5">
+                <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-purple-900">
+                  {balanceSummary?.remaining.annual_leaves ?? 6}
+                </p>
+                <span className="text-xs font-bold text-slate-400">
+                  / {balanceSummary?.quotas.annual_leaves ?? 6} Quota
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">
+                {balanceSummary?.used.annual_leaves ?? 0} used
+              </span>
+              {(balanceSummary?.remaining.annual_leaves ?? 6) === 0 ? (
+                <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
+                  Exhausted
+                </Badge>
+              ) : (
+                <span className="text-purple-600 font-semibold text-[11px]">Available</span>
+              )}
+            </div>
+          </Card>
+
+          {/* 3. Sick Leaves */}
+          <Card className="p-4 bg-emerald-50/25 shadow-2xs border-emerald-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Sick Leaves</p>
+              <div className="w-6 h-6 rounded-md bg-emerald-100 flex items-center justify-center text-emerald-700">
+                <ShieldCheck className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="my-2">
+              <div className="flex items-baseline gap-1.5">
+                <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-emerald-900">
+                  {balanceSummary?.remaining.sick_leaves ?? 7}
+                </p>
+                <span className="text-xs font-bold text-slate-400">
+                  / {balanceSummary?.quotas.sick_leaves ?? 7} Quota
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">
+                {balanceSummary?.used.sick_leaves ?? 0} used
+              </span>
+              {(balanceSummary?.remaining.sick_leaves ?? 7) === 0 ? (
+                <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
+                  Exhausted
+                </Badge>
+              ) : (
+                <span className="text-emerald-600 font-semibold text-[11px]">Available</span>
+              )}
+            </div>
+          </Card>
+
+          {/* 4. Casual Leaves */}
+          <Card className="p-4 bg-blue-50/25 shadow-2xs border-blue-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-blue-800">Casual Leaves</p>
+              <div className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center text-blue-700">
+                <Clock className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="my-2">
+              <div className="flex items-baseline gap-1.5">
+                <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-blue-900">
+                  {balanceSummary?.remaining.casual_leaves ?? 7}
+                </p>
+                <span className="text-xs font-bold text-slate-400">
+                  / {balanceSummary?.quotas.casual_leaves ?? 7} Quota
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">
+                {balanceSummary?.used.casual_leaves ?? 0} used
+              </span>
+              {(balanceSummary?.remaining.casual_leaves ?? 7) === 0 ? (
+                <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
+                  Exhausted
+                </Badge>
+              ) : (
+                <span className="text-blue-600 font-semibold text-[11px]">Available</span>
+              )}
+            </div>
+          </Card>
+
+          {/* 5. Probation Leaves or Confirmed Status */}
+          {balanceSummary?.isProbation ? (
+            <Card className="p-4 bg-amber-50/30 shadow-2xs border-amber-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-800">Probation Leaves</p>
+                <div className="w-6 h-6 rounded-md bg-amber-100 flex items-center justify-center text-amber-700">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="my-2">
+                <div className="flex items-baseline gap-1.5">
+                  <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-amber-900">
+                    {balanceSummary?.remaining.probation_leaves ?? 3}
+                  </p>
+                  <span className="text-xs font-bold text-slate-400">
+                    / {balanceSummary?.quotas.probation_leaves ?? 3} Quota
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-medium">
+                  {balanceSummary?.used.probation_leaves ?? 0} used (Max 1/mo)
+                </span>
+                {(balanceSummary?.remaining.probation_leaves ?? 3) === 0 ? (
+                  <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
+                    Exhausted
+                  </Badge>
+                ) : (
+                  <Badge variant="warning" className="text-[9px] px-1 py-0 font-bold">
+                    Probation Active
+                  </Badge>
+                )}
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-4 bg-slate-50/60 shadow-2xs border-slate-200/80 rounded-xl flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Staff Status</p>
+                <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-slate-500">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                </div>
+              </div>
+              <div className="my-2">
+                <p className="text-base font-extrabold text-slate-800 tracking-tight">
+                  {employee?.is_old_staff ? 'Old Staff' : 'Confirmed Staff'}
+                </p>
+              </div>
+              <p className="text-xs text-slate-400 font-medium">
+                {employee?.is_old_staff ? 'Exempt from probation' : 'Standard leave quota active'}
+              </p>
+            </Card>
+          )}
         </div>
       </div>
 

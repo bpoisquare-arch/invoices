@@ -439,9 +439,16 @@ export default function EditAttendanceModal({
           }),
         })
 
-        const data = await res.json()
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to update record.')
+        let data: any
+        try {
+          data = await res.json()
+        } catch {
+          const text = await res.text().catch(() => '')
+          throw new Error(text || `Server error (${res.status})`)
+        }
+
+        if (!data?.success) {
+          throw new Error(data?.error || 'Failed to update record.')
         }
         onSaveSuccess(data.record)
       } else {
@@ -460,9 +467,16 @@ export default function EditAttendanceModal({
           }),
         })
 
-        const data = await res.json()
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to save record.')
+        let data: any
+        try {
+          data = await res.json()
+        } catch {
+          const text = await res.text().catch(() => '')
+          throw new Error(text || `Server error (${res.status})`)
+        }
+
+        if (!data?.success) {
+          throw new Error(data?.error || 'Failed to save record.')
         }
         onSaveSuccess(data.record)
       }

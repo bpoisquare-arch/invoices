@@ -325,6 +325,13 @@ export async function getEmployees(params?: {
           wfh_quota: Number((initialWfh - used.wfh_quota).toFixed(2)),
           probation_leaves: Math.max(0, Number((initialProb - used.probation_leaves).toFixed(2))),
         },
+        base_leave_quotas: {
+          annual_leaves: initialAnn,
+          sick_leaves: initialSick,
+          casual_leaves: initialCas,
+          wfh_quota: initialWfh,
+          probation_leaves: initialProb,
+        },
       }
     })
 
@@ -341,19 +348,27 @@ export async function getEmployees(params?: {
 
     return result
   } catch (err) {
-    console.error('Exception fetching employees:', err)
+    console.error('getEmployees catch:', err)
     return []
   }
 }
 
-export async function getEmployeeById(id: string): Promise<Employee | null> {
+/**
+ * Gets single employee by ID or employee_id (EMP-XXXX)
+ */
+export async function getEmployeeById(idOrEmpId: string): Promise<Employee | null> {
   try {
     const supabase = await getSupabase()
-    const { data, error } = await supabase
-      .from('employees')
-      .select('*')
-      .or(`id.eq.${id},employee_id.eq.${id}`)
-      .single()
+    const isUuid = Boolean(idOrEmpId && idOrEmpId.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
+
+    let query = supabase.from('employees').select('*')
+    if (isUuid) {
+      query = query.or(`id.eq.${idOrEmpId},employee_id.eq.${idOrEmpId}`)
+    } else {
+      query = query.eq('employee_id', idOrEmpId)
+    }
+
+    const { data, error } = await query.maybeSingle()
 
     if (error || !data) {
       return null
@@ -387,6 +402,13 @@ export async function getEmployeeById(id: string): Promise<Employee | null> {
         casual_leaves: Math.max(0, Number((initialCas - used.casual_leaves).toFixed(2))),
         wfh_quota: Number((initialWfh - used.wfh_quota).toFixed(2)),
         probation_leaves: Math.max(0, Number((initialProb - used.probation_leaves).toFixed(2))),
+      },
+      base_leave_quotas: {
+        annual_leaves: initialAnn,
+        sick_leaves: initialSick,
+        casual_leaves: initialCas,
+        wfh_quota: initialWfh,
+        probation_leaves: initialProb,
       },
     }
   } catch (err) {
@@ -643,6 +665,7 @@ export async function updateEmployee(
     joining_date: isOldStaff ? null : (params.joining_date !== undefined ? params.joining_date : (data.joining_date || data.created_at)),
     is_old_staff: isOldStaff !== undefined ? isOldStaff : Boolean(existingMeta.is_old_staff),
     leave_quotas: liveRemQuotas,
+    base_leave_quotas: baseQuotas,
   }
 }
 
@@ -1182,22 +1205,41 @@ export async function getEmployeeLeaveBalanceSummary(
   probationDates: string[]
   hasProbationInTargetMonth: boolean
 }> {
-  const emp = await getEmployeeById(employeeIdOrUuid)
-  const isOldStaff = Boolean(emp?.is_old_staff)
-  const joiningDate = isOldStaff ? null : (emp?.joining_date || emp?.created_at || null)
-  const quotas: EmployeeLeaveQuotas = emp?.leave_quotas || {
-    annual_leaves: 6,
-    sick_leaves: 7,
-    casual_leaves: 7,
-    wfh_quota: 4,
-    probation_leaves: isOldStaff ? 0 : 3,
+  const [emp, metaMap] = await Promise.all([
+    getEmployeeById(employeeIdOrUuid),
+    getEmployeeMetadataMap(),
+  ])
+
+  const meta = (emp?.id && metaMap[emp.id]) || (emp?.employee_id && metaMap[emp.employee_id]) || metaMap[employeeIdOrUuid] || {}
+  const isOldStaff = meta.is_old_staff !== undefined ? Boolean(meta.is_old_staff) : Boolean(emp?.is_old_staff)
+  const joiningDate = isOldStaff ? null : (meta.joining_date || emp?.joining_date || emp?.created_at || null)
+
+  const initialQuotas: EmployeeLeaveQuotas = meta.leave_quotas || {
+    annual_leaves: DEFAULT_EMPLOYEE_LEAVE_QUOTAS.annual_leaves ?? 6,
+    sick_leaves: DEFAULT_EMPLOYEE_LEAVE_QUOTAS.sick_leaves ?? 7,
+    casual_leaves: DEFAULT_EMPLOYEE_LEAVE_QUOTAS.casual_leaves ?? 7,
+    wfh_quota: DEFAULT_EMPLOYEE_LEAVE_QUOTAS.wfh_quota ?? 4,
+    probation_leaves: isOldStaff ? 0 : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.probation_leaves ?? 3),
   }
 
+  const initial_prob = isOldStaff ? 0 : (initialQuotas.probation_leaves !== undefined ? Number(initialQuotas.probation_leaves) : 3)
+  const initial_ann = initialQuotas.annual_leaves !== undefined ? Number(initialQuotas.annual_leaves) : 6
+  const initial_sick = initialQuotas.sick_leaves !== undefined ? Number(initialQuotas.sick_leaves) : 7
+  const initial_cas = initialQuotas.casual_leaves !== undefined ? Number(initialQuotas.casual_leaves) : 7
+  const initial_wfh = initialQuotas.wfh_quota !== undefined ? Number(initialQuotas.wfh_quota) : 4
+
   const supabase = await getSupabase()
-  const { data: allRecords } = await supabase
-    .from('attendance_records')
-    .select('id, attendance_date, arrival_status, departure_status, raw_punches')
-    .or(`employee_id.eq.${employeeIdOrUuid}${emp?.id ? `,employee_id.eq.${emp.id}` : ''}${emp?.employee_id ? `,employee_id.eq.${emp.employee_id}` : ''}`)
+  const isUuid = Boolean(employeeIdOrUuid && employeeIdOrUuid.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
+  const empDbId = emp?.id || (isUuid ? employeeIdOrUuid : null)
+
+  let allRecords: any[] = []
+  if (empDbId) {
+    const { data } = await supabase
+      .from('attendance_records')
+      .select('id, attendance_date, arrival_status, departure_status, raw_punches')
+      .eq('employee_id', empDbId)
+    allRecords = data || []
+  }
 
   const probationDates: string[] = []
   let used_annual = 0
@@ -1262,16 +1304,16 @@ export async function getEmployeeLeaveBalanceSummary(
     ? probationDates.some((d) => d.startsWith(targetMonthStr))
     : false
 
-  const initial_prob = isOldStaff ? 0 : (quotas.probation_leaves !== undefined ? Number(quotas.probation_leaves) : 3)
-  const initial_ann = quotas.annual_leaves !== undefined ? Number(quotas.annual_leaves) : 6
-  const initial_sick = quotas.sick_leaves !== undefined ? Number(quotas.sick_leaves) : 7
-  const initial_cas = quotas.casual_leaves !== undefined ? Number(quotas.casual_leaves) : 7
-  const initial_wfh = quotas.wfh_quota !== undefined ? Number(quotas.wfh_quota) : 4
-
   return {
     isProbation,
     joiningDate,
-    quotas,
+    quotas: {
+      probation_leaves: initial_prob,
+      annual_leaves: initial_ann,
+      sick_leaves: initial_sick,
+      casual_leaves: initial_cas,
+      wfh_quota: initial_wfh,
+    },
     used: {
       probation_leaves: Number(used_probation.toFixed(2)),
       annual_leaves: Number(used_annual.toFixed(2)),
@@ -1400,7 +1442,14 @@ export async function updateAttendanceRecord(
     throw new Error('Attendance record not found in database.')
   }
 
-  const effectiveEmpId = params.employee_id || current.employee_id
+  let effectiveEmpId = params.employee_id || current.employee_id
+  if (effectiveEmpId && !effectiveEmpId.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)) {
+    const emp = await getEmployeeById(effectiveEmpId)
+    if (emp?.id) {
+      effectiveEmpId = emp.id
+    }
+  }
+
   const dateToUse = params.attendance_date !== undefined ? params.attendance_date : current.attendance_date
 
   // Validate Leave or WFH Quotas before updating
@@ -1449,7 +1498,7 @@ export async function updateAttendanceRecord(
     arrivalStatus = 'On Time Arrival'
     departureStatus = 'Work From Home'
     totalMinutes = dayOfWeek === 6 ? 4 * 60 : 8 * 60
-    formatted = dayOfWeek === 6 ? '04:00' : '08:00'
+    formatted = dayOfWeek === 6 ? '4h 0m' : '8h 0m'
   } else {
     // Normal present / punch recalculation
     arrivalStatus = calculateArrivalStatus(inTimeToUse, dayOfWeek, settings)
@@ -1508,6 +1557,14 @@ export async function createManualAttendanceRecord(params: {
   const supabase = await getSupabase()
   const settings = await getAttendanceSettings()
 
+  let resolvedEmployeeId = params.employee_id
+  if (resolvedEmployeeId && !resolvedEmployeeId.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)) {
+    const emp = await getEmployeeById(resolvedEmployeeId)
+    if (emp?.id) {
+      resolvedEmployeeId = emp.id
+    }
+  }
+
   const parsedDate = parseDateString(params.attendance_date)
   const dayOfWeek = parsedDate ? parsedDate.dayOfWeek : 1
   const dayName = parsedDate ? parsedDate.dayName : 'Monday'
@@ -1527,10 +1584,10 @@ export async function createManualAttendanceRecord(params: {
     params.departure_status?.includes('Leave') ||
     LEAVE_TYPES.includes(params.departure_status as any)
 
-  if (params.employee_id && (isLeave || isWfh)) {
+  if (resolvedEmployeeId && (isLeave || isWfh)) {
     const leaveTypeToValidate = isWfh ? 'Work From Home' : (params.departure_status || 'Casual Leave')
     const leaveVal = parseLeaveValue(params.notes)
-    await validateEmployeeLeaveQuotas(params.employee_id, params.attendance_date, leaveTypeToValidate, undefined, leaveVal)
+    await validateEmployeeLeaveQuotas(resolvedEmployeeId, params.attendance_date, leaveTypeToValidate, undefined, leaveVal)
   }
 
   if (params.arrival_status === 'Absent' || params.departure_status === 'Absent') {
@@ -1551,7 +1608,7 @@ export async function createManualAttendanceRecord(params: {
     arrivalStatus = 'On Time Arrival'
     departureStatus = 'Work From Home'
     totalMinutes = dayOfWeek === 6 ? 4 * 60 : 8 * 60
-    formatted = dayOfWeek === 6 ? '04:00' : '08:00'
+    formatted = dayOfWeek === 6 ? '4h 0m' : '8h 0m'
   } else {
     arrivalStatus = calculateArrivalStatus(params.in_time || null, dayOfWeek, settings)
     departureStatus = calculateDepartureStatus(params.out_time || null, dayOfWeek, settings)
@@ -1570,7 +1627,7 @@ export async function createManualAttendanceRecord(params: {
     : []
 
   const newRecord = {
-    employee_id: params.employee_id,
+    employee_id: resolvedEmployeeId,
     attendance_date: params.attendance_date,
     day_of_week: dayName,
     in_time: (arrivalStatus === 'Absent' || arrivalStatus === 'Leave') ? null : (params.in_time?.trim() || null),

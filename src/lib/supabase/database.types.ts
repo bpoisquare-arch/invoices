@@ -691,6 +691,7 @@ export type Employee = Database['public']['Tables']['employees']['Row'] & {
   joining_date?: string | null
   is_old_staff?: boolean | null
   leave_quotas?: EmployeeLeaveQuotas
+  base_leave_quotas?: EmployeeLeaveQuotas
 }
 export type EmployeeInsert = Database['public']['Tables']['employees']['Insert']
 export type EmployeeUpdate = Database['public']['Tables']['employees']['Update']

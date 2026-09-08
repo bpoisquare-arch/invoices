@@ -307,7 +307,7 @@ export default function EmployeesPage() {
     setEditJoiningDate(rawDate ? rawDate.split('T')[0] : todayStr)
     setEditSalary(emp.salary !== undefined && emp.salary !== null ? String(emp.salary) : '')
     setEditActive(emp.is_active)
-    const q = emp.leave_quotas || {}
+    const q = emp.base_leave_quotas || emp.leave_quotas || {}
     setEditAnnualLeaves(q.annual_leaves !== undefined ? Number(q.annual_leaves) : 6)
     setEditSickLeaves(q.sick_leaves !== undefined ? Number(q.sick_leaves) : 7)
     setEditCasualLeaves(q.casual_leaves !== undefined ? Number(q.casual_leaves) : 7)
