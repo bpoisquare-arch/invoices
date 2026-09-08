@@ -282,10 +282,6 @@ export default function EditAttendanceModal({
   const handleStatusChange = (newStatus: AttendanceStatusType) => {
     setError(null)
     if (newStatus === 'wfh') {
-      if (isWfhExhausted) {
-        setError('Work From Home quota is exhausted (0 remaining). Cannot apply WFH.')
-        return
-      }
       setAttendanceStatus('wfh')
       const wfh = getWfhTimes(date, settings)
       setInTime(wfh.inTime)
@@ -386,14 +382,6 @@ export default function EditAttendanceModal({
           setError(`Casual Leaves Quota Exceeded: Only ${effectiveRemaining.casual_leaves ?? 0} remaining, but ${numLeaveDays} day(s) requested.`)
           return
         }
-      }
-    }
-
-    // Validation 2: WFH Quota Enforcement
-    if (attendanceStatus === 'wfh') {
-      if ((effectiveRemaining.wfh_quota || 0) < numWfhDays) {
-        setError(`Work From Home (WFH) Quota Exceeded: Only ${effectiveRemaining.wfh_quota ?? 0} remaining, but ${numWfhDays} day(s) requested.`)
-        return
       }
     }
 
@@ -596,18 +584,15 @@ export default function EditAttendanceModal({
               <button
                 type="button"
                 onClick={() => handleStatusChange('wfh')}
-                disabled={isWfhExhausted}
                 className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
-                  isWfhExhausted
-                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
-                    : attendanceStatus === 'wfh'
+                  attendanceStatus === 'wfh'
                     ? 'bg-cyan-50 text-cyan-800 border-cyan-500 shadow-2xs ring-1 ring-cyan-500'
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                 }`}
-                title={isWfhExhausted ? 'WFH quota exhausted (0 remaining)' : 'Work From Home'}
+                title="Work From Home"
               >
-                <Laptop className={`w-3.5 h-3.5 ${isWfhExhausted ? 'text-slate-400' : 'text-cyan-600'}`} />
-                <span>WFH {isWfhExhausted ? '(0)' : ''}</span>
+                <Laptop className="w-3.5 h-3.5 text-cyan-600" />
+                <span>WFH</span>
               </button>
             </div>
           </div>

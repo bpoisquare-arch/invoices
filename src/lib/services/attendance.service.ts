@@ -322,7 +322,7 @@ export async function getEmployees(params?: {
           annual_leaves: Math.max(0, Number((initialAnn - used.annual_leaves).toFixed(2))),
           sick_leaves: Math.max(0, Number((initialSick - used.sick_leaves).toFixed(2))),
           casual_leaves: Math.max(0, Number((initialCas - used.casual_leaves).toFixed(2))),
-          wfh_quota: Math.max(0, Number((initialWfh - used.wfh_quota).toFixed(2))),
+          wfh_quota: Number((initialWfh - used.wfh_quota).toFixed(2)),
           probation_leaves: Math.max(0, Number((initialProb - used.probation_leaves).toFixed(2))),
         },
       }
@@ -385,7 +385,7 @@ export async function getEmployeeById(id: string): Promise<Employee | null> {
         annual_leaves: Math.max(0, Number((initialAnn - used.annual_leaves).toFixed(2))),
         sick_leaves: Math.max(0, Number((initialSick - used.sick_leaves).toFixed(2))),
         casual_leaves: Math.max(0, Number((initialCas - used.casual_leaves).toFixed(2))),
-        wfh_quota: Math.max(0, Number((initialWfh - used.wfh_quota).toFixed(2))),
+        wfh_quota: Number((initialWfh - used.wfh_quota).toFixed(2)),
         probation_leaves: Math.max(0, Number((initialProb - used.probation_leaves).toFixed(2))),
       },
     }
@@ -632,7 +632,7 @@ export async function updateEmployee(
     annual_leaves: Math.max(0, Number(((baseQuotas.annual_leaves ?? 6) - used.annual_leaves).toFixed(2))),
     sick_leaves: Math.max(0, Number(((baseQuotas.sick_leaves ?? 7) - used.sick_leaves).toFixed(2))),
     casual_leaves: Math.max(0, Number(((baseQuotas.casual_leaves ?? 7) - used.casual_leaves).toFixed(2))),
-    wfh_quota: Math.max(0, Number(((baseQuotas.wfh_quota ?? 4) - used.wfh_quota).toFixed(2))),
+    wfh_quota: Number(((baseQuotas.wfh_quota ?? 4) - used.wfh_quota).toFixed(2)),
     probation_leaves: isOldStaff ? 0 : Math.max(0, Number(((baseQuotas.probation_leaves ?? 3) - used.probation_leaves).toFixed(2))),
   }
 
@@ -1284,7 +1284,7 @@ export async function getEmployeeLeaveBalanceSummary(
       annual_leaves: Math.max(0, Number((initial_ann - used_annual).toFixed(2))),
       sick_leaves: Math.max(0, Number((initial_sick - used_sick).toFixed(2))),
       casual_leaves: Math.max(0, Number((initial_cas - used_casual).toFixed(2))),
-      wfh_quota: Math.max(0, Number((initial_wfh - used_wfh).toFixed(2))),
+      wfh_quota: Number((initial_wfh - used_wfh).toFixed(2)),
     },
     probationDates,
     hasProbationInTargetMonth,
@@ -1339,9 +1339,7 @@ export async function validateEmployeeLeaveQuotas(
       throw new Error(`Casual Leaves Quota Exceeded: Only ${summary.remaining.casual_leaves} remaining, but ${requestedValue} day(s) requested.`)
     }
   } else if (isWfh) {
-    if (summary.remaining.wfh_quota < requestedValue) {
-      throw new Error(`Work From Home (WFH) Quota Exceeded: Only ${summary.remaining.wfh_quota} remaining, but ${requestedValue} day(s) requested.`)
-    }
+    // Work From Home (WFH) is allowed unlimited - quota balance can go into negative
   }
 }
 

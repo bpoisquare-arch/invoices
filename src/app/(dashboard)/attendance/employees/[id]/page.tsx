@@ -400,15 +400,24 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       return
     }
 
-    const exportRows = records.map((r) => ({
-      Date: r.attendance_date,
-      Day: r.day_of_week,
-      'In Time': r.in_time || '',
-      'Arrival Status': r.arrival_status,
-      'Out Time': r.out_time || '',
-      'Departure Status': r.departure_status,
-      'Working Duration': r.total_working_hours_formatted || '',
-    }))
+    const exportRows = records.map((r) => {
+      const isWfh = Boolean(
+        r.departure_status === 'Work From Home' ||
+        r.arrival_status === 'Work From Home' ||
+        r.notes?.includes('Work From Home')
+      )
+
+      return {
+        Date: r.attendance_date,
+        Day: r.day_of_week,
+        'In Time': r.in_time || '',
+        'Arrival Status': isWfh ? 'Work From Home' : r.arrival_status,
+        'Out Time': r.out_time || '',
+        'Departure Status': isWfh ? 'Work From Home' : r.departure_status,
+        'Working Duration': r.total_working_hours_formatted || '',
+        Notes: r.notes || (isWfh ? 'Work From Home' : ''),
+      }
+    })
 
     const ws = XLSX.utils.json_to_sheet(exportRows)
     const wb = XLSX.utils.book_new()

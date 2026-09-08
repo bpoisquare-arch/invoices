@@ -524,28 +524,53 @@ export default function AttendanceRecordsPage() {
         const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
         const colHeader = `${date} (${dayName})`
 
+        // 1. Sunday is official weekly holiday
+        if (dayName === 'Sunday') {
+          rowData[colHeader] = 'Holiday'
+          return
+        }
+
+        // 2. Gazetted Holiday (when all employees have no office punches on this holiday)
+        if (isGazettedHoliday) {
+          rowData[colHeader] = `Gazetted Holiday (${holidays[date] || 'Gazetted Holiday'})`
+          return
+        }
+
+        // 3. Check individual employee attendance record if present
         if (rec) {
+          const isWfh = Boolean(
+            rec.notes?.includes('Work From Home') ||
+            rec.arrival_status === 'Work From Home' ||
+            rec.departure_status === 'Work From Home'
+          )
+
           const isLeave =
             rec.arrival_status === 'Leave' ||
             rec.departure_status?.includes('Leave') ||
-            ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.departure_status as any)
+            ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.departure_status as any) ||
+            ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.arrival_status as any)
 
           const isAbsent =
             rec.arrival_status === 'Absent' ||
             rec.departure_status === 'Absent' ||
-            (!rec.in_time && !rec.out_time && !isLeave)
+            (!rec.in_time && !rec.out_time && !isLeave && !isWfh)
 
-          if (isLeave) {
-            rowData[colHeader] = `Leave (${rec.departure_status || 'Casual Leave'})`
+          if (isWfh) {
+            rowData[colHeader] = `${rec.in_time || '10:30 AM'} - ${rec.out_time || '06:30 PM'} [${rec.total_working_hours_formatted || '08:00'}] (WFH)`
+          } else if (isLeave) {
+            const leaveLabel =
+              ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].find(
+                (l) => l === rec.departure_status || l === rec.arrival_status
+              ) || rec.departure_status || 'Casual Leave'
+
+            const match = rec.notes?.match(/\(([0-9]+(?:\.[0-9]+)?)\s*day/i) || rec.notes?.match(/([0-9]+(?:\.[0-9]+)?)\s*day/i)
+            const daysSuffix = match && match[1] !== '1' ? ` (${match[1]}d)` : ''
+            rowData[colHeader] = `Leave (${leaveLabel}${daysSuffix})`
           } else if (isAbsent) {
             rowData[colHeader] = 'Absent'
           } else {
             rowData[colHeader] = `${rec.in_time || '--'} - ${rec.out_time || '--'} [${rec.total_working_hours_formatted || ''}]`
           }
-        } else if (isGazettedHoliday) {
-          rowData[colHeader] = `Gazetted Holiday (${holidays[date] || 'Gazetted Holiday'})`
-        } else if (dayName === 'Sunday') {
-          rowData[colHeader] = 'Holiday'
         } else {
           rowData[colHeader] = 'Absent'
         }
