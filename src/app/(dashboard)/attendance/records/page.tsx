@@ -53,7 +53,7 @@ import {
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
-import * as XLSX from 'xlsx'
+import type ExcelJS from 'exceljs'
 
 // Helper to format date to YYYY-MM-DD
 function formatDate(d: Date): string {
@@ -89,6 +89,267 @@ function getDayName(dateStr: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'long' })
 }
 
+// Format 12-hour lowercase time (e.g. "10:30 am", "6:58 pm")
+function formatExcelTime(timeStr?: string | null): string {
+  if (!timeStr || timeStr === '---' || timeStr === '--') return ''
+  const clean = timeStr.trim()
+  const match = clean.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM|am|pm)?$/i)
+  if (match) {
+    let [_, hStr, mStr, meridiem] = match
+    let h = parseInt(hStr, 10)
+    if (!meridiem) {
+      meridiem = h >= 12 ? 'pm' : 'am'
+      if (h > 12) h -= 12
+      if (h === 0) h = 12
+    } else {
+      meridiem = meridiem.toLowerCase()
+    }
+    return `${h}:${mStr} ${meridiem}`
+  }
+  return clean
+}
+
+// Format Worked Hours (e.g. "8:28", "7:52", "0:00")
+function formatExcelWorkedHours(minutes?: number | null, formattedStr?: string | null): string {
+  if (minutes !== undefined && minutes !== null && minutes > 0) {
+    const h = Math.floor(minutes / 60)
+    const m = minutes % 60
+    return `${h}:${String(m).padStart(2, '0')}`
+  }
+  if (formattedStr && formattedStr !== '00:00' && formattedStr !== '--') {
+    const match = formattedStr.match(/(\d+)[:h]\s*(\d+)?/)
+    if (match) {
+      const h = parseInt(match[1], 10)
+      const m = match[2] ? match[2].padStart(2, '0') : '00'
+      return `${h}:${m}`
+    }
+    return formattedStr
+  }
+  return '0:00'
+}
+
+// Helper to check if office arrival cutoff has passed
+function hasOfficeInTimePassed(dateStr: string, settings?: AttendanceSettings): boolean {
+  const now = new Date()
+  const today = formatDate(now)
+  if (dateStr < today) return true
+  if (dateStr > today) return false
+
+  const dayOfWeek = now.getDay() // 0 = Sunday, 6 = Saturday
+  const isSaturday = dayOfWeek === 6
+  const inTimeStr = isSaturday ? (settings?.saturday_in_time || '11:00') : (settings?.weekday_in_time || '10:30')
+  const grace = isSaturday ? (settings?.saturday_grace_minutes ?? 15) : (settings?.weekday_grace_minutes ?? 15)
+
+  const [h, m] = inTimeStr.split(':').map(Number)
+  const cutoffMinutes = (h || 10) * 60 + (m || 30) + grace
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  return currentMinutes >= cutoffMinutes
+}
+
+// Helper to check if office departure cutoff has passed
+function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings): boolean {
+  const now = new Date()
+  const today = formatDate(now)
+  if (dateStr < today) return true
+  if (dateStr > today) return false
+
+  const dayOfWeek = now.getDay()
+  const isSaturday = dayOfWeek === 6
+  const outTimeStr = isSaturday ? (settings?.saturday_out_time || '15:00') : (settings?.weekday_out_time || '18:30')
+
+  const [h, m] = outTimeStr.split(':').map(Number)
+  const cutoffMinutes = (h || 18) * 60 + (m || 30)
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  return currentMinutes >= cutoffMinutes
+}
+
+// Helper to evaluate record status flags for filtering & excel
+function getRecordStatusFlags(
+  emp: Employee,
+  date: string,
+  recordMatrixMap: Map<string, AttendanceRecordWithEmployee>,
+  holidays: Record<string, string>,
+  settings?: AttendanceSettings
+) {
+  const dayName = getDayName(date)
+  const isSunday = dayName === 'Sunday'
+  const isGazettedHoliday = Boolean(holidays[date])
+  const todayStr = formatDate(new Date())
+  const isFuture = date > todayStr
+  const isToday = date === todayStr
+  const isPast = date < todayStr
+
+  if (isSunday || isGazettedHoliday) {
+    return {
+      isSunday,
+      isGazettedHoliday,
+      isLeave: false,
+      isAbsent: false,
+      isLate: false,
+      isEarlyLeave: false,
+      isMissingIn: false,
+      isMissingOut: false,
+      isWfh: false,
+      isPresent: false,
+      statusLabel: isSunday ? 'Sunday' : 'Holiday',
+    }
+  }
+
+  const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
+
+  if (rec) {
+    const isWfh = Boolean(
+      rec.notes?.includes('Work From Home') ||
+      rec.arrival_status === 'Work From Home' ||
+      rec.departure_status === 'Work From Home'
+    )
+
+    const isLeave =
+      rec.arrival_status === 'Leave' ||
+      rec.departure_status?.includes('Leave') ||
+      ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.departure_status as any) ||
+      ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.arrival_status as any)
+
+    const hasInTime = Boolean(rec.in_time && rec.in_time !== '---' && rec.in_time !== '--')
+    const hasOutTime = Boolean(rec.out_time && rec.out_time !== '---' && rec.out_time !== '--')
+    const isLate = rec.arrival_status === 'Late Arrival'
+    const isEarlyLeave = rec.departure_status === 'Early Departure'
+
+    const outTimePassed = isPast || (isToday && hasOfficeOutTimePassed(date, settings))
+
+    const isMissingOut = !isWfh && !isLeave && hasInTime && !hasOutTime && outTimePassed
+    const isMissingIn = !isWfh && !isLeave && !hasInTime && hasOutTime
+
+    const isExplicitAbsent =
+      rec.arrival_status === 'Absent' ||
+      rec.departure_status === 'Absent' ||
+      (!hasInTime && !hasOutTime && !isLeave && !isWfh)
+
+    if (isLeave) {
+      const leaveLabel =
+        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].find(
+          (l) => l === rec.departure_status || l === rec.arrival_status
+        ) || rec.departure_status || 'Casual Leave'
+      return {
+        isSunday: false,
+        isGazettedHoliday: false,
+        isLeave: true,
+        isAbsent: false,
+        isLate: false,
+        isEarlyLeave: false,
+        isMissingIn: false,
+        isMissingOut: false,
+        isWfh: false,
+        isPresent: false,
+        statusLabel: leaveLabel,
+      }
+    }
+
+    if (isExplicitAbsent) {
+      if (isFuture) {
+        return {
+          isSunday: false,
+          isGazettedHoliday: false,
+          isLeave: false,
+          isAbsent: false,
+          isLate: false,
+          isEarlyLeave: false,
+          isMissingIn: false,
+          isMissingOut: false,
+          isWfh: false,
+          isPresent: false,
+          statusLabel: '',
+        }
+      }
+      return {
+        isSunday: false,
+        isGazettedHoliday: false,
+        isLeave: false,
+        isAbsent: true,
+        isLate: false,
+        isEarlyLeave: false,
+        isMissingIn: false,
+        isMissingOut: false,
+        isWfh: false,
+        isPresent: false,
+        statusLabel: 'Absent',
+      }
+    }
+
+    let statusLabel = ''
+    if (isMissingIn) statusLabel = 'Missing In'
+    else if (isMissingOut) statusLabel = 'Missing Out'
+    else if (isLate) statusLabel = 'Late Arrival'
+    else if (isEarlyLeave) statusLabel = 'Early Departure'
+    else if (isWfh) statusLabel = 'Work From Home'
+
+    return {
+      isSunday: false,
+      isGazettedHoliday: false,
+      isLeave: false,
+      isAbsent: false,
+      isLate,
+      isEarlyLeave,
+      isMissingIn,
+      isMissingOut,
+      isWfh,
+      isPresent: true,
+      statusLabel,
+    }
+  }
+
+  // No record in database
+  if (isPast) {
+    return {
+      isSunday: false,
+      isGazettedHoliday: false,
+      isLeave: false,
+      isAbsent: true,
+      isLate: false,
+      isEarlyLeave: false,
+      isMissingIn: false,
+      isMissingOut: false,
+      isWfh: false,
+      isPresent: false,
+      statusLabel: 'Absent',
+    }
+  }
+
+  if (isToday) {
+    if (hasOfficeInTimePassed(date, settings)) {
+      return {
+        isSunday: false,
+        isGazettedHoliday: false,
+        isLeave: false,
+        isAbsent: true,
+        isLate: false,
+        isEarlyLeave: false,
+        isMissingIn: false,
+        isMissingOut: false,
+        isWfh: false,
+        isPresent: false,
+        statusLabel: 'Absent',
+      }
+    }
+  }
+
+  return {
+    isSunday: false,
+    isGazettedHoliday: false,
+    isLeave: false,
+    isAbsent: false,
+    isLate: false,
+    isEarlyLeave: false,
+    isMissingIn: false,
+    isMissingOut: false,
+    isWfh: false,
+    isPresent: false,
+    statusLabel: '',
+  }
+}
+
 export default function AttendanceRecordsPage() {
   const [records, setRecords] = useState<AttendanceRecordWithEmployee[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -113,6 +374,17 @@ export default function AttendanceRecordsPage() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all')
   const [arrivalStatus, setArrivalStatus] = useState<string>('all')
   const [departureStatus, setDepartureStatus] = useState<string>('all')
+
+  // Checkbox Filters State (Absent, Missing In, Missing Out)
+  const [statusFilters, setStatusFilters] = useState<{
+    absent: boolean
+    missingIn: boolean
+    missingOut: boolean
+  }>({
+    absent: false,
+    missingIn: false,
+    missingOut: false,
+  })
 
   // Pagination / Entries limit
   const [pageSize, setPageSize] = useState<number | 'all'>('all')
@@ -368,15 +640,74 @@ export default function AttendanceRecordsPage() {
     return getDatesInRange(startDate, endDate)
   }, [startDate, endDate])
 
-  // Filter Employees based on Search, Designation, Branch, and presence of at least 1 attendance/leave record in range
+  // Fast Lookup Map: (employeeId_date) -> AttendanceRecordWithEmployee
+  const recordMatrixMap = useMemo(() => {
+    const map = new Map<string, AttendanceRecordWithEmployee>()
+    records.forEach((rec) => {
+      if (rec.employee?.id) {
+        map.set(`${rec.employee.id}_${rec.attendance_date}`, rec)
+      }
+      if (rec.employee?.employee_id) {
+        map.set(`${rec.employee.employee_id}_${rec.attendance_date}`, rec)
+      }
+      if (rec.employee_id) {
+        map.set(`${rec.employee_id}_${rec.attendance_date}`, rec)
+      }
+    })
+    return map
+  }, [records])
+
+  // Calculate status counts across entire active range for filter badges & employee map
+  const statusFilterCounts = useMemo(() => {
+    let totalAbsent = 0
+    let totalMissingIn = 0
+    let totalMissingOut = 0
+
+    const empHasMap = new Map<string, { hasAbsent: boolean; hasMissingIn: boolean; hasMissingOut: boolean }>()
+
+    employees.forEach((emp) => {
+      let hasAbsent = false
+      let hasMissingIn = false
+      let hasMissingOut = false
+
+      dateColumns.forEach((date) => {
+        const flags = getRecordStatusFlags(emp, date, recordMatrixMap, holidays, settings)
+        if (flags.isAbsent) {
+          hasAbsent = true
+          totalAbsent++
+        }
+        if (flags.isMissingIn) {
+          hasMissingIn = true
+          totalMissingIn++
+        }
+        if (flags.isMissingOut) {
+          hasMissingOut = true
+          totalMissingOut++
+        }
+      })
+
+      empHasMap.set(emp.id, { hasAbsent, hasMissingIn, hasMissingOut })
+      empHasMap.set(emp.employee_id, { hasAbsent, hasMissingIn, hasMissingOut })
+    })
+
+    return {
+      totalAbsent,
+      totalMissingIn,
+      totalMissingOut,
+      empHasMap,
+    }
+  }, [employees, dateColumns, recordMatrixMap, holidays, settings])
+
+  // Filter Employees based on Search, Designation, Branch, Status Checkboxes, and presence of records in range
   const filteredEmployees = useMemo(() => {
-    // Collect all employee IDs/keys that have at least 1 uploaded/saved attendance, leave, or WFH record
     const recordedEmployeeIds = new Set<string>()
     records.forEach((rec) => {
       if (rec.employee_id) recordedEmployeeIds.add(rec.employee_id)
       if (rec.employee?.id) recordedEmployeeIds.add(rec.employee.id)
       if (rec.employee?.employee_id) recordedEmployeeIds.add(rec.employee.employee_id)
     })
+
+    const isAnyStatusFilterActive = statusFilters.absent || statusFilters.missingIn || statusFilters.missingOut
 
     let list = employees.filter((emp) => {
       // Must have at least 1 attendance / leave / WFH record in the active date range
@@ -408,6 +739,21 @@ export default function AttendanceRecordsPage() {
         const branchMatch = emp.branch?.toLowerCase().includes(q)
         if (!nameMatch && !idMatch && !desigMatch && !branchMatch) return false
       }
+
+      // Status Checkbox filters (Absent, Missing In, Missing Out)
+      if (isAnyStatusFilterActive) {
+        const empStatus = statusFilterCounts.empHasMap.get(emp.id) || statusFilterCounts.empHasMap.get(emp.employee_id)
+        if (!empStatus) return false
+
+        const matchAbsent = statusFilters.absent && empStatus.hasAbsent
+        const matchMissingIn = statusFilters.missingIn && empStatus.hasMissingIn
+        const matchMissingOut = statusFilters.missingOut && empStatus.hasMissingOut
+
+        if (!matchAbsent && !matchMissingIn && !matchMissingOut) {
+          return false
+        }
+      }
+
       return true
     })
 
@@ -416,24 +762,7 @@ export default function AttendanceRecordsPage() {
     }
 
     return list
-  }, [employees, records, selectedDesignation, selectedBranch, selectedEmployeeId, search, pageSize])
-
-  // Fast Lookup Map: (employeeId_date) -> AttendanceRecordWithEmployee
-  const recordMatrixMap = useMemo(() => {
-    const map = new Map<string, AttendanceRecordWithEmployee>()
-    records.forEach((rec) => {
-      if (rec.employee?.id) {
-        map.set(`${rec.employee.id}_${rec.attendance_date}`, rec)
-      }
-      if (rec.employee?.employee_id) {
-        map.set(`${rec.employee.employee_id}_${rec.attendance_date}`, rec)
-      }
-      if (rec.employee_id) {
-        map.set(`${rec.employee_id}_${rec.attendance_date}`, rec)
-      }
-    })
-    return map
-  }, [records])
+  }, [employees, records, selectedDesignation, selectedBranch, selectedEmployeeId, search, pageSize, statusFilters, statusFilterCounts])
 
   // Dynamically calculate KPI summary stats across grid matrix
   const kpiStats = useMemo(() => {
@@ -503,86 +832,287 @@ export default function AttendanceRecordsPage() {
     }
   }, [filteredEmployees, dateColumns, recordMatrixMap, settings, holidays])
 
-  // Export to Excel Matrix
-  const handleExportExcel = () => {
+  // Export to Excel (Styled exactly as 2nd Attachment with Designation & Branch columns, Peach Headers, and Color Rules)
+  const handleExportExcel = async () => {
     if (filteredEmployees.length === 0) {
       alert('No employee records available to export.')
       return
     }
 
-    const rows = filteredEmployees.map((emp) => {
-      const rowData: Record<string, any> = {
-        'Batch ID': emp.employee_id,
-        'Employee Name': emp.name,
-        Designation: emp.designation || '--',
-        Branch: emp.branch || 'Multan',
+    try {
+      const ExcelJS = (await import('exceljs')).default
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('Attendance Sheet')
+
+      // Set column widths
+      worksheet.columns = [
+        { key: 'date', width: 14 },
+        { key: 'day', width: 14 },
+        { key: 'employee', width: 24 },
+        { key: 'designation', width: 28 },
+        { key: 'branch', width: 14 },
+        { key: 'attendance', width: 14 },
+        { key: 'timeIn', width: 14 },
+        { key: 'timeOut', width: 14 },
+        { key: 'workedHours', width: 14 },
+        { key: 'status', width: 20 },
+      ]
+
+      const thinBorder: Partial<ExcelJS.Borders> = {
+        top: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+        left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+        bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+        right: { style: 'thin', color: { argb: 'FFBFBFBF' } },
       }
+
+      // Row 1: Merged Title "Attendance Sheet"
+      worksheet.mergeCells('A1:J1')
+      const titleCell = worksheet.getCell('A1')
+      titleCell.value = 'Attendance Sheet'
+      titleCell.font = { name: 'Calibri', size: 14, bold: true, italic: true }
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle' }
+      worksheet.getRow(1).height = 25
+
+      // Row 2: Merged Branch in Center (A2:I2) and Month-Year on Right (J2)
+      worksheet.mergeCells('A2:I2')
+      const branchCell = worksheet.getCell('A2')
+      branchCell.value = selectedBranch !== 'all' ? selectedBranch : 'Multan'
+      branchCell.font = { name: 'Calibri', size: 12, bold: true, italic: true }
+      branchCell.alignment = { horizontal: 'center', vertical: 'middle' }
+
+      const monthCell = worksheet.getCell('J2')
+      const sDateObj = new Date(startDate + 'T00:00:00')
+      const monthStr = !isNaN(sDateObj.getTime())
+        ? sDateObj.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }).replace(' ', '-')
+        : ''
+      monthCell.value = monthStr
+      monthCell.font = { name: 'Calibri', size: 11, bold: true }
+      monthCell.alignment = { horizontal: 'center', vertical: 'middle' }
+      worksheet.getRow(2).height = 20
+
+      // Row 3: Headers with Peach Background (#FCE4D6)
+      const headerRow = worksheet.getRow(3)
+      headerRow.values = [
+        'Date',
+        'Day',
+        'Employee',
+        'Designation',
+        'Branch',
+        'Attendance',
+        'Time In',
+        'Time Out',
+        'Worked Hours',
+        'Status',
+      ]
+      headerRow.height = 23
+      headerRow.eachCell((cell) => {
+        cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF000000' } }
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFCE4D6' }, // Peach background
+        }
+        cell.alignment = { horizontal: 'center', vertical: 'middle' }
+        cell.border = thinBorder
+      })
+
+      // Ensure border on Row 1 and Row 2 cells
+      const topCells = ['A1', 'B1', 'C1', 'D1', 'E1', 'F1', 'G1', 'H1', 'I1', 'J1', 'A2', 'B2', 'C2', 'D2', 'E2', 'F2', 'G2', 'H2', 'I2', 'J2']
+      topCells.forEach((addr) => {
+        worksheet.getCell(addr).border = thinBorder
+      })
+
+      // User requested colors:
+      // - Absent: Red (#FFC7CE fill, #9C0006 font)
+      // - Late Arrival & Early Departure: Yellow (#FFFF00 fill / #FFF200)
+      // - Missing In & Missing Out: Green (#C6EFCE fill, #006100 font)
+      // - Work From Home: Sky Blue (#BDD7EE fill, #1F4E78 font)
+      // - Sunday / Off: Blue bold text (#002060)
+
+      const yellowFill: ExcelJS.Fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFFF00' }, // Bright Yellow
+      }
+
+      const redFill: ExcelJS.Fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFC7CE' }, // Soft Red fill
+      }
+
+      const greenFill: ExcelJS.Fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFC6EFCE' }, // Soft Green fill
+      }
+
+      const skyBlueFill: ExcelJS.Fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFBDD7EE' }, // Sky Blue fill
+      }
+
+      let rowIndex = 4
 
       dateColumns.forEach((date) => {
         const dayName = getDayName(date)
+        const isSunday = dayName === 'Sunday'
         const isGazettedHoliday = Boolean(holidays[date]) && getPresentEmployeesCountOnDate(date) === 0
-        const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
-        const colHeader = `${date} (${dayName})`
+        const [y, m, d] = date.split('-')
+        const formattedDate = `${d}/${m}/${y}` // DD/MM/YYYY
 
-        // 1. Sunday is official weekly holiday
-        if (dayName === 'Sunday') {
-          rowData[colHeader] = 'Holiday'
-          return
-        }
+        filteredEmployees.forEach((emp) => {
+          const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
+          const flags = getRecordStatusFlags(emp, date, recordMatrixMap, holidays, settings)
 
-        // 2. Gazetted Holiday (when all employees have no office punches on this holiday)
-        if (isGazettedHoliday) {
-          rowData[colHeader] = `Gazetted Holiday (${holidays[date] || 'Gazetted Holiday'})`
-          return
-        }
+          const row = worksheet.getRow(rowIndex)
+          row.height = 20
 
-        // 3. Check individual employee attendance record if present
-        if (rec) {
-          const isWfh = Boolean(
-            rec.notes?.includes('Work From Home') ||
-            rec.arrival_status === 'Work From Home' ||
-            rec.departure_status === 'Work From Home'
-          )
+          let attendanceVal = 'Present'
+          let timeInVal = ''
+          let timeOutVal = ''
+          let workedHoursVal = '0:00'
+          let statusVal = ''
 
-          const isLeave =
-            rec.arrival_status === 'Leave' ||
-            rec.departure_status?.includes('Leave') ||
-            ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.departure_status as any) ||
-            ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.arrival_status as any)
-
-          const isAbsent =
-            rec.arrival_status === 'Absent' ||
-            rec.departure_status === 'Absent' ||
-            (!rec.in_time && !rec.out_time && !isLeave && !isWfh)
-
-          if (isWfh) {
-            rowData[colHeader] = `${rec.in_time || '10:30 AM'} - ${rec.out_time || '06:30 PM'} [${rec.total_working_hours_formatted || '08:00'}] (WFH)`
-          } else if (isLeave) {
-            const leaveLabel =
-              ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave'].find(
-                (l) => l === rec.departure_status || l === rec.arrival_status
-              ) || rec.departure_status || 'Casual Leave'
-
-            const match = rec.notes?.match(/\(([0-9]+(?:\.[0-9]+)?)\s*day/i) || rec.notes?.match(/([0-9]+(?:\.[0-9]+)?)\s*day/i)
-            const daysSuffix = match && match[1] !== '1' ? ` (${match[1]}d)` : ''
-            rowData[colHeader] = `Leave (${leaveLabel}${daysSuffix})`
-          } else if (isAbsent) {
-            rowData[colHeader] = 'Absent'
+          if (isSunday) {
+            attendanceVal = 'Sunday'
+            timeInVal = 'Sunday'
+            timeOutVal = 'Sunday'
+            workedHoursVal = '0:00'
+            statusVal = ''
+          } else if (isGazettedHoliday) {
+            attendanceVal = 'Holiday'
+            timeInVal = 'Holiday'
+            timeOutVal = 'Holiday'
+            workedHoursVal = '0:00'
+            statusVal = holidays[date] || 'Gazetted Holiday'
+          } else if (flags.isLeave) {
+            attendanceVal = 'Leave'
+            timeInVal = 'Leave'
+            timeOutVal = 'Leave'
+            workedHoursVal = '0:00'
+            statusVal = flags.statusLabel || 'Leave'
+          } else if (flags.isAbsent) {
+            attendanceVal = 'Absent'
+            timeInVal = 'Absent'
+            timeOutVal = 'Absent'
+            workedHoursVal = '0:00'
+            statusVal = 'Absent'
           } else {
-            rowData[colHeader] = `${rec.in_time || '--'} - ${rec.out_time || '--'} [${rec.total_working_hours_formatted || ''}]`
+            // Present / WFH
+            attendanceVal = flags.isWfh ? 'Present' : 'Present'
+            timeInVal = formatExcelTime(rec?.in_time)
+            timeOutVal = formatExcelTime(rec?.out_time)
+            workedHoursVal = formatExcelWorkedHours(rec?.total_working_minutes, rec?.total_working_hours_formatted)
+            statusVal = flags.statusLabel
           }
-        } else {
-          rowData[colHeader] = 'Absent'
-        }
+
+          row.values = [
+            formattedDate,
+            dayName,
+            emp.name,
+            emp.designation || '--',
+            emp.branch || 'Multan',
+            attendanceVal,
+            timeInVal,
+            timeOutVal,
+            workedHoursVal,
+            statusVal,
+          ]
+
+          // Apply default styling to all data cells
+          row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF000000' } }
+            cell.alignment = {
+              horizontal: colNumber === 3 || colNumber === 4 || colNumber === 5 ? 'left' : 'center',
+              vertical: 'middle',
+            }
+            cell.border = thinBorder
+          })
+
+          const attCell = row.getCell(6)
+          const timeInCell = row.getCell(7)
+          const timeOutCell = row.getCell(8)
+          const statusCell = row.getCell(10)
+
+          // 1. Sunday / Off -> Blue bold font
+          if (isSunday || attendanceVal === 'Off') {
+            const blueFont: Partial<ExcelJS.Font> = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF002060' } }
+            attCell.font = blueFont
+            timeInCell.font = blueFont
+            timeOutCell.font = blueFont
+          }
+
+          // 2. Absent -> Red highlight
+          if (flags.isAbsent) {
+            const redFont: Partial<ExcelJS.Font> = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF9C0006' } }
+            attCell.fill = redFill
+            attCell.font = redFont
+            timeInCell.fill = redFill
+            timeInCell.font = redFont
+            timeOutCell.fill = redFill
+            timeOutCell.font = redFont
+            statusCell.fill = redFill
+            statusCell.font = redFont
+          }
+
+          // 3. Work From Home -> Sky Blue highlight
+          if (flags.isWfh) {
+            const skyBlueFont: Partial<ExcelJS.Font> = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF1F4E78' } }
+            attCell.fill = skyBlueFill
+            attCell.font = skyBlueFont
+            statusCell.fill = skyBlueFill
+            statusCell.font = skyBlueFont
+          }
+
+          // 4. Late Arrival -> Yellow on Time In & Status
+          if (flags.isLate) {
+            timeInCell.fill = yellowFill
+            statusCell.fill = yellowFill
+            statusCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF9C6500' } }
+          }
+
+          // 5. Early Departure / Half Day -> Yellow on Time Out & Red font on Status
+          if (flags.isEarlyLeave) {
+            timeOutCell.fill = yellowFill
+            statusCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFF0000' } }
+          }
+
+          // 6. Missing In -> Green highlight
+          if (flags.isMissingIn) {
+            timeInCell.fill = greenFill
+            statusCell.fill = greenFill
+            statusCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF006100' } }
+          }
+
+          // 7. Missing Out -> Green highlight
+          if (flags.isMissingOut) {
+            timeOutCell.fill = greenFill
+            statusCell.fill = greenFill
+            statusCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF006100' } }
+          }
+
+          rowIndex++
+        })
       })
 
-      return rowData
-    })
-
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Attendance_Matrix')
-    XLSX.writeFile(wb, `attendance_matrix_${startDate}_to_${endDate}.xlsx`)
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Attendance_Sheet_${startDate}_to_${endDate}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error exporting Excel:', err)
+      alert('Failed to generate Excel sheet. Please try again.')
+    }
   }
 
   // Handle Blank Cell Click (Allows adding attendance or marking leave)
@@ -608,43 +1138,6 @@ export default function AttendanceRecordsPage() {
       employee: emp,
     } as any)
   }
-
-// Helper to check if office arrival cutoff has passed
-function hasOfficeInTimePassed(dateStr: string, settings?: AttendanceSettings): boolean {
-  const now = new Date()
-  const today = formatDate(now)
-  if (dateStr < today) return true
-  if (dateStr > today) return false
-
-  const dayOfWeek = now.getDay() // 0 = Sunday, 6 = Saturday
-  const isSaturday = dayOfWeek === 6
-  const inTimeStr = isSaturday ? (settings?.saturday_in_time || '11:00') : (settings?.weekday_in_time || '10:30')
-  const grace = isSaturday ? (settings?.saturday_grace_minutes ?? 15) : (settings?.weekday_grace_minutes ?? 15)
-
-  const [h, m] = inTimeStr.split(':').map(Number)
-  const cutoffMinutes = (h || 10) * 60 + (m || 30) + grace
-
-  const currentMinutes = now.getHours() * 60 + now.getMinutes()
-  return currentMinutes >= cutoffMinutes
-}
-
-// Helper to check if office departure cutoff has passed
-function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings): boolean {
-  const now = new Date()
-  const today = formatDate(now)
-  if (dateStr < today) return true
-  if (dateStr > today) return false
-
-  const dayOfWeek = now.getDay()
-  const isSaturday = dayOfWeek === 6
-  const outTimeStr = isSaturday ? (settings?.saturday_out_time || '15:00') : (settings?.weekday_out_time || '18:30')
-
-  const [h, m] = outTimeStr.split(':').map(Number)
-  const cutoffMinutes = (h || 18) * 60 + (m || 30)
-
-  const currentMinutes = now.getHours() * 60 + now.getMinutes()
-  return currentMinutes >= cutoffMinutes
-}
 
   // Render Status Badge / Content inside each Grid Cell
   const renderCellContent = (emp: Employee, date: string) => {
@@ -757,12 +1250,13 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
       )
       const isLate = rec.arrival_status === 'Late Arrival'
       const isEarlyLeave = rec.departure_status === 'Early Departure'
-      const hasInTime = Boolean(rec.in_time && rec.in_time !== '---')
-      const hasOutTime = Boolean(rec.out_time && rec.out_time !== '---')
+      const hasInTime = Boolean(rec.in_time && rec.in_time !== '---' && rec.in_time !== '--')
+      const hasOutTime = Boolean(rec.out_time && rec.out_time !== '---' && rec.out_time !== '--')
 
       // Check if departure time cutoff has passed
       const outTimePassed = isPast || (isToday && hasOfficeOutTimePassed(date, settings))
       const isMissingOut = !isWfh && hasInTime && !hasOutTime && outTimePassed
+      const isMissingIn = !isWfh && !hasInTime && hasOutTime
       const isCurrentlyInOffice = !isWfh && hasInTime && !hasOutTime && isToday && !outTimePassed
 
       return (
@@ -770,23 +1264,25 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
           onClick={() => setEditingRecord(rec)}
           className={`group/cell cursor-pointer p-1.5 rounded-md transition-all flex flex-col items-center justify-center text-center gap-0.5 border ${
             isWfh
-              ? 'bg-cyan-50/70 hover:bg-cyan-100/90 border-cyan-200/90 text-cyan-950 shadow-2xs hover:shadow-xs'
-              : isMissingOut
-              ? 'bg-amber-50/90 hover:bg-amber-100/95 border-amber-300 text-amber-950 shadow-2xs hover:shadow-xs'
+              ? 'bg-sky-50 hover:bg-sky-100 border-sky-300 text-sky-950 shadow-2xs hover:shadow-xs'
+              : isMissingOut || isMissingIn
+              ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-950 shadow-2xs hover:shadow-xs'
               : isCurrentlyInOffice
               ? 'bg-emerald-50/70 hover:bg-emerald-100 border-emerald-300 text-emerald-950'
               : isLate || isEarlyLeave
-              ? 'bg-amber-50/70 hover:bg-amber-100/90 border-amber-200/80 text-amber-900'
+              ? 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-950 shadow-2xs hover:shadow-xs'
               : 'bg-emerald-50/50 hover:bg-emerald-100/80 border-emerald-200/70 text-slate-800'
           }`}
           title={isWfh ? 'Work From Home (Full Present). Click to edit.' : isCurrentlyInOffice ? 'Currently active in office' : 'Click to edit timings or enter missing Out Time'}
         >
           {/* In Time - Out Time */}
           <div className="font-mono text-[11px] font-semibold tracking-tight whitespace-nowrap flex items-center justify-center gap-1">
-            <span>{rec.in_time || '---'}</span>
+            <span className={isMissingIn ? 'text-emerald-800 font-bold bg-emerald-200/80 px-1 rounded' : ''}>
+              {hasInTime ? rec.in_time : isMissingIn ? 'Missing In' : '---'}
+            </span>
             <span className="text-slate-400">-</span>
-            <span className={isMissingOut ? 'text-amber-700 font-bold bg-amber-200/60 px-1 rounded' : isCurrentlyInOffice ? 'text-emerald-700 font-semibold' : ''}>
-              {hasOutTime ? rec.out_time : isCurrentlyInOffice ? 'In Office' : '---'}
+            <span className={isMissingOut ? 'text-emerald-800 font-bold bg-emerald-200/80 px-1 rounded' : isCurrentlyInOffice ? 'text-emerald-700 font-semibold' : ''}>
+              {hasOutTime ? rec.out_time : isCurrentlyInOffice ? 'In Office' : isMissingOut ? 'Missing Out' : '---'}
             </span>
           </div>
 
@@ -795,31 +1291,36 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
             <span
               className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] ${
                 isWfh
-                  ? 'bg-cyan-600 text-white'
-                  : isMissingOut
-                  ? 'bg-amber-500 text-white'
+                  ? 'bg-sky-600 text-white'
+                  : isMissingOut || isMissingIn
+                  ? 'bg-emerald-600 text-white'
                   : isCurrentlyInOffice
                   ? 'bg-emerald-500 text-white animate-pulse'
-                  : isLate
+                  : isLate || isEarlyLeave
                   ? 'bg-amber-500 text-white'
                   : 'bg-emerald-600 text-white'
               }`}
             >
               {isWfh ? '🏠' : '⏱'}
             </span>
-            <span className={`font-bold ${isMissingOut ? 'text-amber-700' : isWfh ? 'text-cyan-900' : 'text-slate-700'}`}>
+            <span className={`font-bold ${isMissingOut || isMissingIn ? 'text-emerald-800' : isWfh ? 'text-sky-900' : isLate || isEarlyLeave ? 'text-amber-800' : 'text-slate-700'}`}>
               ({rec.total_working_hours_formatted && rec.total_working_hours_formatted !== '00:00' ? rec.total_working_hours_formatted : isCurrentlyInOffice ? 'Working' : '--'})
             </span>
           </div>
 
-          {/* Missing Out Alert or Status Pill */}
+          {/* Missing In / Out / Status Pill */}
           {isMissingOut ? (
-            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300 flex items-center gap-0.5 mt-0.5 group-hover/cell:bg-amber-300 transition-colors">
+            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-0.5 mt-0.5 group-hover/cell:bg-emerald-200 transition-colors">
               <span>Missing Out</span>
               <Edit2 className="w-2.5 h-2.5 inline" />
             </span>
+          ) : isMissingIn ? (
+            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-0.5 mt-0.5 group-hover/cell:bg-emerald-200 transition-colors">
+              <span>Missing In</span>
+              <Edit2 className="w-2.5 h-2.5 inline" />
+            </span>
           ) : isWfh ? (
-            <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-cyan-100 text-cyan-800 border border-cyan-300">
+            <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-sky-100 text-sky-900 border border-sky-300">
               WFH
             </span>
           ) : isCurrentlyInOffice ? (
@@ -827,7 +1328,7 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
               Active Now
             </span>
           ) : (isLate || isEarlyLeave) ? (
-            <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-200/90 text-amber-800">
+            <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-200/90 text-amber-900 border border-amber-300">
               {isLate ? 'Late' : 'Early Out'}
             </span>
           ) : null}
@@ -931,8 +1432,8 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
         </div>
       </div>
 
-      {/* Top Unified Filter Bar with DateRangePicker */}
-      <Card className="p-3.5 shadow-xs border-slate-200/90">
+      {/* Top Unified Filter Bar with DateRangePicker and Status Checkbox Filters */}
+      <Card className="p-4 shadow-xs border-slate-200/90 space-y-3.5 bg-white">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-3 items-end">
           {/* 1. Date Range Picker (Unified Start & End) */}
           <div className="lg:col-span-4 space-y-1">
@@ -1044,6 +1545,128 @@ function hasOfficeOutTimePassed(dateStr: string, settings?: AttendanceSettings):
               )}
             </div>
           </div>
+        </div>
+
+        {/* Responsive Quick Status Checkbox Filter Bar (Marked in Attachment 3) */}
+        <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 mr-1">
+              <Filter className="w-3.5 h-3.5 text-[#009D9E]" />
+              Status Filter:
+            </span>
+
+            {/* Checkbox 1: Absent */}
+            <label
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-all select-none ${
+                statusFilters.absent
+                  ? 'bg-rose-50 border-rose-400 text-rose-800 shadow-2xs ring-1 ring-rose-300'
+                  : 'bg-slate-50/70 hover:bg-slate-100 border-slate-200 text-slate-700'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={statusFilters.absent}
+                onChange={(e) =>
+                  setStatusFilters((prev) => ({ ...prev, absent: e.target.checked }))
+                }
+                className="w-3.5 h-3.5 rounded text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer accent-rose-600"
+              />
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-600"></span>
+                <span>Absent</span>
+              </span>
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                  statusFilters.absent
+                    ? 'bg-rose-200 text-rose-900'
+                    : 'bg-slate-200/80 text-slate-600'
+                }`}
+              >
+                {statusFilterCounts.totalAbsent}
+              </span>
+            </label>
+
+            {/* Checkbox 2: Missing In */}
+            <label
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-all select-none ${
+                statusFilters.missingIn
+                  ? 'bg-emerald-50 border-emerald-400 text-emerald-800 shadow-2xs ring-1 ring-emerald-300'
+                  : 'bg-slate-50/70 hover:bg-slate-100 border-slate-200 text-slate-700'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={statusFilters.missingIn}
+                onChange={(e) =>
+                  setStatusFilters((prev) => ({ ...prev, missingIn: e.target.checked }))
+                }
+                className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer accent-emerald-600"
+              />
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                <span>Missing In</span>
+              </span>
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                  statusFilters.missingIn
+                    ? 'bg-emerald-200 text-emerald-900'
+                    : 'bg-slate-200/80 text-slate-600'
+                }`}
+              >
+                {statusFilterCounts.totalMissingIn}
+              </span>
+            </label>
+
+            {/* Checkbox 3: Missing Out */}
+            <label
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-all select-none ${
+                statusFilters.missingOut
+                  ? 'bg-emerald-50 border-emerald-400 text-emerald-800 shadow-2xs ring-1 ring-emerald-300'
+                  : 'bg-slate-50/70 hover:bg-slate-100 border-slate-200 text-slate-700'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={statusFilters.missingOut}
+                onChange={(e) =>
+                  setStatusFilters((prev) => ({ ...prev, missingOut: e.target.checked }))
+                }
+                className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer accent-emerald-600"
+              />
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                <span>Missing Out</span>
+              </span>
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                  statusFilters.missingOut
+                    ? 'bg-emerald-200 text-emerald-900'
+                    : 'bg-slate-200/80 text-slate-600'
+                }`}
+              >
+                {statusFilterCounts.totalMissingOut}
+              </span>
+            </label>
+          </div>
+
+          {/* Reset Filters / Active indicator */}
+          {(statusFilters.absent || statusFilters.missingIn || statusFilters.missingOut) && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium text-slate-500">
+                Filtered: <strong className="text-slate-800">{filteredEmployees.length}</strong> employee(s)
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setStatusFilters({ absent: false, missingIn: false, missingOut: false })
+                }
+                className="text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-md border border-rose-200 flex items-center gap-1 transition-colors"
+              >
+                <X className="w-3 h-3" />
+                Reset Filters
+              </button>
+            </div>
+          )}
         </div>
       </Card>
 
