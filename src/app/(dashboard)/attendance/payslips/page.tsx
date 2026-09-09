@@ -933,7 +933,7 @@ export default function PayslipsPage() {
                   <img
                     src="/edlink-logo.png"
                     alt="EdLink"
-                    className="h-12 w-auto object-contain mx-auto mb-2"
+                    className="h-16 w-auto object-contain mx-auto mb-3"
                   />
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-[#007A78] tracking-tight uppercase">
                     EMPLOYEE PAYSLIP
@@ -1055,7 +1055,7 @@ export default function PayslipsPage() {
                     </div>
                     <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
                       <span>
-                        Others Deduction{currentPayslipData.othersDeductionNote && currentPayslipData.othersDeductionNote !== 'Other Deduction' ? ` (${currentPayslipData.othersDeductionNote})` : ''}
+                        Others Deduction{currentPayslipData.othersDeductionNote && !['other deduction', 'others deduction', ''].includes(currentPayslipData.othersDeductionNote.toLowerCase().trim()) ? ` (${currentPayslipData.othersDeductionNote})` : ''}
                       </span>
                       <span className="font-mono">
                         PKR {Math.round(currentPayslipData.othersDeduction || 0).toLocaleString('en-US')}

@@ -25,89 +25,91 @@ Font.register({
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 30,
-    paddingBottom: 30,
-    paddingHorizontal: 38,
-    fontSize: 9.5,
+    paddingTop: 32,
+    paddingBottom: 32,
+    paddingHorizontal: 40,
+    fontSize: 10.5,
     fontFamily: 'Geist',
     color: '#1e293b',
     backgroundColor: '#ffffff',
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: 14,
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   logo: {
-    width: 130,
-    height: 48,
+    width: 210,
+    height: 72,
     objectFit: 'contain',
+    alignSelf: 'center',
     marginBottom: 8,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: 'Geist',
     fontWeight: 'bold',
     color: '#007A78',
     textAlign: 'center',
-    letterSpacing: 1.5,
+    letterSpacing: 2,
     textTransform: 'uppercase',
   },
   metaGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    marginBottom: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#cbd5e1',
   },
   metaCol: {
     width: '48%',
   },
   metaRow: {
     flexDirection: 'row',
-    marginBottom: 5,
+    marginBottom: 6,
   },
   metaLabel: {
-    width: 95,
+    width: 110,
     fontFamily: 'Geist',
     fontWeight: 'bold',
     color: '#003D5C',
-    fontSize: 9.5,
+    fontSize: 10.5,
   },
   metaColon: {
-    width: 10,
+    width: 12,
     fontFamily: 'Geist',
     fontWeight: 'bold',
     color: '#003D5C',
-    fontSize: 9.5,
+    fontSize: 10.5,
   },
   metaValue: {
     flex: 1,
     color: '#0f172a',
-    fontSize: 9.5,
+    fontSize: 10.5,
   },
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontFamily: 'Geist',
     fontWeight: 'bold',
     color: '#007A78',
     textTransform: 'uppercase',
-    marginBottom: 4,
-    marginTop: 8,
-    letterSpacing: 0.5,
+    marginBottom: 5,
+    marginTop: 12,
+    letterSpacing: 0.8,
   },
   table: {
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 3,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   tableRowEven: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#efefef',
-    paddingVertical: 5.5,
-    paddingHorizontal: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -115,8 +117,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#ffffff',
-    paddingVertical: 5.5,
-    paddingHorizontal: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -124,58 +126,60 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#e5e5e5',
-    paddingVertical: 6.5,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
   rowLabel: {
-    fontSize: 9,
+    fontSize: 10.5,
     color: '#1e293b',
   },
   rowLabelBold: {
-    fontSize: 9,
+    fontSize: 10.5,
     fontFamily: 'Geist',
     fontWeight: 'bold',
     color: '#0f172a',
   },
   rowValue: {
-    fontSize: 9,
+    fontSize: 10.5,
     color: '#1e293b',
   },
   rowValueBold: {
-    fontSize: 9,
+    fontSize: 10.5,
     fontFamily: 'Geist',
     fontWeight: 'bold',
     color: '#0f172a',
   },
   amountInWordsRow: {
     flexDirection: 'row',
-    marginTop: 14,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 3,
+    borderColor: '#cbd5e1',
+    borderRadius: 4,
   },
   amountInWordsLabel: {
-    width: 105,
+    width: 125,
     fontFamily: 'Geist',
     fontWeight: 'bold',
-    fontSize: 9,
+    fontSize: 10.5,
     color: '#0f172a',
   },
   amountInWordsValue: {
     flex: 1,
-    fontSize: 9,
+    fontSize: 10.5,
     color: '#334155',
   },
   disclaimer: {
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: 'Geist',
     color: '#64748b',
     textAlign: 'center',
     lineHeight: 1.4,
-    marginTop: 12,
+    marginTop: 16,
   },
 })
 
@@ -225,10 +229,17 @@ export default function PayslipPDFTemplate({
       ? `${window.location.origin}/edlink-logo.png`
       : '/edlink-logo.png')
 
+  const customNote = payslipData.othersDeductionNote?.trim()
+  const hasCustomNote =
+    customNote &&
+    !['other deduction', 'others deduction', 'other', 'others', ''].includes(
+      customNote.toLowerCase()
+    )
+
   return (
     <Document title={`Payslip_${safeEmpName}`}>
       <Page size="A4" style={styles.page}>
-        {/* 1. Header with Logo & Title */}
+        {/* 1. Header with Logo & Title (Centered and Enlarged) */}
         <View style={styles.headerContainer}>
           <Image src={resolvedLogo} style={styles.logo} />
           <Text style={styles.headerTitle}>EMPLOYEE PAYSLIP</Text>
@@ -336,7 +347,7 @@ export default function PayslipPDFTemplate({
           </View>
           <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabel}>
-              Others Deduction{payslipData.othersDeductionNote && payslipData.othersDeductionNote !== 'Other Deduction' ? ` (${payslipData.othersDeductionNote})` : ''}
+              Others Deduction{hasCustomNote ? ` (${customNote})` : ''}
             </Text>
             <Text style={styles.rowValue}>
               PKR {Math.round(payslipData.othersDeduction || 0).toLocaleString('en-US')}
