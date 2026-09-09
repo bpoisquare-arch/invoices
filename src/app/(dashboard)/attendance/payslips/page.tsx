@@ -276,6 +276,7 @@ export default function PayslipsPage() {
         clDays: number
         slDays: number
         wfhDays: number
+        probationDays: number
         unpaidDays: number
       }
     > = {}
@@ -322,6 +323,7 @@ export default function PayslipsPage() {
       let clDays = 0
       let slDays = 0
       let wfhDays = 0
+      let probationDays = 0
       let unpaidDays = 0
 
       for (let day = 1; day <= daysInMonth; day++) {
@@ -413,11 +415,13 @@ export default function PayslipsPage() {
         if (isWfh) {
           wfhDays += leaveVal
           presentDays += leaveVal
+        } else if (isProbationLeave) {
+          probationDays += leaveVal
         } else if (isAnnualLeave) {
           alDays += leaveVal
         } else if (isCasualLeave) {
           clDays += leaveVal
-        } else if (isSickLeave || isProbationLeave) {
+        } else if (isSickLeave) {
           slDays += leaveVal
         } else if (isGenericLeave) {
           alDays += leaveVal
@@ -425,15 +429,18 @@ export default function PayslipsPage() {
           presentDays += 1
         } else if (isExplicitHoliday) {
           // Paid Sunday or Paid Gazetted Holiday (not absent)
-        } else if (isFuture || isBeforeJoining || arrStatus === '--' || depStatus === '--') {
-          // Future day or before joining date (not absent)
+        } else if (isBeforeJoining) {
+          // Pre-joining unworked day (unpaid for salary calculation)
+          unpaidDays += 1
+        } else if (isFuture || arrStatus === '--' || depStatus === '--') {
+          // Future day or neutral placeholder
         } else {
           // Past normal working day with no punch/leave/wfh -> Absent (Unpaid day)
           unpaidDays += 1
         }
       }
 
-      const statsObj = { presentDays, alDays, clDays, slDays, wfhDays, unpaidDays }
+      const statsObj = { presentDays, alDays, clDays, slDays, wfhDays, probationDays, unpaidDays }
       if (emp.id) map[emp.id] = statsObj
       if (emp.employee_id) map[emp.employee_id] = statsObj
       if (emp.id) map[emp.id.toLowerCase()] = statsObj
@@ -487,8 +494,22 @@ export default function PayslipsPage() {
         clDays: 0,
         slDays: 0,
         wfhDays: 0,
+        probationDays: 0,
         unpaidDays: 0,
       }
+
+    const isInProbation = Boolean(
+      !emp.is_old_staff &&
+      emp.joining_date &&
+      (() => {
+        const j = new Date(emp.joining_date.split('T')[0] + 'T00:00:00')
+        const target = new Date(`${startDate}T00:00:00`)
+        if (isNaN(j.getTime()) || isNaN(target.getTime())) return false
+        const probationEnd = new Date(j)
+        probationEnd.setMonth(probationEnd.getMonth() + 3)
+        return target < probationEnd
+      })()
+    )
 
     const totalWorkingDays = daysInMonth // Monthly Total Days (calendar days e.g. 31)
     const unpaidDays = stats.unpaidDays
@@ -527,6 +548,7 @@ export default function PayslipsPage() {
       clDays: stats.clDays,
       slDays: stats.slDays,
       wfhDays: stats.wfhDays,
+      probationDays: stats.probationDays || 0,
       unpaidDays,
       totalPaidDays,
       basicPay,
@@ -540,6 +562,7 @@ export default function PayslipsPage() {
       totalDeduction,
       netPay,
       amountInWords: numberToWordsPKR(netPay),
+      isInProbation,
     }
   }
 
@@ -981,26 +1004,47 @@ export default function PayslipsPage() {
                       <span>Total Working Days</span>
                       <span className="font-mono">{currentPayslipData.totalWorkingDays.toFixed(2)}</span>
                     </div>
-                    <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
-                      <span>A/L Days</span>
-                      <span className="font-mono">{currentPayslipData.alDays}</span>
-                    </div>
-                    <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
-                      <span>C/L Days</span>
-                      <span className="font-mono">{currentPayslipData.clDays}</span>
-                    </div>
-                    <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
-                      <span>S/L Days</span>
-                      <span className="font-mono">{currentPayslipData.slDays}</span>
-                    </div>
-                    <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
-                      <span>WFH/L Days</span>
-                      <span className="font-mono">{currentPayslipData.wfhDays}</span>
-                    </div>
-                    <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
-                      <span>Unpaid Days</span>
-                      <span className="font-mono">{currentPayslipData.unpaidDays}</span>
-                    </div>
+
+                    {currentPayslipData.isInProbation ? (
+                      <>
+                        <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
+                          <span>Probation Leaves</span>
+                          <span className="font-mono">{currentPayslipData.probationDays ?? 0}</span>
+                        </div>
+                        <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
+                          <span>WFH/L Days</span>
+                          <span className="font-mono">{currentPayslipData.wfhDays}</span>
+                        </div>
+                        <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
+                          <span>Unpaid Days</span>
+                          <span className="font-mono">{currentPayslipData.unpaidDays}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
+                          <span>A/L Days</span>
+                          <span className="font-mono">{currentPayslipData.alDays}</span>
+                        </div>
+                        <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
+                          <span>C/L Days</span>
+                          <span className="font-mono">{currentPayslipData.clDays}</span>
+                        </div>
+                        <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
+                          <span>S/L Days</span>
+                          <span className="font-mono">{currentPayslipData.slDays}</span>
+                        </div>
+                        <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
+                          <span>WFH/L Days</span>
+                          <span className="font-mono">{currentPayslipData.wfhDays}</span>
+                        </div>
+                        <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
+                          <span>Unpaid Days</span>
+                          <span className="font-mono">{currentPayslipData.unpaidDays}</span>
+                        </div>
+                      </>
+                    )}
+
                     <div className="bg-[#E5E5E5] px-4 py-2.5 flex justify-between items-center text-slate-900 font-bold">
                       <span>Total Paid Days</span>
                       <span className="font-mono">{currentPayslipData.totalPaidDays.toFixed(2)}</span>

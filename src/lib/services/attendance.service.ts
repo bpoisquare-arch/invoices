@@ -953,6 +953,19 @@ export async function getAttendanceSummary(params?: {
     }
   }
 
+  let empJoiningDate: string | null = null
+  let empIsOldStaff = false
+  if (params?.employeeId) {
+    const allEmployees = await getEmployees({ isActiveOnly: false })
+    const foundEmp = allEmployees.find(
+      (e) => e.id === params.employeeId || e.employee_id === params.employeeId
+    )
+    if (foundEmp) {
+      empJoiningDate = foundEmp.joining_date ? foundEmp.joining_date.split('T')[0] : null
+      empIsOldStaff = Boolean(foundEmp.is_old_staff)
+    }
+  }
+
   // If explicit date range (startDate to endDate) is provided, iterate all calendar dates in range:
   if (params?.startDate && params?.endDate) {
     const sParts = params.startDate.split('-').map(Number)
@@ -973,10 +986,15 @@ export async function getAttendanceSummary(params?: {
         const isSaturday = dayNum === 6
         const isGazettedHoliday = Boolean(holidaysMap[dStr])
 
+        const isBeforeJoining = Boolean(!empIsOldStaff && empJoiningDate && dStr < empJoiningDate)
+
         const r = recordsByDate.get(dStr)
         const isLeave = isLeaveRecord(r)
 
-        if (isSunday || isGazettedHoliday || isLeave) {
+        if (isBeforeJoining) {
+          // Pre-joining dates have 0 required hours
+          requiredWorkingMinutes += 0
+        } else if (isSunday || isGazettedHoliday || isLeave) {
           // 0 hours for Sunday, Gazetted Holiday, and approved Leave
           requiredWorkingMinutes += 0
         } else if (isSaturday) {

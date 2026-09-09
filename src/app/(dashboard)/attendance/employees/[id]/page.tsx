@@ -298,6 +298,12 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(existing?.departure_status as any) ||
           ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(existing?.arrival_status as any)
 
+        const isBeforeJoining = Boolean(
+          !currentEmp?.is_old_staff &&
+          currentEmp?.joining_date &&
+          dStr < currentEmp.joining_date.split('T')[0]
+        )
+
         if (existing) {
           if (isGazettedHoliday && !hasPunches && !isExplicitLeaveOrWfh) {
             fullGridRows.push({
@@ -318,6 +324,23 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           } else {
             fullGridRows.push(existing)
           }
+        } else if (isBeforeJoining) {
+          fullGridRows.push({
+            id: `prejoin-${dStr}`,
+            employee_id: currentEmp?.id || employeeId,
+            attendance_date: dStr,
+            day_of_week: dayName,
+            in_time: null,
+            out_time: null,
+            arrival_status: '--',
+            departure_status: '--',
+            total_working_minutes: 0,
+            total_working_hours_formatted: '--',
+            raw_punches: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            employee: currentEmp || undefined,
+          } as any)
         } else if (isSunday || isGazettedHoliday) {
           fullGridRows.push({
             id: `holiday-${dStr}`,
@@ -650,13 +673,24 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       ? baseSalary / monthTotalDays
       : 0
 
-    // Paid Days in active range = Total days - Absent days
+    // Pre-joining unworked days in the active month (unpaid for mid-month joiners)
+    let preJoiningDays = 0
+    if (!employee?.is_old_staff && employee?.joining_date) {
+      const jStr = employee.joining_date.split('T')[0]
+      rangeList.forEach((r) => {
+        const d = r.attendance_date?.split('T')[0]
+        if (d && d < jStr) preJoiningDays++
+      })
+    }
+
+    // Paid Days in active range = Total days - (Absent days + Pre-joining days)
     const absentDays = rangeStats.absent
-    const paidDays = Math.max(0, rangeStats.totalDays - absentDays)
-    const absentDeduction = Math.round(absentDays * perDaySalary)
+    const unpaidDays = absentDays + preJoiningDays
+    const paidDays = Math.max(0, rangeStats.totalDays - unpaidDays)
+    const absentDeduction = Math.round(unpaidDays * perDaySalary)
     const totalDeductions = absentDeduction + deductionAmount
 
-    // Earned Base Salary = Base Salary - Absent Deduction
+    // Earned Base Salary = Base Salary - Absent/Unpaid Deduction
     const earnedBaseSalary = baseSalary !== null ? Math.max(0, Math.round(baseSalary - absentDeduction)) : 0
     // Total Earned Salary = Earned Base Salary + Commission - Other Deductions
     const totalEarnedSalary = Math.max(0, earnedBaseSalary + commissionAmount - deductionAmount)
@@ -670,6 +704,8 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       holidayDays: rangeStats.holiday,
       absentDays: rangeStats.absent,
       futureDays: rangeStats.future,
+      preJoiningDays,
+      unpaidDays,
       paidDays,
       totalDaysInMonth: rangeStats.totalDays,
       totalWorkingDays: rangeStats.totalWorkingDays,
@@ -684,7 +720,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       totalDeductions,
       totalEarnedSalary,
       hasSalaryConfigured,
-      isFullSalaryPayable: rangeStats.absent === 0 && rangeStats.future === 0 && hasSalaryConfigured && deductionAmount === 0,
+      isFullSalaryPayable: unpaidDays === 0 && rangeStats.future === 0 && hasSalaryConfigured && deductionAmount === 0,
       hasAbsents: rangeStats.absent > 0,
     }
   }, [fullMonthRecords, records, employee, holidays, monthlyCommission, monthlyDeduction, startDate, endDate, selectedMonth])
@@ -961,194 +997,196 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
-          {/* 1. Work From Home (WFH) */}
-          <Card className="p-4 bg-cyan-50/25 shadow-2xs border-cyan-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-800">WFH Remaining</p>
-              <div className="w-6 h-6 rounded-md bg-cyan-100 flex items-center justify-center text-cyan-700">
-                <Laptop className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="my-2">
-              <div className="flex items-baseline gap-1.5">
-                <p className={`text-3xl sm:text-4xl font-black font-mono tracking-tight ${
-                  (balanceSummary?.remaining.wfh_quota ?? 4) < 0
-                    ? 'text-amber-600'
-                    : 'text-cyan-900'
-                }`}>
-                  {balanceSummary?.remaining.wfh_quota ?? 4}
-                </p>
-                <span className="text-xs font-bold text-slate-400">
-                  / {balanceSummary?.quotas.wfh_quota ?? 4} Quota
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-600 font-semibold">
-                {monthlyLeaves.wfh} used in {selectedMonthLabel.split(' ')[0]}
-              </span>
-              {(balanceSummary?.remaining.wfh_quota ?? 4) < 0 ? (
-                <Badge variant="warning" className="text-[9px] px-1 py-0 font-bold">
-                  Negative ({balanceSummary?.remaining.wfh_quota})
-                </Badge>
-              ) : (
-                <Badge variant="info" className="text-[9px] px-1 py-0 font-bold">
-                  Unlimited
-                </Badge>
-              )}
-            </div>
-          </Card>
+        {(() => {
+          const isEmployeeProbation = Boolean(
+            !employee?.is_old_staff &&
+            employee?.joining_date &&
+            (() => {
+              const j = new Date(employee.joining_date.split('T')[0] + 'T00:00:00')
+              const targetMonthStart = new Date(`${selectedMonth}-01T00:00:00`)
+              if (isNaN(j.getTime()) || isNaN(targetMonthStart.getTime())) return false
+              const probationEnd = new Date(j)
+              probationEnd.setMonth(probationEnd.getMonth() + 3)
+              return targetMonthStart < probationEnd
+            })()
+          )
 
-          {/* 2. Annual Leaves */}
-          <Card className="p-4 bg-purple-50/25 shadow-2xs border-purple-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-purple-800">Annual Leaves</p>
-              <div className="w-6 h-6 rounded-md bg-purple-100 flex items-center justify-center text-purple-700">
-                <Calendar className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="my-2">
-              <div className="flex items-baseline gap-1.5">
-                <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-purple-900">
-                  {balanceSummary?.remaining.annual_leaves ?? 6}
-                </p>
-                <span className="text-xs font-bold text-slate-400">
-                  / {balanceSummary?.quotas.annual_leaves ?? 6} Quota
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-600 font-semibold">
-                {monthlyLeaves.annual} used in {selectedMonthLabel.split(' ')[0]}
-              </span>
-              {(balanceSummary?.remaining.annual_leaves ?? 6) === 0 ? (
-                <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
-                  Exhausted
-                </Badge>
-              ) : (
-                <span className="text-purple-600 font-semibold text-[11px]">Available</span>
-              )}
-            </div>
-          </Card>
-
-          {/* 3. Sick Leaves */}
-          <Card className="p-4 bg-emerald-50/25 shadow-2xs border-emerald-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Sick Leaves</p>
-              <div className="w-6 h-6 rounded-md bg-emerald-100 flex items-center justify-center text-emerald-700">
-                <ShieldCheck className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="my-2">
-              <div className="flex items-baseline gap-1.5">
-                <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-emerald-900">
-                  {balanceSummary?.remaining.sick_leaves ?? 7}
-                </p>
-                <span className="text-xs font-bold text-slate-400">
-                  / {balanceSummary?.quotas.sick_leaves ?? 7} Quota
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-600 font-semibold">
-                {monthlyLeaves.sick} used in {selectedMonthLabel.split(' ')[0]}
-              </span>
-              {(balanceSummary?.remaining.sick_leaves ?? 7) === 0 ? (
-                <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
-                  Exhausted
-                </Badge>
-              ) : (
-                <span className="text-emerald-600 font-semibold text-[11px]">Available</span>
-              )}
-            </div>
-          </Card>
-
-          {/* 4. Casual Leaves */}
-          <Card className="p-4 bg-blue-50/25 shadow-2xs border-blue-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-blue-800">Casual Leaves</p>
-              <div className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center text-blue-700">
-                <Clock className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="my-2">
-              <div className="flex items-baseline gap-1.5">
-                <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-blue-900">
-                  {balanceSummary?.remaining.casual_leaves ?? 6}
-                </p>
-                <span className="text-xs font-bold text-slate-400">
-                  / {balanceSummary?.quotas.casual_leaves ?? 6} Quota
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-600 font-semibold">
-                {monthlyLeaves.casual} used in {selectedMonthLabel.split(' ')[0]}
-              </span>
-              {(balanceSummary?.remaining.casual_leaves ?? 6) === 0 ? (
-                <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
-                  Exhausted
-                </Badge>
-              ) : (
-                <span className="text-blue-600 font-semibold text-[11px]">Available</span>
-              )}
-            </div>
-          </Card>
-
-          {/* 5. Probation Leaves or Confirmed Status */}
-          {(!employee?.is_old_staff || Boolean(balanceSummary?.isProbation) || (balanceSummary?.quotas.probation_leaves !== undefined && balanceSummary.quotas.probation_leaves > 0) || monthlyLeaves.probation > 0) ? (
-            <Card className="p-4 bg-amber-50/30 shadow-2xs border-amber-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-800">Probation Leaves</p>
-                <div className="w-6 h-6 rounded-md bg-amber-100 flex items-center justify-center text-amber-700">
-                  <AlertTriangle className="w-3.5 h-3.5" />
+          return (
+            <div className={`grid grid-cols-2 ${isEmployeeProbation ? 'sm:grid-cols-2 lg:grid-cols-2 max-w-2xl' : 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'} gap-3.5`}>
+              {/* 1. Work From Home (WFH) */}
+              <Card className="p-4 bg-cyan-50/25 shadow-2xs border-cyan-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-800">WFH Remaining</p>
+                  <div className="w-6 h-6 rounded-md bg-cyan-100 flex items-center justify-center text-cyan-700">
+                    <Laptop className="w-3.5 h-3.5" />
+                  </div>
                 </div>
-              </div>
-              <div className="my-2">
-                <div className="flex items-baseline gap-1.5">
-                  <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-amber-900">
-                    {balanceSummary?.remaining.probation_leaves ?? 3}
-                  </p>
-                  <span className="text-xs font-bold text-slate-400">
-                    / {balanceSummary?.quotas.probation_leaves ?? 3} Quota
+                <div className="my-2">
+                  <div className="flex items-baseline gap-1.5">
+                    <p className={`text-3xl sm:text-4xl font-black font-mono tracking-tight ${
+                      (balanceSummary?.remaining.wfh_quota ?? 4) < 0
+                        ? 'text-amber-600'
+                        : 'text-cyan-900'
+                    }`}>
+                      {balanceSummary?.remaining.wfh_quota ?? 4}
+                    </p>
+                    <span className="text-xs font-bold text-slate-400">
+                      / {balanceSummary?.quotas.wfh_quota ?? 4} Quota
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-600 font-semibold">
+                    {monthlyLeaves.wfh} used in {selectedMonthLabel.split(' ')[0]}
                   </span>
+                  {(balanceSummary?.remaining.wfh_quota ?? 4) < 0 ? (
+                    <Badge variant="warning" className="text-[9px] px-1 py-0 font-bold">
+                      Negative ({balanceSummary?.remaining.wfh_quota})
+                    </Badge>
+                  ) : (
+                    <Badge variant="info" className="text-[9px] px-1 py-0 font-bold">
+                      Unlimited
+                    </Badge>
+                  )}
                 </div>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-semibold">
-                  {monthlyLeaves.probation} used in {selectedMonthLabel.split(' ')[0]} (Max 1/mo)
-                </span>
-                {(balanceSummary?.remaining.probation_leaves ?? 3) === 0 ? (
-                  <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
-                    Exhausted
-                  </Badge>
-                ) : (
-                  <Badge variant="warning" className="text-[9px] px-1 py-0 font-bold">
-                    Probation Active
-                  </Badge>
-                )}
-              </div>
-            </Card>
-          ) : (
-            <Card className="p-4 bg-slate-50/60 shadow-2xs border-slate-200/80 rounded-xl flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Staff Status</p>
-                <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-slate-500">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                </div>
-              </div>
-              <div className="my-2">
-                <p className="text-base font-extrabold text-slate-800 tracking-tight">
-                  Old Staff
-                </p>
-              </div>
-              <p className="text-xs text-slate-400 font-medium">
-                Exempt from probation • Standard leave quota active
-              </p>
-            </Card>
-          )}
-        </div>
+              </Card>
+
+              {/* Conditional Leaves Display: If In Probation, show ONLY Probation Leaves; If not in probation, show Annual, Sick, Casual */}
+              {isEmployeeProbation ? (
+                <Card className="p-4 bg-amber-50/30 shadow-2xs border-amber-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-amber-800">Probation Leaves</p>
+                    <div className="w-6 h-6 rounded-md bg-amber-100 flex items-center justify-center text-amber-700">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="my-2">
+                    <div className="flex items-baseline gap-1.5">
+                      <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-amber-900">
+                        {balanceSummary?.remaining.probation_leaves ?? 3}
+                      </p>
+                      <span className="text-xs font-bold text-slate-400">
+                        / {balanceSummary?.quotas.probation_leaves ?? 3} Quota
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-600 font-semibold">
+                      {monthlyLeaves.probation} used in {selectedMonthLabel.split(' ')[0]} (Max 1/mo)
+                    </span>
+                    {(balanceSummary?.remaining.probation_leaves ?? 3) === 0 ? (
+                      <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
+                        Exhausted
+                      </Badge>
+                    ) : (
+                      <Badge variant="warning" className="text-[9px] px-1 py-0 font-bold">
+                        Probation Active
+                      </Badge>
+                    )}
+                  </div>
+                </Card>
+              ) : (
+                <>
+                  {/* 2. Annual Leaves */}
+                  <Card className="p-4 bg-purple-50/25 shadow-2xs border-purple-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-purple-800">Annual Leaves</p>
+                      <div className="w-6 h-6 rounded-md bg-purple-100 flex items-center justify-center text-purple-700">
+                        <Calendar className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                    <div className="my-2">
+                      <div className="flex items-baseline gap-1.5">
+                        <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-purple-900">
+                          {balanceSummary?.remaining.annual_leaves ?? 6}
+                        </p>
+                        <span className="text-xs font-bold text-slate-400">
+                          / {balanceSummary?.quotas.annual_leaves ?? 6} Quota
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600 font-semibold">
+                        {monthlyLeaves.annual} used in {selectedMonthLabel.split(' ')[0]}
+                      </span>
+                      {(balanceSummary?.remaining.annual_leaves ?? 6) === 0 ? (
+                        <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
+                          Exhausted
+                        </Badge>
+                      ) : (
+                        <span className="text-purple-600 font-semibold text-[11px]">Available</span>
+                      )}
+                    </div>
+                  </Card>
+
+                  {/* 3. Sick Leaves */}
+                  <Card className="p-4 bg-emerald-50/25 shadow-2xs border-emerald-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Sick Leaves</p>
+                      <div className="w-6 h-6 rounded-md bg-emerald-100 flex items-center justify-center text-emerald-700">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                    <div className="my-2">
+                      <div className="flex items-baseline gap-1.5">
+                        <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-emerald-900">
+                          {balanceSummary?.remaining.sick_leaves ?? 7}
+                        </p>
+                        <span className="text-xs font-bold text-slate-400">
+                          / {balanceSummary?.quotas.sick_leaves ?? 7} Quota
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600 font-semibold">
+                        {monthlyLeaves.sick} used in {selectedMonthLabel.split(' ')[0]}
+                      </span>
+                      {(balanceSummary?.remaining.sick_leaves ?? 7) === 0 ? (
+                        <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
+                          Exhausted
+                        </Badge>
+                      ) : (
+                        <span className="text-emerald-600 font-semibold text-[11px]">Available</span>
+                      )}
+                    </div>
+                  </Card>
+
+                  {/* 4. Casual Leaves */}
+                  <Card className="p-4 bg-blue-50/25 shadow-2xs border-blue-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-blue-800">Casual Leaves</p>
+                      <div className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center text-blue-700">
+                        <Clock className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                    <div className="my-2">
+                      <div className="flex items-baseline gap-1.5">
+                        <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-blue-900">
+                          {balanceSummary?.remaining.casual_leaves ?? 6}
+                        </p>
+                        <span className="text-xs font-bold text-slate-400">
+                          / {balanceSummary?.quotas.casual_leaves ?? 6} Quota
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600 font-semibold">
+                        {monthlyLeaves.casual} used in {selectedMonthLabel.split(' ')[0]}
+                      </span>
+                      {(balanceSummary?.remaining.casual_leaves ?? 6) === 0 ? (
+                        <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
+                          Exhausted
+                        </Badge>
+                      ) : (
+                        <span className="text-blue-600 font-semibold text-[11px]">Available</span>
+                      )}
+                    </div>
+                  </Card>
+                </>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Dedicated Salary & Attendance Section (with Month Selection & Commission) */}

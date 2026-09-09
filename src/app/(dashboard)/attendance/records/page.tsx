@@ -181,6 +181,29 @@ function getRecordStatusFlags(
   const isToday = date === todayStr
   const isPast = date < todayStr
 
+  const isBeforeJoining = Boolean(
+    !emp.is_old_staff &&
+    emp.joining_date &&
+    date < emp.joining_date.split('T')[0]
+  )
+
+  if (isBeforeJoining) {
+    return {
+      isSunday: false,
+      isGazettedHoliday: false,
+      isLeave: false,
+      isAbsent: false,
+      isLate: false,
+      isEarlyLeave: false,
+      isMissingIn: false,
+      isMissingOut: false,
+      isWfh: false,
+      isPresent: false,
+      isBeforeJoining: true,
+      statusLabel: '--',
+    }
+  }
+
   if (isSunday || isGazettedHoliday) {
     return {
       isSunday,
@@ -777,6 +800,13 @@ export default function AttendanceRecordsPage() {
 
     filteredEmployees.forEach((emp) => {
       dateColumns.forEach((date) => {
+        const isBeforeJoining = Boolean(
+          !emp.is_old_staff &&
+          emp.joining_date &&
+          date < emp.joining_date.split('T')[0]
+        )
+        if (isBeforeJoining) return // Pre-joining dates are not counted in absent or KPI statistics
+
         const dayName = getDayName(date)
         const isGazettedHoliday = Boolean(holidays[date]) && getPresentEmployeesCountOnDate(date) === 0
         if (dayName === 'Sunday' || isGazettedHoliday) return // Sundays and Gazetted Holidays
@@ -975,7 +1005,13 @@ export default function AttendanceRecordsPage() {
           let workedHoursVal = '0:00'
           let statusVal = ''
 
-          if (isSunday) {
+          if (flags.isBeforeJoining) {
+            attendanceVal = '--'
+            timeInVal = '--'
+            timeOutVal = '--'
+            workedHoursVal = '0:00'
+            statusVal = ''
+          } else if (isSunday) {
             attendanceVal = 'Sunday'
             timeInVal = 'Sunday'
             timeOutVal = 'Sunday'
@@ -1149,6 +1185,26 @@ export default function AttendanceRecordsPage() {
     const presentCountOnDate = getPresentEmployeesCountOnDate(date)
     const isGazettedHoliday = Boolean(holidays[date]) && presentCountOnDate === 0
 
+    const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
+
+    const isBeforeJoining = Boolean(
+      !emp.is_old_staff &&
+      emp.joining_date &&
+      date < emp.joining_date.split('T')[0]
+    )
+
+    // Pre-joining dates without punches show neutral placeholder "--"
+    if (isBeforeJoining && !rec) {
+      return (
+        <div
+          className="flex items-center justify-center py-2 text-slate-400 font-mono text-xs select-none"
+          title={`Pre-joining date (Joined on ${emp.joining_date ? emp.joining_date.split('T')[0] : ''})`}
+        >
+          --
+        </div>
+      )
+    }
+
     // 0. Sunday is strictly an official weekly holiday (auto Holiday, no edit needed)
     if (dayName === 'Sunday') {
       return (
@@ -1176,8 +1232,6 @@ export default function AttendanceRecordsPage() {
         </div>
       )
     }
-
-    const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
 
     // 2. If an explicit record exists in database (or manually added)
     if (rec) {

@@ -190,6 +190,7 @@ export interface PayslipData {
   clDays: number
   slDays: number
   wfhDays: number
+  probationDays?: number
   unpaidDays: number
   totalPaidDays: number
   basicPay: number
@@ -203,6 +204,7 @@ export interface PayslipData {
   totalDeduction: number
   netPay: number
   amountInWords: string
+  isInProbation?: boolean
 }
 
 interface PayslipPDFTemplateProps {
@@ -274,26 +276,45 @@ export default function PayslipPDFTemplate({
             <Text style={styles.rowLabel}>Total Working Days</Text>
             <Text style={styles.rowValue}>{payslipData.totalWorkingDays.toFixed(2)}</Text>
           </View>
-          <View style={styles.tableRowOdd}>
-            <Text style={styles.rowLabel}>A/L Days</Text>
-            <Text style={styles.rowValue}>{payslipData.alDays}</Text>
-          </View>
-          <View style={styles.tableRowEven}>
-            <Text style={styles.rowLabel}>C/L Days</Text>
-            <Text style={styles.rowValue}>{payslipData.clDays}</Text>
-          </View>
-          <View style={styles.tableRowOdd}>
-            <Text style={styles.rowLabel}>S/L Days</Text>
-            <Text style={styles.rowValue}>{payslipData.slDays}</Text>
-          </View>
-          <View style={styles.tableRowEven}>
-            <Text style={styles.rowLabel}>WFH/L Days</Text>
-            <Text style={styles.rowValue}>{payslipData.wfhDays}</Text>
-          </View>
-          <View style={styles.tableRowOdd}>
-            <Text style={styles.rowLabel}>Unpaid Days</Text>
-            <Text style={styles.rowValue}>{payslipData.unpaidDays}</Text>
-          </View>
+          {payslipData.isInProbation ? (
+            <>
+              <View style={styles.tableRowOdd}>
+                <Text style={styles.rowLabel}>Probation Leaves</Text>
+                <Text style={styles.rowValue}>{payslipData.probationDays ?? 0}</Text>
+              </View>
+              <View style={styles.tableRowEven}>
+                <Text style={styles.rowLabel}>WFH/L Days</Text>
+                <Text style={styles.rowValue}>{payslipData.wfhDays}</Text>
+              </View>
+              <View style={styles.tableRowOdd}>
+                <Text style={styles.rowLabel}>Unpaid Days</Text>
+                <Text style={styles.rowValue}>{payslipData.unpaidDays}</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.tableRowOdd}>
+                <Text style={styles.rowLabel}>A/L Days</Text>
+                <Text style={styles.rowValue}>{payslipData.alDays}</Text>
+              </View>
+              <View style={styles.tableRowEven}>
+                <Text style={styles.rowLabel}>C/L Days</Text>
+                <Text style={styles.rowValue}>{payslipData.clDays}</Text>
+              </View>
+              <View style={styles.tableRowOdd}>
+                <Text style={styles.rowLabel}>S/L Days</Text>
+                <Text style={styles.rowValue}>{payslipData.slDays}</Text>
+              </View>
+              <View style={styles.tableRowEven}>
+                <Text style={styles.rowLabel}>WFH/L Days</Text>
+                <Text style={styles.rowValue}>{payslipData.wfhDays}</Text>
+              </View>
+              <View style={styles.tableRowOdd}>
+                <Text style={styles.rowLabel}>Unpaid Days</Text>
+                <Text style={styles.rowValue}>{payslipData.unpaidDays}</Text>
+              </View>
+            </>
+          )}
           <View style={styles.tableRowHighlight}>
             <Text style={styles.rowLabelBold}>Total Paid Days</Text>
             <Text style={styles.rowValueBold}>{payslipData.totalPaidDays.toFixed(2)}</Text>
