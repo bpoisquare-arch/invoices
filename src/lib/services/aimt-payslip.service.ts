@@ -122,9 +122,12 @@ export const aimtPayslipService = {
       const { data, error } = await (supabase as any)
         .from('aimt_payslips')
         .select('*')
+        .not('paid_by_name', 'ilike', '%EdLink%')
+        .not('payment_reference', 'ilike', '%EdLink%')
+        .not('id', 'ilike', 'edlink_%')
         .order('created_at', { ascending: false })
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         // Sync local storage with DB data
         saveLocalPayslips(data as AIMTPayslip[])
         return data as AIMTPayslip[]
@@ -132,7 +135,12 @@ export const aimtPayslipService = {
     } catch (e) {
       console.warn('Supabase fetch failed, using local storage fallback:', e)
     }
-    return getLocalPayslips()
+    return getLocalPayslips().filter(
+      (p) =>
+        !p.paid_by_name?.toLowerCase().includes('edlink') &&
+        !p.payment_reference?.toLowerCase().includes('edlink') &&
+        !p.id?.startsWith('edlink_')
+    )
   },
 
   async getById(id: string): Promise<AIMTPayslip | null> {

@@ -151,6 +151,9 @@ export default function AppSidebar() {
     if (pathname.startsWith('/stc')) {
       setActiveEntity('stc')
       if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'stc')
+    } else if (pathname.startsWith('/edlink')) {
+      setActiveEntity('edlink-au')
+      if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'edlink-au')
     } else if (pathname.startsWith('/installments') || pathname.startsWith('/payslips')) {
       setActiveEntity('aimt')
       if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'aimt')
@@ -220,12 +223,14 @@ export default function AppSidebar() {
 
   const isInstallmentsActive = pathname.startsWith('/installments')
   const isPayslipsActive = pathname.startsWith('/payslips')
+  const isEdLinkPayslipsActive = pathname.startsWith('/edlink/payslips')
   const isStcInstallmentsActive = pathname.startsWith('/stc/installments') || pathname.startsWith('/stc')
 
   const [invoicesOpen, setInvoicesOpen] = useState(true)
   const [payrollOpen, setPayrollOpen] = useState(true)
   const [installmentsOpen, setInstallmentsOpen] = useState(true)
   const [payslipsOpen, setPayslipsOpen] = useState(true)
+  const [edlinkPayslipsOpen, setEdlinkPayslipsOpen] = useState(true)
   const [stcInstallmentsOpen, setStcInstallmentsOpen] = useState(true)
 
   useEffect(() => {
@@ -245,12 +250,16 @@ export default function AppSidebar() {
   }, [isPayslipsActive])
 
   useEffect(() => {
+    if (isEdLinkPayslipsActive) setEdlinkPayslipsOpen(true)
+  }, [isEdLinkPayslipsActive])
+
+  useEffect(() => {
     if (isStcInstallmentsActive) setStcInstallmentsOpen(true)
   }, [isStcInstallmentsActive])
 
   const isStc = activeEntity === 'stc' || pathname.startsWith('/stc')
-  const isAimt = !isStc && (activeEntity === 'aimt' || pathname.startsWith('/installments') || pathname.startsWith('/payslips'))
-  const isEdLinkAu = !isStc && activeEntity === 'edlink-au'
+  const isEdLinkAu = !isStc && (activeEntity === 'edlink-au' || pathname.startsWith('/edlink'))
+  const isAimt = !isStc && !isEdLinkAu && (activeEntity === 'aimt' || pathname.startsWith('/installments') || pathname.startsWith('/payslips'))
   const isEdLinkPk = !isStc && !isAimt && !isEdLinkAu && activeEntity !== 'nsc' && activeEntity !== 'isquare-bpo'
 
   const currentEntityObj =
@@ -559,83 +568,148 @@ export default function AppSidebar() {
           </>
         ) : isEdLinkAu ? (
           /* =========================================================================
-             EDLINK AUSTRALIA ENTITY: Official Invoices + Companies
+             EDLINK AUSTRALIA ENTITY: Official Invoices + Payslips + Companies
              ========================================================================= */
-          <SidebarGroup className="p-0">
-            <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#81F5F5]/70 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
-              Invoices
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-1">
-                <Collapsible
-                  open={invoicesOpen}
-                  onOpenChange={setInvoicesOpen}
-                  className="group/collapsible"
-                >
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger
-                      render={
-                        <SidebarMenuButton
-                          tooltip="Invoices"
-                          className={`text-[13px] font-medium transition-all hover:bg-[#0E3E5B]/80 hover:text-white rounded-lg px-2.5 py-2 ${
-                            isInvoiceActive
-                              ? 'text-[#81F5F5] bg-[#0E3E5B]'
-                              : 'text-slate-300'
-                          }`}
-                        />
-                      }
-                    >
-                      <Receipt className="size-4 shrink-0 text-[#81F5F5]" />
-                      <span className="font-semibold text-slate-200">Invoices</span>
-                      <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
-                        {/* Generate Invoice (EdLink Australia template) */}
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            render={<Link href="/invoices/new?company=edlink" onClick={handleNavClick} />}
-                            isActive={pathname.startsWith('/invoices/new')}
-                            className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                          >
-                            <PlusCircle className="size-3.5 shrink-0" />
-                            <span>Generate Invoice</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
+          <>
+            {/* 1. Invoices Group */}
+            <SidebarGroup className="p-0">
+              <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#81F5F5]/70 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
+                Invoices
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <Collapsible
+                    open={invoicesOpen}
+                    onOpenChange={setInvoicesOpen}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton
+                            tooltip="Invoices"
+                            className={`text-[13px] font-medium transition-all hover:bg-[#0E3E5B]/80 hover:text-white rounded-lg px-2.5 py-2 ${
+                              isInvoiceActive
+                                ? 'text-[#81F5F5] bg-[#0E3E5B]'
+                                : 'text-slate-300'
+                            }`}
+                          />
+                        }
+                      >
+                        <Receipt className="size-4 shrink-0 text-[#81F5F5]" />
+                        <span className="font-semibold text-slate-200">Invoices</span>
+                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
+                          {/* Generate Invoice (EdLink Australia template) */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/invoices/new?company=edlink" onClick={handleNavClick} />}
+                              isActive={pathname.startsWith('/invoices/new')}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <PlusCircle className="size-3.5 shrink-0" />
+                              <span>Generate Invoice</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
 
-                        {/* Invoices List */}
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            render={<Link href="/invoices" onClick={handleNavClick} />}
-                            isActive={
-                              pathname === '/invoices' ||
-                              (pathname.startsWith('/invoices') && !pathname.includes('/new'))
-                            }
-                            className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                          >
-                            <FileText className="size-3.5 shrink-0" />
-                            <span>All Invoices</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
+                          {/* Invoices List */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/invoices" onClick={handleNavClick} />}
+                              isActive={
+                                pathname === '/invoices' ||
+                                (pathname.startsWith('/invoices') && !pathname.includes('/new'))
+                              }
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <FileText className="size-3.5 shrink-0" />
+                              <span>All Invoices</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
 
-                        {/* Companies */}
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            render={<Link href="/companies" onClick={handleNavClick} />}
-                            isActive={pathname.startsWith('/companies')}
-                            className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                          >
-                            <Building2 className="size-3.5 shrink-0" />
-                            <span>Companies</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+                          {/* Companies */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/companies" onClick={handleNavClick} />}
+                              isActive={pathname.startsWith('/companies')}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <Building2 className="size-3.5 shrink-0" />
+                              <span>Companies</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* 2. EdLink Payslips Group */}
+            <SidebarGroup className="p-0 mt-3">
+              <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#81F5F5]/70 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
+                Payslips
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <Collapsible
+                    open={edlinkPayslipsOpen}
+                    onOpenChange={setEdlinkPayslipsOpen}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton
+                            tooltip="Payslips"
+                            className={`text-[13px] font-medium transition-all hover:bg-[#0E3E5B]/80 hover:text-white rounded-lg px-2.5 py-2 ${
+                              isEdLinkPayslipsActive
+                                ? 'text-[#81F5F5] bg-[#0E3E5B]'
+                                : 'text-slate-300'
+                            }`}
+                          />
+                        }
+                      >
+                        <Banknote className="size-4 shrink-0 text-[#81F5F5]" />
+                        <span className="font-semibold text-slate-200">Payslips</span>
+                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
+                          {/* Generate Payslip */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/edlink/payslips/new" onClick={handleNavClick} />}
+                              isActive={pathname === '/edlink/payslips/new'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <PlusCircle className="size-3.5 shrink-0" />
+                              <span>Generate Payslip</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+
+                          {/* All Payslips */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/edlink/payslips" onClick={handleNavClick} />}
+                              isActive={pathname === '/edlink/payslips'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <FileText className="size-3.5 shrink-0" />
+                              <span>All Payslips</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
         ) : (
           /* =========================================================================
              EDLINK PAKISTAN ENTITY: Anonymous Invoices + Full Payroll (NO Companies)

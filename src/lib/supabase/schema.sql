@@ -411,3 +411,56 @@ BEGIN
     END IF;
 END $$;
 
+-- 15. EDLINK PAYSLIPS TABLE
+CREATE TABLE IF NOT EXISTS public.edlink_payslips (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    paid_by_name VARCHAR(255) NOT NULL,
+    paid_by_address_1 VARCHAR(255) NOT NULL,
+    paid_by_address_2 VARCHAR(255) NOT NULL,
+    paid_by_abn VARCHAR(100) NOT NULL,
+    employee_name VARCHAR(255) NOT NULL,
+    address_line_1 VARCHAR(255) NOT NULL,
+    address_line_2 VARCHAR(255) NOT NULL,
+    pay_frequency VARCHAR(100) NOT NULL,
+    annual_salary NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    employment_basis VARCHAR(100) NOT NULL,
+    pay_period_start VARCHAR(50) NOT NULL,
+    pay_period_end VARCHAR(50) NOT NULL,
+    payment_date VARCHAR(50) NOT NULL,
+    total_earnings NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    net_pay NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    wages_description VARCHAR(255) NOT NULL,
+    ordinary_hours NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    hourly_rate NUMERIC(10, 4) NOT NULL DEFAULT 0.0000,
+    wages_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    wages_total NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    tax_description VARCHAR(100) NOT NULL,
+    tax_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    tax_total NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    bank_account_masked VARCHAR(100) NOT NULL,
+    account_name VARCHAR(255) NOT NULL,
+    payment_reference VARCHAR(255) NOT NULL,
+    payment_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_edlink_payslips_employee_name ON public.edlink_payslips(employee_name);
+CREATE INDEX IF NOT EXISTS idx_edlink_payslips_created_at ON public.edlink_payslips(created_at DESC);
+
+-- Enable RLS
+ALTER TABLE public.edlink_payslips ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated access to edlink_payslips') THEN
+        CREATE POLICY "Allow authenticated access to edlink_payslips" ON public.edlink_payslips FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon access to edlink_payslips') THEN
+        CREATE POLICY "Allow anon access to edlink_payslips" ON public.edlink_payslips FOR ALL TO anon USING (true) WITH CHECK (true);
+    END IF;
+END $$;
+
+
