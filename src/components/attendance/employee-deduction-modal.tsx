@@ -95,7 +95,7 @@ export default function EmployeeDeductionModal({
   const [selectedYear, setSelectedYear] = useState<string>(defaultPeriod.year)
   const [selectedMonthNum, setSelectedMonthNum] = useState<string>(defaultPeriod.month)
   const [amount, setAmount] = useState<string>('')
-  const [noteType, setNoteType] = useState<string>('')
+  const [noteType, setNoteType] = useState<string>('Others Deduction')
 
   // Editing state
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null)
@@ -122,7 +122,7 @@ export default function EmployeeDeductionModal({
         const match = data.deductions.find((d: DeductionRecord) => d.month_year === selectedMonthKey)
         if (match && !editingRecordId) {
           setAmount(match.amount ? String(match.amount) : '')
-          setNoteType(match.note_type || match.notes || '')
+          setNoteType(match.note_type || match.notes || 'Others Deduction')
         }
       } else {
         setHistoryList([])
@@ -140,7 +140,7 @@ export default function EmployeeDeductionModal({
       setSelectedYear(p.year)
       setSelectedMonthNum(p.month)
       setAmount('')
-      setNoteType('')
+      setNoteType('Others Deduction')
       setEditingRecordId(null)
       setError(null)
       setSuccessMsg(null)
@@ -155,14 +155,14 @@ export default function EmployeeDeductionModal({
     const match = historyList.find((d) => d.month_year === newKey)
     if (match) {
       setAmount(String(match.amount || 0))
-      setNoteType(match.note_type || match.notes || '')
+      setNoteType(match.note_type || match.notes || 'Others Deduction')
       setEditingRecordId(match.id || newKey)
     } else {
       if (editingRecordId) {
         setEditingRecordId(null)
       }
       setAmount('')
-      setNoteType('')
+      setNoteType('Others Deduction')
     }
   }
 
@@ -173,7 +173,7 @@ export default function EmployeeDeductionModal({
       setSelectedMonthNum(parts[1])
     }
     setAmount(String(item.amount || 0))
-    setNoteType(item.note_type || item.notes || '')
+    setNoteType(item.note_type || item.notes || 'Others Deduction')
     setEditingRecordId(item.id || item.month_year)
     setError(null)
     setSuccessMsg(null)
@@ -182,7 +182,7 @@ export default function EmployeeDeductionModal({
   const handleCancelEdit = () => {
     setEditingRecordId(null)
     setAmount('')
-    setNoteType('')
+    setNoteType('Others Deduction')
   }
 
   const handleDeleteRecord = async (monthYearToDelete: string) => {
@@ -213,7 +213,7 @@ export default function EmployeeDeductionModal({
 
       if (selectedMonthKey === monthYearToDelete) {
         setAmount('')
-        setNoteType('')
+        setNoteType('Others Deduction')
         setEditingRecordId(null)
       }
 
@@ -446,7 +446,7 @@ export default function EmployeeDeductionModal({
                     type="text"
                     value={noteType}
                     onChange={(e) => setNoteType(e.target.value)}
-                    placeholder="e.g. Previous Deduction"
+                    placeholder="e.g. Others Deduction, Previous Deduction"
                     className="text-xs border-slate-200 h-8 bg-white"
                   />
                 </div>

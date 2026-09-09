@@ -229,13 +229,6 @@ export default function PayslipPDFTemplate({
       ? `${window.location.origin}/edlink-logo.png`
       : '/edlink-logo.png')
 
-  const customNote = payslipData.othersDeductionNote?.trim()
-  const hasCustomNote =
-    customNote &&
-    !['other deduction', 'others deduction', 'other', 'others', ''].includes(
-      customNote.toLowerCase()
-    )
-
   return (
     <Document title={`Payslip_${safeEmpName}`}>
       <Page size="A4" style={styles.page}>
@@ -347,7 +340,7 @@ export default function PayslipPDFTemplate({
           </View>
           <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabel}>
-              Others Deduction{hasCustomNote ? ` (${customNote})` : ''}
+              {payslipData.othersDeductionNote?.trim() || 'Others Deduction'}
             </Text>
             <Text style={styles.rowValue}>
               PKR {Math.round(payslipData.othersDeduction || 0).toLocaleString('en-US')}

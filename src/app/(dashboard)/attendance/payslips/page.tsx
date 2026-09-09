@@ -1055,7 +1055,7 @@ export default function PayslipsPage() {
                     </div>
                     <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
                       <span>
-                        Others Deduction{currentPayslipData.othersDeductionNote && !['other deduction', 'others deduction', ''].includes(currentPayslipData.othersDeductionNote.toLowerCase().trim()) ? ` (${currentPayslipData.othersDeductionNote})` : ''}
+                        {currentPayslipData.othersDeductionNote?.trim() || 'Others Deduction'}
                       </span>
                       <span className="font-mono">
                         PKR {Math.round(currentPayslipData.othersDeduction || 0).toLocaleString('en-US')}
