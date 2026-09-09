@@ -93,6 +93,51 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+/**
+ * Sanitize frontend payload to match exact database columns
+ */
+function toDbPayload(payslip: EdlinkPayslip) {
+  return {
+    id: payslip.id,
+    paid_by_name: payslip.paid_by_name,
+    paid_by_address_1: payslip.paid_by_address_1,
+    paid_by_address_2: payslip.paid_by_address_2,
+    paid_by_abn: payslip.paid_by_abn,
+    employee_name: payslip.employee_name,
+    address_line_1: payslip.address_line_1,
+    address_line_2: payslip.address_line_2,
+    pay_frequency: payslip.pay_frequency || 'Fortnightly',
+    annual_salary: payslip.show_annual_salary === false ? 0 : Number(payslip.annual_salary || 0),
+    employment_basis: payslip.employment_basis || 'Full-time employment',
+    pay_period_start: payslip.pay_period_start,
+    pay_period_end: payslip.pay_period_end,
+    payment_date: payslip.payment_date,
+    total_earnings: Number(payslip.total_earnings || 0),
+    net_pay: Number(payslip.net_pay || 0),
+    wages_description: payslip.wages_description || 'Ordinary Hours',
+    ordinary_hours: Number(payslip.ordinary_hours || 0),
+    hourly_rate: Number(payslip.hourly_rate || 0),
+    wages_amount: Number(payslip.wages_amount || 0),
+    wages_total: Number(payslip.wages_total || 0),
+    tax_description: payslip.tax_description || 'PAYG',
+    tax_amount: Number(payslip.tax_amount || 0),
+    tax_total: Number(payslip.tax_total || 0),
+    bank_account_masked: payslip.bank_account_masked || '',
+    account_name: payslip.account_name || '',
+    payment_reference: payslip.payment_reference || 'EdLink Pay',
+    payment_amount: Number(payslip.payment_amount || 0),
+    created_at: payslip.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+}
+
+function fromDbRow(row: any): EdlinkPayslip {
+  return {
+    ...row,
+    show_annual_salary: Number(row.annual_salary || 0) > 0,
+  }
+}
+
 export const edlinkPayslipService = {
   /**
    * Fetch all EdLink payslips from the database in real-time.
@@ -108,7 +153,7 @@ export const edlinkPayslipService = {
         .order('created_at', { ascending: false })
 
       if (!error && data) {
-        return data as EdlinkPayslip[]
+        return (data as any[]).map(fromDbRow)
       }
 
       // 2. Fallback: Query aimt_payslips table filtered by EdLink identifier
@@ -120,7 +165,7 @@ export const edlinkPayslipService = {
           .order('created_at', { ascending: false })
 
         if (!fallbackError && fallbackData) {
-          return fallbackData as EdlinkPayslip[]
+          return (fallbackData as any[]).map(fromDbRow)
         }
       }
     } catch (e) {
@@ -144,7 +189,7 @@ export const edlinkPayslipService = {
         .single()
 
       if (!error && data) {
-        return data as EdlinkPayslip
+        return fromDbRow(data)
       }
 
       // 2. Fallback: Try aimt_payslips table
@@ -155,7 +200,7 @@ export const edlinkPayslipService = {
         .single()
 
       if (fallbackData) {
-        return fallbackData as EdlinkPayslip
+        return fromDbRow(fallbackData)
       }
     } catch (e) {
       console.error('Database fetchById failed for edlink payslip:', e)
@@ -185,30 +230,32 @@ export const edlinkPayslipService = {
       updated_at: now,
     }
 
+    const dbPayload = toDbPayload(payslip)
+
     try {
       const supabase = createClient()
 
       // 1. Primary: Try upsert into edlink_payslips table
       const { data, error } = await (supabase as any)
         .from('edlink_payslips')
-        .upsert(payslip)
+        .upsert(dbPayload)
         .select()
         .single()
 
       if (!error && data) {
-        return { success: true, data: data as EdlinkPayslip }
+        return { success: true, data: fromDbRow(data) }
       }
 
       // 2. Fallback: If table is not created yet, upsert into aimt_payslips
       if (error && (error.code === 'PGRST205' || error.message?.includes('edlink_payslips'))) {
         const { data: fallbackData, error: fallbackError } = await (supabase as any)
           .from('aimt_payslips')
-          .upsert(payslip)
+          .upsert(dbPayload)
           .select()
           .single()
 
         if (!fallbackError && fallbackData) {
-          return { success: true, data: fallbackData as EdlinkPayslip }
+          return { success: true, data: fromDbRow(fallbackData) }
         }
 
         if (fallbackError) {

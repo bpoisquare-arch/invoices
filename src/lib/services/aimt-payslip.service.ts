@@ -95,6 +95,51 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+/**
+ * Sanitize frontend payload to match exact database columns
+ */
+function toDbPayload(payslip: AIMTPayslip) {
+  return {
+    id: payslip.id,
+    paid_by_name: payslip.paid_by_name,
+    paid_by_address_1: payslip.paid_by_address_1,
+    paid_by_address_2: payslip.paid_by_address_2,
+    paid_by_abn: payslip.paid_by_abn,
+    employee_name: payslip.employee_name,
+    address_line_1: payslip.address_line_1,
+    address_line_2: payslip.address_line_2,
+    pay_frequency: payslip.pay_frequency || 'Fortnightly',
+    annual_salary: payslip.show_annual_salary === false ? 0 : Number(payslip.annual_salary || 0),
+    employment_basis: payslip.employment_basis || 'Full-time employment',
+    pay_period_start: payslip.pay_period_start,
+    pay_period_end: payslip.pay_period_end,
+    payment_date: payslip.payment_date,
+    total_earnings: Number(payslip.total_earnings || 0),
+    net_pay: Number(payslip.net_pay || 0),
+    wages_description: payslip.wages_description || 'Ordinary Hours',
+    ordinary_hours: Number(payslip.ordinary_hours || 0),
+    hourly_rate: Number(payslip.hourly_rate || 0),
+    wages_amount: Number(payslip.wages_amount || 0),
+    wages_total: Number(payslip.wages_total || 0),
+    tax_description: payslip.tax_description || 'PAYG',
+    tax_amount: Number(payslip.tax_amount || 0),
+    tax_total: Number(payslip.tax_total || 0),
+    bank_account_masked: payslip.bank_account_masked || '',
+    account_name: payslip.account_name || '',
+    payment_reference: payslip.payment_reference || 'AIMT Pay',
+    payment_amount: Number(payslip.payment_amount || 0),
+    created_at: payslip.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+}
+
+function fromDbRow(row: any): AIMTPayslip {
+  return {
+    ...row,
+    show_annual_salary: Number(row.annual_salary || 0) > 0,
+  }
+}
+
 // Local storage fallback helpers
 function getLocalPayslips(): AIMTPayslip[] {
   if (typeof window === 'undefined') return []
@@ -130,9 +175,10 @@ export const aimtPayslipService = {
         .order('created_at', { ascending: false })
 
       if (!error && data) {
+        const mapped = (data as any[]).map(fromDbRow)
         // Sync local storage with DB data
-        saveLocalPayslips(data as AIMTPayslip[])
-        return data as AIMTPayslip[]
+        saveLocalPayslips(mapped)
+        return mapped
       }
     } catch (e) {
       console.warn('Supabase fetch failed, using local storage fallback:', e)
@@ -155,7 +201,7 @@ export const aimtPayslipService = {
         .single()
 
       if (!error && data) {
-        return data as AIMTPayslip
+        return fromDbRow(data)
       }
     } catch (e) {
       console.warn('Supabase fetchById failed, using local storage fallback:', e)
@@ -188,17 +234,19 @@ export const aimtPayslipService = {
     }
     saveLocalPayslips(locals)
 
+    const dbPayload = toDbPayload(payslip)
+
     // Attempt Supabase insert/upsert
     try {
       const supabase = createClient()
       const { data, error } = await (supabase as any)
         .from('aimt_payslips')
-        .upsert(payslip)
+        .upsert(dbPayload)
         .select()
         .single()
 
       if (!error && data) {
-        return { success: true, data: data as AIMTPayslip }
+        return { success: true, data: fromDbRow(data) }
       }
     } catch (e) {
       console.warn('Supabase upsert failed, stored in local storage:', e)
@@ -236,9 +284,10 @@ export const aimtPayslipService = {
       let lastError: string | null = null
 
       for (const payslip of locals) {
+        const dbPayload = toDbPayload(payslip)
         const { error } = await (supabase as any)
           .from('aimt_payslips')
-          .upsert(payslip, { onConflict: 'id' })
+          .upsert(dbPayload, { onConflict: 'id' })
 
         if (!error) {
           successCount++
@@ -263,7 +312,7 @@ export const aimtPayslipService = {
         .order('created_at', { ascending: false })
 
       if (data && data.length > 0) {
-        saveLocalPayslips(data as AIMTPayslip[])
+        saveLocalPayslips((data as any[]).map(fromDbRow))
       }
 
       return {
@@ -282,4 +331,3 @@ export const aimtPayslipService = {
     }
   },
 }
-
