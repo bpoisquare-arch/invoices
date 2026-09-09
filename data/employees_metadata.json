@@ -7,7 +7,7 @@
       "annual_leaves": 6,
       "sick_leaves": 7,
       "casual_leaves": 6,
-      "wfh_quota": 3.5,
+      "wfh_quota": 4,
       "probation_leaves": 0
     },
     "is_old_staff": true
@@ -20,7 +20,7 @@
       "annual_leaves": 6,
       "sick_leaves": 7,
       "casual_leaves": 6,
-      "wfh_quota": 3.5,
+      "wfh_quota": 4,
       "probation_leaves": 0
     },
     "is_old_staff": true

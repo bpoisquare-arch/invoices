@@ -444,6 +444,77 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     XLSX.writeFile(wb, `${employee?.name || 'Employee'}_Attendance_History.xlsx`)
   }
 
+  // Helper to parse fractional leaves / WFH from notes
+  function parseLeaveValue(notes?: string | null): number {
+    if (!notes) return 1
+    const match = notes.match(/\(([0-9]+(?:\.[0-9]+)?)\s*day/i) || notes.match(/([0-9]+(?:\.[0-9]+)?)\s*day/i)
+    if (match) {
+      const v = parseFloat(match[1])
+      if (!isNaN(v) && v > 0) return v
+    }
+    return 1
+  }
+
+  const selectedMonthLabel = useMemo(() => {
+    const [y, m] = selectedMonth.split('-')
+    const monthName = MONTH_OPTIONS.find((opt) => opt.value === m)?.label || m
+    return `${monthName} ${y}`
+  }, [selectedMonth])
+
+  // Compute used leaves & WFH for the active selected month
+  const monthlyLeaves = useMemo(() => {
+    let wfh = 0
+    let annual = 0
+    let sick = 0
+    let casual = 0
+    let probation = 0
+
+    const list = fullMonthRecords.length > 0 ? fullMonthRecords : records
+    list.forEach((r) => {
+      const arrStatus = r.arrival_status || ''
+      const depStatus = r.departure_status || ''
+
+      let noteStr: string | null = null
+      if (Array.isArray(r.raw_punches)) {
+        const found = (r.raw_punches as any[]).find((p) => p && typeof p === 'object' && p.notes)
+        if (found) noteStr = found.notes
+      }
+      const leaveVal = parseLeaveValue(noteStr || depStatus)
+
+      const isWfh =
+        depStatus === 'Work From Home' ||
+        arrStatus === 'Work From Home' ||
+        (noteStr ? noteStr.toLowerCase().includes('work from home') || noteStr.toLowerCase().includes('wfh') : false)
+
+      const isLeave =
+        arrStatus === 'Leave' ||
+        depStatus.includes('Leave') ||
+        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Probation Leaves'].includes(depStatus as any)
+
+      if (isWfh) {
+        wfh += leaveVal
+      } else if (isLeave) {
+        if (depStatus.includes('Probation') || arrStatus.includes('Probation') || (noteStr && noteStr.toLowerCase().includes('probation'))) {
+          probation += leaveVal
+        } else if (depStatus.includes('Annual') || arrStatus.includes('Annual') || (noteStr && noteStr.toLowerCase().includes('annual'))) {
+          annual += leaveVal
+        } else if (depStatus.includes('Sick') || arrStatus.includes('Sick') || (noteStr && noteStr.toLowerCase().includes('sick'))) {
+          sick += leaveVal
+        } else if (depStatus.includes('Casual') || arrStatus.includes('Casual') || (noteStr && noteStr.toLowerCase().includes('casual'))) {
+          casual += leaveVal
+        }
+      }
+    })
+
+    return {
+      wfh: Number(wfh.toFixed(2)),
+      annual: Number(annual.toFixed(2)),
+      sick: Number(sick.toFixed(2)),
+      casual: Number(casual.toFixed(2)),
+      probation: Number(probation.toFixed(2)),
+    }
+  }, [fullMonthRecords, records])
+
   // Calculate attendance status breakdown & earned salary (including monthly commission, leave rules, WFH, and absent deductions)
   const salaryStats = useMemo(() => {
     const now = new Date()
@@ -678,7 +749,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             <p className="text-xs text-slate-400 font-medium">Calendar days in month</p>
           </Card>
 
-          {/* 2. Present Days */}
+          {/* 2. Present Days (Counting Office + WFH) */}
           <Card className="p-4 bg-blue-50/20 shadow-2xs border-blue-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Present Days</p>
@@ -689,7 +760,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             <p className="text-3xl sm:text-4xl font-black text-blue-900 font-mono tracking-tight my-2">
               {salaryStats.presentDays}
             </p>
-            <p className="text-xs text-blue-600/80 font-medium">Days attended / WFH</p>
+            <p className="text-xs text-blue-600 font-medium">
+              {salaryStats.wfhDays > 0
+                ? `${salaryStats.presentDays - salaryStats.wfhDays} Office + ${salaryStats.wfhDays} WFH`
+                : 'Days attended in office'}
+            </p>
           </Card>
 
           {/* 3. Absents */}
@@ -846,7 +921,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             Leave & Work From Home (WFH) Balances
           </h3>
           <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
-            WFH has no hard limit & remains flexible (balances can be negative)
+            Showing usage for <strong className="text-slate-700">{selectedMonthLabel}</strong> • Overall quota balance shown
           </span>
         </div>
 
@@ -874,8 +949,8 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               </div>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">
-                {balanceSummary?.used.wfh_quota ?? 0} used
+              <span className="text-slate-600 font-semibold">
+                {monthlyLeaves.wfh} used in {selectedMonthLabel.split(' ')[0]}
               </span>
               {(balanceSummary?.remaining.wfh_quota ?? 4) < 0 ? (
                 <Badge variant="warning" className="text-[9px] px-1 py-0 font-bold">
@@ -908,8 +983,8 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               </div>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">
-                {balanceSummary?.used.annual_leaves ?? 0} used
+              <span className="text-slate-600 font-semibold">
+                {monthlyLeaves.annual} used in {selectedMonthLabel.split(' ')[0]}
               </span>
               {(balanceSummary?.remaining.annual_leaves ?? 6) === 0 ? (
                 <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
@@ -940,8 +1015,8 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               </div>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">
-                {balanceSummary?.used.sick_leaves ?? 0} used
+              <span className="text-slate-600 font-semibold">
+                {monthlyLeaves.sick} used in {selectedMonthLabel.split(' ')[0]}
               </span>
               {(balanceSummary?.remaining.sick_leaves ?? 7) === 0 ? (
                 <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
@@ -964,18 +1039,18 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             <div className="my-2">
               <div className="flex items-baseline gap-1.5">
                 <p className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-blue-900">
-                  {balanceSummary?.remaining.casual_leaves ?? 7}
+                  {balanceSummary?.remaining.casual_leaves ?? 6}
                 </p>
                 <span className="text-xs font-bold text-slate-400">
-                  / {balanceSummary?.quotas.casual_leaves ?? 7} Quota
+                  / {balanceSummary?.quotas.casual_leaves ?? 6} Quota
                 </span>
               </div>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">
-                {balanceSummary?.used.casual_leaves ?? 0} used
+              <span className="text-slate-600 font-semibold">
+                {monthlyLeaves.casual} used in {selectedMonthLabel.split(' ')[0]}
               </span>
-              {(balanceSummary?.remaining.casual_leaves ?? 7) === 0 ? (
+              {(balanceSummary?.remaining.casual_leaves ?? 6) === 0 ? (
                 <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
                   Exhausted
                 </Badge>
@@ -986,7 +1061,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           </Card>
 
           {/* 5. Probation Leaves or Confirmed Status */}
-          {balanceSummary?.isProbation ? (
+          {(!employee?.is_old_staff || Boolean(balanceSummary?.isProbation) || (balanceSummary?.quotas.probation_leaves !== undefined && balanceSummary.quotas.probation_leaves > 0) || monthlyLeaves.probation > 0) ? (
             <Card className="p-4 bg-amber-50/30 shadow-2xs border-amber-200/80 rounded-xl hover:shadow-xs transition-shadow flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-amber-800">Probation Leaves</p>
@@ -1005,8 +1080,8 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                 </div>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-medium">
-                  {balanceSummary?.used.probation_leaves ?? 0} used (Max 1/mo)
+                <span className="text-slate-600 font-semibold">
+                  {monthlyLeaves.probation} used in {selectedMonthLabel.split(' ')[0]} (Max 1/mo)
                 </span>
                 {(balanceSummary?.remaining.probation_leaves ?? 3) === 0 ? (
                   <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">
@@ -1029,11 +1104,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               </div>
               <div className="my-2">
                 <p className="text-base font-extrabold text-slate-800 tracking-tight">
-                  {employee?.is_old_staff ? 'Old Staff' : 'Confirmed Staff'}
+                  Old Staff
                 </p>
               </div>
               <p className="text-xs text-slate-400 font-medium">
-                {employee?.is_old_staff ? 'Exempt from probation' : 'Standard leave quota active'}
+                Exempt from probation • Standard leave quota active
               </p>
             </Card>
           )}
@@ -1087,7 +1162,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
             <Badge variant="success" className="px-2.5 py-1 text-xs font-semibold">
               Paid Days: <strong className="font-mono ml-1">{salaryStats.paidDays}/{salaryStats.monthTotalDays} Days</strong>
-              <span className="text-emerald-700 ml-1">({salaryStats.presentDays} Pres{salaryStats.wfhDays > 0 ? `, ${salaryStats.wfhDays} WFH` : ''}{salaryStats.leaveDays > 0 ? `, ${salaryStats.leaveDays} Leaves` : ''})</span>
+              <span className="text-emerald-700 ml-1">({salaryStats.presentDays} Pres{salaryStats.wfhDays > 0 ? ` incl. ${salaryStats.wfhDays} WFH` : ''}{salaryStats.leaveDays > 0 ? `, ${salaryStats.leaveDays} Leaves` : ''})</span>
             </Badge>
 
             <Badge
