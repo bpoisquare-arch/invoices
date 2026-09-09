@@ -22,8 +22,10 @@ import {
   MoreHorizontal,
   Lock,
   Sparkles,
+  FileMinus,
 } from 'lucide-react'
 import EmployeeCommissionModal from '@/components/attendance/employee-commission-modal'
+import EmployeeDeductionModal from '@/components/attendance/employee-deduction-modal'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -77,8 +79,9 @@ export default function EmployeeOverviewPage() {
   const [branchFilter, setBranchFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
 
-  // Commission Modal State
+  // Commission & Deduction Modal State
   const [selectedCommissionEmployee, setSelectedCommissionEmployee] = useState<Employee | null>(null)
+  const [selectedDeductionEmployee, setSelectedDeductionEmployee] = useState<Employee | null>(null)
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -661,7 +664,14 @@ export default function EmployeeOverviewPage() {
                               className="flex items-center gap-2 px-2.5 py-2 text-amber-800 hover:bg-amber-50 hover:text-amber-950 rounded-lg cursor-pointer font-medium transition-colors"
                             >
                               <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                              <span>View Commission</span>
+                              <span>Commission</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setSelectedDeductionEmployee(emp)}
+                              className="flex items-center gap-2 px-2.5 py-2 text-rose-800 hover:bg-rose-50 hover:text-rose-950 rounded-lg cursor-pointer font-medium transition-colors"
+                            >
+                              <FileMinus className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Deduction</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => openEditModal(emp)}
@@ -1328,6 +1338,16 @@ export default function EmployeeOverviewPage() {
         isOpen={!!selectedCommissionEmployee}
         onClose={() => setSelectedCommissionEmployee(null)}
         employee={selectedCommissionEmployee}
+        onSaveSuccess={() => {
+          fetchEmployees()
+        }}
+      />
+
+      {/* Employee Deduction Management Modal */}
+      <EmployeeDeductionModal
+        isOpen={!!selectedDeductionEmployee}
+        onClose={() => setSelectedDeductionEmployee(null)}
+        employee={selectedDeductionEmployee}
         onSaveSuccess={() => {
           fetchEmployees()
         }}

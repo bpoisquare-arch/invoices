@@ -145,6 +145,8 @@ export default function PayslipsPage() {
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([])
   const [holidays, setHolidays] = useState<Record<string, string>>({})
   const [commissionsMap, setCommissionsMap] = useState<Record<string, number>>({})
+  const [deductionsMap, setDeductionsMap] = useState<Record<string, number>>({})
+  const [deductionsNotesMap, setDeductionsNotesMap] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
 
@@ -174,15 +176,16 @@ export default function PayslipsPage() {
     return { startDate: sDate, endDate: eDate, daysInMonth: totalDays, monthLabel: label, monthKey: key }
   }, [selectedMonth, selectedYear])
 
-  // Fetch employees, attendance records, holidays, and monthly commissions for selected month
+  // Fetch employees, attendance records, holidays, monthly commissions & deductions for selected month
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const [empRes, attRes, commRes, holRes] = await Promise.all([
+      const [empRes, attRes, commRes, holRes, dedRes] = await Promise.all([
         fetch('/api/attendance/employees?isActiveOnly=false'),
         fetch(`/api/attendance/records?startDate=${startDate}&endDate=${endDate}&pageSize=10000`),
         fetch(`/api/attendance/commissions?month=${monthKey}`),
         fetch('/api/attendance/holidays'),
+        fetch(`/api/attendance/deductions?month=${monthKey}`),
       ])
 
       const empData = await empRes.json()
@@ -214,6 +217,25 @@ export default function PayslipsPage() {
         setCommissionsMap(cMap)
       } else {
         setCommissionsMap({})
+      }
+
+      const dedData = await dedRes.json()
+      if (dedData.success && Array.isArray(dedData.deductions)) {
+        const dMap: Record<string, number> = {}
+        const dNotes: Record<string, string> = {}
+        dedData.deductions.forEach((d: any) => {
+          if (d.employee_id) {
+            dMap[d.employee_id] = Number(d.amount) || 0
+            dMap[d.employee_id.toLowerCase()] = Number(d.amount) || 0
+            dNotes[d.employee_id] = d.note_type || d.notes || 'Other Deduction'
+            dNotes[d.employee_id.toLowerCase()] = d.note_type || d.notes || 'Other Deduction'
+          }
+        })
+        setDeductionsMap(dMap)
+        setDeductionsNotesMap(dNotes)
+      } else {
+        setDeductionsMap({})
+        setDeductionsNotesMap({})
       }
     } catch (e) {
       console.error('Failed to fetch payslip data:', e)
@@ -475,11 +497,28 @@ export default function PayslipsPage() {
     const basicPay = Number(emp.salary) || 0
     const perDaySalary = totalWorkingDays > 0 ? basicPay / totalWorkingDays : 0
     const unpaidDeduction = Math.round(perDaySalary * unpaidDays)
-    const commission = commissionsMap[emp.id] || commissionsMap[emp.employee_id] || (emp.id ? commissionsMap[emp.id.toLowerCase()] : 0) || (emp.employee_id ? commissionsMap[emp.employee_id.toLowerCase()] : 0) || 0
+    const commission =
+      commissionsMap[emp.id] ||
+      commissionsMap[emp.employee_id] ||
+      (emp.id ? commissionsMap[emp.id.toLowerCase()] : 0) ||
+      (emp.employee_id ? commissionsMap[emp.employee_id.toLowerCase()] : 0) ||
+      0
+    const othersDeduction =
+      deductionsMap[emp.id] ||
+      deductionsMap[emp.employee_id] ||
+      (emp.id ? deductionsMap[emp.id.toLowerCase()] : 0) ||
+      (emp.employee_id ? deductionsMap[emp.employee_id.toLowerCase()] : 0) ||
+      0
+    const othersDeductionNote =
+      deductionsNotesMap[emp.id] ||
+      deductionsNotesMap[emp.employee_id] ||
+      (emp.id ? deductionsNotesMap[emp.id.toLowerCase()] : '') ||
+      (emp.employee_id ? deductionsNotesMap[emp.employee_id.toLowerCase()] : '') ||
+      'Others Deduction'
     const adjustments = 0
     const totalEarnings = basicPay + commission + adjustments
-    const totalDeduction = unpaidDeduction
-    const netPay = Math.max(0, (basicPay - unpaidDeduction) + commission + adjustments)
+    const totalDeduction = unpaidDeduction + othersDeduction
+    const netPay = Math.max(0, totalEarnings - totalDeduction)
 
     return {
       totalWorkingDays,
@@ -496,6 +535,8 @@ export default function PayslipsPage() {
       adjustments,
       totalEarnings,
       unpaidDeduction,
+      othersDeduction,
+      othersDeductionNote,
       totalDeduction,
       netPay,
       amountInWords: numberToWordsPKR(netPay),
@@ -887,9 +928,14 @@ export default function PayslipsPage() {
                 ref={payslipRef}
                 className="bg-white p-8 max-w-xl mx-auto space-y-7 text-slate-900 border border-slate-100 shadow-xs rounded-lg font-sans"
               >
-                {/* 1. Header Title (Exact green/teal styling from attachment) */}
+                {/* 1. Header with Logo & Title (Exact styling from 2nd attachment) */}
                 <div className="text-center pt-2">
-                  <h1 className="text-3xl font-extrabold text-[#007A78] tracking-tight uppercase">
+                  <img
+                    src="/edlink-logo.png"
+                    alt="EdLink"
+                    className="h-12 w-auto object-contain mx-auto mb-2"
+                  />
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#007A78] tracking-tight uppercase">
                     EMPLOYEE PAYSLIP
                   </h1>
                 </div>
@@ -932,36 +978,32 @@ export default function PayslipsPage() {
                   </h2>
                   <div className="border border-slate-200 overflow-hidden rounded-xs text-xs">
                     <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800 font-medium">
-                      <span>Monthly Total Days</span>
-                      <span className="font-mono">{currentPayslipData.totalWorkingDays}</span>
+                      <span>Total Working Days</span>
+                      <span className="font-mono">{currentPayslipData.totalWorkingDays.toFixed(2)}</span>
                     </div>
                     <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
-                      <span>Present Days</span>
-                      <span className="font-mono">{currentPayslipData.presentDays}</span>
-                    </div>
-                    <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
                       <span>A/L Days</span>
                       <span className="font-mono">{currentPayslipData.alDays}</span>
                     </div>
-                    <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
+                    <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
                       <span>C/L Days</span>
                       <span className="font-mono">{currentPayslipData.clDays}</span>
                     </div>
-                    <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
+                    <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
                       <span>S/L Days</span>
                       <span className="font-mono">{currentPayslipData.slDays}</span>
                     </div>
-                    <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
+                    <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
                       <span>WFH/L Days</span>
                       <span className="font-mono">{currentPayslipData.wfhDays}</span>
                     </div>
-                    <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
+                    <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
                       <span>Unpaid Days</span>
                       <span className="font-mono">{currentPayslipData.unpaidDays}</span>
                     </div>
                     <div className="bg-[#E5E5E5] px-4 py-2.5 flex justify-between items-center text-slate-900 font-bold">
                       <span>Total Paid Days</span>
-                      <span className="font-mono">{currentPayslipData.totalPaidDays}</span>
+                      <span className="font-mono">{currentPayslipData.totalPaidDays.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -990,7 +1032,7 @@ export default function PayslipsPage() {
                         PKR {Math.round(currentPayslipData.adjustments).toLocaleString('en-US')}
                       </span>
                     </div>
-                    <div className="bg-white px-4 py-2.5 flex justify-between items-center text-slate-900 font-bold">
+                    <div className="bg-[#E5E5E5] px-4 py-2.5 flex justify-between items-center text-slate-900 font-bold">
                       <span>Total Earnings</span>
                       <span className="font-mono">
                         PKR {Math.round(currentPayslipData.totalEarnings).toLocaleString('en-US')}
@@ -1008,18 +1050,24 @@ export default function PayslipsPage() {
                     <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800 font-medium">
                       <span>Unpaid Days</span>
                       <span className="font-mono">
-                        {currentPayslipData.unpaidDays > 0
-                          ? `${currentPayslipData.unpaidDays} * PKR ${Math.round(currentPayslipData.perDaySalary).toLocaleString('en-US')}`
-                          : `PKR 0`}
+                        PKR {Math.round(currentPayslipData.unpaidDeduction).toLocaleString('en-US')}
                       </span>
                     </div>
-                    <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-900 font-bold">
+                    <div className="bg-white px-4 py-2 flex justify-between items-center text-slate-700">
+                      <span>
+                        Others Deduction{currentPayslipData.othersDeductionNote && currentPayslipData.othersDeductionNote !== 'Other Deduction' ? ` (${currentPayslipData.othersDeductionNote})` : ''}
+                      </span>
+                      <span className="font-mono">
+                        PKR {Math.round(currentPayslipData.othersDeduction || 0).toLocaleString('en-US')}
+                      </span>
+                    </div>
+                    <div className="bg-[#E5E5E5] px-4 py-2.5 flex justify-between items-center text-slate-900 font-bold">
                       <span>Total Deduction</span>
                       <span className="font-mono">
                         PKR {Math.round(currentPayslipData.totalDeduction).toLocaleString('en-US')}
                       </span>
                     </div>
-                    <div className="bg-[#E5E5E5] px-4 py-2.5 flex justify-between items-center text-slate-900 font-bold">
+                    <div className="bg-white px-4 py-2.5 flex justify-between items-center text-slate-900 font-bold">
                       <span>Net Pay</span>
                       <span className="font-mono">
                         PKR {Math.round(currentPayslipData.netPay).toLocaleString('en-US')}

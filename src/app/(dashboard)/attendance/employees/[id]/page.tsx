@@ -26,7 +26,10 @@ import {
   ArrowUp,
   ArrowDown,
   Laptop,
+  FileMinus,
 } from 'lucide-react'
+import EmployeeCommissionModal from '@/components/attendance/employee-commission-modal'
+import EmployeeDeductionModal from '@/components/attendance/employee-deduction-modal'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -98,12 +101,20 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     hasProbationInTargetMonth: boolean
   } | null>(null)
 
-  // Monthly Commission & Month Selector
+  // Monthly Commission & Deduction
   const [selectedMonth, setSelectedMonth] = useState<string>('2026-08')
   const [monthlyCommission, setMonthlyCommission] = useState<{ amount: number; notes: string }>({
     amount: 0,
     notes: '',
   })
+  const [monthlyDeduction, setMonthlyDeduction] = useState<{ amount: number; noteType: string }>({
+    amount: 0,
+    noteType: '',
+  })
+
+  // Commission & Deduction Modals
+  const [isCommissionModalOpen, setIsCommissionModalOpen] = useState(false)
+  const [isDeductionModalOpen, setIsDeductionModalOpen] = useState(false)
 
   // Filters & Sorting
   const [startDate, setStartDate] = useState('')
@@ -165,6 +176,23 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       }
     } catch (e) {
       console.error('Failed to load commission:', e)
+    }
+  }
+
+  const loadDeduction = async (targetEmpId: string, monthStr: string) => {
+    try {
+      const res = await fetch(`/api/attendance/deductions?employeeId=${targetEmpId}&month=${monthStr}`)
+      const data = await res.json()
+      if (data.success && data.deduction) {
+        setMonthlyDeduction({
+          amount: Number(data.deduction.amount) || 0,
+          noteType: data.deduction.note_type || data.deduction.notes || 'Other Deduction',
+        })
+      } else {
+        setMonthlyDeduction({ amount: 0, noteType: '' })
+      }
+    } catch (e) {
+      console.error('Failed to load deduction:', e)
     }
   }
 
@@ -386,8 +414,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         setSummary(summaryData.summary)
       }
 
-      // Load monthly commission
-      await loadCommission(employeeId, selectedMonth)
+      // Load monthly commission and deductions
+      await Promise.all([
+        loadCommission(employeeId, selectedMonth),
+        loadDeduction(employeeId, selectedMonth),
+      ])
     } catch (err) {
       console.error('Error loading employee details:', err)
     } finally {
@@ -515,7 +546,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     }
   }, [fullMonthRecords, records])
 
-  // Calculate attendance status breakdown & earned salary (including monthly commission, leave rules, WFH, and absent deductions)
+  // Calculate attendance status breakdown & earned salary (including monthly commission, deductions, leave rules, WFH, and absent deductions)
   const salaryStats = useMemo(() => {
     const now = new Date()
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -610,6 +641,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
 
     const baseSalary = employee?.salary ? Number(employee.salary) : null
     const commissionAmount = monthlyCommission.amount || 0
+    const deductionAmount = monthlyDeduction.amount || 0
     const grossMonthlySalary = baseSalary !== null ? baseSalary + commissionAmount : commissionAmount > 0 ? commissionAmount : 0
 
     // Daily Rate = Base Salary / Total Days of the ENTIRE Month (e.g. 31 days in August)
@@ -622,11 +654,12 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     const absentDays = rangeStats.absent
     const paidDays = Math.max(0, rangeStats.totalDays - absentDays)
     const absentDeduction = Math.round(absentDays * perDaySalary)
+    const totalDeductions = absentDeduction + deductionAmount
 
     // Earned Base Salary = Base Salary - Absent Deduction
     const earnedBaseSalary = baseSalary !== null ? Math.max(0, Math.round(baseSalary - absentDeduction)) : 0
-    // Total Earned Salary = Earned Base Salary + Full Commission
-    const totalEarnedSalary = earnedBaseSalary + commissionAmount
+    // Total Earned Salary = Earned Base Salary + Commission - Other Deductions
+    const totalEarnedSalary = Math.max(0, earnedBaseSalary + commissionAmount - deductionAmount)
 
     const hasSalaryConfigured = (baseSalary !== null && baseSalary > 0) || commissionAmount > 0
 
@@ -643,15 +676,18 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       monthTotalDays,
       baseSalary,
       commissionAmount,
+      deductionAmount,
+      deductionNoteType: monthlyDeduction.noteType,
       grossMonthlySalary,
       perDaySalary: Math.round(perDaySalary),
       absentDeduction,
+      totalDeductions,
       totalEarnedSalary,
       hasSalaryConfigured,
-      isFullSalaryPayable: rangeStats.absent === 0 && rangeStats.future === 0 && hasSalaryConfigured,
+      isFullSalaryPayable: rangeStats.absent === 0 && rangeStats.future === 0 && hasSalaryConfigured && deductionAmount === 0,
       hasAbsents: rangeStats.absent > 0,
     }
-  }, [fullMonthRecords, records, employee, holidays, monthlyCommission, startDate, endDate, selectedMonth])
+  }, [fullMonthRecords, records, employee, holidays, monthlyCommission, monthlyDeduction, startDate, endDate, selectedMonth])
 
   return (
     <div className="space-y-6 max-w-full mx-auto font-sans">
@@ -1149,16 +1185,47 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               Total Package: <strong className="text-slate-900 font-mono">{salaryStats.grossMonthlySalary ? `PKR ${salaryStats.grossMonthlySalary.toLocaleString()}` : 'Not Set'}</strong>
             </span>
 
-            {/* Monthly Commission Badge */}
-            <Badge variant="warning" className="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              Commission:{' '}
-              <strong className="font-mono text-amber-950 font-bold">
-                {salaryStats.commissionAmount > 0
-                  ? `+ PKR ${salaryStats.commissionAmount.toLocaleString()}`
-                  : 'PKR 0'}
-              </strong>
-            </Badge>
+            {/* Monthly Commission Badge (Clickable) */}
+            <button
+              type="button"
+              onClick={() => setIsCommissionModalOpen(true)}
+              className="cursor-pointer focus:outline-none"
+              title="Click to manage monthly commission"
+            >
+              <Badge variant="warning" className="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5 shadow-2xs hover:bg-amber-100 hover:border-amber-300 transition-colors">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                Commission:{' '}
+                <strong className="font-mono text-amber-950 font-bold">
+                  {salaryStats.commissionAmount > 0
+                    ? `+ PKR ${salaryStats.commissionAmount.toLocaleString()}`
+                    : 'PKR 0'}
+                </strong>
+              </Badge>
+            </button>
+
+            {/* Monthly Deduction Badge (Clickable) */}
+            <button
+              type="button"
+              onClick={() => setIsDeductionModalOpen(true)}
+              className="cursor-pointer focus:outline-none"
+              title="Click to manage monthly deductions"
+            >
+              <Badge
+                variant={salaryStats.deductionAmount > 0 ? 'destructive' : 'secondary'}
+                className="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5 shadow-2xs hover:opacity-90 transition-opacity"
+              >
+                <FileMinus className="w-3.5 h-3.5 text-rose-500" />
+                Deduction:{' '}
+                <strong className="font-mono font-bold">
+                  {salaryStats.deductionAmount > 0
+                    ? `- PKR ${salaryStats.deductionAmount.toLocaleString()}`
+                    : 'PKR 0'}
+                </strong>
+                {salaryStats.deductionAmount > 0 && salaryStats.deductionNoteType && (
+                  <span className="text-[10px] opacity-80 font-normal">({salaryStats.deductionNoteType})</span>
+                )}
+              </Badge>
+            </button>
 
             <Badge variant="success" className="px-2.5 py-1 text-xs font-semibold">
               Paid Days: <strong className="font-mono ml-1">{salaryStats.paidDays}/{salaryStats.monthTotalDays} Days</strong>
@@ -1528,6 +1595,28 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         isOpen={!!viewingPunchesRecord}
         onClose={() => setViewingPunchesRecord(null)}
         record={viewingPunchesRecord}
+      />
+
+      {/* Monthly Commission Modal */}
+      <EmployeeCommissionModal
+        isOpen={isCommissionModalOpen}
+        onClose={() => setIsCommissionModalOpen(false)}
+        employee={employee}
+        initialMonth={selectedMonth}
+        onSaveSuccess={() => {
+          loadCommission(employeeId, selectedMonth)
+        }}
+      />
+
+      {/* Monthly Deduction Modal */}
+      <EmployeeDeductionModal
+        isOpen={isDeductionModalOpen}
+        onClose={() => setIsDeductionModalOpen(false)}
+        employee={employee}
+        initialMonth={selectedMonth}
+        onSaveSuccess={() => {
+          loadDeduction(employeeId, selectedMonth)
+        }}
       />
     </div>
   )

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer'
 import { Employee } from '@/lib/supabase/database.types'
 
 // Register Geist Font Family
@@ -25,32 +25,38 @@ Font.register({
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 36,
-    paddingBottom: 36,
+    paddingTop: 30,
+    paddingBottom: 30,
     paddingHorizontal: 38,
     fontSize: 9.5,
     fontFamily: 'Geist',
     color: '#1e293b',
     backgroundColor: '#ffffff',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  logo: {
+    width: 130,
+    height: 48,
+    objectFit: 'contain',
+    marginBottom: 8,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontFamily: 'Geist',
     fontWeight: 'bold',
     color: '#007A78',
     textAlign: 'center',
-    marginBottom: 16,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   metaGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 14,
-    paddingBottom: 10,
+    marginBottom: 12,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -59,7 +65,7 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     flexDirection: 'row',
-    marginBottom: 6,
+    marginBottom: 5,
   },
   metaLabel: {
     width: 95,
@@ -81,27 +87,27 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Geist',
     fontWeight: 'bold',
     color: '#007A78',
     textTransform: 'uppercase',
-    marginBottom: 5,
-    marginTop: 10,
+    marginBottom: 4,
+    marginTop: 8,
     letterSpacing: 0.5,
   },
   table: {
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   tableRowEven: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#efefef',
-    paddingVertical: 7,
-    paddingHorizontal: 14,
+    paddingVertical: 5.5,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -109,8 +115,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#ffffff',
-    paddingVertical: 7,
-    paddingHorizontal: 14,
+    paddingVertical: 5.5,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -118,62 +124,62 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#e5e5e5',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 6.5,
+    paddingHorizontal: 12,
   },
   rowLabel: {
-    fontSize: 9.5,
+    fontSize: 9,
     color: '#1e293b',
   },
   rowLabelBold: {
-    fontSize: 9.5,
+    fontSize: 9,
     fontFamily: 'Geist',
     fontWeight: 'bold',
     color: '#0f172a',
   },
   rowValue: {
-    fontSize: 9.5,
+    fontSize: 9,
     color: '#1e293b',
   },
   rowValueBold: {
-    fontSize: 9.5,
+    fontSize: 9,
     fontFamily: 'Geist',
     fontWeight: 'bold',
     color: '#0f172a',
   },
   amountInWordsRow: {
     flexDirection: 'row',
-    marginTop: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    marginTop: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 4,
+    borderRadius: 3,
   },
   amountInWordsLabel: {
-    width: 110,
+    width: 105,
     fontFamily: 'Geist',
     fontWeight: 'bold',
-    fontSize: 9.5,
+    fontSize: 9,
     color: '#0f172a',
   },
   amountInWordsValue: {
     flex: 1,
-    fontSize: 9.5,
+    fontSize: 9,
     color: '#334155',
   },
   disclaimer: {
-    fontSize: 8.5,
+    fontSize: 8,
     fontFamily: 'Geist',
     color: '#64748b',
     textAlign: 'center',
-    lineHeight: 1.5,
-    marginTop: 14,
+    lineHeight: 1.4,
+    marginTop: 12,
   },
 })
 
-interface PayslipData {
+export interface PayslipData {
   totalWorkingDays: number // Monthly Total Days
   presentDays?: number
   alDays: number
@@ -188,6 +194,8 @@ interface PayslipData {
   adjustments: number
   totalEarnings: number
   unpaidDeduction: number
+  othersDeduction?: number
+  othersDeductionNote?: string
   totalDeduction: number
   netPay: number
   amountInWords: string
@@ -197,25 +205,36 @@ interface PayslipPDFTemplateProps {
   employee: Employee
   payslipData: PayslipData
   payPeriod: string
+  logoUrl?: string
 }
 
 export default function PayslipPDFTemplate({
   employee,
   payslipData,
   payPeriod,
+  logoUrl,
 }: PayslipPDFTemplateProps) {
   const safeEmpName = (employee.name || employee.employee_id || 'Staff')
     .trim()
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .replace(/_+/g, '_')
 
+  const resolvedLogo =
+    logoUrl ||
+    (typeof window !== 'undefined'
+      ? `${window.location.origin}/edlink-logo.png`
+      : '/edlink-logo.png')
+
   return (
     <Document title={`Payslip_${safeEmpName}`}>
       <Page size="A4" style={styles.page}>
-        {/* Title */}
-        <Text style={styles.headerTitle}>EMPLOYEE PAYSLIP</Text>
+        {/* 1. Header with Logo & Title */}
+        <View style={styles.headerContainer}>
+          <Image src={resolvedLogo} style={styles.logo} />
+          <Text style={styles.headerTitle}>EMPLOYEE PAYSLIP</Text>
+        </View>
 
-        {/* Top Info Grid */}
+        {/* 2. Top Info Grid */}
         <View style={styles.metaGrid}>
           <View style={styles.metaCol}>
             <View style={styles.metaRow}>
@@ -244,44 +263,40 @@ export default function PayslipPDFTemplate({
           </View>
         </View>
 
-        {/* 1. ATTENDANCE */}
+        {/* 3. ATTENDANCE Section */}
         <Text style={styles.sectionTitle}>ATTENDANCE</Text>
         <View style={styles.table}>
           <View style={styles.tableRowEven}>
-            <Text style={styles.rowLabel}>Monthly Total Days</Text>
-            <Text style={styles.rowValue}>{payslipData.totalWorkingDays}</Text>
+            <Text style={styles.rowLabel}>Total Working Days</Text>
+            <Text style={styles.rowValue}>{payslipData.totalWorkingDays.toFixed(2)}</Text>
           </View>
           <View style={styles.tableRowOdd}>
-            <Text style={styles.rowLabel}>Present Days</Text>
-            <Text style={styles.rowValue}>{payslipData.presentDays ?? 0}</Text>
-          </View>
-          <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>A/L Days</Text>
             <Text style={styles.rowValue}>{payslipData.alDays}</Text>
           </View>
-          <View style={styles.tableRowOdd}>
+          <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>C/L Days</Text>
             <Text style={styles.rowValue}>{payslipData.clDays}</Text>
           </View>
-          <View style={styles.tableRowEven}>
+          <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabel}>S/L Days</Text>
             <Text style={styles.rowValue}>{payslipData.slDays}</Text>
           </View>
-          <View style={styles.tableRowOdd}>
+          <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>WFH/L Days</Text>
             <Text style={styles.rowValue}>{payslipData.wfhDays}</Text>
           </View>
-          <View style={styles.tableRowEven}>
+          <View style={styles.tableRowOdd}>
             <Text style={styles.rowLabel}>Unpaid Days</Text>
             <Text style={styles.rowValue}>{payslipData.unpaidDays}</Text>
           </View>
           <View style={styles.tableRowHighlight}>
             <Text style={styles.rowLabelBold}>Total Paid Days</Text>
-            <Text style={styles.rowValueBold}>{payslipData.totalPaidDays}</Text>
+            <Text style={styles.rowValueBold}>{payslipData.totalPaidDays.toFixed(2)}</Text>
           </View>
         </View>
 
-        {/* 2. EARNINGS */}
+        {/* 4. EARNINGS Section */}
         <Text style={styles.sectionTitle}>EARNINGS</Text>
         <View style={styles.table}>
           <View style={styles.tableRowEven}>
@@ -302,7 +317,7 @@ export default function PayslipPDFTemplate({
               PKR {Math.round(payslipData.adjustments).toLocaleString('en-US')}
             </Text>
           </View>
-          <View style={styles.tableRowOdd}>
+          <View style={styles.tableRowHighlight}>
             <Text style={styles.rowLabelBold}>Total Earnings</Text>
             <Text style={styles.rowValueBold}>
               PKR {Math.round(payslipData.totalEarnings).toLocaleString('en-US')}
@@ -310,24 +325,30 @@ export default function PayslipPDFTemplate({
           </View>
         </View>
 
-        {/* 3. DEDUCTIONS */}
+        {/* 5. DEDUCTIONS Section */}
         <Text style={styles.sectionTitle}>DEDUCTIONS</Text>
         <View style={styles.table}>
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Unpaid Days</Text>
             <Text style={styles.rowValue}>
-              {payslipData.unpaidDays > 0
-                ? `${payslipData.unpaidDays} * PKR ${Math.round(payslipData.perDaySalary).toLocaleString('en-US')}`
-                : 'PKR 0'}
+              PKR {Math.round(payslipData.unpaidDeduction).toLocaleString('en-US')}
             </Text>
           </View>
           <View style={styles.tableRowOdd}>
+            <Text style={styles.rowLabel}>
+              Others Deduction{payslipData.othersDeductionNote && payslipData.othersDeductionNote !== 'Other Deduction' ? ` (${payslipData.othersDeductionNote})` : ''}
+            </Text>
+            <Text style={styles.rowValue}>
+              PKR {Math.round(payslipData.othersDeduction || 0).toLocaleString('en-US')}
+            </Text>
+          </View>
+          <View style={styles.tableRowHighlight}>
             <Text style={styles.rowLabelBold}>Total Deduction</Text>
             <Text style={styles.rowValueBold}>
               PKR {Math.round(payslipData.totalDeduction).toLocaleString('en-US')}
             </Text>
           </View>
-          <View style={styles.tableRowHighlight}>
+          <View style={styles.tableRowEven}>
             <Text style={styles.rowLabelBold}>Net Pay</Text>
             <Text style={styles.rowValueBold}>
               PKR {Math.round(payslipData.netPay).toLocaleString('en-US')}
@@ -335,7 +356,7 @@ export default function PayslipPDFTemplate({
           </View>
         </View>
 
-        {/* 4. Footer */}
+        {/* 6. Footer (Amount in Words & Disclaimer Note) */}
         <View style={styles.amountInWordsRow}>
           <Text style={styles.amountInWordsLabel}>Amount in Words</Text>
           <Text style={styles.amountInWordsValue}>{payslipData.amountInWords}</Text>
