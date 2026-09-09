@@ -216,9 +216,11 @@ export default function AIMTPayslipPDFTemplate({ payslip }: AIMTPayslipPDFTempla
             <Text style={styles.employmentRow}>
               Pay Frequency: {payslip.pay_frequency || 'Fortnightly'}
             </Text>
-            <Text style={styles.employmentRow}>
-              Annual Salary: {formatCurrency(payslip.annual_salary || 104000)}
-            </Text>
+            {payslip.show_annual_salary !== false && Number(payslip.annual_salary || 0) > 0 ? (
+              <Text style={styles.employmentRow}>
+                Annual Salary: {formatCurrency(payslip.annual_salary || 0)}
+              </Text>
+            ) : null}
             <Text style={styles.employmentRow}>
               Employment Basis: {payslip.employment_basis || 'Full-time employment'}
             </Text>

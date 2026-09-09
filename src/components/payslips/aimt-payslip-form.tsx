@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -23,6 +23,8 @@ import {
   CreditCard,
   Building,
   Sparkles,
+  Briefcase,
+  Check,
 } from 'lucide-react'
 
 interface AIMTPayslipFormProps {
@@ -53,18 +55,40 @@ function toDisplayDateFormat(isoStr?: string): string {
   return isoStr
 }
 
-// Helper to calculate Fortnight end (+13 days)
-function calculateFortnightEnd(startIso: string): string {
+// Helper to calculate End Date based on Pay Frequency
+function calculatePeriodEnd(startIso: string, frequency: string): string {
+  if (!startIso) return ''
   try {
     const [y, m, d] = startIso.split('-').map(Number)
     const date = new Date(y, m - 1, d)
-    date.setDate(date.getDate() + 13)
+    if (frequency === 'Weekly') {
+      date.setDate(date.getDate() + 6)
+    } else if (frequency === 'Monthly') {
+      // Add 1 month and minus 1 day
+      date.setMonth(date.getMonth() + 1)
+      date.setDate(date.getDate() - 1)
+    } else {
+      // Default Fortnightly: +13 days
+      date.setDate(date.getDate() + 13)
+    }
     const yyyy = date.getFullYear()
     const mm = String(date.getMonth() + 1).padStart(2, '0')
     const dd = String(date.getDate()).padStart(2, '0')
     return `${yyyy}-${mm}-${dd}`
   } catch {
     return startIso
+  }
+}
+
+// Helper to calculate Annual Salary based on Frequency and Wages
+function calculateAnnualSalary(wages: number, frequency: string): number {
+  if (frequency === 'Weekly') {
+    return Math.round(wages * 52 * 100) / 100
+  } else if (frequency === 'Monthly') {
+    return Math.round(wages * 12 * 100) / 100
+  } else {
+    // Fortnightly
+    return Math.round(wages * 26 * 100) / 100
   }
 }
 
@@ -86,7 +110,7 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
   // Auto-calculation handler for hours and rate
   const handleHoursRateChange = (hours: number, rate: number) => {
     const calcWages = Math.round(hours * rate * 100) / 100
-    const calcAnnual = Math.round(calcWages * 26 * 100) / 100
+    const calcAnnual = calculateAnnualSalary(calcWages, formData.pay_frequency || 'Fortnightly')
     const calcNet = Math.max(0, Math.round((calcWages - formData.tax_amount) * 100) / 100)
 
     setFormData((prev) => ({
@@ -96,16 +120,42 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
       wages_amount: calcWages,
       wages_total: calcWages,
       total_earnings: calcWages,
-      annual_salary: calcAnnual,
+      annual_salary: prev.show_annual_salary !== false ? calcAnnual : prev.annual_salary,
       net_pay: calcNet,
       payment_amount: calcNet,
     }))
   }
 
-  // Handle Start Date change with Auto Fortnightly selection
+  // Handle Pay Frequency change
+  const handleFrequencyChange = (frequency: 'Weekly' | 'Fortnightly' | 'Monthly') => {
+    const startIso = toInputDateFormat(formData.pay_period_start)
+    let newEndDisplay = formData.pay_period_end
+
+    if (startIso) {
+      const endIso = calculatePeriodEnd(startIso, frequency)
+      newEndDisplay = toDisplayDateFormat(endIso)
+    }
+
+    const calcAnnual = calculateAnnualSalary(formData.total_earnings || 0, frequency)
+
+    // Adjust default hours recommendation if standard
+    let hours = formData.ordinary_hours
+    if (frequency === 'Weekly' && hours === 76) hours = 38
+    else if (frequency === 'Fortnightly' && hours === 38) hours = 76
+
+    setFormData((prev) => ({
+      ...prev,
+      pay_frequency: frequency,
+      pay_period_end: newEndDisplay,
+      ordinary_hours: hours,
+      annual_salary: prev.show_annual_salary !== false ? calcAnnual : prev.annual_salary,
+    }))
+  }
+
+  // Handle Start Date change with Auto Frequency date selection
   const handleStartDateChange = (isoVal: string) => {
     if (!isoVal) return
-    const endIso = calculateFortnightEnd(isoVal)
+    const endIso = calculatePeriodEnd(isoVal, formData.pay_frequency || 'Fortnightly')
     setFormData((prev) => ({
       ...prev,
       pay_period_start: toDisplayDateFormat(isoVal),
@@ -226,6 +276,8 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
     }
   }
 
+  const showAnnual = formData.show_annual_salary !== false
+
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto pb-16">
       {/* Header bar */}
@@ -242,7 +294,7 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
               {isEditing ? 'Edit AIMT Payslip' : 'Generate AIMT Payslip'}
             </h1>
             <p className="text-xs sm:text-sm text-slate-300">
-              Fill in manual details or use default template info to generate and export exact replica PDF.
+              Customize employee, pay frequency, dates, wages, and export replica PDF.
             </p>
           </div>
         </div>
@@ -289,7 +341,7 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
 
       {/* Main Grid: Left Form (Col-5), Right Preview (Col-7) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Form Column (Slightly more compact width) */}
+        {/* Form Column */}
         <div
           className={`lg:col-span-5 space-y-5 ${
             showPreviewMobile ? 'hidden lg:block' : 'block'
@@ -350,7 +402,120 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
             </div>
           </div>
 
-          {/* Card 2: Pay Period & Dates */}
+          {/* Card 2: Employment Details (Pay Frequency, Employment Basis & Optional Annual Salary) */}
+          <div className="bg-[#001E2F] border border-white/10 rounded-2xl p-5 shadow-lg space-y-4">
+            <div className="flex items-center gap-2 text-[#81F5F5] font-semibold text-sm border-b border-white/10 pb-2.5">
+              <Briefcase className="size-4" />
+              <span>Employment & Frequency Details</span>
+            </div>
+
+            <div className="space-y-4">
+              {/* 1. Pay Frequency (Weekly, Fortnightly, Monthly) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Pay Frequency <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['Weekly', 'Fortnightly', 'Monthly'] as const).map((freq) => {
+                    const active = (formData.pay_frequency || 'Fortnightly') === freq
+                    return (
+                      <button
+                        key={freq}
+                        type="button"
+                        onClick={() => handleFrequencyChange(freq)}
+                        className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                          active
+                            ? 'bg-[#81F5F5] text-[#002020] border-[#81F5F5] shadow-md'
+                            : 'bg-[#001724] text-slate-300 border-white/15 hover:border-white/30 hover:text-white'
+                        }`}
+                      >
+                        {active && <Check className="size-3.5 stroke-[3]" />}
+                        <span>{freq}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Employment Basis (Full-time vs Part-time) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Employment Basis <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['Full-time employment', 'Part-time employment'] as const).map((basis) => {
+                    const active = (formData.employment_basis || 'Full-time employment') === basis
+                    return (
+                      <button
+                        key={basis}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, employment_basis: basis })}
+                        className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                          active
+                            ? 'bg-[#0E3E5B] text-[#81F5F5] border-[#81F5F5]/60 shadow-xs'
+                            : 'bg-[#001724] text-slate-300 border-white/15 hover:border-white/30 hover:text-white'
+                        }`}
+                      >
+                        {active && <Check className="size-3.5 text-[#81F5F5]" />}
+                        <span>{basis}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Optional Annual Salary Section */}
+              <div className="pt-2 border-t border-white/10 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-200 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showAnnual}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          show_annual_salary: e.target.checked,
+                          annual_salary:
+                            e.target.checked && (!formData.annual_salary || formData.annual_salary === 0)
+                              ? calculateAnnualSalary(formData.total_earnings || 0, formData.pay_frequency || 'Fortnightly')
+                              : formData.annual_salary,
+                        })
+                      }
+                      className="size-4 rounded bg-[#001724] border-white/20 text-[#81F5F5] focus:ring-[#81F5F5]/40"
+                    />
+                    <span>Show Annual Salary on Payslip</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">Optional</span>
+                </div>
+
+                {showAnnual && (
+                  <div className="pl-6 animate-in fade-in">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.annual_salary || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            annual_salary: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        placeholder="e.g. 104000.00"
+                        className="w-full bg-[#001724] border border-white/20 rounded-xl pl-7 pr-3 py-2 text-xs sm:text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50"
+                      />
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1">
+                      Auto-calculated from {formData.pay_frequency || 'Fortnightly'} earnings ({formData.pay_frequency === 'Weekly' ? '×52' : formData.pay_frequency === 'Monthly' ? '×12' : '×26'}), or enter manual value.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Pay Period & Dates */}
           <div className="bg-[#001E2F] border border-white/10 rounded-2xl p-5 shadow-lg space-y-4">
             <div className="flex items-center gap-2 text-[#81F5F5] font-semibold text-sm border-b border-white/10 pb-2.5">
               <Calendar className="size-4" />
@@ -374,8 +539,8 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Period End Date (Fortnightly)
+                <label className="block text-xs font-semibold text-slate-300 mb-1 truncate" title={`Period End Date (${formData.pay_frequency || 'Fortnightly'})`}>
+                  Period End ({formData.pay_frequency || 'Fortnightly'})
                 </label>
                 <input
                   type="date"
@@ -405,7 +570,7 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
             </div>
           </div>
 
-          {/* Card 3: Salary, Wages & Hours Calculation */}
+          {/* Card 4: Salary, Wages & Hours Calculation */}
           <div className="bg-[#001E2F] border border-white/10 rounded-2xl p-5 shadow-lg space-y-4">
             <div className="flex items-center gap-2 text-[#81F5F5] font-semibold text-sm border-b border-white/10 pb-2.5">
               <DollarSign className="size-4" />
@@ -415,7 +580,7 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Ordinary Hours (e.g. 76)
+                  Ordinary Hours ({formData.pay_frequency === 'Weekly' ? 'e.g. 38' : formData.pay_frequency === 'Monthly' ? 'e.g. 164.67' : 'e.g. 76'})
                 </label>
                 <input
                   type="number"
@@ -425,7 +590,7 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
                     const val = e.target.value === '' ? 0 : parseFloat(e.target.value)
                     handleHoursRateChange(val, formData.hourly_rate)
                   }}
-                  placeholder="76"
+                  placeholder={formData.pay_frequency === 'Weekly' ? '38' : '76'}
                   className="w-full bg-[#001724] border border-white/20 rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50"
                 />
               </div>
@@ -461,11 +626,13 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
                   value={formData.total_earnings}
                   onChange={(e) => {
                     const val = parseFloat(e.target.value) || 0
+                    const calcAnnual = calculateAnnualSalary(val, formData.pay_frequency || 'Fortnightly')
                     setFormData({
                       ...formData,
                       total_earnings: val,
                       wages_amount: val,
                       wages_total: val,
+                      annual_salary: formData.show_annual_salary !== false ? calcAnnual : formData.annual_salary,
                       net_pay: Math.max(0, val - formData.tax_amount),
                       payment_amount: Math.max(0, val - formData.tax_amount),
                     })
@@ -496,16 +663,18 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
                   ${formData.net_pay.toFixed(2)}
                 </span>
               </div>
-              <div>
-                <span className="text-slate-400">Annual Salary: </span>
-                <span className="font-bold text-white">
-                  ${formData.annual_salary.toLocaleString()}
-                </span>
-              </div>
+              {showAnnual && Number(formData.annual_salary || 0) > 0 && (
+                <div>
+                  <span className="text-slate-400">Annual Salary: </span>
+                  <span className="font-bold text-white">
+                    ${formData.annual_salary?.toLocaleString()}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Card 4: Payment Details (Bank & Account) */}
+          {/* Card 5: Payment Details (Bank & Account) */}
           <div className="bg-[#001E2F] border border-white/10 rounded-2xl p-5 shadow-lg space-y-4">
             <div className="flex items-center gap-2 text-[#81F5F5] font-semibold text-sm border-b border-white/10 pb-2.5">
               <CreditCard className="size-4" />
@@ -545,12 +714,12 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
             </div>
           </div>
 
-          {/* Card 5: Fixed / Template Details (Pre-filled Green items) */}
+          {/* Card 6: Fixed / Template Details (Pre-filled items) */}
           <details className="bg-[#001E2F] border border-white/10 rounded-2xl p-4 shadow-lg text-xs group">
             <summary className="font-semibold text-slate-300 cursor-pointer flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-400">
                 <Building className="size-4 text-[#81F5F5]" />
-                <span>Template & Paid By Info (Fixed Green Items)</span>
+                <span>Template & Paid By Info (Fixed Items)</span>
               </div>
               <span className="text-[10px] text-slate-400 uppercase tracking-wider group-open:hidden">
                 Click to expand / override
@@ -589,26 +758,26 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                    Pay Frequency
+                    Address Line 1
                   </label>
                   <input
                     type="text"
-                    value={formData.pay_frequency}
+                    value={formData.paid_by_address_1}
                     onChange={(e) =>
-                      setFormData({ ...formData, pay_frequency: e.target.value })
+                      setFormData({ ...formData, paid_by_address_1: e.target.value })
                     }
                     className="w-full bg-[#001724] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white"
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                    Employment Basis
+                    Address Line 2
                   </label>
                   <input
                     type="text"
-                    value={formData.employment_basis}
+                    value={formData.paid_by_address_2}
                     onChange={(e) =>
-                      setFormData({ ...formData, employment_basis: e.target.value })
+                      setFormData({ ...formData, paid_by_address_2: e.target.value })
                     }
                     className="w-full bg-[#001724] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white"
                   />
@@ -618,7 +787,7 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
           </details>
         </div>
 
-        {/* Right Preview Column (Expanded Width) */}
+        {/* Right Preview Column */}
         <div
           className={`lg:col-span-7 sticky top-6 ${
             showPreviewMobile ? 'block' : 'hidden lg:block'

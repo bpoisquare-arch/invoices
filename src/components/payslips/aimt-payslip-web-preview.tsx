@@ -61,12 +61,14 @@ export default function AIMTPayslipWebPreview({ payslip }: AIMTPayslipWebPreview
               <span className="text-slate-600">Pay Frequency: </span>
               <span className="font-semibold text-slate-900">{payslip.pay_frequency || 'Fortnightly'}</span>
             </div>
-            <div>
-              <span className="text-slate-600">Annual Salary: </span>
-              <span className="font-semibold text-slate-900">
-                {formatCurrency(payslip.annual_salary || 104000)}
-              </span>
-            </div>
+            {payslip.show_annual_salary !== false && Number(payslip.annual_salary || 0) > 0 && (
+              <div>
+                <span className="text-slate-600">Annual Salary: </span>
+                <span className="font-semibold text-slate-900">
+                  {formatCurrency(payslip.annual_salary || 0)}
+                </span>
+              </div>
+            )}
             <div>
               <span className="text-slate-600">Employment Basis: </span>
               <span className="font-semibold text-slate-900">

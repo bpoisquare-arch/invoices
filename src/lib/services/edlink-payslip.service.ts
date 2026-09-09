@@ -18,6 +18,7 @@ export interface EdlinkPayslip {
 
   // Employment Details
   pay_frequency: string
+  show_annual_salary?: boolean
   annual_salary: number
   employment_basis: string
 
@@ -60,6 +61,7 @@ export const DEFAULT_EDLINK_PAYSLIP: Omit<EdlinkPayslip, 'id' | 'created_at'> = 
   address_line_1: '12 Collins Street',
   address_line_2: 'Melbourne VIC 3000',
   pay_frequency: 'Fortnightly',
+  show_annual_salary: true,
   annual_salary: 104000.0,
   employment_basis: 'Full-time employment',
   pay_period_start: '01/04/2025',
