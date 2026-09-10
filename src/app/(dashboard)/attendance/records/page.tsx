@@ -187,39 +187,6 @@ function getRecordStatusFlags(
     date < emp.joining_date.split('T')[0]
   )
 
-  if (isBeforeJoining) {
-    return {
-      isSunday: false,
-      isGazettedHoliday: false,
-      isLeave: false,
-      isAbsent: false,
-      isLate: false,
-      isEarlyLeave: false,
-      isMissingIn: false,
-      isMissingOut: false,
-      isWfh: false,
-      isPresent: false,
-      isBeforeJoining: true,
-      statusLabel: '--',
-    }
-  }
-
-  if (isSunday || isGazettedHoliday) {
-    return {
-      isSunday,
-      isGazettedHoliday,
-      isLeave: false,
-      isAbsent: false,
-      isLate: false,
-      isEarlyLeave: false,
-      isMissingIn: false,
-      isMissingOut: false,
-      isWfh: false,
-      isPresent: false,
-      statusLabel: isSunday ? 'Sunday' : 'Holiday',
-    }
-  }
-
   const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
 
   if (rec) {
@@ -244,6 +211,8 @@ function getRecordStatusFlags(
 
     const isMissingOut = !isWfh && !isLeave && hasInTime && !hasOutTime && outTimePassed
     const isMissingIn = !isWfh && !isLeave && !hasInTime && hasOutTime
+
+    const hasActualData = hasInTime || hasOutTime || (rec.total_working_minutes ? rec.total_working_minutes > 0 : false) || isLeave || isWfh
 
     const isExplicitAbsent =
       rec.arrival_status === 'Absent' ||
@@ -270,7 +239,40 @@ function getRecordStatusFlags(
       }
     }
 
-    if (isExplicitAbsent) {
+    if (isExplicitAbsent && !hasActualData) {
+      if (isBeforeJoining) {
+        return {
+          isSunday: false,
+          isGazettedHoliday: false,
+          isLeave: false,
+          isAbsent: false,
+          isLate: false,
+          isEarlyLeave: false,
+          isMissingIn: false,
+          isMissingOut: false,
+          isWfh: false,
+          isPresent: false,
+          isBeforeJoining: true,
+          statusLabel: '--',
+        }
+      }
+
+      if (isSunday || isGazettedHoliday) {
+        return {
+          isSunday,
+          isGazettedHoliday,
+          isLeave: false,
+          isAbsent: false,
+          isLate: false,
+          isEarlyLeave: false,
+          isMissingIn: false,
+          isMissingOut: false,
+          isWfh: false,
+          isPresent: false,
+          statusLabel: isSunday ? 'Sunday' : 'Holiday',
+        }
+      }
+
       if (isFuture) {
         return {
           isSunday: false,
@@ -286,6 +288,7 @@ function getRecordStatusFlags(
           statusLabel: '',
         }
       }
+
       return {
         isSunday: false,
         isGazettedHoliday: false,
@@ -324,6 +327,39 @@ function getRecordStatusFlags(
   }
 
   // No record in database
+  if (isSunday || isGazettedHoliday) {
+    return {
+      isSunday,
+      isGazettedHoliday,
+      isLeave: false,
+      isAbsent: false,
+      isLate: false,
+      isEarlyLeave: false,
+      isMissingIn: false,
+      isMissingOut: false,
+      isWfh: false,
+      isPresent: false,
+      statusLabel: isSunday ? 'Sunday' : 'Holiday',
+    }
+  }
+
+  if (isBeforeJoining) {
+    return {
+      isSunday: false,
+      isGazettedHoliday: false,
+      isLeave: false,
+      isAbsent: false,
+      isLate: false,
+      isEarlyLeave: false,
+      isMissingIn: false,
+      isMissingOut: false,
+      isWfh: false,
+      isPresent: false,
+      isBeforeJoining: true,
+      statusLabel: '--',
+    }
+  }
+
   if (isPast) {
     return {
       isSunday: false,

@@ -47,6 +47,37 @@ export async function getAllDeductions(): Promise<EmployeeDeduction[]> {
   try {
     const { createClient } = await import('@/lib/supabase/server')
     const supabase = await createClient()
+
+    // 1. Try dedicated employee_deductions table first
+    const { data: dbRows, error: tableError } = await supabase
+      .from('employee_deductions')
+      .select('*')
+
+    if (!tableError && Array.isArray(dbRows) && dbRows.length > 0) {
+      const map = new Map<string, EmployeeDeduction>()
+      fileDeductions.forEach((d) => {
+        const key = `${d.employee_id}_${d.month_year}`.toLowerCase()
+        map.set(key, d)
+      })
+      dbRows.forEach((d: any) => {
+        const key = `${d.employee_id}_${d.month_year}`.toLowerCase()
+        map.set(key, {
+          id: d.id,
+          employee_id: d.employee_id,
+          month_year: d.month_year,
+          amount: Number(d.amount) || 0,
+          note_type: d.note_type || d.notes || 'Other Deduction',
+          notes: d.notes || d.note_type || 'Other Deduction',
+          created_at: d.created_at,
+          updated_at: d.updated_at,
+        })
+      })
+      const merged = Array.from(map.values())
+      inMemoryDeductions = merged
+      return merged
+    }
+
+    // 2. Fallback to audit logs if table is empty
     const { data, error } = await supabase
       .from('attendance_audit_logs')
       .select('details')
@@ -55,13 +86,8 @@ export async function getAllDeductions(): Promise<EmployeeDeduction[]> {
       .limit(1)
       .single()
 
-    if (error) {
-      console.warn('Database deductions fetch warning:', error.message)
-    }
-
     if (data && data.details && Array.isArray(data.details)) {
       const dbDeductions = data.details as unknown as EmployeeDeduction[]
-      // Merge: DB deductions take precedence
       const map = new Map<string, EmployeeDeduction>()
       fileDeductions.forEach((d) => {
         const key = `${d.employee_id}_${d.month_year}`.toLowerCase()
@@ -140,18 +166,25 @@ export async function setEmployeeDeduction(params: {
   inMemoryDeductions = deductions
   writeDeductionsFile(deductions)
 
-  // Persist to Supabase Database
+  // Persist to Supabase Database (both dedicated table and audit log)
   try {
     const { createClient } = await import('@/lib/supabase/server')
     const supabase = await createClient()
-    const { error } = await supabase.from('attendance_audit_logs').insert({
+
+    await supabase.from('employee_deductions').upsert({
+      id: result.id,
+      employee_id: result.employee_id,
+      month_year: result.month_year,
+      amount: result.amount,
+      note_type: result.note_type,
+      notes: result.notes || '',
+      updated_at: now,
+    }, { onConflict: 'employee_id,month_year' })
+
+    await supabase.from('attendance_audit_logs').insert({
       action: 'EMPLOYEE_DEDUCTIONS_STORE',
       details: deductions as any,
     })
-
-    if (error) {
-      console.error('Failed to insert employee deductions to attendance_audit_logs:', error.message)
-    }
   } catch (err) {
     console.error('Error in setEmployeeDeduction db write:', err)
   }
@@ -196,14 +229,17 @@ export async function deleteEmployeeDeduction(
   try {
     const { createClient } = await import('@/lib/supabase/server')
     const supabase = await createClient()
-    const { error } = await supabase.from('attendance_audit_logs').insert({
+
+    await supabase
+      .from('employee_deductions')
+      .delete()
+      .eq('employee_id', employeeId)
+      .eq('month_year', monthYear)
+
+    await supabase.from('attendance_audit_logs').insert({
       action: 'EMPLOYEE_DEDUCTIONS_STORE',
       details: filtered as any,
     })
-
-    if (error) {
-      console.error('Failed to update employee deductions after delete in attendance_audit_logs:', error.message)
-    }
   } catch (err) {
     console.error('Error in deleteEmployeeDeduction db write:', err)
   }

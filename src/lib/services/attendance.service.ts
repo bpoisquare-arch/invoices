@@ -172,12 +172,15 @@ export async function saveEmployeeMetadata(
   try {
     const currentMap = await getEmployeeMetadataMap()
     const existing = currentMap[idOrEmpId] || {}
+    const isOldStaffVal = meta.is_old_staff !== undefined ? Boolean(meta.is_old_staff) : existing.is_old_staff
+    const joiningDateVal = isOldStaffVal ? null : (meta.joining_date !== undefined ? meta.joining_date : existing.joining_date)
+
     currentMap[idOrEmpId] = {
       ...existing,
       ...(meta.branch !== undefined ? { branch: meta.branch || 'Multan' } : {}),
       ...(meta.salary !== undefined ? { salary: meta.salary } : {}),
-      ...(meta.joining_date !== undefined ? { joining_date: meta.joining_date || undefined } : {}),
-      ...(meta.is_old_staff !== undefined ? { is_old_staff: meta.is_old_staff } : {}),
+      joining_date: joiningDateVal || undefined,
+      is_old_staff: isOldStaffVal,
       ...(meta.leave_quotas !== undefined ? { leave_quotas: meta.leave_quotas } : {}),
     }
 
@@ -302,21 +305,30 @@ export async function getEmployees(params?: {
 
     let result: Employee[] = data.map((emp) => {
       const meta = metaMap[emp.id] || metaMap[emp.employee_id] || {}
-      const isOldStaff = meta.is_old_staff !== undefined ? Boolean(meta.is_old_staff) : Boolean((emp as any).is_old_staff)
+      const isOldStaff = emp.is_old_staff !== undefined && emp.is_old_staff !== null
+        ? Boolean(emp.is_old_staff)
+        : (meta.is_old_staff !== undefined ? Boolean(meta.is_old_staff) : false)
+
       const used = usedMap.get(emp.id) || usedMap.get(emp.employee_id) || { annual_leaves: 0, sick_leaves: 0, casual_leaves: 0, wfh_quota: 0, probation_leaves: 0 }
 
-      const initialAnn = meta.leave_quotas?.annual_leaves !== undefined ? Number(meta.leave_quotas.annual_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.annual_leaves ?? 6)
-      const initialSick = meta.leave_quotas?.sick_leaves !== undefined ? Number(meta.leave_quotas.sick_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.sick_leaves ?? 7)
-      const initialCas = meta.leave_quotas?.casual_leaves !== undefined ? Number(meta.leave_quotas.casual_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.casual_leaves ?? 7)
-      const initialWfh = meta.leave_quotas?.wfh_quota !== undefined ? Number(meta.leave_quotas.wfh_quota) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.wfh_quota ?? 4)
-      const initialProb = isOldStaff ? 0 : (meta.leave_quotas?.probation_leaves !== undefined ? Number(meta.leave_quotas.probation_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.probation_leaves ?? 3))
+      const dbQuotas = typeof emp.leave_quotas === 'object' && emp.leave_quotas !== null ? (emp.leave_quotas as any) : null
+      const effectiveQuotas = dbQuotas || meta.leave_quotas || {}
+
+      const initialAnn = effectiveQuotas?.annual_leaves !== undefined ? Number(effectiveQuotas.annual_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.annual_leaves ?? 6)
+      const initialSick = effectiveQuotas?.sick_leaves !== undefined ? Number(effectiveQuotas.sick_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.sick_leaves ?? 7)
+      const initialCas = effectiveQuotas?.casual_leaves !== undefined ? Number(effectiveQuotas.casual_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.casual_leaves ?? 7)
+      const initialWfh = effectiveQuotas?.wfh_quota !== undefined ? Number(effectiveQuotas.wfh_quota) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.wfh_quota ?? 4)
+      const initialProb = isOldStaff ? 0 : (effectiveQuotas?.probation_leaves !== undefined ? Number(effectiveQuotas.probation_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.probation_leaves ?? 3))
+
+      const rawJoining = emp.joining_date || meta.joining_date || null
+      const cleanJoining = isOldStaff ? null : (rawJoining ? rawJoining.split('T')[0] : null)
 
       return {
         ...emp,
         designation: cleanDesignation(emp.designation),
-        branch: meta.branch || emp.branch || 'Multan',
-        salary: meta.salary !== undefined && meta.salary !== null ? meta.salary : (emp.salary !== undefined && emp.salary !== null ? emp.salary : null),
-        joining_date: isOldStaff ? null : (meta.joining_date || emp.joining_date || emp.created_at),
+        branch: emp.branch || meta.branch || 'Multan',
+        salary: emp.salary !== undefined && emp.salary !== null ? emp.salary : (meta.salary !== undefined && meta.salary !== null ? meta.salary : null),
+        joining_date: cleanJoining,
         is_old_staff: isOldStaff,
         leave_quotas: {
           annual_leaves: Math.max(0, Number((initialAnn - used.annual_leaves).toFixed(2))),
@@ -380,21 +392,30 @@ export async function getEmployeeById(idOrEmpId: string): Promise<Employee | nul
     ])
 
     const meta = metaMap[data.id] || metaMap[data.employee_id] || {}
-    const isOldStaff = meta.is_old_staff !== undefined ? Boolean(meta.is_old_staff) : Boolean((data as any).is_old_staff)
+    const isOldStaff = data.is_old_staff !== undefined && data.is_old_staff !== null
+      ? Boolean(data.is_old_staff)
+      : (meta.is_old_staff !== undefined ? Boolean(meta.is_old_staff) : false)
+
     const used = usedMap.get(data.id) || usedMap.get(data.employee_id) || { annual_leaves: 0, sick_leaves: 0, casual_leaves: 0, wfh_quota: 0, probation_leaves: 0 }
 
-    const initialAnn = meta.leave_quotas?.annual_leaves !== undefined ? Number(meta.leave_quotas.annual_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.annual_leaves ?? 6)
-    const initialSick = meta.leave_quotas?.sick_leaves !== undefined ? Number(meta.leave_quotas.sick_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.sick_leaves ?? 7)
-    const initialCas = meta.leave_quotas?.casual_leaves !== undefined ? Number(meta.leave_quotas.casual_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.casual_leaves ?? 7)
-    const initialWfh = meta.leave_quotas?.wfh_quota !== undefined ? Number(meta.leave_quotas.wfh_quota) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.wfh_quota ?? 4)
-    const initialProb = isOldStaff ? 0 : (meta.leave_quotas?.probation_leaves !== undefined ? Number(meta.leave_quotas.probation_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.probation_leaves ?? 3))
+    const dbQuotas = typeof data.leave_quotas === 'object' && data.leave_quotas !== null ? (data.leave_quotas as any) : null
+    const effectiveQuotas = dbQuotas || meta.leave_quotas || {}
+
+    const initialAnn = effectiveQuotas?.annual_leaves !== undefined ? Number(effectiveQuotas.annual_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.annual_leaves ?? 6)
+    const initialSick = effectiveQuotas?.sick_leaves !== undefined ? Number(effectiveQuotas.sick_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.sick_leaves ?? 7)
+    const initialCas = effectiveQuotas?.casual_leaves !== undefined ? Number(effectiveQuotas.casual_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.casual_leaves ?? 7)
+    const initialWfh = effectiveQuotas?.wfh_quota !== undefined ? Number(effectiveQuotas.wfh_quota) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.wfh_quota ?? 4)
+    const initialProb = isOldStaff ? 0 : (effectiveQuotas?.probation_leaves !== undefined ? Number(effectiveQuotas.probation_leaves) : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.probation_leaves ?? 3))
+
+    const rawJoining = data.joining_date || meta.joining_date || null
+    const cleanJoining = isOldStaff ? null : (rawJoining ? rawJoining.split('T')[0] : null)
 
     return {
       ...data,
       designation: cleanDesignation(data.designation),
       branch: data.branch || meta.branch || 'Multan',
-      salary: data.salary !== undefined && data.salary !== null ? data.salary : (meta.salary !== undefined ? meta.salary : null),
-      joining_date: isOldStaff ? null : (data.joining_date || meta.joining_date || data.created_at),
+      salary: data.salary !== undefined && data.salary !== null ? data.salary : (meta.salary !== undefined && meta.salary !== null ? meta.salary : null),
+      joining_date: cleanJoining,
       is_old_staff: isOldStaff,
       leave_quotas: {
         annual_leaves: Math.max(0, Number((initialAnn - used.annual_leaves).toFixed(2))),
@@ -516,6 +537,8 @@ export async function createEmployee(params: {
     branch,
     salary,
     joining_date: joiningDate,
+    is_old_staff: isOldStaff,
+    leave_quotas: leaveQuotas,
     is_active: true,
   }
 
@@ -583,10 +606,26 @@ export async function updateEmployee(
     updateData.salary = params.salary !== null && params.salary !== '' ? Number(params.salary) : null
   }
   if (params.joining_date !== undefined || isOldStaff !== undefined) {
-    updateData.joining_date = isOldStaff ? null : params.joining_date
+    updateData.joining_date = isOldStaff ? null : (params.joining_date || null)
+  }
+  if (isOldStaff !== undefined) {
+    updateData.is_old_staff = isOldStaff
   }
   if (params.is_active !== undefined) {
     updateData.is_active = params.is_active
+  }
+
+  const probationEligible = isWithinProbation(isOldStaff ? null : params.joining_date, isOldStaff)
+
+  const finalQuotas = params.leave_quotas
+    ? {
+        ...params.leave_quotas,
+        probation_leaves: probationEligible ? params.leave_quotas.probation_leaves : 0,
+      }
+    : undefined
+
+  if (finalQuotas !== undefined) {
+    updateData.leave_quotas = finalQuotas
   }
 
   let { data, error } = await supabase
@@ -609,15 +648,6 @@ export async function updateEmployee(
     const res = await supabase.from('employees').update(safeData).eq('id', id).select().single()
     data = res.data
   }
-
-  const probationEligible = isWithinProbation(isOldStaff ? null : params.joining_date, isOldStaff)
-
-  const finalQuotas = params.leave_quotas
-    ? {
-        ...params.leave_quotas,
-        probation_leaves: probationEligible ? params.leave_quotas.probation_leaves : 0,
-      }
-    : undefined
 
   // Persist metadata to DB store
   await saveEmployeeMetadata(id, {
@@ -662,7 +692,7 @@ export async function updateEmployee(
     ...data,
     branch: params.branch !== undefined ? params.branch : (data.branch || 'Multan'),
     salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : (data.salary ?? null),
-    joining_date: isOldStaff ? null : (params.joining_date !== undefined ? params.joining_date : (data.joining_date || data.created_at)),
+    joining_date: isOldStaff ? null : (params.joining_date !== undefined ? params.joining_date : (data.joining_date || null)),
     is_old_staff: isOldStaff !== undefined ? isOldStaff : Boolean(existingMeta.is_old_staff),
     leave_quotas: liveRemQuotas,
     base_leave_quotas: baseQuotas,

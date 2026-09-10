@@ -46,6 +46,36 @@ export async function getAllCommissions(): Promise<EmployeeCommission[]> {
   try {
     const { createClient } = await import('@/lib/supabase/server')
     const supabase = await createClient()
+
+    // 1. Try dedicated employee_commissions table first
+    const { data: dbRows, error: tableError } = await supabase
+      .from('employee_commissions')
+      .select('*')
+
+    if (!tableError && Array.isArray(dbRows) && dbRows.length > 0) {
+      const map = new Map<string, EmployeeCommission>()
+      fileComms.forEach((c) => {
+        const key = `${c.employee_id}_${c.month_year}`.toLowerCase()
+        map.set(key, c)
+      })
+      dbRows.forEach((c: any) => {
+        const key = `${c.employee_id}_${c.month_year}`.toLowerCase()
+        map.set(key, {
+          id: c.id,
+          employee_id: c.employee_id,
+          month_year: c.month_year,
+          amount: Number(c.amount) || 0,
+          notes: c.notes || '',
+          created_at: c.created_at,
+          updated_at: c.updated_at,
+        })
+      })
+      const merged = Array.from(map.values())
+      inMemoryCommissions = merged
+      return merged
+    }
+
+    // 2. Fallback to audit logs if table is empty
     const { data, error } = await supabase
       .from('attendance_audit_logs')
       .select('details')
@@ -54,13 +84,8 @@ export async function getAllCommissions(): Promise<EmployeeCommission[]> {
       .limit(1)
       .single()
 
-    if (error) {
-      console.warn('Database commissions fetch warning:', error.message)
-    }
-
     if (data && data.details && Array.isArray(data.details)) {
       const dbComms = data.details as unknown as EmployeeCommission[]
-      // Merge: DB commissions take precedence
       const map = new Map<string, EmployeeCommission>()
       fileComms.forEach((c) => {
         const key = `${c.employee_id}_${c.month_year}`.toLowerCase()
@@ -134,18 +159,24 @@ export async function setEmployeeCommission(params: {
   inMemoryCommissions = commissions
   writeCommissionsFile(commissions)
 
-  // Persist to Supabase Database
+  // Persist to Supabase Database (both dedicated table and audit log)
   try {
     const { createClient } = await import('@/lib/supabase/server')
     const supabase = await createClient()
-    const { error } = await supabase.from('attendance_audit_logs').insert({
+
+    await supabase.from('employee_commissions').upsert({
+      id: result.id,
+      employee_id: result.employee_id,
+      month_year: result.month_year,
+      amount: result.amount,
+      notes: result.notes || '',
+      updated_at: now,
+    }, { onConflict: 'employee_id,month_year' })
+
+    await supabase.from('attendance_audit_logs').insert({
       action: 'EMPLOYEE_COMMISSIONS_STORE',
       details: commissions as any,
     })
-
-    if (error) {
-      console.error('Failed to insert employee commissions to attendance_audit_logs:', error.message)
-    }
   } catch (err) {
     console.error('Error in setEmployeeCommission db write:', err)
   }
@@ -190,14 +221,17 @@ export async function deleteEmployeeCommission(
   try {
     const { createClient } = await import('@/lib/supabase/server')
     const supabase = await createClient()
-    const { error } = await supabase.from('attendance_audit_logs').insert({
+
+    await supabase
+      .from('employee_commissions')
+      .delete()
+      .eq('employee_id', employeeId)
+      .eq('month_year', monthYear)
+
+    await supabase.from('attendance_audit_logs').insert({
       action: 'EMPLOYEE_COMMISSIONS_STORE',
       details: filtered as any,
     })
-
-    if (error) {
-      console.error('Failed to update employee commissions after delete in attendance_audit_logs:', error.message)
-    }
   } catch (err) {
     console.error('Error in deleteEmployeeCommission db write:', err)
   }

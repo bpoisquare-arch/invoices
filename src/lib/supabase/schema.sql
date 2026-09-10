@@ -253,10 +253,22 @@ CREATE TABLE IF NOT EXISTS public.employees (
     name VARCHAR(255) NOT NULL,
     normalized_name VARCHAR(255) NOT NULL,
     designation VARCHAR(255) NOT NULL,
+    branch VARCHAR(100) DEFAULT 'Multan',
+    salary NUMERIC(12, 2),
+    joining_date DATE,
+    is_old_staff BOOLEAN NOT NULL DEFAULT false,
+    leave_quotas JSONB DEFAULT '{"annual_leaves":6,"sick_leaves":7,"casual_leaves":7,"wfh_quota":4,"probation_leaves":3}'::jsonb,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migrations to ensure existing databases have new employee columns
+ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS branch VARCHAR(100) DEFAULT 'Multan';
+ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS salary NUMERIC(12, 2);
+ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS joining_date DATE;
+ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS is_old_staff BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS leave_quotas JSONB DEFAULT '{"annual_leaves":6,"sick_leaves":7,"casual_leaves":7,"wfh_quota":4,"probation_leaves":3}'::jsonb;
 
 -- 9. EMPLOYEE SEQUENCES TABLE (For atomic gapless EMP-0001, EMP-0002 ID generation)
 CREATE TABLE IF NOT EXISTS public.employee_sequences (
@@ -305,6 +317,40 @@ CREATE TABLE IF NOT EXISTS public.attendance_audit_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 13. GAZETTED HOLIDAYS TABLE
+CREATE TABLE IF NOT EXISTS public.gazetted_holidays (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date DATE NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL DEFAULT 'Gazetted Holiday',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 14. EMPLOYEE COMMISSIONS TABLE
+CREATE TABLE IF NOT EXISTS public.employee_commissions (
+    id TEXT PRIMARY KEY,
+    employee_id VARCHAR(100) NOT NULL,
+    month_year VARCHAR(20) NOT NULL,
+    amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_emp_month_commission UNIQUE (employee_id, month_year)
+);
+
+-- 15. EMPLOYEE DEDUCTIONS TABLE
+CREATE TABLE IF NOT EXISTS public.employee_deductions (
+    id TEXT PRIMARY KEY,
+    employee_id VARCHAR(100) NOT NULL,
+    month_year VARCHAR(20) NOT NULL,
+    amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    note_type VARCHAR(100) DEFAULT 'Other Deduction',
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_emp_month_deduction UNIQUE (employee_id, month_year)
+);
+
 -- Function for atomic sequential Employee ID generation (e.g. EMP-0001)
 CREATE OR REPLACE FUNCTION public.generate_next_employee_id()
 RETURNS VARCHAR(50)
@@ -334,6 +380,9 @@ CREATE INDEX IF NOT EXISTS idx_attendance_records_date ON public.attendance_reco
 CREATE INDEX IF NOT EXISTS idx_attendance_records_arrival_status ON public.attendance_records(arrival_status);
 CREATE INDEX IF NOT EXISTS idx_attendance_records_departure_status ON public.attendance_records(departure_status);
 CREATE INDEX IF NOT EXISTS idx_attendance_audit_logs_created_at ON public.attendance_audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_gazetted_holidays_date ON public.gazetted_holidays(date);
+CREATE INDEX IF NOT EXISTS idx_employee_commissions_lookup ON public.employee_commissions(employee_id, month_year);
+CREATE INDEX IF NOT EXISTS idx_employee_deductions_lookup ON public.employee_deductions(employee_id, month_year);
 
 -- Enable RLS
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
@@ -341,18 +390,68 @@ ALTER TABLE public.employee_sequences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance_audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.gazetted_holidays ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employee_commissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employee_deductions ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated access to employees') THEN
         CREATE POLICY "Allow authenticated access to employees" ON public.employees FOR ALL TO authenticated USING (true) WITH CHECK (true);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon access to employees') THEN
+        CREATE POLICY "Allow anon access to employees" ON public.employees FOR ALL TO anon USING (true) WITH CHECK (true);
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated access to employee_sequences') THEN
         CREATE POLICY "Allow authenticated access to employee_sequences" ON public.employee_sequences FOR ALL TO authenticated USING (true) WITH CHECK (true);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon access to employee_sequences') THEN
+        CREATE POLICY "Allow anon access to employee_sequences" ON public.employee_sequences FOR ALL TO anon USING (true) WITH CHECK (true);
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated access to attendance_settings') THEN
         CREATE POLICY "Allow authenticated access to attendance_settings" ON public.attendance_settings FOR ALL TO authenticated USING (true) WITH CHECK (true);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon access to attendance_settings') THEN
+        CREATE POLICY "Allow anon access to attendance_settings" ON public.attendance_settings FOR ALL TO anon USING (true) WITH CHECK (true);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated access to attendance_records') THEN
+        CREATE POLICY "Allow authenticated access to attendance_records" ON public.attendance_records FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon access to attendance_records') THEN
+        CREATE POLICY "Allow anon access to attendance_records" ON public.attendance_records FOR ALL TO anon USING (true) WITH CHECK (true);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated access to attendance_audit_logs') THEN
+        CREATE POLICY "Allow authenticated access to attendance_audit_logs" ON public.attendance_audit_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon access to attendance_audit_logs') THEN
+        CREATE POLICY "Allow anon access to attendance_audit_logs" ON public.attendance_audit_logs FOR ALL TO anon USING (true) WITH CHECK (true);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated access to gazetted_holidays') THEN
+        CREATE POLICY "Allow authenticated access to gazetted_holidays" ON public.gazetted_holidays FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon access to gazetted_holidays') THEN
+        CREATE POLICY "Allow anon access to gazetted_holidays" ON public.gazetted_holidays FOR ALL TO anon USING (true) WITH CHECK (true);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated access to employee_commissions') THEN
+        CREATE POLICY "Allow authenticated access to employee_commissions" ON public.employee_commissions FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon access to employee_commissions') THEN
+        CREATE POLICY "Allow anon access to employee_commissions" ON public.employee_commissions FOR ALL TO anon USING (true) WITH CHECK (true);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated access to employee_deductions') THEN
+        CREATE POLICY "Allow authenticated access to employee_deductions" ON public.employee_deductions FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon access to employee_deductions') THEN
+        CREATE POLICY "Allow anon access to employee_deductions" ON public.employee_deductions FOR ALL TO anon USING (true) WITH CHECK (true);
+    END IF;
+END $$;
 -- 13. AIMT PAYSLIPS TABLE
 CREATE TABLE IF NOT EXISTS public.aimt_payslips (
     id TEXT PRIMARY KEY,

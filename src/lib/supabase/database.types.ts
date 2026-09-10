@@ -399,6 +399,8 @@ export interface Database {
           branch?: string | null
           salary?: number | null
           joining_date?: string | null
+          is_old_staff?: boolean | null
+          leave_quotas?: Json | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -413,6 +415,8 @@ export interface Database {
           branch?: string | null
           salary?: number | null
           joining_date?: string | null
+          is_old_staff?: boolean | null
+          leave_quotas?: Json | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -427,6 +431,8 @@ export interface Database {
           branch?: string | null
           salary?: number | null
           joining_date?: string | null
+          is_old_staff?: boolean | null
+          leave_quotas?: Json | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -567,6 +573,93 @@ export interface Database {
         }
         Relationships: []
       }
+      gazetted_holidays: {
+        Row: {
+          id: string
+          date: string
+          name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          date: string
+          name?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          date?: string
+          name?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      employee_commissions: {
+        Row: {
+          id: string
+          employee_id: string
+          month_year: string
+          amount: number
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          employee_id: string
+          month_year: string
+          amount?: number
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          employee_id?: string
+          month_year?: string
+          amount?: number
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      employee_deductions: {
+        Row: {
+          id: string
+          employee_id: string
+          month_year: string
+          amount: number
+          note_type: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          employee_id: string
+          month_year: string
+          amount?: number
+          note_type?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          employee_id?: string
+          month_year?: string
+          amount?: number
+          note_type?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           id: string
@@ -685,7 +778,7 @@ export interface EmployeeLeaveQuotas {
   probation_leaves?: number // Default: 3
 }
 
-export type Employee = Database['public']['Tables']['employees']['Row'] & {
+export type Employee = Omit<Database['public']['Tables']['employees']['Row'], 'leave_quotas'> & {
   branch?: string | null
   salary?: number | null
   joining_date?: string | null
@@ -700,6 +793,9 @@ export type AttendanceRecord = Database['public']['Tables']['attendance_records'
 export type AttendanceRecordInsert = Database['public']['Tables']['attendance_records']['Insert']
 export type AttendanceRecordUpdate = Database['public']['Tables']['attendance_records']['Update']
 export type AttendanceAuditLog = Database['public']['Tables']['attendance_audit_logs']['Row']
+export type GazettedHoliday = Database['public']['Tables']['gazetted_holidays']['Row']
+export type EmployeeCommission = Database['public']['Tables']['employee_commissions']['Row']
+export type EmployeeDeduction = Database['public']['Tables']['employee_deductions']['Row']
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type SecurityAuditLog = Database['public']['Tables']['security_audit_logs']['Row']
 
@@ -715,4 +811,5 @@ export interface AttendanceRecordWithEmployee extends AttendanceRecord {
   raw_punches_parsed?: RawPunch[]
   notes?: string | null
 }
+
 

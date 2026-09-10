@@ -183,6 +183,24 @@ export async function getGazettedHolidays(): Promise<Record<string, string>> {
   try {
     const { createClient } = await import('@/lib/supabase/server')
     const supabase = await createClient()
+
+    // 1. Try dedicated gazetted_holidays table first
+    const { data: dbRows, error: tableError } = await supabase
+      .from('gazetted_holidays')
+      .select('*')
+
+    if (!tableError && Array.isArray(dbRows) && dbRows.length > 0) {
+      const holidaysMap: Record<string, string> = { ...fileHolidays }
+      for (const row of dbRows) {
+        if (row.date) {
+          holidaysMap[row.date] = row.name || 'Gazetted Holiday'
+        }
+      }
+      inMemoryHolidays = holidaysMap
+      return holidaysMap
+    }
+
+    // 2. Fallback to audit logs if table is empty or not yet migrated
     const { data, error } = await supabase
       .from('attendance_audit_logs')
       .select('details')
@@ -191,14 +209,10 @@ export async function getGazettedHolidays(): Promise<Record<string, string>> {
       .limit(1)
       .single()
 
-    if (error) {
-      console.warn('Database holidays fetch warning:', error.message)
-    }
-
     if (data && data.details && typeof data.details === 'object') {
       const dbHolidays = data.details as Record<string, string>
-      inMemoryHolidays = dbHolidays
-      return dbHolidays
+      inMemoryHolidays = { ...fileHolidays, ...dbHolidays }
+      return inMemoryHolidays
     }
   } catch (err) {
     console.error('Error fetching gazetted holidays from database:', err)
@@ -216,8 +230,10 @@ export async function saveGazettedHoliday(
   const currentMap = await getGazettedHolidays()
   const updatedMap = { ...currentMap }
 
+  const holidayName = name && name.trim() ? name.trim() : 'Gazetted Holiday'
+
   if (isHoliday) {
-    updatedMap[date] = name && name.trim() ? name.trim() : 'Gazetted Holiday'
+    updatedMap[date] = holidayName
   } else {
     delete updatedMap[date]
   }
@@ -225,23 +241,31 @@ export async function saveGazettedHoliday(
   inMemoryHolidays = updatedMap
   writeHoliday(date, name, isHoliday)
 
-  // 2. Persist to Supabase Database
+  // 2. Persist to Supabase Database (both dedicated table & audit log for backward compatibility)
   try {
     const { createClient } = await import('@/lib/supabase/server')
     const supabase = await createClient()
-    const { error } = await supabase.from('attendance_audit_logs').insert({
+
+    if (isHoliday) {
+      await supabase.from('gazetted_holidays').upsert({
+        date,
+        name: holidayName,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'date' })
+    } else {
+      await supabase.from('gazetted_holidays').delete().eq('date', date)
+    }
+
+    await supabase.from('attendance_audit_logs').insert({
       action: 'GAZETTED_HOLIDAYS_STORE',
       details: updatedMap as any,
     })
-
-    if (error) {
-      console.error('Failed to insert gazetted holidays to attendance_audit_logs:', error.message)
-    }
   } catch (err) {
     console.error('Error in saveGazettedHoliday db write:', err)
   }
 
   return updatedMap
 }
+
 
 
