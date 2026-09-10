@@ -154,7 +154,7 @@ export default function AppSidebar() {
     } else if (pathname.startsWith('/edlink')) {
       setActiveEntity('edlink-au')
       if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'edlink-au')
-    } else if (pathname.startsWith('/installments') || pathname.startsWith('/payslips')) {
+    } else if (pathname.startsWith('/installments') || pathname.startsWith('/payslips') || pathname.startsWith('/reports')) {
       setActiveEntity('aimt')
       if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'aimt')
     } else if (pathname.startsWith('/attendance')) {
@@ -223,6 +223,7 @@ export default function AppSidebar() {
 
   const isInstallmentsActive = pathname.startsWith('/installments')
   const isPayslipsActive = pathname.startsWith('/payslips')
+  const isReportsActive = pathname.startsWith('/reports')
   const isEdLinkPayslipsActive = pathname.startsWith('/edlink/payslips')
   const isStcInstallmentsActive = pathname.startsWith('/stc/installments') || pathname.startsWith('/stc')
 
@@ -230,6 +231,7 @@ export default function AppSidebar() {
   const [payrollOpen, setPayrollOpen] = useState(true)
   const [installmentsOpen, setInstallmentsOpen] = useState(true)
   const [payslipsOpen, setPayslipsOpen] = useState(true)
+  const [reportsOpen, setReportsOpen] = useState(true)
   const [edlinkPayslipsOpen, setEdlinkPayslipsOpen] = useState(true)
   const [stcInstallmentsOpen, setStcInstallmentsOpen] = useState(true)
 
@@ -250,6 +252,10 @@ export default function AppSidebar() {
   }, [isPayslipsActive])
 
   useEffect(() => {
+    if (isReportsActive) setReportsOpen(true)
+  }, [isReportsActive])
+
+  useEffect(() => {
     if (isEdLinkPayslipsActive) setEdlinkPayslipsOpen(true)
   }, [isEdLinkPayslipsActive])
 
@@ -259,7 +265,7 @@ export default function AppSidebar() {
 
   const isStc = activeEntity === 'stc' || pathname.startsWith('/stc')
   const isEdLinkAu = !isStc && (activeEntity === 'edlink-au' || pathname.startsWith('/edlink'))
-  const isAimt = !isStc && !isEdLinkAu && (activeEntity === 'aimt' || pathname.startsWith('/installments') || pathname.startsWith('/payslips'))
+  const isAimt = !isStc && !isEdLinkAu && (activeEntity === 'aimt' || pathname.startsWith('/installments') || pathname.startsWith('/payslips') || pathname.startsWith('/reports'))
   const isEdLinkPk = !isStc && !isAimt && !isEdLinkAu && activeEntity !== 'nsc' && activeEntity !== 'isquare-bpo'
 
   const currentEntityObj =
@@ -556,6 +562,56 @@ export default function AppSidebar() {
                             >
                               <FileText className="size-3.5 shrink-0" />
                               <span>All Payslips</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* 3. Reports Module (Attachment 1 Red Line Placement) */}
+            <SidebarGroup className="p-0 mt-3">
+              <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#81F5F5]/70 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
+                Reports
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <Collapsible
+                    open={reportsOpen}
+                    onOpenChange={setReportsOpen}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton
+                            tooltip="Reports"
+                            className={`text-[13px] font-medium transition-all hover:bg-[#0E3E5B]/80 hover:text-white rounded-lg px-2.5 py-2 ${
+                              isReportsActive
+                                ? 'text-[#81F5F5] bg-[#0E3E5B]'
+                                : 'text-slate-300'
+                            }`}
+                          />
+                        }
+                      >
+                        <FileSpreadsheet className="size-4 shrink-0 text-[#81F5F5]" />
+                        <span className="font-semibold text-slate-200">Reports</span>
+                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
+                          {/* Report Management */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/reports" onClick={handleNavClick} />}
+                              isActive={pathname === '/reports'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <FileText className="size-3.5 shrink-0" />
+                              <span>Report Management</span>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         </SidebarMenuSub>

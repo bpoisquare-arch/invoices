@@ -39,7 +39,10 @@ export async function updateSession(request: NextRequest) {
   const isAuthenticated = !!user || devSession
 
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
-  const isPublicRoute = request.nextUrl.pathname.startsWith('/auth') || request.nextUrl.pathname === '/'
+  const isPublicRoute =
+    request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.startsWith('/api') ||
+    request.nextUrl.pathname === '/'
 
   // Enforce session access control redirects
   if (!isAuthenticated && !isAuthRoute && !isPublicRoute) {
