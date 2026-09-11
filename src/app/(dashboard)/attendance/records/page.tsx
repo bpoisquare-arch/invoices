@@ -55,6 +55,35 @@ import ViewPunchesModal from '@/components/attendance/view-punches-modal'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
 import type ExcelJS from 'exceljs'
 
+// Months List for Quick Selector
+const MONTHS_LIST = [
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+]
+
+// Years List for Quick Selector (2026 to 2030)
+const YEARS_LIST = ['2026', '2027', '2028', '2029', '2030']
+
+// Helper to calculate start & end date of full month
+function getMonthStartAndEnd(yearStr: string, monthStr: string) {
+  const y = parseInt(yearStr, 10)
+  const m = parseInt(monthStr, 10)
+  const start = `${yearStr}-${monthStr.padStart(2, '0')}-01`
+  const lastDay = new Date(y, m, 0).getDate()
+  const end = `${yearStr}-${monthStr.padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  return { start, end }
+}
+
 // Helper to format date to YYYY-MM-DD
 function formatDate(d: Date): string {
   const year = d.getFullYear()
@@ -415,24 +444,64 @@ export default function AttendanceRecordsPage() {
   const [settings, setSettings] = useState<AttendanceSettings | undefined>()
   const [isLoading, setIsLoading] = useState(true)
 
-  // Date Range Defaults: Past 7 days by default
-  const today = useMemo(() => new Date(), [])
-  const defaultEnd = useMemo(() => formatDate(today), [today])
-  const defaultStart = useMemo(() => {
-    const d = new Date()
-    d.setDate(d.getDate() - 6)
-    return formatDate(d)
+  // Date Range Defaults: Current Month by default (1st to last day of current month)
+  const initialDateRange = useMemo(() => {
+    const now = new Date()
+    const yStr = String(now.getFullYear())
+    const mStr = String(now.getMonth() + 1).padStart(2, '0')
+    const activeYear = YEARS_LIST.includes(yStr) ? yStr : '2026'
+    const { start, end } = getMonthStartAndEnd(activeYear, mStr)
+    return {
+      year: activeYear,
+      month: mStr,
+      start,
+      end,
+    }
   }, [])
 
   // Filters State
-  const [startDate, setStartDate] = useState(defaultStart)
-  const [endDate, setEndDate] = useState(defaultEnd)
+  const [selectedQuickMonth, setSelectedQuickMonth] = useState<string>(initialDateRange.month)
+  const [selectedQuickYear, setSelectedQuickYear] = useState<string>(initialDateRange.year)
+  const [startDate, setStartDate] = useState(initialDateRange.start)
+  const [endDate, setEndDate] = useState(initialDateRange.end)
   const [selectedDesignation, setSelectedDesignation] = useState<string>('all')
   const [selectedBranch, setSelectedBranch] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all')
   const [arrivalStatus, setArrivalStatus] = useState<string>('all')
   const [departureStatus, setDepartureStatus] = useState<string>('all')
+
+  // Quick Month Change Handler
+  const handleQuickMonthChange = (newMonth: string) => {
+    setSelectedQuickMonth(newMonth)
+    const { start, end } = getMonthStartAndEnd(selectedQuickYear, newMonth)
+    setStartDate(start)
+    setEndDate(end)
+  }
+
+  // Quick Year Change Handler
+  const handleQuickYearChange = (newYear: string) => {
+    setSelectedQuickYear(newYear)
+    const { start, end } = getMonthStartAndEnd(newYear, selectedQuickMonth)
+    setStartDate(start)
+    setEndDate(end)
+  }
+
+  // Custom Range Change Handler (via DateRangePicker)
+  const handleCustomRangeChange = (s: string, e: string) => {
+    setStartDate(s)
+    setEndDate(e)
+    if (s && e) {
+      const sParts = s.split('-')
+      const eParts = e.split('-')
+      if (sParts[0] === eParts[0] && sParts[1] === eParts[1]) {
+        if (YEARS_LIST.includes(sParts[0])) {
+          setSelectedQuickYear(sParts[0])
+        }
+        setSelectedQuickMonth(sParts[1])
+      }
+    }
+  }
 
   // Checkbox Filters State (Absent, Missing In, Missing Out)
   const [statusFilters, setStatusFilters] = useState<{
@@ -1522,41 +1591,85 @@ export default function AttendanceRecordsPage() {
         </div>
       </div>
 
-      {/* Top Unified Filter Bar with DateRangePicker and Status Checkbox Filters */}
+      {/* Top Unified Filter Bar with DateRangePicker, Quick Month/Year, Designation, Branch, Search & Status Checkbox Filters */}
       <Card className="p-4 shadow-xs border-slate-200/90 space-y-3.5 bg-white">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-3 items-end">
-          {/* 1. Date Range Picker (Unified Start & End) */}
-          <div className="lg:col-span-4 space-y-1">
+        <div className="flex flex-wrap items-end gap-3">
+          {/* 1. Date Range: Quick Month & Year + Range Picker */}
+          <div className="space-y-1">
             <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
               Date Range:
             </label>
-            <DateRangePicker
-              startDate={startDate}
-              endDate={endDate}
-              onStartDateChange={(s) => setStartDate(s)}
-              onEndDateChange={(e) => setEndDate(e)}
-              onRangeChange={(s, e) => {
-                setStartDate(s)
-                setEndDate(e)
-              }}
-            />
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5">
+              {/* Quick Month Select */}
+              <div className="w-[120px] shrink-0">
+                <Select
+                  value={selectedQuickMonth}
+                  onValueChange={(val) => val && handleQuickMonthChange(val)}
+                >
+                  <SelectTrigger className="text-xs border-slate-300 h-9.5 font-semibold rounded-lg bg-slate-50/50 focus:bg-white w-full">
+                    <SelectValue placeholder="Month">
+                      {MONTHS_LIST.find((m) => m.value === selectedQuickMonth)?.label || 'Month'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60 min-w-[135px]">
+                    {MONTHS_LIST.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label} ({m.value})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Quick Year Select */}
+              <div className="w-[82px] shrink-0">
+                <Select
+                  value={selectedQuickYear}
+                  onValueChange={(val) => val && handleQuickYearChange(val)}
+                >
+                  <SelectTrigger className="text-xs border-slate-300 h-9.5 font-semibold rounded-lg bg-slate-50/50 focus:bg-white w-full">
+                    <SelectValue placeholder="Year">
+                      {selectedQuickYear}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60 min-w-[90px]">
+                    {YEARS_LIST.map((yr) => (
+                      <SelectItem key={yr} value={yr}>
+                        {yr}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Custom Date Range Picker */}
+              <div className="w-full sm:w-[280px] shrink-0">
+                <DateRangePicker
+                  startDate={startDate}
+                  endDate={endDate}
+                  onStartDateChange={(s) => setStartDate(s)}
+                  onEndDateChange={(e) => setEndDate(e)}
+                  onRangeChange={handleCustomRangeChange}
+                />
+              </div>
+            </div>
           </div>
 
-          {/* 2. Select Designation */}
-          <div className="lg:col-span-3 space-y-1">
-            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+          {/* 2. Select Designation (Width adjusted to match largest dropdown text) */}
+          <div className="w-full sm:w-[210px] shrink-0 space-y-1">
+            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block truncate">
               Select Designation
             </label>
             <Select
               value={selectedDesignation}
               onValueChange={(val) => setSelectedDesignation(val || 'all')}
             >
-              <SelectTrigger className="text-xs border-slate-300 h-9.5 font-medium rounded-lg bg-slate-50/50 focus:bg-white w-full">
+              <SelectTrigger className="text-xs border-slate-300 h-9.5 font-medium rounded-lg bg-slate-50/50 focus:bg-white w-full truncate">
                 <SelectValue placeholder="ALL DESIGNATIONS">
                   {selectedDesignation === 'all' ? 'ALL DESIGNATIONS' : selectedDesignation}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent className="max-h-64 min-w-[260px]">
+              <SelectContent className="max-h-64 min-w-[240px]">
                 <SelectItem value="all">ALL DESIGNATIONS</SelectItem>
                 {availableDesignations.map((desig) => (
                   <SelectItem key={desig} value={desig}>
@@ -1567,9 +1680,9 @@ export default function AttendanceRecordsPage() {
             </Select>
           </div>
 
-          {/* 3. Branch Filter */}
-          <div className="lg:col-span-2 space-y-1">
-            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+          {/* 3. Branch Filter (Width adjusted to match branches list) */}
+          <div className="w-full sm:w-[135px] shrink-0 space-y-1">
+            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block truncate">
               Branch
             </label>
             <Select
@@ -1581,7 +1694,7 @@ export default function AttendanceRecordsPage() {
                   {selectedBranch === 'all' ? 'ALL BRANCHES' : selectedBranch}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent className="max-h-64 min-w-[180px]">
+              <SelectContent className="max-h-64 min-w-[150px]">
                 <SelectItem value="all">ALL BRANCHES</SelectItem>
                 {availableBranches.map((br) => (
                   <SelectItem key={br} value={br}>
@@ -1592,8 +1705,8 @@ export default function AttendanceRecordsPage() {
             </Select>
           </div>
 
-          {/* 4. Search Bar */}
-          <div className="lg:col-span-3 space-y-1">
+          {/* 4. Search Bar (Flex-1 to fill the remaining width to the right edge) */}
+          <div className="flex-1 min-w-[200px] space-y-1">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
                 Search
@@ -1619,7 +1732,7 @@ export default function AttendanceRecordsPage() {
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <Input
                 type="text"
-                placeholder="Search Name, ID, Branch..."
+                placeholder="Search Name, ID..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 pr-8 text-xs border-slate-300 h-9.5 w-full rounded-lg bg-slate-50/50 focus:bg-white transition-colors"

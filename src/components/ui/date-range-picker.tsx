@@ -60,15 +60,15 @@ export function DateRangePicker({
     : ''
 
   return (
-    <div id="date-range-picker" className={cn("flex items-center gap-2", className)}>
+    <div id="date-range-picker" className={cn("flex items-center gap-1.5", className)}>
       {/* Start Date */}
-      <div className="relative flex-1">
+      <div className="relative flex-1 min-w-0">
         <Popover open={startOpen} onOpenChange={setStartOpen}>
           <PopoverTrigger asChild>
             <div className="relative cursor-pointer group">
-              <div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none text-slate-400 group-hover:text-slate-600 transition-colors">
+              <div className="absolute inset-y-0 start-0 flex items-center ps-2 pointer-events-none text-slate-400 group-hover:text-slate-600 transition-colors">
                 <svg
-                  className="w-4 h-4"
+                  className="w-3.5 h-3.5"
                   aria-hidden="true"
                   xmlns="http://www.w3.org/2000/svg"
                   width="24"
@@ -91,8 +91,8 @@ export function DateRangePicker({
                 type="text"
                 readOnly
                 value={displayStart}
-                className="block w-full ps-9 pe-3 py-2 bg-slate-50/60 hover:bg-white border border-slate-200 hover:border-[#009D9E] text-slate-900 text-xs font-mono font-medium rounded-lg focus:ring-2 focus:ring-[#003D5C] focus:border-[#003D5C] shadow-2xs placeholder:text-slate-400 cursor-pointer transition-all"
-                placeholder="Select date start"
+                className="block w-full ps-6.5 pe-1 py-2 bg-slate-50/60 hover:bg-white border border-slate-200 hover:border-[#009D9E] text-slate-900 text-xs font-mono font-medium rounded-lg focus:ring-2 focus:ring-[#003D5C] focus:border-[#003D5C] shadow-2xs placeholder:text-slate-400 cursor-pointer transition-all"
+                placeholder="Start Date"
               />
             </div>
           </PopoverTrigger>
@@ -106,16 +106,16 @@ export function DateRangePicker({
         </Popover>
       </div>
 
-      <span className="text-slate-400 text-xs font-semibold select-none px-1">to</span>
+      <span className="text-slate-400 text-xs font-semibold select-none px-0.5">to</span>
 
       {/* End Date */}
-      <div className="relative flex-1">
+      <div className="relative flex-1 min-w-0">
         <Popover open={endOpen} onOpenChange={setEndOpen}>
           <PopoverTrigger asChild>
             <div className="relative cursor-pointer group">
-              <div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none text-slate-400 group-hover:text-slate-600 transition-colors">
+              <div className="absolute inset-y-0 start-0 flex items-center ps-2 pointer-events-none text-slate-400 group-hover:text-slate-600 transition-colors">
                 <svg
-                  className="w-4 h-4"
+                  className="w-3.5 h-3.5"
                   aria-hidden="true"
                   xmlns="http://www.w3.org/2000/svg"
                   width="24"
@@ -138,8 +138,8 @@ export function DateRangePicker({
                 type="text"
                 readOnly
                 value={displayEnd}
-                className="block w-full ps-9 pe-3 py-2 bg-slate-50/60 hover:bg-white border border-slate-200 hover:border-[#009D9E] text-slate-900 text-xs font-mono font-medium rounded-lg focus:ring-2 focus:ring-[#003D5C] focus:border-[#003D5C] shadow-2xs placeholder:text-slate-400 cursor-pointer transition-all"
-                placeholder="Select date end"
+                className="block w-full ps-6.5 pe-1 py-2 bg-slate-50/60 hover:bg-white border border-slate-200 hover:border-[#009D9E] text-slate-900 text-xs font-mono font-medium rounded-lg focus:ring-2 focus:ring-[#003D5C] focus:border-[#003D5C] shadow-2xs placeholder:text-slate-400 cursor-pointer transition-all"
+                placeholder="End Date"
               />
             </div>
           </PopoverTrigger>
