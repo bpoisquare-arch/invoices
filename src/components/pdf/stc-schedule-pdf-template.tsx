@@ -350,30 +350,7 @@ export default function STCSchedulePDFTemplate({
               <Text style={styles.tableHeaderText}>INSTALLMENT SCHEDULE</Text>
             </View>
 
-            {/* 2. Column Subheadings Bar */}
-            <View
-              style={{
-                flexDirection: 'row',
-                backgroundColor: '#DCE6F1',
-                borderBottomWidth: 1,
-                borderBottomColor: '#cbd5e1',
-                paddingVertical: 5,
-                paddingHorizontal: 10,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={[styles.colMonth, { color: '#0f172a', fontFamily: 'Helvetica-Bold', fontSize: 8.5 }]}>
-                Date
-              </Text>
-              <Text style={[styles.colDesc, { color: '#0f172a', fontFamily: 'Helvetica-Bold', fontSize: 8.5, textAlign: 'center' }]}>
-                Installment Details
-              </Text>
-              <Text style={[styles.colAmount, { color: '#0f172a', fontFamily: 'Helvetica-Bold', fontSize: 8.5 }]}>
-                Amount (AUD)
-              </Text>
-            </View>
-
-            {/* 3. Installment Rows */}
+            {/* 2. Installment Rows */}
             {items.map((item, idx) => (
               <View key={idx} style={idx % 2 === 0 ? styles.tableRowOdd : styles.tableRowEven}>
                 <Text style={styles.colMonth}>{item.monthLabel}</Text>

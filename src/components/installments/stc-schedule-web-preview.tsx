@@ -209,13 +209,6 @@ export default function STCScheduleWebPreview({
           INSTALLMENT SCHEDULE
         </div>
 
-        {/* Table Column Subheadings */}
-        <div className="grid grid-cols-12 bg-[#DCE6F1] font-bold text-slate-900 py-2 px-3 border-b border-slate-300 text-xs sm:text-[13px]">
-          <div className="col-span-3 text-center">Date</div>
-          <div className="col-span-6 text-center border-l border-slate-300 pl-3">Installment Details</div>
-          <div className="col-span-3 text-right border-l border-slate-300 pl-3">Amount (AUD)</div>
-        </div>
-
         {/* Table Body with alternating #EEF4FB and #DCE6F1 */}
         <div className="divide-y divide-slate-200">
           {items.length > 0 ? (
