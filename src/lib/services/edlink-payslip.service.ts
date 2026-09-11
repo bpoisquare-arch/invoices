@@ -49,9 +49,9 @@ export interface EdlinkPayslip {
 }
 
 export const DEFAULT_EDLINK_PAID_BY = {
-  paid_by_name: 'EdLink Australia PTY Ltd',
-  paid_by_address_1: 'Suite 3, Level 4',
-  paid_by_address_2: '20 Collins Street, Melbourne VIC 3000',
+  paid_by_name: 'EdLink Education & Visa Services',
+  paid_by_address_1: 'Suit 3, Level 4/20',
+  paid_by_address_2: 'Collins Street, Melbourne 3000',
   paid_by_abn: '62 658 488 469',
 }
 
@@ -132,8 +132,24 @@ function toDbPayload(payslip: EdlinkPayslip) {
 }
 
 function fromDbRow(row: any): EdlinkPayslip {
+  const isOldDefaultName =
+    !row.paid_by_name ||
+    row.paid_by_name === 'EdLink Australia PTY Ltd' ||
+    row.paid_by_name === 'EdLink Australia'
+  const isOldDefaultAddr1 =
+    !row.paid_by_address_1 ||
+    row.paid_by_address_1 === 'Suite 3, Level 4' ||
+    row.paid_by_address_1 === 'Suit 3, Level 4'
+  const isOldDefaultAddr2 =
+    !row.paid_by_address_2 ||
+    row.paid_by_address_2 === '20 Collins Street, Melbourne VIC 3000' ||
+    row.paid_by_address_2 === '20 Collins Street, Melbourne 3000'
+
   return {
     ...row,
+    paid_by_name: isOldDefaultName ? 'EdLink Education & Visa Services' : row.paid_by_name,
+    paid_by_address_1: isOldDefaultAddr1 ? 'Suit 3, Level 4/20' : row.paid_by_address_1,
+    paid_by_address_2: isOldDefaultAddr2 ? 'Collins Street, Melbourne 3000' : row.paid_by_address_2,
     show_annual_salary: Number(row.annual_salary || 0) > 0,
   }
 }

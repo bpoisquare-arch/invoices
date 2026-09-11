@@ -31,10 +31,10 @@ export default function EdLinkPayslipWebPreview({ payslip }: EdLinkPayslipWebPre
               PAID BY
             </div>
             <div className="text-slate-800 font-medium">
-              {payslip.paid_by_name || 'EdLink Australia PTY Ltd'}
+              {payslip.paid_by_name || 'EdLink Education & Visa Services'}
             </div>
-            <div className="text-slate-600">{payslip.paid_by_address_1 || 'Suite 3, Level 4'}</div>
-            <div className="text-slate-600">{payslip.paid_by_address_2 || '20 Collins Street, Melbourne VIC 3000'}</div>
+            <div className="text-slate-600">{payslip.paid_by_address_1 || 'Suit 3, Level 4/20'}</div>
+            <div className="text-slate-600">{payslip.paid_by_address_2 || 'Collins Street, Melbourne 3000'}</div>
             <div className="text-slate-600">ABN {payslip.paid_by_abn || '62 658 488 469'}</div>
           </div>
         </div>

@@ -191,9 +191,9 @@ export default function EdLinkPayslipPDFTemplate({ payslip }: EdLinkPayslipPDFTe
           </View>
           <View style={styles.paidByBox}>
             <Text style={styles.paidByTitle}>PAID BY</Text>
-            <Text style={styles.paidByText}>{payslip.paid_by_name || 'EdLink Australia PTY Ltd'}</Text>
-            <Text style={styles.paidByText}>{payslip.paid_by_address_1 || 'Suite 3, Level 4'}</Text>
-            <Text style={styles.paidByText}>{payslip.paid_by_address_2 || '20 Collins Street, Melbourne VIC 3000'}</Text>
+            <Text style={styles.paidByText}>{payslip.paid_by_name || 'EdLink Education & Visa Services'}</Text>
+            <Text style={styles.paidByText}>{payslip.paid_by_address_1 || 'Suit 3, Level 4/20'}</Text>
+            <Text style={styles.paidByText}>{payslip.paid_by_address_2 || 'Collins Street, Melbourne 3000'}</Text>
             <Text style={styles.paidByText}>ABN {payslip.paid_by_abn || '62 658 488 469'}</Text>
           </View>
         </View>

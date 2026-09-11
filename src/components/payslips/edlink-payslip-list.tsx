@@ -388,7 +388,7 @@ export default function EdLinkPayslipList() {
                         {item.employee_name || 'Unnamed Employee'}
                       </div>
                       <div className="text-[11px] text-slate-400">
-                        {item.paid_by_name || 'EdLink Australia'}
+                        {item.paid_by_name || 'EdLink Education & Visa Services'}
                       </div>
                     </td>
 

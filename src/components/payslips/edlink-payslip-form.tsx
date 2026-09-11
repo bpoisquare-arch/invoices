@@ -106,6 +106,9 @@ export default function EdLinkPayslipForm({ initialData, isEditing = false }: Ed
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [showPreviewMobile, setShowPreviewMobile] = useState(false)
 
+  const [hasSaved, setHasSaved] = useState<boolean>(Boolean(isEditing && initialData?.id))
+  const [showSavedModal, setShowSavedModal] = useState<boolean>(false)
+
   // Auto-calculation handler for hours and rate
   const handleHoursRateChange = (hours: number, rate: number) => {
     const calcWages = Math.round(hours * rate * 100) / 100
@@ -203,10 +206,11 @@ export default function EdLinkPayslipForm({ initialData, isEditing = false }: Ed
       const res = await edlinkPayslipService.save(formData)
       if (res.success && res.data) {
         setFormData(res.data)
+        setHasSaved(true)
         setSaveSuccess(true)
-        setTimeout(() => setSaveSuccess(false), 4000)
-        if (!isEditing) {
-          router.push('/edlink/payslips')
+        setShowSavedModal(true)
+        if (!isEditing && typeof window !== 'undefined') {
+          window.history.replaceState(null, '', `/edlink/payslips/${res.data.id}/edit`)
         }
       } else {
         alert(res.error || 'Failed to save payslip.')
@@ -292,7 +296,7 @@ export default function EdLinkPayslipForm({ initialData, isEditing = false }: Ed
           </Link>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-['Montserrat']">
-              {isEditing ? 'Edit EdLink Payslip' : 'Generate EdLink Payslip'}
+              {isEditing || hasSaved ? 'Edit EdLink Payslip' : 'Generate EdLink Payslip'}
             </h1>
             <p className="text-xs sm:text-sm text-slate-300">
               Customize employee, pay frequency, dates, wages, and export replica PDF.
@@ -318,25 +322,94 @@ export default function EdLinkPayslipForm({ initialData, isEditing = false }: Ed
             className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-[#0E3E5B] hover:bg-[#15537a] text-white rounded-xl text-xs sm:text-sm font-semibold transition-all border border-white/20 shadow-md cursor-pointer disabled:opacity-50"
           >
             <Save className="size-4 text-[#81F5F5]" />
-            <span>{saving ? 'Saving...' : 'Save Payslip'}</span>
+            <span>{saving ? 'Saving...' : hasSaved ? 'Save Changes' : 'Save Payslip'}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleDownloadPDF}
-            disabled={downloading}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-[#81F5F5] hover:bg-[#6be0e0] text-[#002020] rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md cursor-pointer disabled:opacity-50"
-          >
-            <Download className="size-4 text-[#002020]" />
-            <span>{downloading ? 'Exporting...' : 'Download PDF'}</span>
-          </button>
+          {/* Download PDF button appears ONLY after saving or when editing an existing saved payslip */}
+          {hasSaved && (
+            <button
+              type="button"
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-[#81F5F5] hover:bg-[#6be0e0] text-[#002020] rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md cursor-pointer disabled:opacity-50 animate-in fade-in duration-200"
+            >
+              <Download className="size-4 text-[#002020]" />
+              <span>{downloading ? 'Exporting...' : 'Download PDF'}</span>
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Success Banner with Download PDF quick action */}
       {saveSuccess && (
-        <div className="flex items-center gap-2.5 p-3.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-sm font-medium animate-in fade-in">
-          <CheckCircle2 className="size-5 shrink-0 text-emerald-400" />
-          <span>Payslip saved to database successfully! You can find it in All Payslips list.</span>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-sm font-medium animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="size-5 shrink-0 text-emerald-400" />
+            <span>
+              Payslip saved successfully! You can download the PDF or find it in All Payslips.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#81F5F5] hover:bg-[#6be0e0] text-[#002020] font-bold rounded-lg text-xs transition-all cursor-pointer shadow"
+            >
+              <Download className="size-3.5" />
+              <span>{downloading ? 'Exporting...' : 'Download PDF'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Post-Save Success & Download PDF Modal */}
+      {showSavedModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#001E2F] border border-[#81F5F5]/30 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 text-center animate-in zoom-in-95 duration-200">
+            <div className="size-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mx-auto text-emerald-400">
+              <CheckCircle2 className="size-9" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-white font-['Montserrat']">
+                Payslip Saved Successfully!
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                The payslip for <span className="text-[#81F5F5] font-semibold">{formData.employee_name || 'Employee'}</span> has been saved to the database.
+              </p>
+            </div>
+
+            <div className="space-y-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  handleDownloadPDF()
+                }}
+                disabled={downloading}
+                className="w-full flex items-center justify-center gap-2.5 px-5 py-3 bg-[#81F5F5] hover:bg-[#6be0e0] text-[#002020] rounded-xl text-sm font-bold transition-all shadow-lg cursor-pointer disabled:opacity-50"
+              >
+                <Download className="size-5 text-[#002020]" />
+                <span>{downloading ? 'Exporting PDF...' : 'Download PDF Now'}</span>
+              </button>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowSavedModal(false)}
+                  className="w-full py-2.5 px-3 bg-white/10 hover:bg-white/15 text-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Continue Editing
+                </button>
+                <Link
+                  href="/edlink/payslips"
+                  className="w-full py-2.5 px-3 bg-[#0E3E5B] hover:bg-[#15537a] text-white rounded-xl text-xs font-semibold transition-colors flex items-center justify-center cursor-pointer"
+                >
+                  All Payslips
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
