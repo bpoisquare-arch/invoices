@@ -252,39 +252,43 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
     }
   }
 
+  function handleStudentIdChange(val: string) {
+    setStudentId(val)
+    const trimmed = val.trim().toLowerCase()
+    if (trimmed) {
+      const match = allSchedules.find(
+        (s) => s.student_id?.trim().toLowerCase() === trimmed && (mode !== 'edit' || s.id !== existingSchedule?.id)
+      )
+      if (match) {
+        if (match.student_name && !studentName) {
+          setStudentName(match.student_name)
+        }
+        if (match.agency && !agency) {
+          setAgency(match.agency)
+        }
+      }
+    }
+  }
+
   return (
-    <div className="space-y-8">
-      {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 text-slate-800 shadow-2xs">
-        <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-xl bg-slate-50 border border-slate-200 p-2 flex items-center justify-center shrink-0 shadow-2xs">
-            <img
-              src="/STC-logo.png"
-              alt="States College Australia"
-              className="max-h-full max-w-full object-contain"
-            />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-md bg-[#009D9E]/10 text-[#009D9E] text-[10px] font-bold uppercase tracking-wider border border-[#009D9E]/20 font-mono">
-                STC
-              </span>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#003D5C] font-['Montserrat']">
-                {mode === 'edit' ? 'Edit Installment Schedule' : 'Create Installment Schedule'}
-              </h1>
-            </div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              States College Australia — Student Payment Planning Module
-            </p>
-          </div>
+    <div className="space-y-6 max-w-[1600px] mx-auto font-sans">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <h1 className="font-['Montserrat'] text-xl sm:text-2xl font-bold text-[#003D5C] tracking-tight">
+            {mode === 'edit' ? 'Edit Installment Schedule' : 'Create Installment Schedule'}
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Configure student course details, duration, fees, and installment breakdown for States College Australia.
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link href="/stc/installments">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Link href="/stc/installments" className="w-full sm:w-auto">
             <Button
               variant="outline"
               size="sm"
-              className="border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
+              className="w-full sm:w-auto border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold h-10 sm:h-9 cursor-pointer justify-center"
             >
               Cancel
             </Button>
@@ -293,17 +297,17 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
             type="submit"
             form="stc-schedule-form"
             disabled={isSubmitting}
-            className="bg-[#003D5C] hover:bg-[#002b40] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+            className="w-full sm:w-auto bg-[#009D9E] hover:bg-[#007A7A] text-white font-bold uppercase text-xs h-10 sm:h-9 gap-2 shadow-xs transition-colors justify-center cursor-pointer"
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
                 Saving...
               </>
             ) : (
               <>
-                <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                {mode === 'edit' ? 'Save Changes' : 'Generate & Save'}
+                <Send className="w-4 h-4" />
+                {mode === 'edit' ? 'UPDATE SCHEDULE' : 'SAVE SCHEDULE'}
               </>
             )}
           </Button>
@@ -311,8 +315,8 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <div className="p-3 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-md flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -320,249 +324,372 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
       {/* Main Grid: Form + Live Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
         {/* Left Form Controls */}
-        <div className="lg:col-span-5 xl:col-span-4 space-y-6">
+        <div className="lg:col-span-5 space-y-6">
           <form id="stc-schedule-form" onSubmit={handleSubmit} className="space-y-6">
-            {/* 1. Student & Course Details */}
-            <Card className="bg-white border border-slate-200/90 text-slate-800 rounded-2xl shadow-2xs">
-              <CardHeader className="pb-3 border-b border-slate-100">
-                <CardTitle className="text-sm font-bold tracking-wide flex items-center gap-2 text-[#003D5C]">
-                  <Layers className="w-4 h-4 text-[#009D9E]" />
-                  1. Student & Course Information
-                </CardTitle>
+            {/* Card 1: Student & Course Information (Exact Sequence from AIMT Attachment) */}
+            <Card className="bg-white border border-[#E2E8F0] shadow-2xs rounded-lg">
+              <CardHeader className="py-4 border-b border-[#E2E8F0] flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="font-['Montserrat'] text-base font-bold text-[#003D5C]">
+                    Student & Course Information
+                  </CardTitle>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    Core identification and enrolled qualifications
+                  </p>
+                </div>
               </CardHeader>
-              <CardContent className="pt-4 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">Schedule Date</Label>
+              <CardContent className="space-y-4 pt-4">
+                {/* Row 1: Student ID & Student Name (2 Columns) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      STUDENT ID *
+                    </Label>
                     <Input
-                      type="date"
-                      value={scheduleDate}
-                      onChange={(e) => setScheduleDate(e.target.value)}
-                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">Student ID</Label>
-                    <Input
-                      type="text"
                       placeholder="e.g. STC20014"
                       value={studentId}
-                      onChange={(e) => setStudentId(e.target.value)}
-                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
+                      onChange={(e) => handleStudentIdChange(e.target.value)}
+                      className="mt-1.5 h-9 text-xs font-mono font-bold text-slate-900"
+                      required
+                    />
+                    {enrolledCoursesForStudent.length > 0 && (
+                      <p className="text-[10.5px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        Auto-filled ({enrolledCoursesForStudent.length} schedule(s) found)
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      STUDENT NAME *
+                    </Label>
+                    <Input
+                      placeholder="e.g. Aqsa Bibi"
+                      value={studentName}
+                      onChange={(e) => setStudentName(e.target.value)}
+                      className="mt-1.5 h-9 text-xs font-semibold text-slate-900"
                       required
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Student Full Name</Label>
+                {/* Row 2: Agency Name (Optional) */}
+                <div>
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px] flex items-center justify-between">
+                    <span>AGENCY NAME (OPTIONAL)</span>
+                    <span className="text-[10px] text-slate-400 font-normal lowercase">
+                      (for schedule list only, not on preview/pdf)
+                    </span>
+                  </Label>
                   <Input
-                    type="text"
-                    placeholder="Enter student's full name"
-                    value={studentName}
-                    onChange={(e) => setStudentName(e.target.value)}
-                    className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
-                    required
+                    placeholder="e.g. Global Education Services, Nexus Visa, etc."
+                    value={agency}
+                    onChange={(e) => setAgency(e.target.value)}
+                    className="mt-1.5 h-9 text-xs font-medium text-slate-900"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Select STC Course</Label>
+                {/* Row 3: Course Name */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      COURSE NAME *
+                    </Label>
+                    {enrolledCoursesForStudent.length > 0 && (
+                      <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        {enrolledCoursesForStudent.length} course(s) disabled
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={selectedCourse}
                     onChange={(e) => handleCourseChange(e.target.value)}
-                    className="w-full h-10 px-3 bg-white border border-slate-200 text-slate-800 text-xs rounded-xl focus:outline-none focus:border-[#009D9E]"
+                    className="mt-1.5 w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#009D9E]"
                   >
                     {STC_COURSES.map((c) => {
-                      const isEnrolled = enrolledCoursesForStudent.includes(c.name.toLowerCase())
+                      const isEnrolled = enrolledCoursesForStudent.includes(c.name.trim().toLowerCase())
                       return (
-                        <option key={c.name} value={c.name} className="bg-white text-slate-800">
-                          {c.name} ({c.duration}) {isEnrolled ? '✓ [Enrolled]' : ''}
+                        <option
+                          key={c.name}
+                          value={c.name}
+                          disabled={isEnrolled}
+                          className={isEnrolled ? 'text-slate-400 bg-slate-100 italic' : ''}
+                        >
+                          {c.name} ({c.duration}) {isEnrolled ? '— [Already Enrolled]' : ''}
                         </option>
                       )
                     })}
                   </select>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">Duration</Label>
+                {/* Row 4: Duration (Weeks) & Schedule Issue Date */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      DURATION (WEEKS)
+                    </Label>
                     <Input
-                      type="text"
                       value={duration}
                       onChange={(e) => setDuration(e.target.value)}
-                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
+                      className="mt-1.5 h-9 text-xs font-medium text-slate-900"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">Agency (Optional)</Label>
-                    <Input
-                      type="text"
-                      placeholder="e.g. EdLink Australia"
-                      value={agency}
-                      onChange={(e) => setAgency(e.target.value)}
-                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">Course Start Date</Label>
+                  <div>
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      SCHEDULE ISSUE DATE
+                    </Label>
                     <Input
                       type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">Course End Date</Label>
-                    <Input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono"
-                      required
+                      value={scheduleDate}
+                      onChange={(e) => setScheduleDate(e.target.value)}
+                      className="mt-1.5 h-9 text-xs font-mono font-medium text-slate-900"
                     />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* 2. Schedule Timeline & Overrides */}
-            <Card className="bg-white border border-slate-200/90 text-slate-800 rounded-2xl shadow-2xs">
-              <CardHeader className="pb-3 border-b border-slate-100">
-                <CardTitle className="text-sm font-bold tracking-wide flex items-center gap-2 text-[#003D5C]">
-                  <Layers className="w-4 h-4 text-[#009D9E]" />
-                  2. Schedule Timeline & Custom Months
+            {/* Card 2: Course Dates (Header Display) */}
+            <Card className="bg-white border border-[#E2E8F0] shadow-2xs rounded-lg">
+              <CardHeader className="py-4 border-b border-[#E2E8F0]">
+                <CardTitle className="font-['Montserrat'] text-base font-bold text-[#003D5C] flex items-center justify-between">
+                  <span>Course Dates (Header Display)</span>
+                  <span className="text-[11px] font-normal text-slate-400">Header Only</span>
                 </CardTitle>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  Controls Start Date & End Date printed on the document header
+                </p>
               </CardHeader>
-              <CardContent className="pt-4 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">
-                      Schedule Start Month (YYYY-MM)
+              <CardContent className="space-y-4 pt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      COURSE START DATE *
+                    </Label>
+                    <Input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="mt-1.5 h-9 text-xs font-medium text-slate-900 font-mono"
+                      required
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      e.g. 21/09/2026 (shows on header)
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      COURSE END DATE *
+                    </Label>
+                    <Input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="mt-1.5 h-9 text-xs font-medium text-slate-900 font-mono"
+                      required
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      e.g. 14/11/2027 (shows on header)
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 3: Installment Schedule Timeline */}
+            <Card className="bg-white border border-[#E2E8F0] shadow-2xs rounded-lg">
+              <CardHeader className="py-4 border-b border-[#E2E8F0]">
+                <CardTitle className="font-['Montserrat'] text-base font-bold text-[#003D5C] flex items-center justify-between">
+                  <span>Installment Schedule Timeline</span>
+                  <span className="text-[11px] font-bold text-[#009D9E] bg-[#009D9E]/10 px-2 py-0.5 rounded">
+                    {calculationResult.scheduleItems.length} Installment{calculationResult.scheduleItems.length !== 1 ? 's' : ''}
+                  </span>
+                </CardTitle>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  Set start and end months for installment schedule table generation
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      SCHEDULE START MONTH *
                     </Label>
                     <Input
                       type="month"
                       value={scheduleStartMonth}
                       onChange={(e) => setScheduleStartMonth(e.target.value)}
-                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono"
+                      className="mt-1.5 h-9 text-xs font-semibold text-slate-900 font-mono"
+                      required
                     />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Timeline starting month (e.g. Sep 2026)
+                    </p>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">
-                      Schedule End Month (YYYY-MM)
+
+                  <div>
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      SCHEDULE END MONTH *
                     </Label>
                     <Input
                       type="month"
                       value={scheduleEndMonth}
                       onChange={(e) => setScheduleEndMonth(e.target.value)}
-                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono"
+                      className="mt-1.5 h-9 text-xs font-semibold text-slate-900 font-mono"
+                      required
                     />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Timeline ending month (e.g. Aug 2027)
+                    </p>
                   </div>
                 </div>
 
+                {/* Optional 1st Installment Custom Month Override */}
                 <div className="pt-2 border-t border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="stcCustomFirstMonthCheckbox"
-                      checked={showCustomFirstMonth}
-                      onChange={(e) => setShowCustomFirstMonth(e.target.checked)}
-                      className="rounded accent-[#009D9E] cursor-pointer"
-                    />
-                    <label
-                      htmlFor="stcCustomFirstMonthCheckbox"
-                      className="text-xs font-semibold text-slate-700 cursor-pointer select-none"
+                  {!showCustomFirstMonth ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCustomFirstMonth(true)}
+                      className="h-8 text-[11px] font-semibold text-slate-600 border-dashed border-slate-300 hover:text-[#009D9E] hover:border-[#009D9E] cursor-pointer"
                     >
-                      Override 1st Installment Month Only
-                    </label>
-                  </div>
-
-                  {showCustomFirstMonth && (
-                    <div className="mt-2.5">
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      + Override 1st Installment Month Only (Optional)
+                    </Button>
+                  ) : (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-md">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                          1ST INSTALLMENT CUSTOM MONTH (OVERRIDE)
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setShowCustomFirstMonth(false)
+                            setCustomFirstMonth('')
+                          }}
+                          className="h-6 text-[11px] text-rose-600 hover:text-rose-800 p-0 cursor-pointer"
+                        >
+                          Reset / Cancel
+                        </Button>
+                      </div>
                       <Input
                         type="month"
                         value={customFirstMonth}
                         onChange={(e) => setCustomFirstMonth(e.target.value)}
-                        className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono max-w-xs"
+                        placeholder="e.g. 2026-08"
+                        className="h-9 text-xs font-semibold text-slate-900 bg-white font-mono"
                       />
+                      <p className="text-[10px] text-slate-500 mt-1.5 leading-tight">
+                        * Modifies only the 1st installment row label. 2nd, 3rd, and subsequent installments will remain strictly on the schedule timeline.
+                      </p>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* 3. Fee Allocations & Initial Fees */}
-            <Card className="bg-white border border-slate-200/90 text-slate-800 rounded-2xl shadow-2xs">
-              <CardHeader className="pb-3 border-b border-slate-100">
-                <CardTitle className="text-sm font-bold tracking-wide flex items-center gap-2 text-[#003D5C]">
-                  <Award className="w-4 h-4 text-[#009D9E]" />
-                  3. Fee Structure & Upfront Payments
-                </CardTitle>
+            {/* Card 4: Fees & Installment Breakdown */}
+            <Card className="bg-white border border-[#E2E8F0] shadow-2xs rounded-lg">
+              <CardHeader className="py-4 border-b border-[#E2E8F0] flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="font-['Montserrat'] text-base font-bold text-[#003D5C]">
+                    Fees & Installment Breakdown
+                  </CardTitle>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    Application fee, Material fee, Tuition fee & Initial payments
+                  </p>
+                </div>
+
+                {!showScholarship && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowScholarship(true)}
+                    className="h-8 text-[11px] gap-1.5 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 font-semibold cursor-pointer"
+                  >
+                    <Award className="w-3.5 h-3.5" />
+                    + Scholarship
+                  </Button>
+                )}
               </CardHeader>
-              <CardContent className="pt-4 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">Application Fee (AUD)</Label>
+              <CardContent className="space-y-4 pt-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="flex flex-col justify-end">
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px] pb-1.5">
+                      APPLICATION
+                    </Label>
                     <Input
                       type="number"
                       value={adminFee}
                       onChange={(e) => setAdminFee(Number(e.target.value))}
-                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
+                      className="h-9 text-xs font-mono"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">Material Fee (AUD)</Label>
+                  <div className="flex flex-col justify-end">
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px] pb-1.5">
+                      MATERIAL
+                    </Label>
                     <Input
                       type="number"
                       value={resourcesFee}
                       onChange={(e) => setResourcesFee(Number(e.target.value))}
-                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
+                      className="h-9 text-xs font-mono"
                     />
                   </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Tuition Fee (AUD)</Label>
-                  <Input
-                    type="number"
-                    value={tuitionFee}
-                    onChange={(e) => setTuitionFee(Number(e.target.value))}
-                    className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
-                  />
-                </div>
-
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold text-emerald-700">Scholarship Discount</Label>
-                    <button
-                      type="button"
-                      onClick={() => setShowScholarship(!showScholarship)}
-                      className="text-[10px] text-[#009D9E] hover:underline font-semibold"
-                    >
-                      {showScholarship ? 'Remove' : '+ Add Scholarship'}
-                    </button>
-                  </div>
-                  {showScholarship && (
+                  <div className="flex flex-col justify-end">
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px] pb-1.5">
+                      TUITION
+                    </Label>
                     <Input
                       type="number"
-                      value={scholarship}
-                      onChange={(e) => setScholarship(Number(e.target.value))}
-                      placeholder="e.g. 1000"
-                      className="bg-emerald-50/50 border-emerald-300 text-emerald-900 text-xs rounded-xl focus:border-emerald-500"
+                      value={tuitionFee}
+                      onChange={(e) => setTuitionFee(Number(e.target.value))}
+                      className="h-9 text-xs font-mono font-bold text-slate-900"
                     />
-                  )}
+                  </div>
                 </div>
 
-                {/* Initial Fees Rows */}
+                {showScholarship && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md flex items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <Label className="text-xs font-bold text-emerald-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                        <Award className="w-4 h-4 text-emerald-600" />
+                        SCHOLARSHIP DISCOUNT (AUD)
+                      </Label>
+                      <Input
+                        type="number"
+                        value={scholarship}
+                        onChange={(e) => setScholarship(Number(e.target.value))}
+                        className="mt-1.5 h-9 text-xs font-mono font-bold text-emerald-900 bg-white"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowScholarship(false)
+                        setScholarship(0)
+                      }}
+                      className="text-xs text-rose-600 hover:text-rose-800 self-end mb-1 cursor-pointer"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+
+                {/* Dynamic Initial Upfront Payments Breakdown */}
                 <div className="pt-3 border-t border-slate-100 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold text-slate-700">
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
                       Initial Upfront Payments Breakdown
                     </Label>
                     <Button
@@ -570,7 +697,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
                       variant="ghost"
                       size="sm"
                       onClick={addInitialFeeRow}
-                      className="h-7 px-2 text-[11px] text-[#009D9E] hover:bg-[#009D9E]/10 rounded-lg font-semibold"
+                      className="h-7 px-2 text-[11px] text-[#009D9E] hover:bg-[#009D9E]/10 rounded-lg font-semibold cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5 mr-1" />
                       Add Initial Fee
@@ -586,7 +713,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
                         type="number"
                         value={fee}
                         onChange={(e) => handleInitialFeeChange(idx, Number(e.target.value))}
-                        className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] flex-1 font-mono"
+                        className="h-9 text-xs font-mono font-semibold text-slate-900 bg-white border-slate-200 flex-1"
                       />
                       {initialFees.length > 1 && (
                         <Button
@@ -603,14 +730,21 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
                   ))}
                 </div>
 
-                {/* Total Calculated Summary */}
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                    Calculated Total:
-                  </span>
-                  <span className="text-base font-black text-[#009D9E] font-mono">
-                    AUD ${calculationResult.totalAmount.toLocaleString()}
-                  </span>
+                {/* Total Calculated Summary Box */}
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-md flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        TOTAL COURSE AMOUNT
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        Application + Material + Tuition {showScholarship && '- Scholarship'}
+                      </span>
+                    </div>
+                    <span className="font-mono text-xl font-extrabold text-[#003D5C]">
+                      AUD {calculationResult.totalAmount.toLocaleString()}
+                    </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -618,8 +752,8 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
         </div>
 
         {/* Right Live Preview */}
-        <div className="lg:col-span-7 xl:col-span-8 sticky top-24">
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+        <div className="lg:col-span-7 sticky top-24">
+          <div className="bg-white border border-[#E2E8F0] shadow-2xs rounded-lg p-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 text-[#009D9E]" />
@@ -632,7 +766,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
               </span>
             </div>
 
-            <div className="max-h-[800px] overflow-y-auto rounded-xl border border-slate-200 bg-slate-100/70 p-3 sm:p-4">
+            <div className="max-h-[850px] overflow-y-auto rounded-xl border border-slate-200 bg-slate-100/70 p-3 sm:p-4">
               <STCScheduleWebPreview schedule={previewScheduleData} fixedInfo={fixedInfo} />
             </div>
           </div>

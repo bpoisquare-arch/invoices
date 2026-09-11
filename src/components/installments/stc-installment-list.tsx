@@ -26,11 +26,18 @@ import {
   Trash2,
   Mail,
   CheckCircle2,
-  AlertCircle,
   CloudUpload,
   AlertTriangle,
   X,
+  Filter,
+  MoreHorizontal,
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
@@ -234,58 +241,52 @@ export default function STCInstallmentList() {
       if (!matchSearch) return false
     }
 
-    if (startDateFilter || endDateFilter) {
-      const schDate = s.date || s.created_at?.split('T')[0]
-      if (startDateFilter && schDate < startDateFilter) return false
-      if (endDateFilter && schDate > endDateFilter) return false
-    }
+    const schDate = s.date || s.created_at?.split('T')[0]
+    if (startDateFilter && schDate < startDateFilter) return false
+    if (endDateFilter && schDate > endDateFilter) return false
 
     return true
   })
 
-  const totalValue = filteredSchedules.reduce((acc, curr) => acc + (Number(curr.total_amount) || 0), 0)
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return 'N/A'
+    if (dateStr.includes('/')) return dateStr
+    const datePart = dateStr.split('T')[0]
+    const parts = datePart.split('-')
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`
+    }
+    return dateStr
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Top Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 text-slate-800 shadow-2xs">
-        <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-xl bg-slate-50 border border-slate-200 p-2 flex items-center justify-center shrink-0 shadow-2xs">
-            <img
-              src="/STC-logo.png"
-              alt="States College Australia"
-              className="max-h-full max-w-full object-contain"
-            />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-md bg-[#009D9E]/10 text-[#009D9E] text-[10px] font-bold uppercase tracking-wider border border-[#009D9E]/20 font-mono">
-                STC
-              </span>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#003D5C] font-['Montserrat']">
-                Installment Schedules
-              </h1>
-            </div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              States College Australia — Dedicated Student Payment Plans
-            </p>
-          </div>
+    <div className="space-y-6 max-w-full mx-auto font-sans">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#003D5C] tracking-tight flex items-center gap-2.5">
+            <GraduationCap className="w-6 h-6 sm:w-7 sm:h-7 text-[#009D9E]" />
+            Student Installment Schedules
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Search, preview, manage and export States College Australia student installment plans.
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Sync Local Storage to Cloud Button */}
+        <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto">
+          {/* Sync to Cloud Button */}
           <Button
             variant="outline"
             size="sm"
             onClick={handleSyncToCloud}
             disabled={syncing}
-            className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 rounded-xl text-xs font-semibold cursor-pointer"
-            title="Upload any local STC schedules from this laptop into Supabase Live Database"
+            className="w-full sm:w-auto h-9 text-xs font-semibold gap-1.5 text-emerald-700 hover:bg-emerald-50 border-emerald-300 justify-center cursor-pointer"
+            title="Upload any local STC schedules into Live Cloud Database"
           >
             {syncing ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin text-emerald-600" />
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin text-emerald-600" />
             ) : (
-              <CloudUpload className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+              <CloudUpload className="w-3.5 h-3.5 mr-1 text-emerald-600" />
             )}
             {syncing ? 'Syncing...' : 'Sync to Cloud'}
           </Button>
@@ -293,20 +294,20 @@ export default function STCInstallmentList() {
           <Button
             variant="outline"
             size="sm"
-            onClick={loadData}
-            disabled={isLoading}
-            className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl text-xs font-semibold cursor-pointer"
+            onClick={resetFilters}
+            className="w-full sm:w-auto h-9 text-xs font-semibold gap-1.5 text-slate-700 hover:bg-slate-100 border-slate-300 justify-center cursor-pointer"
+            title="Refresh Data & Reset Filters"
           >
-            <RotateCcw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <RotateCcw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
 
-          <Link href="/stc/installments/new">
+          <Link href="/stc/installments/new" className="w-full sm:w-auto">
             <Button
               size="sm"
-              className="bg-[#003D5C] hover:bg-[#002b40] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+              className="w-full sm:w-auto bg-[#009D9E] hover:bg-[#007A7A] text-white font-bold uppercase text-xs h-9 gap-2 shadow-xs justify-center cursor-pointer"
             >
-              <PlusCircle className="w-4 h-4 mr-1.5" />
+              <PlusCircle className="w-4 h-4" />
               Create Schedule
             </Button>
           </Link>
@@ -340,236 +341,281 @@ export default function STCInstallmentList() {
         </div>
       )}
 
-      {/* KPI Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 text-slate-800 shadow-2xs">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Schedules</p>
-          <p className="text-2xl font-black mt-1 text-[#009D9E] font-mono">
-            {filteredSchedules.length}
-          </p>
-        </div>
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 text-slate-800 shadow-2xs">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Planned Value</p>
-          <p className="text-2xl font-black mt-1 text-[#003D5C] font-mono">
-            AUD ${totalValue.toLocaleString()}
-          </p>
-        </div>
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 text-slate-800 shadow-2xs">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Average Schedule</p>
-          <p className="text-2xl font-black mt-1 text-slate-700 font-mono">
-            AUD $
-            {filteredSchedules.length > 0
-              ? Math.round(totalValue / filteredSchedules.length).toLocaleString()
-              : 0}
-          </p>
-        </div>
-      </div>
-
-      {/* Filters Bar */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 text-slate-800 shadow-2xs space-y-3">
-        <div className="flex flex-col md:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      {/* Filter / Search & Custom Date Range Bar */}
+      <Card className="p-3.5 sm:p-4 bg-white border-slate-200 shadow-2xs space-y-3 sm:space-y-4">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4">
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-md w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
-              type="text"
-              placeholder="Search by student name, student ID, course, agency..."
+              placeholder="Search by Student ID, Name, Course or Agency..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="bg-slate-50/70 border-slate-200 text-slate-900 pl-10 text-xs rounded-xl focus:bg-white focus:border-[#009D9E] h-10 w-full"
+              className="pl-9 h-9 text-xs font-medium"
             />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
-            {(['all', 'today', '7days', '30days', 'thisMonth', 'custom'] as const).map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => handlePresetChange(preset)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                  datePreset === preset
-                    ? 'bg-[#003D5C] text-white shadow-2xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
-                }`}
-              >
-                {preset === 'all'
-                  ? 'All Time'
-                  : preset === 'today'
-                  ? 'Today'
-                  : preset === '7days'
-                  ? 'Last 7 Days'
-                  : preset === '30days'
-                  ? 'Last 30 Days'
-                  : preset === 'thisMonth'
-                  ? 'This Month'
-                  : 'Custom'}
-              </button>
-            ))}
+          {/* Quick Date Presets */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+            <span className="text-slate-400 text-xs font-bold uppercase tracking-wider mr-1 flex items-center gap-1">
+              <Filter className="w-3 h-3 text-[#009D9E]" /> Filter:
+            </span>
+            <Button
+              variant={datePreset === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handlePresetChange('all')}
+              className={`h-8 text-xs cursor-pointer ${
+                datePreset === 'all' ? 'bg-[#003D5C] text-white' : 'text-slate-700'
+              }`}
+            >
+              All Time
+            </Button>
+            <Button
+              variant={datePreset === 'today' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handlePresetChange('today')}
+              className={`h-8 text-xs cursor-pointer ${
+                datePreset === 'today' ? 'bg-[#003D5C] text-white' : 'text-slate-700'
+              }`}
+            >
+              Today
+            </Button>
+            <Button
+              variant={datePreset === '7days' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handlePresetChange('7days')}
+              className={`h-8 text-xs cursor-pointer ${
+                datePreset === '7days' ? 'bg-[#003D5C] text-white' : 'text-slate-700'
+              }`}
+            >
+              Last 7 Days
+            </Button>
+            <Button
+              variant={datePreset === '30days' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handlePresetChange('30days')}
+              className={`h-8 text-xs cursor-pointer ${
+                datePreset === '30days' ? 'bg-[#003D5C] text-white' : 'text-slate-700'
+              }`}
+            >
+              Last 30 Days
+            </Button>
+            <Button
+              variant={datePreset === 'thisMonth' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handlePresetChange('thisMonth')}
+              className={`h-8 text-xs cursor-pointer ${
+                datePreset === 'thisMonth' ? 'bg-[#003D5C] text-white' : 'text-slate-700'
+              }`}
+            >
+              This Month
+            </Button>
+            <Button
+              variant={datePreset === 'custom' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setDatePreset('custom')}
+              className={`h-8 text-xs cursor-pointer ${
+                datePreset === 'custom' ? 'bg-[#009D9E] text-white' : 'text-slate-700'
+              }`}
+            >
+              Custom Range
+            </Button>
           </div>
         </div>
 
-        {datePreset === 'custom' && (
-          <div className="flex items-center gap-3 pt-3 border-t border-slate-100 bg-slate-50/60 p-2.5 rounded-xl">
+        {/* Custom Date Pickers Row (Visible when Custom Range selected or dates specified) */}
+        {(datePreset === 'custom' || startDateFilter || endDateFilter) && (
+          <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50/80 p-3 rounded-md">
+            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-[#009D9E]" />
+              Custom Date Range:
+            </span>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-600 font-semibold">From:</span>
+              <span className="text-[11px] text-slate-500 font-semibold w-10 sm:w-auto">From:</span>
               <Input
                 type="date"
                 value={startDateFilter}
-                onChange={(e) => setStartDateFilter(e.target.value)}
-                className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl h-8 w-36 font-mono"
+                onChange={(e) => {
+                  setStartDateFilter(e.target.value)
+                  setDatePreset('custom')
+                }}
+                className="h-8 w-full sm:w-36 text-xs font-mono bg-white"
               />
             </div>
+
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-600 font-semibold">To:</span>
+              <span className="text-[11px] text-slate-500 font-semibold w-10 sm:w-auto">To:</span>
               <Input
                 type="date"
                 value={endDateFilter}
-                onChange={(e) => setEndDateFilter(e.target.value)}
-                className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl h-8 w-36 font-mono"
+                onChange={(e) => {
+                  setEndDateFilter(e.target.value)
+                  setDatePreset('custom')
+                }}
+                className="h-8 w-full sm:w-36 text-xs font-mono bg-white"
               />
             </div>
+
+            {(startDateFilter || endDateFilter) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStartDateFilter('')
+                  setEndDateFilter('')
+                  setDatePreset('all')
+                }}
+                className="h-8 text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 font-semibold gap-1 self-start sm:self-auto cursor-pointer"
+              >
+                <X className="w-3 h-3" /> Clear Date Range
+              </Button>
+            )}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Schedules Table */}
-      <Card className="bg-white border border-slate-200/90 text-slate-800 rounded-2xl shadow-2xs overflow-hidden">
+      <Card className="bg-white border-slate-200 shadow-2xs overflow-hidden">
         {isLoading ? (
-          <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
-            <Loader2 className="w-8 h-8 text-[#009D9E] animate-spin" />
-            <p className="text-xs text-slate-500 font-medium">Loading STC installment schedules...</p>
+          <div className="p-12 text-center text-slate-500 flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-[#009D9E]" />
+            <span>Loading schedules...</span>
           </div>
         ) : filteredSchedules.length === 0 ? (
-          <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
+          <div className="p-8 sm:p-12 text-center text-slate-500 space-y-3">
             <GraduationCap className="w-12 h-12 text-slate-300 mx-auto" />
-            <h3 className="text-base font-bold text-slate-700">No Installment Schedules Found</h3>
-            <p className="text-xs text-slate-500 max-w-sm">
-              Create your first student installment schedule for States College Australia.
+            <h3 className="text-base font-bold text-slate-800">No installment schedules found</h3>
+            <p className="text-xs text-slate-500">
+              {search ? 'Try clearing your search term.' : 'Click Create Schedule to generate the first one.'}
             </p>
-            <Link href="/stc/installments/new" className="pt-2">
-              <Button size="sm" className="bg-[#003D5C] hover:bg-[#002b40] text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs">
-                <PlusCircle className="w-4 h-4 mr-1.5" />
-                Create New Schedule
-              </Button>
-            </Link>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200 text-[10.5px]">
-                <tr>
-                  <th className="py-3.5 px-4">Student</th>
-                  <th className="py-3.5 px-4">Student ID</th>
-                  <th className="py-3.5 px-4">Course</th>
-                  <th className="py-3.5 px-4">Timeline</th>
-                  <th className="py-3.5 px-4 text-right">Total Amount</th>
-                  <th className="py-3.5 px-4 text-center">Email Status</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left text-xs border-collapse min-w-[800px] lg:min-w-0">
+              <thead>
+                <tr className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] border-y border-slate-200">
+                  <th className="py-3 px-3 sm:px-3.5 whitespace-nowrap">Student ID</th>
+                  <th className="py-3 px-3 sm:px-3.5 whitespace-nowrap">Student Name</th>
+                  <th className="py-3 px-3 sm:px-3.5 whitespace-nowrap">Course Name</th>
+                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap">Agency</th>
+                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap">Issue Date</th>
+                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap">Start Date</th>
+                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap">End Date</th>
+                  <th className="py-3 px-3 sm:px-3.5 text-right whitespace-nowrap">Total Amount</th>
+                  <th className="py-3 px-3 text-right sticky right-0 bg-slate-50 z-20 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {filteredSchedules.map((schedule) => (
-                  <tr key={schedule.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-slate-900">
-                      <Link
-                        href={`/stc/installments/${schedule.id}/preview`}
-                        className="hover:text-[#009D9E] transition-colors"
-                      >
-                        {schedule.student_name}
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {filteredSchedules.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
+                    <td className="py-3.5 px-3 sm:px-3.5 font-mono font-bold text-blue-700 whitespace-nowrap">
+                      <Link href={`/stc/installments/${item.id}/preview`} className="hover:underline">
+                        {item.student_id}
                       </Link>
-                      {schedule.agency ? (
-                        <span className="block text-[10px] font-normal text-slate-500 mt-0.5">
-                          Agency: {schedule.agency}
-                        </span>
-                      ) : null}
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-slate-600">
-                      {schedule.student_id}
+
+                    <td className="py-3.5 px-3 sm:px-3.5 font-bold text-slate-900 max-w-[140px] truncate" title={item.student_name}>
+                      {item.student_name}
                     </td>
-                    <td className="py-3.5 px-4 max-w-xs truncate text-slate-800" title={schedule.course_name}>
-                      {schedule.course_name}
-                      <span className="block text-[10px] text-slate-500 font-normal">
-                        {schedule.duration}
-                      </span>
+
+                    <td className="py-3.5 px-3 sm:px-3.5 text-slate-700 font-medium max-w-[160px] truncate" title={item.course_name}>
+                      {item.course_name}
                     </td>
-                    <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">
-                      {schedule.start_date} <span className="text-slate-400">→</span> {schedule.end_date}
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-bold text-[#009D9E] font-mono text-sm">
-                      AUD ${Number(schedule.total_amount).toLocaleString()}
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      {schedule.last_email_sent_at ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Sent
+
+                    <td className="py-3.5 px-2.5 sm:px-3 text-slate-700 font-medium max-w-[130px] truncate" title={item.agency || ''}>
+                      {item.agency ? (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10.5px] font-semibold bg-cyan-50 text-cyan-800 border border-cyan-200 truncate max-w-full">
+                          {item.agency}
                         </span>
                       ) : (
-                        <span className="text-[10px] text-slate-400 font-medium">Unsent</span>
+                        <span className="text-slate-400">--</span>
                       )}
                     </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Link href={`/stc/installments/${schedule.id}/preview`} title="View / Print">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-slate-500 hover:text-[#003D5C] hover:bg-slate-100 rounded-lg cursor-pointer"
+
+                    <td className="py-3.5 px-2.5 sm:px-3 text-slate-700 font-medium font-mono text-[11px] whitespace-nowrap">
+                      {formatDate(item.date || item.created_at)}
+                    </td>
+
+                    <td className="py-3.5 px-2.5 sm:px-3 text-slate-600 font-mono text-[11px] whitespace-nowrap">
+                      {formatDate(item.start_date)}
+                    </td>
+
+                    <td className="py-3.5 px-2.5 sm:px-3 text-slate-600 font-mono text-[11px] whitespace-nowrap">
+                      {formatDate(item.end_date)}
+                    </td>
+
+                    <td className="py-3.5 px-3 sm:px-3.5 text-right font-extrabold text-slate-900 text-xs sm:text-sm font-mono whitespace-nowrap">
+                      AUD {Number(item.total_amount).toLocaleString()}
+                    </td>
+
+                    <td className="py-3.5 px-3 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-slate-50 transition-colors z-10 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)]">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="h-7 w-7 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300 transition-colors shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 data-popup-open:bg-slate-100">
+                          <MoreHorizontal className="w-4 h-4" />
+                          <span className="sr-only">Actions</span>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 shadow-lg rounded-xl p-1 text-xs z-50">
+                          <DropdownMenuItem
+                            onClick={() => router.push(`/stc/installments/${item.id}/preview`)}
+                            className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
                           >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Preview</span>
+                          </DropdownMenuItem>
 
-                        <Link href={`/stc/installments/${schedule.id}/edit`} title="Edit Schedule">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-slate-500 hover:text-[#003D5C] hover:bg-slate-100 rounded-lg cursor-pointer"
+                          <DropdownMenuItem
+                            onClick={() => router.push(`/stc/installments/${item.id}/edit`)}
+                            className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
                           >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                            <Edit className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Edit</span>
+                          </DropdownMenuItem>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDownloadPDF(schedule)}
-                          disabled={downloadingId === schedule.id}
-                          title="Download PDF"
-                          className="h-8 w-8 text-slate-500 hover:text-[#009D9E] hover:bg-slate-100 rounded-lg cursor-pointer"
-                        >
-                          {downloadingId === schedule.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-[#009D9E]" />
-                          ) : (
-                            <Download className="w-4 h-4" />
-                          )}
-                        </Button>
+                          <DropdownMenuItem
+                            onClick={() => handleDownloadPDF(item)}
+                            disabled={downloadingId === item.id}
+                            className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
+                          >
+                            {downloadingId === item.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                            ) : (
+                              <Download className="w-3.5 h-3.5 text-emerald-600" />
+                            )}
+                            <span>Download PDF</span>
+                          </DropdownMenuItem>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setScheduleToEmail(schedule)
-                            setEmailModalOpen(true)
-                          }}
-                          title="Email Schedule"
-                          className="h-8 w-8 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg cursor-pointer"
-                        >
-                          <Mail className="w-4 h-4" />
-                        </Button>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setScheduleToEmail(item)
+                              setEmailModalOpen(true)
+                            }}
+                            className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
+                          >
+                            <Mail className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Email Schedule</span>
+                          </DropdownMenuItem>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setScheduleToDelete(schedule)
-                            setDeleteModalOpen(true)
-                          }}
-                          title="Delete Schedule"
-                          className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => {
+                              setScheduleToDelete(item)
+                              setDeleteModalOpen(true)
+                            }}
+                            className="flex items-center gap-2 px-2.5 py-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg cursor-pointer font-medium transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Delete</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))}
