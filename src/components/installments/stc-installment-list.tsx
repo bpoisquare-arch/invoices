@@ -248,9 +248,9 @@ export default function STCInstallmentList() {
   return (
     <div className="space-y-6">
       {/* Top Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#001724] border border-white/10 rounded-2xl p-6 text-white shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 text-slate-800 shadow-2xs">
         <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-xl bg-white p-2 flex items-center justify-center shrink-0 shadow-md">
+          <div className="h-14 w-14 rounded-xl bg-slate-50 border border-slate-200 p-2 flex items-center justify-center shrink-0 shadow-2xs">
             <img
               src="/STC-logo.png"
               alt="States College Australia"
@@ -259,33 +259,33 @@ export default function STCInstallmentList() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-md bg-[#00BF8F]/20 text-[#00BF8F] text-[10px] font-bold uppercase tracking-wider border border-[#00BF8F]/30 font-mono">
+              <span className="px-2 py-0.5 rounded-md bg-[#009D9E]/10 text-[#009D9E] text-[10px] font-bold uppercase tracking-wider border border-[#009D9E]/20 font-mono">
                 STC
               </span>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight font-['Montserrat']">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#003D5C] font-['Montserrat']">
                 Installment Schedules
               </h1>
             </div>
-            <p className="text-xs text-slate-300 font-medium mt-0.5">
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
               States College Australia — Dedicated Student Payment Plans
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Sync Local Storage to Cloud Button */}
           <Button
             variant="outline"
             size="sm"
             onClick={handleSyncToCloud}
             disabled={syncing}
-            className="border-emerald-500/30 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 hover:text-white rounded-xl text-xs font-semibold"
+            className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 rounded-xl text-xs font-semibold cursor-pointer"
             title="Upload any local STC schedules from this laptop into Supabase Live Database"
           >
             {syncing ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin text-emerald-400" />
+              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin text-emerald-600" />
             ) : (
-              <CloudUpload className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />
+              <CloudUpload className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
             )}
             {syncing ? 'Syncing...' : 'Sync to Cloud'}
           </Button>
@@ -295,7 +295,7 @@ export default function STCInstallmentList() {
             size="sm"
             onClick={loadData}
             disabled={isLoading}
-            className="border-white/15 text-slate-300 hover:bg-white/10 hover:text-white rounded-xl text-xs font-semibold"
+            className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl text-xs font-semibold cursor-pointer"
           >
             <RotateCcw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
@@ -304,7 +304,7 @@ export default function STCInstallmentList() {
           <Link href="/stc/installments/new">
             <Button
               size="sm"
-              className="bg-[#00BF8F] hover:bg-[#00a87e] text-[#001E2F] rounded-xl text-xs font-bold shadow-md shadow-[#00BF8F]/20 cursor-pointer"
+              className="bg-[#003D5C] hover:bg-[#002b40] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
             >
               <PlusCircle className="w-4 h-4 mr-1.5" />
               Create Schedule
@@ -316,24 +316,24 @@ export default function STCInstallmentList() {
       {/* Sync Feedback Toast / Banner */}
       {syncFeedback && (
         <div
-          className={`flex items-center justify-between p-4 rounded-xl text-xs sm:text-sm border shadow-md transition-all ${
+          className={`flex items-center justify-between p-4 rounded-xl text-xs sm:text-sm border shadow-xs transition-all ${
             syncFeedback.type === 'success'
-              ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200'
-              : 'bg-amber-950/80 border-amber-500/40 text-amber-200'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-amber-50 border-amber-200 text-amber-800'
           }`}
         >
           <div className="flex items-center gap-2.5">
             {syncFeedback.type === 'success' ? (
-              <CheckCircle2 className="size-5 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="size-5 text-emerald-600 shrink-0" />
             ) : (
-              <AlertTriangle className="size-5 text-amber-400 shrink-0" />
+              <AlertTriangle className="size-5 text-amber-600 shrink-0" />
             )}
             <span>{syncFeedback.message}</span>
           </div>
           <button
             type="button"
             onClick={() => setSyncFeedback(null)}
-            className="p-1 hover:bg-white/10 rounded-md transition-colors"
+            className="p-1 hover:bg-black/5 rounded-md transition-colors"
           >
             <X className="size-4" />
           </button>
@@ -342,21 +342,21 @@ export default function STCInstallmentList() {
 
       {/* KPI Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#001724] border border-white/10 rounded-2xl p-5 text-white shadow-md">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Schedules</p>
-          <p className="text-2xl font-extrabold mt-1 text-[#00BF8F] font-mono">
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 text-slate-800 shadow-2xs">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Schedules</p>
+          <p className="text-2xl font-black mt-1 text-[#009D9E] font-mono">
             {filteredSchedules.length}
           </p>
         </div>
-        <div className="bg-[#001724] border border-white/10 rounded-2xl p-5 text-white shadow-md">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Planned Value</p>
-          <p className="text-2xl font-extrabold mt-1 text-white font-mono">
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 text-slate-800 shadow-2xs">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Planned Value</p>
+          <p className="text-2xl font-black mt-1 text-[#003D5C] font-mono">
             AUD ${totalValue.toLocaleString()}
           </p>
         </div>
-        <div className="bg-[#001724] border border-white/10 rounded-2xl p-5 text-white shadow-md">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Average Schedule</p>
-          <p className="text-2xl font-extrabold mt-1 text-slate-200 font-mono">
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 text-slate-800 shadow-2xs">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Average Schedule</p>
+          <p className="text-2xl font-black mt-1 text-slate-700 font-mono">
             AUD $
             {filteredSchedules.length > 0
               ? Math.round(totalValue / filteredSchedules.length).toLocaleString()
@@ -366,7 +366,7 @@ export default function STCInstallmentList() {
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-[#001724] border border-white/10 rounded-2xl p-4 text-white shadow-md space-y-3">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 text-slate-800 shadow-2xs space-y-3">
         <div className="flex flex-col md:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -375,7 +375,7 @@ export default function STCInstallmentList() {
               placeholder="Search by student name, student ID, course, agency..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="bg-[#001E2F] border-white/15 text-white pl-10 text-xs rounded-xl focus:border-[#00BF8F] h-10 w-full"
+              className="bg-slate-50/70 border-slate-200 text-slate-900 pl-10 text-xs rounded-xl focus:bg-white focus:border-[#009D9E] h-10 w-full"
             />
           </div>
 
@@ -387,8 +387,8 @@ export default function STCInstallmentList() {
                 onClick={() => handlePresetChange(preset)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                   datePreset === preset
-                    ? 'bg-[#00BF8F] text-[#001E2F]'
-                    : 'bg-[#001E2F] text-slate-300 hover:bg-white/10'
+                    ? 'bg-[#003D5C] text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
                 }`}
               >
                 {preset === 'all'
@@ -408,23 +408,23 @@ export default function STCInstallmentList() {
         </div>
 
         {datePreset === 'custom' && (
-          <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+          <div className="flex items-center gap-3 pt-3 border-t border-slate-100 bg-slate-50/60 p-2.5 rounded-xl">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400 font-medium">From:</span>
+              <span className="text-xs text-slate-600 font-semibold">From:</span>
               <Input
                 type="date"
                 value={startDateFilter}
                 onChange={(e) => setStartDateFilter(e.target.value)}
-                className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl h-8 w-36"
+                className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl h-8 w-36 font-mono"
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400 font-medium">To:</span>
+              <span className="text-xs text-slate-600 font-semibold">To:</span>
               <Input
                 type="date"
                 value={endDateFilter}
                 onChange={(e) => setEndDateFilter(e.target.value)}
-                className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl h-8 w-36"
+                className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl h-8 w-36 font-mono"
               />
             </div>
           </div>
@@ -432,21 +432,21 @@ export default function STCInstallmentList() {
       </div>
 
       {/* Schedules Table */}
-      <Card className="bg-[#001724] border-white/10 text-white rounded-2xl shadow-xl overflow-hidden">
+      <Card className="bg-white border border-slate-200/90 text-slate-800 rounded-2xl shadow-2xs overflow-hidden">
         {isLoading ? (
           <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
-            <Loader2 className="w-8 h-8 text-[#00BF8F] animate-spin" />
-            <p className="text-xs text-slate-400 font-medium">Loading STC installment schedules...</p>
+            <Loader2 className="w-8 h-8 text-[#009D9E] animate-spin" />
+            <p className="text-xs text-slate-500 font-medium">Loading STC installment schedules...</p>
           </div>
         ) : filteredSchedules.length === 0 ? (
           <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
-            <GraduationCap className="w-12 h-12 text-slate-600" />
-            <h3 className="text-base font-bold text-slate-300">No Installment Schedules Found</h3>
-            <p className="text-xs text-slate-400 max-w-sm">
+            <GraduationCap className="w-12 h-12 text-slate-300 mx-auto" />
+            <h3 className="text-base font-bold text-slate-700">No Installment Schedules Found</h3>
+            <p className="text-xs text-slate-500 max-w-sm">
               Create your first student installment schedule for States College Australia.
             </p>
             <Link href="/stc/installments/new" className="pt-2">
-              <Button size="sm" className="bg-[#00BF8F] hover:bg-[#00a87e] text-[#001E2F] font-bold rounded-xl text-xs">
+              <Button size="sm" className="bg-[#003D5C] hover:bg-[#002b40] text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs">
                 <PlusCircle className="w-4 h-4 mr-1.5" />
                 Create New Schedule
               </Button>
@@ -455,7 +455,7 @@ export default function STCInstallmentList() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-[#001E2F] text-slate-400 uppercase tracking-wider font-semibold border-b border-white/10 text-[11px]">
+              <thead className="bg-slate-50/80 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200 text-[10.5px]">
                 <tr>
                   <th className="py-3.5 px-4">Student</th>
                   <th className="py-3.5 px-4">Student ID</th>
@@ -466,54 +466,54 @@ export default function STCInstallmentList() {
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 text-slate-200">
+              <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredSchedules.map((schedule) => (
-                  <tr key={schedule.id} className="hover:bg-white/5 transition-colors">
-                    <td className="py-3 px-4 font-bold text-white">
+                  <tr key={schedule.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-slate-900">
                       <Link
                         href={`/stc/installments/${schedule.id}/preview`}
-                        className="hover:text-[#00BF8F] transition-colors"
+                        className="hover:text-[#009D9E] transition-colors"
                       >
                         {schedule.student_name}
                       </Link>
                       {schedule.agency ? (
-                        <span className="block text-[10px] font-normal text-slate-400 mt-0.5">
+                        <span className="block text-[10px] font-normal text-slate-500 mt-0.5">
                           Agency: {schedule.agency}
                         </span>
                       ) : null}
                     </td>
-                    <td className="py-3 px-4 font-mono text-slate-300">
+                    <td className="py-3.5 px-4 font-mono text-slate-600">
                       {schedule.student_id}
                     </td>
-                    <td className="py-3 px-4 max-w-xs truncate text-slate-300" title={schedule.course_name}>
+                    <td className="py-3.5 px-4 max-w-xs truncate text-slate-800" title={schedule.course_name}>
                       {schedule.course_name}
-                      <span className="block text-[10px] text-slate-400 font-normal">
+                      <span className="block text-[10px] text-slate-500 font-normal">
                         {schedule.duration}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-slate-300 font-mono text-[11px]">
-                      {schedule.start_date} <span className="text-slate-500">→</span> {schedule.end_date}
+                    <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">
+                      {schedule.start_date} <span className="text-slate-400">→</span> {schedule.end_date}
                     </td>
-                    <td className="py-3 px-4 text-right font-bold text-[#00BF8F] font-mono">
+                    <td className="py-3.5 px-4 text-right font-bold text-[#009D9E] font-mono text-sm">
                       AUD ${Number(schedule.total_amount).toLocaleString()}
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3.5 px-4 text-center">
                       {schedule.last_email_sent_at ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <CheckCircle2 className="w-3 h-3" />
                           Sent
                         </span>
                       ) : (
-                        <span className="text-[10px] text-slate-500 font-medium">Unsent</span>
+                        <span className="text-[10px] text-slate-400 font-medium">Unsent</span>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <Link href={`/stc/installments/${schedule.id}/preview`} title="View / Print">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg"
+                            className="h-8 w-8 text-slate-500 hover:text-[#003D5C] hover:bg-slate-100 rounded-lg cursor-pointer"
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
@@ -523,7 +523,7 @@ export default function STCInstallmentList() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg"
+                            className="h-8 w-8 text-slate-500 hover:text-[#003D5C] hover:bg-slate-100 rounded-lg cursor-pointer"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -535,10 +535,10 @@ export default function STCInstallmentList() {
                           onClick={() => handleDownloadPDF(schedule)}
                           disabled={downloadingId === schedule.id}
                           title="Download PDF"
-                          className="h-8 w-8 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg"
+                          className="h-8 w-8 text-slate-500 hover:text-[#009D9E] hover:bg-slate-100 rounded-lg cursor-pointer"
                         >
                           {downloadingId === schedule.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-[#00BF8F]" />
+                            <Loader2 className="w-4 h-4 animate-spin text-[#009D9E]" />
                           ) : (
                             <Download className="w-4 h-4" />
                           )}
@@ -552,7 +552,7 @@ export default function STCInstallmentList() {
                             setEmailModalOpen(true)
                           }}
                           title="Email Schedule"
-                          className="h-8 w-8 text-slate-300 hover:text-[#00BF8F] hover:bg-[#00BF8F]/10 rounded-lg"
+                          className="h-8 w-8 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg cursor-pointer"
                         >
                           <Mail className="w-4 h-4" />
                         </Button>
@@ -565,7 +565,7 @@ export default function STCInstallmentList() {
                             setDeleteModalOpen(true)
                           }}
                           title="Delete Schedule"
-                          className="h-8 w-8 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg"
+                          className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -589,15 +589,15 @@ export default function STCInstallmentList() {
 
       {/* Delete Modal */}
       <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
-        <DialogContent className="sm:max-w-md bg-[#001724] border border-white/10 text-white shadow-2xl p-6 rounded-2xl">
+        <DialogContent className="sm:max-w-md bg-white border border-slate-200 text-slate-900 shadow-2xl p-6 rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-rose-400 flex items-center gap-2">
+            <DialogTitle className="text-base font-bold text-rose-600 flex items-center gap-2">
               <Trash2 className="w-5 h-5" />
               Delete Installment Schedule
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-300 pt-2">
+            <DialogDescription className="text-xs text-slate-600 pt-2">
               Are you sure you want to delete the installment schedule for{' '}
-              <strong className="text-white">{scheduleToDelete?.student_name}</strong> (
+              <strong className="text-slate-900">{scheduleToDelete?.student_name}</strong> (
               {scheduleToDelete?.student_id})? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
@@ -606,7 +606,7 @@ export default function STCInstallmentList() {
               variant="outline"
               size="sm"
               onClick={() => setDeleteModalOpen(false)}
-              className="border-white/15 text-slate-300 hover:bg-white/10 text-xs rounded-xl"
+              className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs rounded-xl cursor-pointer"
             >
               Cancel
             </Button>
@@ -615,7 +615,7 @@ export default function STCInstallmentList() {
               size="sm"
               onClick={confirmDelete}
               disabled={isDeleting}
-              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl"
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs"
             >
               {isDeleting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
               Confirm Delete

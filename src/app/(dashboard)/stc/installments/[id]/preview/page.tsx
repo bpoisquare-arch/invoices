@@ -108,8 +108,8 @@ export default function STCInstallmentPreviewPage() {
 
   if (isLoading) {
     return (
-      <div className="p-16 text-center text-slate-400 flex items-center justify-center gap-3">
-        <Loader2 className="w-6 h-6 animate-spin text-[#00BF8F]" />
+      <div className="p-16 text-center text-slate-500 flex items-center justify-center gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-[#009D9E]" />
         <span className="text-sm font-medium">Loading STC Schedule Preview...</span>
       </div>
     )
@@ -117,11 +117,11 @@ export default function STCInstallmentPreviewPage() {
 
   if (!schedule) {
     return (
-      <div className="p-16 text-center text-slate-400 space-y-4">
-        <h2 className="text-xl font-bold text-white">Schedule Not Found</h2>
-        <p className="text-xs text-slate-400">The requested schedule does not exist or has been removed.</p>
+      <div className="p-16 text-center text-slate-500 space-y-4">
+        <h2 className="text-xl font-bold text-slate-800">Schedule Not Found</h2>
+        <p className="text-xs text-slate-500">The requested schedule does not exist or has been removed.</p>
         <Link href="/stc/installments">
-          <Button size="sm" className="bg-[#00BF8F] text-[#001E2F] font-bold rounded-xl text-xs">
+          <Button size="sm" className="bg-[#003D5C] hover:bg-[#002b40] text-white font-bold rounded-xl text-xs">
             Back to Schedules
           </Button>
         </Link>
@@ -132,23 +132,23 @@ export default function STCInstallmentPreviewPage() {
   return (
     <div className="space-y-6">
       {/* Top Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#001724] border border-white/10 rounded-2xl p-5 text-white shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 text-slate-800 shadow-2xs">
         <div className="flex items-center gap-3">
           <Link href="/stc/installments">
             <Button
               variant="outline"
               size="sm"
-              className="border-white/15 text-slate-300 hover:bg-white/10 hover:text-white rounded-xl text-xs"
+              className="border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4 mr-1.5" />
               Back
             </Button>
           </Link>
           <div>
-            <h1 className="text-lg font-bold font-['Montserrat'] tracking-tight">
+            <h1 className="text-lg font-bold font-['Montserrat'] tracking-tight text-[#003D5C]">
               {schedule.student_name}
             </h1>
-            <p className="text-xs text-slate-400 font-mono">
+            <p className="text-xs text-slate-500 font-mono">
               ID: {schedule.student_id} • {schedule.course_name}
             </p>
           </div>
@@ -159,7 +159,7 @@ export default function STCInstallmentPreviewPage() {
             <Button
               variant="outline"
               size="sm"
-              className="border-white/15 text-slate-200 hover:bg-white/10 rounded-xl text-xs font-semibold"
+              className="border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
             >
               <Edit className="w-4 h-4 mr-1.5" />
               Edit
@@ -170,7 +170,7 @@ export default function STCInstallmentPreviewPage() {
             variant="outline"
             size="sm"
             onClick={handlePrint}
-            className="border-white/15 text-slate-200 hover:bg-white/10 rounded-xl text-xs font-semibold"
+            className="border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
           >
             <Printer className="w-4 h-4 mr-1.5" />
             Print
@@ -180,7 +180,7 @@ export default function STCInstallmentPreviewPage() {
             variant="outline"
             size="sm"
             onClick={() => setEmailModalOpen(true)}
-            className="border-white/15 text-[#00BF8F] hover:bg-[#00BF8F]/10 rounded-xl text-xs font-semibold"
+            className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-semibold cursor-pointer"
           >
             <Mail className="w-4 h-4 mr-1.5" />
             Email Schedule
@@ -190,7 +190,7 @@ export default function STCInstallmentPreviewPage() {
             size="sm"
             onClick={handleDownloadPDF}
             disabled={isDownloading}
-            className="bg-[#00BF8F] hover:bg-[#00a87e] text-[#001E2F] rounded-xl text-xs font-bold shadow-md cursor-pointer"
+            className="bg-[#003D5C] hover:bg-[#002b40] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
           >
             {isDownloading ? (
               <>
@@ -208,7 +208,7 @@ export default function STCInstallmentPreviewPage() {
       </div>
 
       {/* Main Web Preview Component */}
-      <div className="flex justify-center p-2 sm:p-6 bg-[#001724] border border-white/10 rounded-2xl shadow-2xl overflow-x-auto">
+      <div className="flex justify-center p-3 sm:p-8 bg-slate-100/80 border border-slate-200/90 rounded-2xl shadow-xs overflow-x-auto">
         <STCScheduleWebPreview schedule={schedule} fixedInfo={fixedInfo} />
       </div>
 

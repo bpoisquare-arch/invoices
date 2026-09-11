@@ -255,9 +255,9 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
   return (
     <div className="space-y-8">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#001724] border border-white/10 rounded-2xl p-6 text-white shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 text-slate-800 shadow-2xs">
         <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-xl bg-white p-2 flex items-center justify-center shrink-0 shadow-md">
+          <div className="h-14 w-14 rounded-xl bg-slate-50 border border-slate-200 p-2 flex items-center justify-center shrink-0 shadow-2xs">
             <img
               src="/STC-logo.png"
               alt="States College Australia"
@@ -266,14 +266,14 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-md bg-[#00BF8F]/20 text-[#00BF8F] text-[10px] font-bold uppercase tracking-wider border border-[#00BF8F]/30 font-mono">
+              <span className="px-2 py-0.5 rounded-md bg-[#009D9E]/10 text-[#009D9E] text-[10px] font-bold uppercase tracking-wider border border-[#009D9E]/20 font-mono">
                 STC
               </span>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight font-['Montserrat']">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#003D5C] font-['Montserrat']">
                 {mode === 'edit' ? 'Edit Installment Schedule' : 'Create Installment Schedule'}
               </h1>
             </div>
-            <p className="text-xs text-slate-300 font-medium mt-0.5">
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
               States College Australia — Student Payment Planning Module
             </p>
           </div>
@@ -284,7 +284,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
             <Button
               variant="outline"
               size="sm"
-              className="border-white/20 text-slate-200 hover:bg-white/10 hover:text-white rounded-xl text-xs font-semibold"
+              className="border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
             >
               Cancel
             </Button>
@@ -293,7 +293,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
             type="submit"
             form="stc-schedule-form"
             disabled={isSubmitting}
-            className="bg-[#00BF8F] hover:bg-[#00a87e] text-[#001E2F] rounded-xl text-xs font-bold shadow-md shadow-[#00BF8F]/20 cursor-pointer"
+            className="bg-[#003D5C] hover:bg-[#002b40] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
           >
             {isSubmitting ? (
               <>
@@ -311,7 +311,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>
@@ -323,61 +323,61 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
         <div className="lg:col-span-5 xl:col-span-4 space-y-6">
           <form id="stc-schedule-form" onSubmit={handleSubmit} className="space-y-6">
             {/* 1. Student & Course Details */}
-            <Card className="bg-[#001724] border-white/10 text-white rounded-2xl shadow-lg">
-              <CardHeader className="pb-3 border-b border-white/5">
-                <CardTitle className="text-sm font-bold tracking-wide flex items-center gap-2 text-[#00BF8F]">
-                  <Layers className="w-4 h-4" />
+            <Card className="bg-white border border-slate-200/90 text-slate-800 rounded-2xl shadow-2xs">
+              <CardHeader className="pb-3 border-b border-slate-100">
+                <CardTitle className="text-sm font-bold tracking-wide flex items-center gap-2 text-[#003D5C]">
+                  <Layers className="w-4 h-4 text-[#009D9E]" />
                   1. Student & Course Information
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">Schedule Date</Label>
+                    <Label className="text-xs font-bold text-slate-700">Schedule Date</Label>
                     <Input
                       type="date"
                       value={scheduleDate}
                       onChange={(e) => setScheduleDate(e.target.value)}
-                      className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono"
                       required
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">Student ID</Label>
+                    <Label className="text-xs font-bold text-slate-700">Student ID</Label>
                     <Input
                       type="text"
                       placeholder="e.g. STC20014"
                       value={studentId}
                       onChange={(e) => setStudentId(e.target.value)}
-                      className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
                       required
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-300">Student Full Name</Label>
+                  <Label className="text-xs font-bold text-slate-700">Student Full Name</Label>
                   <Input
                     type="text"
                     placeholder="Enter student's full name"
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
-                    className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                    className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
                     required
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-300">Select STC Course</Label>
+                  <Label className="text-xs font-bold text-slate-700">Select STC Course</Label>
                   <select
                     value={selectedCourse}
                     onChange={(e) => handleCourseChange(e.target.value)}
-                    className="w-full h-10 px-3 bg-[#001E2F] border border-white/15 text-white text-xs rounded-xl focus:outline-none focus:border-[#00BF8F]"
+                    className="w-full h-10 px-3 bg-white border border-slate-200 text-slate-800 text-xs rounded-xl focus:outline-none focus:border-[#009D9E]"
                   >
                     {STC_COURSES.map((c) => {
                       const isEnrolled = enrolledCoursesForStudent.includes(c.name.toLowerCase())
                       return (
-                        <option key={c.name} value={c.name} className="bg-[#001E2F] text-white">
+                        <option key={c.name} value={c.name} className="bg-white text-slate-800">
                           {c.name} ({c.duration}) {isEnrolled ? '✓ [Enrolled]' : ''}
                         </option>
                       )
@@ -387,44 +387,44 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">Duration</Label>
+                    <Label className="text-xs font-bold text-slate-700">Duration</Label>
                     <Input
                       type="text"
                       value={duration}
                       onChange={(e) => setDuration(e.target.value)}
-                      className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">Agency (Optional)</Label>
+                    <Label className="text-xs font-bold text-slate-700">Agency (Optional)</Label>
                     <Input
                       type="text"
                       placeholder="e.g. EdLink Australia"
                       value={agency}
                       onChange={(e) => setAgency(e.target.value)}
-                      className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">Course Start Date</Label>
+                    <Label className="text-xs font-bold text-slate-700">Course Start Date</Label>
                     <Input
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono"
                       required
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">Course End Date</Label>
+                    <Label className="text-xs font-bold text-slate-700">Course End Date</Label>
                     <Input
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono"
                       required
                     />
                   </div>
@@ -433,51 +433,51 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
             </Card>
 
             {/* 2. Schedule Timeline & Overrides */}
-            <Card className="bg-[#001724] border-white/10 text-white rounded-2xl shadow-lg">
-              <CardHeader className="pb-3 border-b border-white/5">
-                <CardTitle className="text-sm font-bold tracking-wide flex items-center gap-2 text-[#00BF8F]">
-                  <Layers className="w-4 h-4" />
+            <Card className="bg-white border border-slate-200/90 text-slate-800 rounded-2xl shadow-2xs">
+              <CardHeader className="pb-3 border-b border-slate-100">
+                <CardTitle className="text-sm font-bold tracking-wide flex items-center gap-2 text-[#003D5C]">
+                  <Layers className="w-4 h-4 text-[#009D9E]" />
                   2. Schedule Timeline & Custom Months
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">
+                    <Label className="text-xs font-bold text-slate-700">
                       Schedule Start Month (YYYY-MM)
                     </Label>
                     <Input
                       type="month"
                       value={scheduleStartMonth}
                       onChange={(e) => setScheduleStartMonth(e.target.value)}
-                      className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">
+                    <Label className="text-xs font-bold text-slate-700">
                       Schedule End Month (YYYY-MM)
                     </Label>
                     <Input
                       type="month"
                       value={scheduleEndMonth}
                       onChange={(e) => setScheduleEndMonth(e.target.value)}
-                      className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono"
                     />
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-white/5">
+                <div className="pt-2 border-t border-slate-100">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       id="stcCustomFirstMonthCheckbox"
                       checked={showCustomFirstMonth}
                       onChange={(e) => setShowCustomFirstMonth(e.target.checked)}
-                      className="rounded accent-[#00BF8F] cursor-pointer"
+                      className="rounded accent-[#009D9E] cursor-pointer"
                     />
                     <label
                       htmlFor="stcCustomFirstMonthCheckbox"
-                      className="text-xs font-semibold text-slate-200 cursor-pointer select-none"
+                      className="text-xs font-semibold text-slate-700 cursor-pointer select-none"
                     >
                       Override 1st Installment Month Only
                     </label>
@@ -489,7 +489,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
                         type="month"
                         value={customFirstMonth}
                         onChange={(e) => setCustomFirstMonth(e.target.value)}
-                        className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F] max-w-xs"
+                        className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] font-mono max-w-xs"
                       />
                     </div>
                   )}
@@ -498,52 +498,52 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
             </Card>
 
             {/* 3. Fee Allocations & Initial Fees */}
-            <Card className="bg-[#001724] border-white/10 text-white rounded-2xl shadow-lg">
-              <CardHeader className="pb-3 border-b border-white/5">
-                <CardTitle className="text-sm font-bold tracking-wide flex items-center gap-2 text-[#00BF8F]">
-                  <Award className="w-4 h-4" />
+            <Card className="bg-white border border-slate-200/90 text-slate-800 rounded-2xl shadow-2xs">
+              <CardHeader className="pb-3 border-b border-slate-100">
+                <CardTitle className="text-sm font-bold tracking-wide flex items-center gap-2 text-[#003D5C]">
+                  <Award className="w-4 h-4 text-[#009D9E]" />
                   3. Fee Structure & Upfront Payments
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">Application Fee (AUD)</Label>
+                    <Label className="text-xs font-bold text-slate-700">Application Fee (AUD)</Label>
                     <Input
                       type="number"
                       value={adminFee}
                       onChange={(e) => setAdminFee(Number(e.target.value))}
-                      className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-300">Material Fee (AUD)</Label>
+                    <Label className="text-xs font-bold text-slate-700">Material Fee (AUD)</Label>
                     <Input
                       type="number"
                       value={resourcesFee}
                       onChange={(e) => setResourcesFee(Number(e.target.value))}
-                      className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                      className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-300">Tuition Fee (AUD)</Label>
+                  <Label className="text-xs font-bold text-slate-700">Tuition Fee (AUD)</Label>
                   <Input
                     type="number"
                     value={tuitionFee}
                     onChange={(e) => setTuitionFee(Number(e.target.value))}
-                    className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F]"
+                    className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E]"
                   />
                 </div>
 
                 <div className="space-y-1.5 pt-1">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold text-emerald-400">Scholarship Discount</Label>
+                    <Label className="text-xs font-bold text-emerald-700">Scholarship Discount</Label>
                     <button
                       type="button"
                       onClick={() => setShowScholarship(!showScholarship)}
-                      className="text-[10px] text-[#00BF8F] hover:underline"
+                      className="text-[10px] text-[#009D9E] hover:underline font-semibold"
                     >
                       {showScholarship ? 'Remove' : '+ Add Scholarship'}
                     </button>
@@ -554,15 +554,15 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
                       value={scholarship}
                       onChange={(e) => setScholarship(Number(e.target.value))}
                       placeholder="e.g. 1000"
-                      className="bg-[#001E2F] border-emerald-500/40 text-emerald-300 text-xs rounded-xl focus:border-emerald-400"
+                      className="bg-emerald-50/50 border-emerald-300 text-emerald-900 text-xs rounded-xl focus:border-emerald-500"
                     />
                   )}
                 </div>
 
                 {/* Initial Fees Rows */}
-                <div className="pt-3 border-t border-white/5 space-y-2.5">
+                <div className="pt-3 border-t border-slate-100 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold text-slate-200">
+                    <Label className="text-xs font-bold text-slate-700">
                       Initial Upfront Payments Breakdown
                     </Label>
                     <Button
@@ -570,7 +570,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
                       variant="ghost"
                       size="sm"
                       onClick={addInitialFeeRow}
-                      className="h-7 px-2 text-[11px] text-[#00BF8F] hover:bg-[#00BF8F]/10 rounded-lg"
+                      className="h-7 px-2 text-[11px] text-[#009D9E] hover:bg-[#009D9E]/10 rounded-lg font-semibold"
                     >
                       <Plus className="w-3.5 h-3.5 mr-1" />
                       Add Initial Fee
@@ -579,14 +579,14 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
 
                   {initialFees.map((fee, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400 w-28 font-mono">
+                      <span className="text-xs text-slate-500 w-28 font-mono font-medium">
                         {idx === 0 ? '1st Payment:' : `${getOrdinal(idx + 1)} Payment:`}
                       </span>
                       <Input
                         type="number"
                         value={fee}
                         onChange={(e) => handleInitialFeeChange(idx, Number(e.target.value))}
-                        className="bg-[#001E2F] border-white/15 text-white text-xs rounded-xl focus:border-[#00BF8F] flex-1"
+                        className="bg-white border-slate-200 text-slate-900 text-xs rounded-xl focus:border-[#009D9E] flex-1 font-mono"
                       />
                       {initialFees.length > 1 && (
                         <Button
@@ -594,7 +594,7 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
                           variant="ghost"
                           size="icon"
                           onClick={() => removeInitialFeeRow(idx)}
-                          className="h-9 w-9 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl shrink-0"
+                          className="h-9 w-9 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl shrink-0 cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -604,11 +604,11 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
                 </div>
 
                 {/* Total Calculated Summary */}
-                <div className="p-3.5 rounded-xl bg-gradient-to-r from-[#00BF8F]/15 to-[#06D6A0]/10 border border-[#00BF8F]/30 flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wide">
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
                     Calculated Total:
                   </span>
-                  <span className="text-base font-black text-[#00BF8F] font-mono">
+                  <span className="text-base font-black text-[#009D9E] font-mono">
                     AUD ${calculationResult.totalAmount.toLocaleString()}
                   </span>
                 </div>
@@ -619,20 +619,20 @@ export default function STCInstallmentForm({ mode, existingSchedule }: STCInstal
 
         {/* Right Live Preview */}
         <div className="lg:col-span-7 xl:col-span-8 sticky top-24">
-          <div className="bg-[#001724] border border-white/10 rounded-2xl p-4 shadow-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4 text-[#00BF8F]" />
-                <span className="text-xs font-bold uppercase tracking-wider text-white">
+                <Eye className="w-4 h-4 text-[#009D9E]" />
+                <span className="text-xs font-bold uppercase tracking-wider text-[#003D5C]">
                   Live Preview (States College Australia)
                 </span>
               </div>
-              <span className="text-[11px] font-mono text-slate-400">
+              <span className="text-[11px] font-mono text-slate-500">
                 {calculationResult.scheduleItems.length} Installment Rows
               </span>
             </div>
 
-            <div className="max-h-[800px] overflow-y-auto rounded-xl border border-white/5 bg-slate-900/50 p-2">
+            <div className="max-h-[800px] overflow-y-auto rounded-xl border border-slate-200 bg-slate-100/70 p-3 sm:p-4">
               <STCScheduleWebPreview schedule={previewScheduleData} fixedInfo={fixedInfo} />
             </div>
           </div>

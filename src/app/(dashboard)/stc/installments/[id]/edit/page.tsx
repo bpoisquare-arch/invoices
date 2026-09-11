@@ -40,8 +40,8 @@ export default function EditSTCInstallmentPage() {
 
   if (isLoading) {
     return (
-      <div className="p-16 text-center text-slate-400 flex items-center justify-center gap-3">
-        <Loader2 className="w-6 h-6 animate-spin text-[#00BF8F]" />
+      <div className="p-16 text-center text-slate-500 flex items-center justify-center gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-[#009D9E]" />
         <span className="text-sm font-medium">Loading STC Installment Schedule...</span>
       </div>
     )
@@ -49,11 +49,11 @@ export default function EditSTCInstallmentPage() {
 
   if (!schedule) {
     return (
-      <div className="p-16 text-center text-slate-400 space-y-4">
-        <h2 className="text-xl font-bold text-white">STC Schedule Not Found</h2>
-        <p className="text-xs text-slate-400">The requested schedule does not exist or has been removed.</p>
+      <div className="p-16 text-center text-slate-500 space-y-4">
+        <h2 className="text-xl font-bold text-slate-800">STC Schedule Not Found</h2>
+        <p className="text-xs text-slate-500">The requested schedule does not exist or has been removed.</p>
         <Link href="/stc/installments">
-          <Button size="sm" className="bg-[#00BF8F] text-[#001E2F] font-bold rounded-xl text-xs">
+          <Button size="sm" className="bg-[#003D5C] hover:bg-[#002b40] text-white font-bold rounded-xl text-xs">
             Back to Schedules
           </Button>
         </Link>
