@@ -428,7 +428,7 @@ export default function EmployeeDeductionModal({
                     <Input
                       type="number"
                       min="0"
-                      step="100"
+                      step="any"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       placeholder="e.g. 5000"
