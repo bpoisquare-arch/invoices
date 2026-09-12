@@ -16,7 +16,10 @@ export const EMPLOYEE_DESIGNATIONS = [
   'Offshore Visa File Officer',
   'Onshore Processing Lead',
   'Onshore Processing Officer',
+  'Processing Officer',
   'Operational Coordinator',
+  'Office Coordinator',
+  'SM Intern',
   'Student Counsellor',
   'IELTS/PTE Trainer',
 ] as const
