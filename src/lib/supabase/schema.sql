@@ -253,6 +253,7 @@ CREATE TABLE IF NOT EXISTS public.employees (
     name VARCHAR(255) NOT NULL,
     normalized_name VARCHAR(255) NOT NULL,
     designation VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
     branch VARCHAR(100) DEFAULT 'Multan',
     salary NUMERIC(12, 2),
     joining_date DATE,
@@ -264,6 +265,7 @@ CREATE TABLE IF NOT EXISTS public.employees (
 );
 
 -- Migrations to ensure existing databases have new employee columns
+ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS email VARCHAR(255);
 ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS branch VARCHAR(100) DEFAULT 'Multan';
 ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS salary NUMERIC(12, 2);
 ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS joining_date DATE;

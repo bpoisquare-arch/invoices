@@ -780,6 +780,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                 })}`
                 : ''}
               {employee?.salary ? ` • Salary: PKR ${Number(employee.salary).toLocaleString()}` : ''}
+              {employee?.email ? ` • Email: ${employee.email}` : ''}
             </p>
           </div>
         </div>

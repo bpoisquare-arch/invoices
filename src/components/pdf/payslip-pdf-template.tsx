@@ -1,6 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer'
 import { Employee } from '@/lib/supabase/database.types'
+import { EDLINK_LOGO_BASE64 } from '@/lib/constants/edlink-assets'
 
 // Register Geist Font Family
 Font.register({
@@ -243,11 +244,7 @@ export default function PayslipPDFTemplate({
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .replace(/_+/g, '_')
 
-  const resolvedLogo =
-    logoUrl ||
-    (typeof window !== 'undefined'
-      ? `${window.location.origin}/edlink-logo.png`
-      : '/edlink-logo.png')
+  const resolvedLogo = logoUrl || EDLINK_LOGO_BASE64
 
   return (
     <Document title={`Payslip_${safeEmpName}`}>
