@@ -10,8 +10,13 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "SwiftInvoice Pro - Enterprise Billing & Invoice Management System",
-  description: "Internal Multi-Company Invoice Management System",
+  title: "CMS - Client Management System",
+  description: "Client Management System & Payroll Operations",
+  icons: {
+    icon: "/isquarebpo.png",
+    shortcut: "/isquarebpo.png",
+    apple: "/isquarebpo.png",
+  },
 };
 
 export default function RootLayout({
