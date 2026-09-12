@@ -951,13 +951,27 @@ export default function PayslipsPage() {
                 ref={payslipRef}
                 className="bg-white p-8 max-w-xl mx-auto space-y-7 text-slate-900 border border-slate-100 shadow-xs rounded-lg font-sans"
               >
-                {/* 1. Header with Logo & Title (Exact styling from 2nd attachment) */}
+                {/* 1. Header with Logo, Address & Title */}
                 <div className="text-center pt-2">
                   <img
                     src="/edlink-logo.png"
                     alt="EdLink"
-                    className="h-16 w-auto object-contain mx-auto mb-3"
+                    className="h-16 w-auto object-contain mx-auto mb-2"
                   />
+                  <div className="text-center text-xs text-slate-600 font-medium space-y-0.5 mb-3.5">
+                    <p>
+                      <span className="font-semibold text-slate-800">Add:</span> 38A 1st Floor DHA Phase 3 XX Block , Lahore, Pakistan, 54000
+                    </p>
+                    <p className="flex items-center justify-center gap-2.5 text-[11.5px]">
+                      <span>
+                        <span className="font-semibold text-slate-800">Ph:</span> 0311 1100696
+                      </span>
+                      <span className="text-slate-300">|</span>
+                      <span>
+                        <span className="font-semibold text-slate-800">Email:</span> connect@edlinkservices.info
+                      </span>
+                    </p>
+                  </div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-[#007A78] tracking-tight uppercase">
                     EMPLOYEE PAYSLIP
                   </h1>

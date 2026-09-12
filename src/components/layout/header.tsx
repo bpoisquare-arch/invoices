@@ -10,7 +10,7 @@ export default function Header() {
       <div className="flex items-center gap-3">
         <SidebarTrigger className="-ml-1 text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-md" />
         <Separator orientation="vertical" className="h-4 hidden sm:block bg-slate-200" />
-        <h2 className="font-['Montserrat'] text-sm sm:text-base md:text-lg font-bold text-[#003D5C] tracking-tight truncate max-w-[200px] sm:max-w-none">
+        <h2 className="font-['Geist'] text-sm sm:text-base md:text-lg font-bold text-[#003D5C] tracking-tight truncate max-w-[200px] sm:max-w-none">
           Client Management System
         </h2>
       </div>

@@ -36,23 +36,40 @@ const styles = StyleSheet.create({
   headerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   logo: {
-    width: 180,
-    height: 52,
+    width: 170,
+    height: 48,
     objectFit: 'contain',
     alignSelf: 'center',
+    marginBottom: 3,
+  },
+  companyInfoContainer: {
+    alignItems: 'center',
     marginBottom: 6,
   },
+  companyInfoRow: {
+    fontSize: 8.5,
+    fontFamily: 'Geist',
+    color: '#334155',
+    textAlign: 'center',
+    lineHeight: 1.35,
+  },
+  companyInfoBold: {
+    fontFamily: 'Geist',
+    fontWeight: 'bold',
+    color: '#0f172a',
+  },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: 'Geist',
     fontWeight: 'bold',
     color: '#007A78',
     textAlign: 'center',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
+    marginTop: 2,
   },
   metaGrid: {
     flexDirection: 'row',
@@ -234,9 +251,22 @@ export default function PayslipPDFTemplate({
   return (
     <Document title={`Payslip_${safeEmpName}`}>
       <Page size="A4" style={styles.page}>
-        {/* 1. Header with Logo & Title (Centered) */}
+        {/* 1. Header with Logo, Address & Title (Centered) */}
         <View style={styles.headerContainer}>
           <Image src={resolvedLogo} style={styles.logo} />
+          <View style={styles.companyInfoContainer}>
+            <Text style={styles.companyInfoRow}>
+              <Text style={styles.companyInfoBold}>Add: </Text>
+              38A 1st Floor DHA Phase 3 XX Block , Lahore, Pakistan, 54000
+            </Text>
+            <Text style={styles.companyInfoRow}>
+              <Text style={styles.companyInfoBold}>Ph: </Text>
+              0311 1100696
+              <Text style={{ color: '#94a3b8' }}>   |   </Text>
+              <Text style={styles.companyInfoBold}>Email: </Text>
+              connect@edlinkservices.info
+            </Text>
+          </View>
           <Text style={styles.headerTitle}>EMPLOYEE PAYSLIP</Text>
         </View>
 
