@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import {
   Receipt,
@@ -9,7 +9,6 @@ import {
   Building2,
   FileSpreadsheet,
   Download,
-  Printer,
   Eye,
   Loader2,
   Users,
@@ -159,10 +158,9 @@ export default function PayslipsPage() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [pageSize, setPageSize] = useState<number | 'all'>('all')
 
-  // Selected Employee for View/Print Modal
+  // Selected Employee for View Modal
   const [selectedPayslipEmployee, setSelectedPayslipEmployee] = useState<Employee | null>(null)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
-  const payslipRef = useRef<HTMLDivElement>(null)
 
   // Email Payslip State
   const [selectedEmailEmployee, setSelectedEmailEmployee] = useState<Employee | null>(null)
@@ -612,10 +610,6 @@ export default function PayslipsPage() {
     }
   }
 
-  const handlePrint = () => {
-    window.print()
-  }
-
   const handleOpenEmailModal = (emp: Employee) => {
     setSelectedEmailEmployee(emp)
     setRecipientEmail(emp.email || '')
@@ -687,20 +681,11 @@ export default function PayslipsPage() {
             Payslips
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Monthly employee salary slips, attendance deductions, branch-wise filters, and printable payslips.
+            Monthly employee salary slips, attendance deductions, branch-wise filters, and PDF payslips.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={handlePrint}
-            className="text-xs font-bold uppercase tracking-wider text-slate-700 border-slate-300 gap-1.5 shadow-2xs h-9"
-          >
-            <Printer className="w-4 h-4 text-[#009D9E]" />
-            Print All
-          </Button>
-
           <Button
             variant="outline"
             className="text-xs font-bold uppercase tracking-wider text-slate-700 border-slate-300 gap-1.5 shadow-2xs h-9"
@@ -1011,13 +996,11 @@ export default function PayslipsPage() {
       {/* Individual Payslip Voucher Modal (Exact Format from User's 2nd Attachment) */}
       {selectedPayslipEmployee && currentPayslipData && (
         <Dialog open={isViewModalOpen} onOpenChange={(open) => !open && setIsViewModalOpen(false)}>
-          <DialogContent className="sm:max-w-2xl max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-2xl p-0 overflow-hidden flex flex-col">
+          <DialogContent className="max-w-3xl w-[95vw] sm:w-[90vw] md:w-[850px] max-h-[92vh] bg-white border border-slate-200 shadow-2xl rounded-2xl p-0 overflow-hidden flex flex-col">
             {/* Modal Scrollable Container */}
-            <div className="overflow-y-auto p-8 flex-1 bg-white">
+            <div className="overflow-y-auto p-4 sm:p-6 md:p-8 flex-1 bg-slate-50/60">
               <div
-                id="printable-payslip"
-                ref={payslipRef}
-                className="bg-white p-8 max-w-xl mx-auto space-y-7 text-slate-900 border border-slate-100 shadow-xs rounded-lg font-sans"
+                className="bg-white p-6 sm:p-8 md:p-10 max-w-2xl mx-auto space-y-6 text-slate-900 border border-slate-200/80 shadow-md rounded-xl font-sans"
               >
                 {/* 1. Header with Logo, Address & Title */}
                 <div className="text-center pt-2">
@@ -1046,33 +1029,33 @@ export default function PayslipsPage() {
                 </div>
 
                 {/* 2. Top Info Grid */}
-                <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs font-medium pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-xs font-medium pt-2">
                   <div className="flex items-center">
-                    <span className="w-28 sm:w-32 font-bold text-[#003D5C] shrink-0">Pay Period</span>
+                    <span className="w-24 sm:w-28 font-bold text-[#003D5C] shrink-0">Pay Period</span>
                     <span className="mr-2 font-bold shrink-0">:</span>
-                    <span className="text-slate-800 font-mono">
+                    <span className="text-slate-800 font-mono font-semibold whitespace-nowrap">
                       {startDate.split('-').reverse().join('/')} - {endDate.split('-').reverse().join('/')}
                     </span>
                   </div>
 
                   <div className="flex items-center">
-                    <span className="w-28 font-bold text-[#003D5C]">Employee ID</span>
-                    <span className="mr-2 font-bold">:</span>
+                    <span className="w-24 sm:w-28 font-bold text-[#003D5C] shrink-0">Employee ID</span>
+                    <span className="mr-2 font-bold shrink-0">:</span>
                     <span className="text-slate-800 font-mono font-bold">
                       {selectedPayslipEmployee.employee_id || '01234'}
                     </span>
                   </div>
 
                   <div className="flex items-center">
-                    <span className="w-32 font-bold text-[#003D5C]">Employee Name</span>
-                    <span className="mr-2 font-bold">:</span>
-                    <span className="text-slate-900 font-semibold">{selectedPayslipEmployee.name}</span>
+                    <span className="w-24 sm:w-28 font-bold text-[#003D5C] shrink-0">Employee Name</span>
+                    <span className="mr-2 font-bold shrink-0">:</span>
+                    <span className="text-slate-900 font-semibold truncate">{selectedPayslipEmployee.name}</span>
                   </div>
 
                   <div className="flex items-center">
-                    <span className="w-28 font-bold text-[#003D5C]">Designation</span>
-                    <span className="mr-2 font-bold">:</span>
-                    <span className="text-slate-800">{selectedPayslipEmployee.designation}</span>
+                    <span className="w-24 sm:w-28 font-bold text-[#003D5C] shrink-0">Designation</span>
+                    <span className="mr-2 font-bold shrink-0">:</span>
+                    <span className="text-slate-800 truncate">{selectedPayslipEmployee.designation}</span>
                   </div>
                 </div>
 
@@ -1220,48 +1203,36 @@ export default function PayslipsPage() {
             </div>
 
             {/* Modal Footer */}
-            <DialogFooter className="p-4 bg-slate-50 border-t border-slate-200 flex sm:justify-between gap-2">
+            <DialogFooter className="px-5 py-4 sm:px-8 sm:py-4.5 bg-white border-t border-slate-200/90 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
               <Button
                 variant="outline"
-                size="sm"
                 onClick={() => setIsViewModalOpen(false)}
-                className="text-xs"
+                className="h-10 px-5 text-xs sm:text-sm font-semibold rounded-xl border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900 shadow-2xs transition-all w-full sm:w-auto"
               >
                 Close
               </Button>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                 <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handlePrint}
-                  className="text-xs font-bold gap-1.5 border-slate-300"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  Print Slip
-                </Button>
-                <Button
-                  size="sm"
                   variant="outline"
                   onClick={() => {
                     if (selectedPayslipEmployee) {
                       handleOpenEmailModal(selectedPayslipEmployee)
                     }
                   }}
-                  className="text-xs font-bold gap-1.5 border-purple-200 text-purple-700 hover:bg-purple-50"
+                  className="h-10 px-5 text-xs sm:text-sm font-semibold rounded-xl border-purple-200 bg-purple-50/40 text-purple-700 hover:bg-purple-100 hover:border-purple-300 gap-2 shadow-2xs transition-all flex-1 sm:flex-none justify-center"
                 >
-                  <Mail className="w-3.5 h-3.5 text-purple-600" />
+                  <Mail className="w-4 h-4 text-purple-600" />
                   Send Email
                 </Button>
                 <Button
-                  size="sm"
                   disabled={isGeneratingPdf}
                   onClick={() => handleDownloadPdf(selectedPayslipEmployee)}
-                  className="bg-[#009D9E] hover:bg-[#007A7A] text-white text-xs font-bold gap-1.5"
+                  className="h-10 px-6 bg-[#009D9E] hover:bg-[#007A7A] text-white text-xs sm:text-sm font-semibold rounded-xl gap-2 shadow-sm transition-all flex-1 sm:flex-none justify-center"
                 >
                   {isGeneratingPdf ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Download className="w-3.5 h-3.5" />
+                    <Download className="w-4 h-4" />
                   )}
                   Download PDF
                 </Button>
@@ -1369,24 +1340,22 @@ export default function PayslipsPage() {
               </div>
             </div>
 
-            <DialogFooter className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+            <DialogFooter className="pt-4 mt-2 border-t border-slate-100 flex items-center justify-between gap-3">
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
                 onClick={() => setIsEmailModalOpen(false)}
                 disabled={isSendingEmail}
-                className="text-xs"
+                className="h-9.5 px-4 text-xs font-semibold rounded-lg border-slate-300 text-slate-700 hover:bg-slate-100"
               >
                 Close
               </Button>
 
               <Button
                 type="button"
-                size="sm"
                 disabled={isSendingEmail || !recipientEmail}
                 onClick={handleSendPayslipEmail}
-                className="bg-[#009D9E] hover:bg-[#007A7A] text-white text-xs font-bold gap-1.5"
+                className="h-9.5 px-5 bg-[#009D9E] hover:bg-[#007A7A] text-white text-xs font-bold gap-2 rounded-lg shadow-sm"
               >
                 {isSendingEmail ? (
                   <>

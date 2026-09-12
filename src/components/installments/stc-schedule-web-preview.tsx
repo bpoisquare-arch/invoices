@@ -20,11 +20,14 @@ export default function STCScheduleWebPreview({
 }: STCScheduleWebPreviewProps) {
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A'
-    const parts = dateStr.split('-')
+    const clean = dateStr.split('T')[0].trim()
+    if (clean.includes('/')) return clean
+    const parts = clean.split('-')
     if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`
+      const [yyyy, mm, dd] = parts
+      return `${dd.padStart(2, '0')}/${mm.padStart(2, '0')}/${yyyy}`
     }
-    return dateStr
+    return clean
   }
 
   const items = schedule.schedule_items || []

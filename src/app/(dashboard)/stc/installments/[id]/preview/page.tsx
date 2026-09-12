@@ -11,8 +11,7 @@ import {
 } from '@/lib/services/stc-installment.service'
 import STCScheduleWebPreview from '@/components/installments/stc-schedule-web-preview'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Download, Edit, Printer, Loader2, Mail } from 'lucide-react'
-import STCResendEmailDialog from '@/components/installments/stc-resend-email-dialog'
+import { ArrowLeft, Download, Edit, Printer, Loader2 } from 'lucide-react'
 
 export default function STCInstallmentPreviewPage() {
   const params = useParams()
@@ -23,7 +22,6 @@ export default function STCInstallmentPreviewPage() {
   const [fixedInfo, setFixedInfo] = useState<STCFixedInfo>(getSTCFixedInfo())
   const [isLoading, setIsLoading] = useState(true)
   const [isDownloading, setIsDownloading] = useState(false)
-  const [emailModalOpen, setEmailModalOpen] = useState(false)
 
   async function loadScheduleData() {
     if (id) {
@@ -177,16 +175,6 @@ export default function STCInstallmentPreviewPage() {
           </Button>
 
           <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setEmailModalOpen(true)}
-            className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-semibold cursor-pointer"
-          >
-            <Mail className="w-4 h-4 mr-1.5" />
-            Email Schedule
-          </Button>
-
-          <Button
             size="sm"
             onClick={handleDownloadPDF}
             disabled={isDownloading}
@@ -211,14 +199,6 @@ export default function STCInstallmentPreviewPage() {
       <div className="flex justify-center p-3 sm:p-8 bg-slate-100/80 border border-slate-200/90 rounded-2xl shadow-xs overflow-x-auto">
         <STCScheduleWebPreview schedule={schedule} fixedInfo={fixedInfo} />
       </div>
-
-      {/* Email Modal */}
-      <STCResendEmailDialog
-        schedule={schedule}
-        open={emailModalOpen}
-        onOpenChange={setEmailModalOpen}
-        onSuccess={loadScheduleData}
-      />
     </div>
   )
 }

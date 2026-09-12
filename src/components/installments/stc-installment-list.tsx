@@ -24,7 +24,6 @@ import {
   Loader2,
   RotateCcw,
   Trash2,
-  Mail,
   CheckCircle2,
   CloudUpload,
   AlertTriangle,
@@ -46,7 +45,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import STCResendEmailDialog from '@/components/installments/stc-resend-email-dialog'
 
 export default function STCInstallmentList() {
   const router = useRouter()
@@ -65,8 +63,6 @@ export default function STCInstallmentList() {
   const [endDateFilter, setEndDateFilter] = useState('')
 
   // Modals State
-  const [scheduleToEmail, setScheduleToEmail] = useState<STCStudentInstallmentSchedule | null>(null)
-  const [emailModalOpen, setEmailModalOpen] = useState(false)
   const [scheduleToDelete, setScheduleToDelete] = useState<STCStudentInstallmentSchedule | null>(null)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -593,17 +589,6 @@ export default function STCInstallmentList() {
                           </DropdownMenuItem>
 
                           <DropdownMenuItem
-                            onClick={() => {
-                              setScheduleToEmail(item)
-                              setEmailModalOpen(true)
-                            }}
-                            className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
-                          >
-                            <Mail className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Email Schedule</span>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem
                             variant="destructive"
                             onClick={() => {
                               setScheduleToDelete(item)
@@ -624,14 +609,6 @@ export default function STCInstallmentList() {
           </div>
         )}
       </Card>
-
-      {/* Email Modal */}
-      <STCResendEmailDialog
-        schedule={scheduleToEmail}
-        open={emailModalOpen}
-        onOpenChange={setEmailModalOpen}
-        onSuccess={loadData}
-      />
 
       {/* Delete Modal */}
       <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
