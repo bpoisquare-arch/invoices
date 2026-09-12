@@ -396,6 +396,7 @@ export interface Database {
           name: string
           normalized_name: string
           designation: string
+          email?: string | null
           branch?: string | null
           salary?: number | null
           joining_date?: string | null
@@ -412,6 +413,7 @@ export interface Database {
           name: string
           normalized_name: string
           designation: string
+          email?: string | null
           branch?: string | null
           salary?: number | null
           joining_date?: string | null
@@ -428,6 +430,7 @@ export interface Database {
           name?: string
           normalized_name?: string
           designation?: string
+          email?: string | null
           branch?: string | null
           salary?: number | null
           joining_date?: string | null
@@ -932,6 +935,7 @@ export type Employee = Omit<Database['public']['Tables']['employees']['Row'], 'l
   salary?: number | null
   joining_date?: string | null
   is_old_staff?: boolean | null
+  email?: string | null
   leave_quotas?: EmployeeLeaveQuotas
   base_leave_quotas?: EmployeeLeaveQuotas
 }

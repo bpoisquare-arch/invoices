@@ -7,6 +7,7 @@ export interface EmployeeMetadata {
   is_old_staff?: boolean | null
   name?: string
   designation?: string
+  email?: string | null
   is_active?: boolean
   leave_quotas?: EmployeeLeaveQuotas
 }
@@ -73,6 +74,7 @@ export function writeEmployeeMetadata(
     is_old_staff?: boolean | null
     name?: string
     designation?: string
+    email?: string | null
     is_active?: boolean
     leave_quotas?: EmployeeLeaveQuotas
   }
@@ -88,6 +90,7 @@ export function writeEmployeeMetadata(
     ...(meta.is_old_staff !== undefined ? { is_old_staff: meta.is_old_staff } : {}),
     ...(meta.name !== undefined ? { name: meta.name } : {}),
     ...(meta.designation !== undefined ? { designation: meta.designation } : {}),
+    ...(meta.email !== undefined ? { email: meta.email } : {}),
     ...(meta.is_active !== undefined ? { is_active: meta.is_active } : {}),
     ...(meta.leave_quotas !== undefined ? { leave_quotas: meta.leave_quotas } : {}),
   }

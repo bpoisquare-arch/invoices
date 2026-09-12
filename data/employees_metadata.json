@@ -5,12 +5,13 @@
     "joining_date": null,
     "leave_quotas": {
       "annual_leaves": 6,
-      "sick_leaves": 7,
-      "casual_leaves": 6,
-      "wfh_quota": 4,
+      "sick_leaves": 5.5,
+      "casual_leaves": 7,
+      "wfh_quota": 1,
       "probation_leaves": 0
     },
-    "is_old_staff": true
+    "is_old_staff": true,
+    "email": "bpoisquare@gmail.com"
   },
   "EMP-0001": {
     "branch": "Multan",
@@ -18,12 +19,13 @@
     "joining_date": null,
     "leave_quotas": {
       "annual_leaves": 6,
-      "sick_leaves": 7,
-      "casual_leaves": 6,
-      "wfh_quota": 4,
+      "sick_leaves": 5.5,
+      "casual_leaves": 7,
+      "wfh_quota": 1,
       "probation_leaves": 0
     },
-    "is_old_staff": true
+    "is_old_staff": true,
+    "email": "bpoisquare@gmail.com"
   },
   "6d06d295-7618-4d8e-b48d-7bb3ddeb257e": {
     "branch": "Multan",

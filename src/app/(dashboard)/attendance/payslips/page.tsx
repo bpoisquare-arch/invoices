@@ -164,6 +164,17 @@ export default function PayslipsPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const payslipRef = useRef<HTMLDivElement>(null)
 
+  // Email Payslip State
+  const [selectedEmailEmployee, setSelectedEmailEmployee] = useState<Employee | null>(null)
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
+  const [recipientEmail, setRecipientEmail] = useState('')
+  const [emailMessage, setEmailMessage] = useState('')
+  const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [emailStatus, setEmailStatus] = useState<{
+    type: 'success' | 'error' | null
+    message: string
+  }>({ type: null, message: '' })
+
   // Computed Date Range based on selected Month & Year
   const { startDate, endDate, daysInMonth, monthLabel, monthKey } = useMemo(() => {
     const m = parseInt(selectedMonth, 10)
@@ -605,6 +616,65 @@ export default function PayslipsPage() {
     window.print()
   }
 
+  const handleOpenEmailModal = (emp: Employee) => {
+    setSelectedEmailEmployee(emp)
+    setRecipientEmail(emp.email || '')
+    setEmailMessage('')
+    setEmailStatus({ type: null, message: '' })
+    setIsEmailModalOpen(true)
+  }
+
+  const handleSendPayslipEmail = async () => {
+    if (!selectedEmailEmployee) return
+
+    const emailToSend = recipientEmail.trim()
+    if (!emailToSend || !emailToSend.includes('@')) {
+      setEmailStatus({
+        type: 'error',
+        message: 'Please enter a valid recipient email address.',
+      })
+      return
+    }
+
+    try {
+      setIsSendingEmail(true)
+      setEmailStatus({ type: null, message: '' })
+
+      const data = getPayslipData(selectedEmailEmployee)
+      const payPeriod = `${startDate.split('-').reverse().join('/')} - ${endDate.split('-').reverse().join('/')}`
+
+      const res = await fetch('/api/attendance/payslips/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee: selectedEmailEmployee,
+          payslipData: data,
+          payPeriod,
+          monthLabel,
+          recipientEmail: emailToSend,
+          customMessage: emailMessage.trim() || undefined,
+        }),
+      })
+
+      const result = await res.json()
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send payslip email.')
+      }
+
+      setEmailStatus({
+        type: 'success',
+        message: `Payslip email with PDF attachment was successfully sent to ${emailToSend}!`,
+      })
+    } catch (err: any) {
+      setEmailStatus({
+        type: 'error',
+        message: err.message || 'Error occurred while sending email.',
+      })
+    } finally {
+      setIsSendingEmail(false)
+    }
+  }
+
   const currentPayslipData = selectedPayslipEmployee ? getPayslipData(selectedPayslipEmployee) : null
 
   return (
@@ -920,9 +990,7 @@ export default function PayslipsPage() {
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
-                              onClick={() => {
-                                alert(`Email feature will be activated soon for ${emp.name}`)
-                              }}
+                              onClick={() => handleOpenEmailModal(emp)}
                               className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-slate-700 hover:bg-purple-50 hover:text-purple-700 cursor-pointer font-medium transition-colors"
                             >
                               <Mail className="w-3.5 h-3.5 text-purple-600" />
@@ -1173,6 +1241,19 @@ export default function PayslipsPage() {
                 </Button>
                 <Button
                   size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (selectedPayslipEmployee) {
+                      handleOpenEmailModal(selectedPayslipEmployee)
+                    }
+                  }}
+                  className="text-xs font-bold gap-1.5 border-purple-200 text-purple-700 hover:bg-purple-50"
+                >
+                  <Mail className="w-3.5 h-3.5 text-purple-600" />
+                  Send Email
+                </Button>
+                <Button
+                  size="sm"
                   disabled={isGeneratingPdf}
                   onClick={() => handleDownloadPdf(selectedPayslipEmployee)}
                   className="bg-[#009D9E] hover:bg-[#007A7A] text-white text-xs font-bold gap-1.5"
@@ -1185,6 +1266,140 @@ export default function PayslipsPage() {
                   Download PDF
                 </Button>
               </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Send Email Modal Dialog */}
+      {selectedEmailEmployee && (
+        <Dialog open={isEmailModalOpen} onOpenChange={(open) => !open && setIsEmailModalOpen(false)}>
+          <DialogContent className="sm:max-w-md bg-white border border-slate-200 shadow-2xl rounded-2xl p-6">
+            <DialogHeader className="border-b border-slate-100 pb-3">
+              <DialogTitle className="text-lg font-bold text-[#003D5C] flex items-center gap-2">
+                <Mail className="w-5 h-5 text-[#009D9E]" />
+                Send Payslip Email
+              </DialogTitle>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Send official PDF payslip directly to the employee via Gmail SMTP.
+              </p>
+            </DialogHeader>
+
+            <div className="space-y-4 py-3 text-xs">
+              {/* Employee & Payslip Summary Card */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 text-sm">
+                    {selectedEmailEmployee.name}
+                  </span>
+                  <span className="font-mono text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                    {selectedEmailEmployee.employee_id || 'N/A'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-slate-600 pt-1 text-[11.5px]">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Month</span>
+                    <span className="font-semibold text-slate-800">{monthLabel}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Net Salary</span>
+                    <span className="font-mono font-bold text-emerald-700">
+                      PKR {Math.round(getPayslipData(selectedEmailEmployee).netPay).toLocaleString('en-US')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Banner */}
+              {emailStatus.type === 'success' && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl flex items-start gap-2 text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Email Sent!</p>
+                    <p className="text-[11.5px] text-emerald-700 mt-0.5">{emailStatus.message}</p>
+                  </div>
+                </div>
+              )}
+
+              {emailStatus.type === 'error' && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl flex items-start gap-2 text-xs">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Sending Failed</p>
+                    <p className="text-[11.5px] text-rose-700 mt-0.5">{emailStatus.message}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Recipient Email Field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Recipient Email Address *
+                </label>
+                <Input
+                  type="email"
+                  placeholder="employee@example.com"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  className="text-xs h-9.5 border-slate-200 font-medium"
+                />
+                <p className="text-[10px] text-slate-400">
+                  Pre-filled from employee record. You can change or enter a recipient email here.
+                </p>
+              </div>
+
+              {/* Custom Message Note (Optional) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Custom Note / Message (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Please find attached your payslip for this month."
+                  value={emailMessage}
+                  onChange={(e) => setEmailMessage(e.target.value)}
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 focus:border-[#009D9E] resize-none"
+                />
+              </div>
+
+              <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-[11px] text-slate-500 flex items-center gap-2">
+                <span>📎</span>
+                <span>The complete PDF payslip will be attached automatically.</span>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEmailModalOpen(false)}
+                disabled={isSendingEmail}
+                className="text-xs"
+              >
+                Close
+              </Button>
+
+              <Button
+                type="button"
+                size="sm"
+                disabled={isSendingEmail || !recipientEmail}
+                onClick={handleSendPayslipEmail}
+                className="bg-[#009D9E] hover:bg-[#007A7A] text-white text-xs font-bold gap-1.5"
+              >
+                {isSendingEmail ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Sending Email...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-3.5 h-3.5" />
+                    Send Payslip Email
+                  </>
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

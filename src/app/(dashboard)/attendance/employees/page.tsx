@@ -91,6 +91,7 @@ export default function EmployeesPage() {
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesignation, setNewDesignation] = useState('')
+  const [newEmail, setNewEmail] = useState('')
   const [newBranch, setNewBranch] = useState('Multan')
   const [newJoiningDate, setNewJoiningDate] = useState(todayStr)
   const [newIsOldStaff, setNewIsOldStaff] = useState(false)
@@ -103,6 +104,7 @@ export default function EmployeesPage() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [editName, setEditName] = useState('')
   const [editDesignation, setEditDesignation] = useState('')
+  const [editEmail, setEditEmail] = useState('')
   const [editBranch, setEditBranch] = useState('Multan')
   const [editJoiningDate, setEditJoiningDate] = useState(todayStr)
   const [editIsOldStaff, setEditIsOldStaff] = useState(false)
@@ -194,6 +196,7 @@ export default function EmployeesPage() {
         body: JSON.stringify({
           name: newName.trim(),
           designation: newDesignation.trim(),
+          email: newEmail.trim() || null,
           branch: newBranch,
           joining_date: newIsOldStaff ? null : newJoiningDate,
           is_old_staff: newIsOldStaff,
@@ -216,6 +219,7 @@ export default function EmployeesPage() {
       setIsAddOpen(false)
       setNewName('')
       setNewDesignation('')
+      setNewEmail('')
       setNewBranch('Multan')
       setNewJoiningDate(todayStr)
       setNewIsOldStaff(false)
@@ -257,6 +261,7 @@ export default function EmployeesPage() {
           id: editingEmployee.id,
           name: editName.trim(),
           designation: editDesignation.trim(),
+          email: editEmail.trim() || null,
           branch: editBranch,
           joining_date: editIsOldStaff ? null : editJoiningDate,
           is_old_staff: editIsOldStaff,
@@ -280,6 +285,7 @@ export default function EmployeesPage() {
                 ...(data.employee || {}),
                 name: editName.trim(),
                 designation: editDesignation.trim(),
+                email: editEmail.trim() || null,
                 branch: editBranch,
                 joining_date: editIsOldStaff ? null : editJoiningDate,
                 is_old_staff: editIsOldStaff,
@@ -304,6 +310,7 @@ export default function EmployeesPage() {
     setEditingEmployee(emp)
     setEditName(emp.name)
     setEditDesignation(emp.designation)
+    setEditEmail(emp.email || '')
     setEditBranch(emp.branch || 'Multan')
     setEditIsOldStaff(isOld)
     const rawDate = emp.joining_date || (!isOld ? emp.created_at : null)
@@ -574,12 +581,19 @@ export default function EmployeesPage() {
                           >
                             {initial}
                           </div>
-                          <Link
-                            href={`/attendance/employees/${emp.id}`}
-                            className="font-bold text-slate-900 hover:text-[#0058BE] transition-colors text-xs"
-                          >
-                            {emp.name}
-                          </Link>
+                          <div className="flex flex-col">
+                            <Link
+                              href={`/attendance/employees/${emp.id}`}
+                              className="font-bold text-slate-900 hover:text-[#0058BE] transition-colors text-xs"
+                            >
+                              {emp.name}
+                            </Link>
+                            {emp.email && (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {emp.email}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
 
@@ -788,6 +802,20 @@ export default function EmployeesPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Email Address (For Payslip Delivery)
+              </Label>
+              <Input
+                type="email"
+                placeholder="e.g. employee@edlinkservices.info"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                className="text-sm border-slate-200"
+              />
             </div>
 
             {/* Branch & Joining Date Row */}
@@ -1053,6 +1081,20 @@ export default function EmployeesPage() {
                   )}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Email Address (For Payslip Delivery)
+              </Label>
+              <Input
+                type="email"
+                placeholder="e.g. employee@edlinkservices.info"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="text-sm border-slate-200"
+              />
             </div>
 
             {/* Branch & Joining Date Row */}

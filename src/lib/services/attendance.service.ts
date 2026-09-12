@@ -130,8 +130,9 @@ export async function updateAttendanceSettings(
 // ----------------------------------------------------
 // 2. EMPLOYEE SERVICES & METADATA SYNC
 import { EmployeeLeaveQuotas } from '@/lib/supabase/database.types'
+import { EmployeeMetadata } from './employee-storage'
 
-export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?: string; salary?: number | null; joining_date?: string; is_old_staff?: boolean | null; leave_quotas?: EmployeeLeaveQuotas }>> {
+export async function getEmployeeMetadataMap(): Promise<Record<string, EmployeeMetadata>> {
   const fileMeta = readAllEmployeeMetadata()
 
   try {
@@ -163,7 +164,7 @@ export async function getEmployeeMetadataMap(): Promise<Record<string, { branch?
 
 export async function saveEmployeeMetadata(
   idOrEmpId: string,
-  meta: { branch?: string | null; salary?: number | null; joining_date?: string | null; is_old_staff?: boolean | null; leave_quotas?: EmployeeLeaveQuotas }
+  meta: { branch?: string | null; salary?: number | null; joining_date?: string | null; is_old_staff?: boolean | null; email?: string | null; leave_quotas?: EmployeeLeaveQuotas }
 ): Promise<void> {
   // 1. Write immediately to server-side in-memory & file store
   writeEmployeeMetadata(idOrEmpId, meta)
@@ -179,6 +180,7 @@ export async function saveEmployeeMetadata(
       ...existing,
       ...(meta.branch !== undefined ? { branch: meta.branch || 'Multan' } : {}),
       ...(meta.salary !== undefined ? { salary: meta.salary } : {}),
+      ...(meta.email !== undefined ? { email: meta.email } : {}),
       joining_date: joiningDateVal || undefined,
       is_old_staff: isOldStaffVal,
       ...(meta.leave_quotas !== undefined ? { leave_quotas: meta.leave_quotas } : {}),
@@ -325,6 +327,7 @@ export async function getEmployees(params?: {
 
       return {
         ...emp,
+        email: emp.email || meta.email || null,
         designation: cleanDesignation(emp.designation),
         branch: emp.branch || meta.branch || 'Multan',
         salary: emp.salary !== undefined && emp.salary !== null ? emp.salary : (meta.salary !== undefined && meta.salary !== null ? meta.salary : null),
@@ -412,6 +415,7 @@ export async function getEmployeeById(idOrEmpId: string): Promise<Employee | nul
 
     return {
       ...data,
+      email: data.email || meta.email || null,
       designation: cleanDesignation(data.designation),
       branch: data.branch || meta.branch || 'Multan',
       salary: data.salary !== undefined && data.salary !== null ? data.salary : (meta.salary !== undefined && meta.salary !== null ? meta.salary : null),
@@ -494,6 +498,7 @@ export function isWithinProbation(joiningDateStr?: string | null, isOld?: boolea
 export async function createEmployee(params: {
   name: string
   designation: string
+  email?: string | null
   branch?: string | null
   salary?: number | string | null
   joining_date?: string | null
@@ -502,6 +507,7 @@ export async function createEmployee(params: {
 }): Promise<{ employee: Employee; warning?: string }> {
   const name = params.name.trim()
   const designation = cleanDesignation(params.designation)
+  const email = params.email && params.email.trim() ? params.email.trim() : null
   const branch = params.branch ? params.branch.trim() : 'Multan'
   const salary = params.salary !== undefined && params.salary !== null && params.salary !== '' ? Number(params.salary) : null
   const isOldStaff = Boolean(params.is_old_staff)
@@ -534,6 +540,7 @@ export async function createEmployee(params: {
     name,
     normalized_name: normalizedName,
     designation,
+    email,
     branch,
     salary,
     joining_date: joiningDate,
@@ -561,15 +568,15 @@ export async function createEmployee(params: {
   }
 
   if (data) {
-    await saveEmployeeMetadata(data.id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, leave_quotas: leaveQuotas })
-    await saveEmployeeMetadata(data.employee_id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, leave_quotas: leaveQuotas })
+    await saveEmployeeMetadata(data.id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, email, leave_quotas: leaveQuotas })
+    await saveEmployeeMetadata(data.employee_id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, email, leave_quotas: leaveQuotas })
   }
 
   if (!data) {
     throw new Error('Failed to create employee in database')
   }
 
-  return { employee: { ...data, branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, designation, leave_quotas: leaveQuotas }, warning }
+  return { employee: { ...data, branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, email, designation, leave_quotas: leaveQuotas }, warning }
 }
 
 export async function updateEmployee(
@@ -577,6 +584,7 @@ export async function updateEmployee(
   params: {
     name?: string
     designation?: string
+    email?: string | null
     branch?: string | null
     salary?: number | string | null
     joining_date?: string | null
@@ -598,6 +606,9 @@ export async function updateEmployee(
   }
   if (params.designation !== undefined) {
     updateData.designation = cleanDesignation(params.designation)
+  }
+  if (params.email !== undefined) {
+    updateData.email = params.email && params.email.trim() ? params.email.trim() : null
   }
   if (params.branch !== undefined) {
     updateData.branch = params.branch
@@ -650,11 +661,13 @@ export async function updateEmployee(
   }
 
   // Persist metadata to DB store
+  const emailVal = params.email !== undefined ? (params.email && params.email.trim() ? params.email.trim() : null) : undefined
   await saveEmployeeMetadata(id, {
     branch: params.branch,
     salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : undefined,
     joining_date: isOldStaff ? null : params.joining_date,
     is_old_staff: isOldStaff,
+    email: emailVal,
     leave_quotas: finalQuotas,
   })
   if (data?.employee_id) {
@@ -663,6 +676,7 @@ export async function updateEmployee(
       salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : undefined,
       joining_date: isOldStaff ? null : params.joining_date,
       is_old_staff: isOldStaff,
+      email: emailVal,
       leave_quotas: finalQuotas,
     })
   }
