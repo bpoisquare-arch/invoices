@@ -21,12 +21,12 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logoContainer: {
-    width: 175,
+    width: 195,
     alignItems: 'flex-start',
   },
   logoImage: {
-    width: 170,
-    height: 58,
+    width: 190,
+    height: 64,
     objectFit: 'contain',
   },
   paidByBox: {

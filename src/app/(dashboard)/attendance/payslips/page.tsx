@@ -571,7 +571,7 @@ export default function PayslipsPage() {
     try {
       setIsGeneratingPdf(true)
       const data = getPayslipData(emp)
-      const payPeriod = `${startDate.split('-').reverse().join('/')}`
+      const payPeriod = `${startDate.split('-').reverse().join('/')} - ${endDate.split('-').reverse().join('/')}`
 
       const doc = (
         <PayslipPDFTemplate
@@ -956,9 +956,9 @@ export default function PayslipsPage() {
                   <img
                     src="/edlink-logo.png"
                     alt="EdLink"
-                    className="h-16 w-auto object-contain mx-auto mb-2"
+                    className="h-20 w-auto object-contain mx-auto mb-3"
                   />
-                  <div className="text-center text-xs text-slate-600 font-medium space-y-0.5 mb-3.5">
+                  <div className="text-center text-xs text-slate-600 font-medium space-y-0.5 mb-6">
                     <p>
                       <span className="font-semibold text-slate-800">Add:</span> 38A 1st Floor DHA Phase 3 XX Block , Lahore, Pakistan, 54000
                     </p>
@@ -972,7 +972,7 @@ export default function PayslipsPage() {
                       </span>
                     </p>
                   </div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#007A78] tracking-tight uppercase">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#007A78] tracking-tight uppercase mb-3">
                     EMPLOYEE PAYSLIP
                   </h1>
                 </div>
@@ -980,10 +980,10 @@ export default function PayslipsPage() {
                 {/* 2. Top Info Grid */}
                 <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs font-medium pt-2">
                   <div className="flex items-center">
-                    <span className="w-32 font-bold text-[#003D5C]">Pay Period</span>
-                    <span className="mr-2 font-bold">:</span>
+                    <span className="w-28 sm:w-32 font-bold text-[#003D5C] shrink-0">Pay Period</span>
+                    <span className="mr-2 font-bold shrink-0">:</span>
                     <span className="text-slate-800 font-mono">
-                      {startDate.split('-').reverse().join('/')}
+                      {startDate.split('-').reverse().join('/')} - {endDate.split('-').reverse().join('/')}
                     </span>
                   </div>
 

@@ -36,18 +36,18 @@ const styles = StyleSheet.create({
   headerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   logo: {
-    width: 170,
-    height: 48,
+    width: 220,
+    height: 62,
     objectFit: 'contain',
     alignSelf: 'center',
-    marginBottom: 3,
+    marginBottom: 4,
   },
   companyInfoContainer: {
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 14,
   },
   companyInfoRow: {
     fontSize: 8.5,
@@ -69,7 +69,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    marginTop: 2,
+    marginTop: 6,
+    marginBottom: 4,
   },
   metaGrid: {
     flexDirection: 'row',

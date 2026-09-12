@@ -19,11 +19,11 @@ export default function EdLinkPayslipWebPreview({ payslip }: EdLinkPayslipWebPre
       <div>
         {/* 1. Top Section: EdLink Logo (Left) and Paid By (Right) */}
         <div className="flex flex-col sm:flex-row justify-between items-start gap-5 mb-8">
-          <div className="w-48 sm:w-56">
+          <div className="w-52 sm:w-60">
             <img
               src="/edlink-logo.png"
               alt="EdLink Australia Logo"
-              className="w-full max-w-[210px] h-auto object-contain block"
+              className="w-full max-w-[240px] h-auto object-contain block"
             />
           </div>
           <div className="w-full sm:w-[270px] bg-[#f1f5f9] rounded-none p-3.5 text-xs sm:text-[12px] leading-relaxed">
