@@ -25,6 +25,7 @@ import { pdf } from '@react-pdf/renderer'
 import AimtSchedulePDFTemplate from '@/components/pdf/aimt-schedule-pdf-template'
 import AimtScheduleWebPreview from '@/components/installments/aimt-schedule-web-preview'
 import { useAuthRole } from '@/lib/hooks/use-auth-role'
+import TablePagination from '@/components/ui/table-pagination'
 
 export default function InstallmentsPage() {
   const router = useRouter()
@@ -33,6 +34,10 @@ export default function InstallmentsPage() {
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   // Date Filtering State
   const [datePreset, setDatePreset] = useState<'all' | 'today' | '7days' | '30days' | 'thisMonth' | 'custom'>('all')
@@ -60,11 +65,13 @@ export default function InstallmentsPage() {
     setDatePreset('all')
     setStartDateFilter('')
     setEndDateFilter('')
+    setCurrentPage(1)
     loadData()
   }
 
   function handlePresetChange(preset: 'all' | 'today' | '7days' | '30days' | 'thisMonth' | 'custom') {
     setDatePreset(preset)
+    setCurrentPage(1)
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
 
@@ -158,6 +165,10 @@ export default function InstallmentsPage() {
     return true
   })
 
+  const totalEntries = filteredSchedules.length
+  const startIndex = (currentPage - 1) * pageSize
+  const paginatedSchedules = filteredSchedules.slice(startIndex, startIndex + pageSize)
+
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A'
     if (dateStr.includes('/')) return dateStr
@@ -215,12 +226,18 @@ export default function InstallmentsPage() {
             <Input
               placeholder="Search by Student ID or Name..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setCurrentPage(1)
+              }}
               className="pl-9 h-9 text-xs font-medium"
             />
             {search && (
               <button
-                onClick={() => setSearch('')}
+                onClick={() => {
+                  setSearch('')
+                  setCurrentPage(1)
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
                 <X className="w-3.5 h-3.5" />
@@ -364,7 +381,7 @@ export default function InstallmentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {filteredSchedules.map((item) => (
+                {paginatedSchedules.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
                     <td className="py-3.5 px-3 sm:px-3.5 font-mono font-bold text-blue-700 whitespace-nowrap">
                       <Link href={`/installments/${item.id}/preview`} className="hover:underline">
@@ -467,6 +484,17 @@ export default function InstallmentsPage() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {!isLoading && filteredSchedules.length > 0 && (
+          <TablePagination
+            totalEntries={totalEntries}
+            currentPage={currentPage}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            theme="light"
+          />
         )}
       </Card>
     </div>

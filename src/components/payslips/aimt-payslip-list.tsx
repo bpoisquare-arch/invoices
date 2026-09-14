@@ -34,6 +34,7 @@ import {
 } from 'lucide-react'
 
 import { useAuthRole } from '@/lib/hooks/use-auth-role'
+import TablePagination from '@/components/ui/table-pagination'
 
 type FilterPeriod = 'all' | 'today' | '7days' | '30days' | 'month'
 
@@ -45,6 +46,10 @@ export default function AIMTPayslipList() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<FilterPeriod>('all')
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   // Sync to Cloud State
   const [syncing, setSyncing] = useState(false)
@@ -175,6 +180,10 @@ export default function AIMTPayslipList() {
     })
   }, [payslips, searchQuery, activeFilter])
 
+  const totalEntries = filteredPayslips.length
+  const startIndex = (currentPage - 1) * pageSize
+  const paginatedPayslips = filteredPayslips.slice(startIndex, startIndex + pageSize)
+
   // Download PDF Action
   const handleDownload = async (item: AIMTPayslip) => {
     setDownloadingId(item.id)
@@ -270,25 +279,12 @@ export default function AIMTPayslipList() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-          {/* Sync Local Storage to Cloud Button */}
           <button
             type="button"
-            onClick={handleSyncToCloud}
-            disabled={syncing}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer border border-emerald-500/30 disabled:opacity-50 shadow-xs"
-            title="Upload any local payslips from this laptop into Supabase Live Database"
-          >
-            {syncing ? (
-              <Loader2 className="size-4 animate-spin text-emerald-400" />
-            ) : (
-              <CloudUpload className="size-4 text-emerald-400" />
-            )}
-            <span>{syncing ? 'Syncing...' : 'Sync to Cloud'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={loadData}
+            onClick={() => {
+              setCurrentPage(1)
+              loadData()
+            }}
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer border border-white/10 disabled:opacity-50"
           >
@@ -308,33 +304,6 @@ export default function AIMTPayslipList() {
         </div>
       </div>
 
-      {/* Sync Feedback Toast / Banner */}
-      {syncFeedback && (
-        <div
-          className={`flex items-center justify-between p-4 rounded-xl text-xs sm:text-sm border shadow-md transition-all ${
-            syncFeedback.type === 'success'
-              ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200'
-              : 'bg-amber-950/80 border-amber-500/40 text-amber-200'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            {syncFeedback.type === 'success' ? (
-              <CheckCircle2 className="size-5 text-emerald-400 shrink-0" />
-            ) : (
-              <AlertTriangle className="size-5 text-amber-400 shrink-0" />
-            )}
-            <span>{syncFeedback.message}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSyncFeedback(null)}
-            className="p-1 hover:bg-white/10 rounded-md transition-colors"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
-
       {/* 2. Search & Filter Ribbon */}
       <div className="bg-[#001E2F] border border-white/10 p-4 rounded-2xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
         {/* Search Bar */}
@@ -343,7 +312,10 @@ export default function AIMTPayslipList() {
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setCurrentPage(1)
+            }}
             placeholder="Search by Employee Name or Date..."
             className="w-full bg-[#001724] border border-white/15 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50 transition-all"
           />
@@ -366,7 +338,10 @@ export default function AIMTPayslipList() {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveFilter(tab.id as FilterPeriod)}
+              onClick={() => {
+                setActiveFilter(tab.id as FilterPeriod)
+                setCurrentPage(1)
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer ${
                 activeFilter === tab.id
                   ? 'bg-[#0E3E5B] text-[#81F5F5] border border-[#81F5F5]/40 shadow-sm'
@@ -433,7 +408,7 @@ export default function AIMTPayslipList() {
                   </td>
                 </tr>
               ) : (
-                filteredPayslips.map((item) => (
+                paginatedPayslips.map((item) => (
                   <tr
                     key={item.id}
                     className="hover:bg-white/[0.03] transition-colors group"
@@ -525,6 +500,17 @@ export default function AIMTPayslipList() {
             </tbody>
           </table>
         </div>
+
+        {!loading && filteredPayslips.length > 0 && (
+          <TablePagination
+            totalEntries={totalEntries}
+            currentPage={currentPage}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            theme="dark"
+          />
+        )}
       </div>
 
       {/* 4. Detached Floating Dropdown Menu (Fixed outside table overflow) */}

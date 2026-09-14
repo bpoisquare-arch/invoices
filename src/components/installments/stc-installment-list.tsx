@@ -46,6 +46,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { useAuthRole } from '@/lib/hooks/use-auth-role'
+import TablePagination from '@/components/ui/table-pagination'
 
 export default function STCInstallmentList() {
   const router = useRouter()
@@ -54,6 +55,10 @@ export default function STCInstallmentList() {
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   // Sync to Cloud State
   const [syncing, setSyncing] = useState(false)
@@ -123,11 +128,13 @@ export default function STCInstallmentList() {
     setDatePreset('all')
     setStartDateFilter('')
     setEndDateFilter('')
+    setCurrentPage(1)
     loadData()
   }
 
   function handlePresetChange(preset: 'all' | 'today' | '7days' | '30days' | 'thisMonth' | 'custom') {
     setDatePreset(preset)
+    setCurrentPage(1)
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
 
@@ -246,6 +253,10 @@ export default function STCInstallmentList() {
     return true
   })
 
+  const totalEntries = filteredSchedules.length
+  const startIndex = (currentPage - 1) * pageSize
+  const paginatedSchedules = filteredSchedules.slice(startIndex, startIndex + pageSize)
+
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A'
     if (dateStr.includes('/')) return dateStr
@@ -272,23 +283,6 @@ export default function STCInstallmentList() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto">
-          {/* Sync to Cloud Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSyncToCloud}
-            disabled={syncing}
-            className="w-full sm:w-auto h-9 text-xs font-semibold gap-1.5 text-emerald-700 hover:bg-emerald-50 border-emerald-300 justify-center cursor-pointer"
-            title="Upload any local STC schedules into Live Cloud Database"
-          >
-            {syncing ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin text-emerald-600" />
-            ) : (
-              <CloudUpload className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-            )}
-            {syncing ? 'Syncing...' : 'Sync to Cloud'}
-          </Button>
-
           <Button
             variant="outline"
             size="sm"
@@ -314,33 +308,6 @@ export default function STCInstallmentList() {
         </div>
       </div>
 
-      {/* Sync Feedback Toast / Banner */}
-      {syncFeedback && (
-        <div
-          className={`flex items-center justify-between p-4 rounded-xl text-xs sm:text-sm border shadow-xs transition-all ${
-            syncFeedback.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              : 'bg-amber-50 border-amber-200 text-amber-800'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            {syncFeedback.type === 'success' ? (
-              <CheckCircle2 className="size-5 text-emerald-600 shrink-0" />
-            ) : (
-              <AlertTriangle className="size-5 text-amber-600 shrink-0" />
-            )}
-            <span>{syncFeedback.message}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSyncFeedback(null)}
-            className="p-1 hover:bg-black/5 rounded-md transition-colors"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
-
       {/* Filter / Search & Custom Date Range Bar */}
       <Card className="p-3.5 sm:p-4 bg-white border-slate-200 shadow-2xs space-y-3 sm:space-y-4">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4">
@@ -350,12 +317,18 @@ export default function STCInstallmentList() {
             <Input
               placeholder="Search by Student ID, Name, Course or Agency..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setCurrentPage(1)
+              }}
               className="pl-9 h-9 text-xs font-medium"
             />
             {search && (
               <button
-                onClick={() => setSearch('')}
+                onClick={() => {
+                  setSearch('')
+                  setCurrentPage(1)
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
@@ -514,7 +487,7 @@ export default function STCInstallmentList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {filteredSchedules.map((item) => (
+                {paginatedSchedules.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
                     <td className="py-3.5 px-3 sm:px-3.5 font-mono font-bold text-blue-700 whitespace-nowrap">
                       <Link href={`/stc/installments/${item.id}/preview`} className="hover:underline">
@@ -615,6 +588,17 @@ export default function STCInstallmentList() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {!isLoading && filteredSchedules.length > 0 && (
+          <TablePagination
+            totalEntries={totalEntries}
+            currentPage={currentPage}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            theme="light"
+          />
         )}
       </Card>
 

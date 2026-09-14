@@ -43,6 +43,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/lib/supabase/database.types'
+import TablePagination from '@/components/ui/table-pagination'
 
 interface ReportDataTableProps {
   records: AimtReportRecord[]
@@ -83,7 +84,7 @@ export default function ReportDataTable({
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState<number>(25)
+  const [pageSize, setPageSize] = useState<number>(10)
 
   // Delete Confirmation State
   const [recordToDelete, setRecordToDelete] = useState<AimtReportRecord | null>(null)
@@ -166,9 +167,7 @@ export default function ReportDataTable({
 
   // Pagination calculation
   const totalRows = filteredRecords.length
-  const totalPages = pageSize === -1 ? 1 : Math.ceil(totalRows / pageSize) || 1
   const paginatedRecords = useMemo(() => {
-    if (pageSize === -1) return filteredRecords
     const start = (currentPage - 1) * pageSize
     return filteredRecords.slice(start, start + pageSize)
   }, [filteredRecords, currentPage, pageSize])
@@ -663,59 +662,31 @@ export default function ReportDataTable({
           </table>
         </div>
 
-        {/* Table Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-          {/* Selected Rows Info */}
-          <div className="flex items-center gap-3">
-            <span className="font-semibold text-slate-700">
-              {selectedIds.length} of {totalRows} row(s) selected
-            </span>
-
-            {/* Rows Per Page selector */}
-            <div className="flex items-center gap-1.5 ml-2">
-              <span className="text-[11px] text-slate-500">Show:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value))
-                  setCurrentPage(1)
-                }}
-                className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500 shadow-2xs"
-              >
-                <option value={10}>10 rows</option>
-                <option value={25}>25 rows</option>
-                <option value={50}>50 rows</option>
-                <option value={100}>100 rows</option>
-                <option value={-1}>All rows</option>
-              </select>
+        {/* Selected Rows Ribbon (if any selected) */}
+        {selectedIds.length > 0 && (
+          <div className="px-4 py-2 bg-cyan-50/70 border-t border-cyan-100 flex items-center justify-between text-xs text-cyan-900 font-medium">
+            <div className="flex items-center gap-2">
+              <span className="font-bold">{selectedIds.length}</span> of {totalRows} row(s) selected
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onSelectChange([])}
+              className="h-6 px-2 text-[11px] text-cyan-700 hover:text-cyan-900 hover:bg-cyan-100/60 font-semibold cursor-pointer"
+            >
+              Deselect all
+            </Button>
           </div>
+        )}
 
-          {/* Pagination Controls */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 mr-2">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-              className="h-8 px-3 border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 rounded-lg text-xs"
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-              className="h-8 px-3 border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 rounded-lg text-xs"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
+        <TablePagination
+          totalEntries={totalRows}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          theme="light"
+        />
       </div>
 
       {/* Delete Record Confirmation Dialog */}
