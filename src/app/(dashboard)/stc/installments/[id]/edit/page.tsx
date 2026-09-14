@@ -12,14 +12,23 @@ import STCInstallmentForm from '@/components/installments/stc-installment-form'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { useAuthRole } from '@/lib/hooks/use-auth-role'
 
 export default function EditSTCInstallmentPage() {
   const params = useParams()
   const id = params.id as string
   const router = useRouter()
+  const { isViewer, isLoading: roleLoading } = useAuthRole()
 
   const [schedule, setSchedule] = useState<STCStudentInstallmentSchedule | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!roleLoading && isViewer) {
+      router.replace('/stc/installments')
+      return
+    }
+  }, [isViewer, roleLoading, router])
 
   useEffect(() => {
     async function load() {

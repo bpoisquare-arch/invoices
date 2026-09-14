@@ -6,6 +6,7 @@ import { AIMTPayslip, aimtPayslipService } from '@/lib/services/aimt-payslip.ser
 import AIMTPayslipForm from '@/components/payslips/aimt-payslip-form'
 import { Loader2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import { useAuthRole } from '@/lib/hooks/use-auth-role'
 
 interface EditPayslipPageProps {
   params: Promise<{ id: string }>
@@ -14,8 +15,16 @@ interface EditPayslipPageProps {
 export default function EditPayslipPage({ params }: EditPayslipPageProps) {
   const resolvedParams = use(params)
   const router = useRouter()
+  const { isViewer, isLoading: roleLoading } = useAuthRole()
   const [payslip, setPayslip] = useState<AIMTPayslip | null>(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!roleLoading && isViewer) {
+      router.replace('/payslips')
+      return
+    }
+  }, [isViewer, roleLoading, router])
 
   useEffect(() => {
     async function fetchPayslip() {

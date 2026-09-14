@@ -1,10 +1,21 @@
-import AIMTPayslipForm from '@/components/payslips/aimt-payslip-form'
+'use client'
 
-export const metadata = {
-  title: 'Create AIMT Payslip | Client Management System',
-  description: 'Generate and export a new AIMT College employee payslip',
-}
+import React, { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import AIMTPayslipForm from '@/components/payslips/aimt-payslip-form'
+import { useAuthRole } from '@/lib/hooks/use-auth-role'
 
 export default function NewPayslipPage() {
+  const router = useRouter()
+  const { isViewer, isLoading } = useAuthRole()
+
+  useEffect(() => {
+    if (!isLoading && isViewer) {
+      router.replace('/payslips')
+    }
+  }, [isViewer, isLoading, router])
+
+  if (isViewer) return null
+
   return <AIMTPayslipForm />
 }

@@ -30,7 +30,7 @@ interface ImportHistoryDrawerProps {
   imports: AimtReportImport[]
   activeImportId?: string | null
   onSelectImport: (importBatch: AimtReportImport) => void
-  onDeleteImport: (id: string) => Promise<void>
+  onDeleteImport?: (id: string) => Promise<void>
   isLoading?: boolean
 }
 
@@ -93,6 +93,7 @@ export default function ImportHistoryDrawer({
   }
 
   async function handleDelete(id: string, fileName: string) {
+    if (!onDeleteImport) return
     if (!confirm(`Are you sure you want to delete "${fileName}" and all its records from the database?`)) return
     try {
       setDeletingId(id)
@@ -252,20 +253,22 @@ export default function ImportHistoryDrawer({
                       </Button>
 
                       {/* Delete batch */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={isDeleting}
-                        onClick={() => handleDelete(item.id, item.file_name)}
-                        className="h-8 size-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg"
-                        title="Delete import batch"
-                      >
-                        {isDeleting ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="size-3.5" />
-                        )}
-                      </Button>
+                      {onDeleteImport && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={isDeleting}
+                          onClick={() => handleDelete(item.id, item.file_name)}
+                          className="h-8 size-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg"
+                          title="Delete import batch"
+                        >
+                          {isDeleting ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="size-3.5" />
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

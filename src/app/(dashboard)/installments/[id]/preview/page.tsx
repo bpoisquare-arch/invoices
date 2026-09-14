@@ -15,11 +15,13 @@ import { ArrowLeft, Download, Edit, Printer, Loader2 } from 'lucide-react'
 
 import { pdf } from '@react-pdf/renderer'
 import AimtSchedulePDFTemplate from '@/components/pdf/aimt-schedule-pdf-template'
+import { useAuthRole } from '@/lib/hooks/use-auth-role'
 
 export default function InstallmentPreviewPage() {
   const params = useParams()
   const id = params.id as string
   const router = useRouter()
+  const { isViewer } = useAuthRole()
 
   const [schedule, setSchedule] = useState<StudentInstallmentSchedule | null>(null)
   const [fixedInfo, setFixedInfo] = useState<AIMTFixedInfo>(getAimtFixedInfo())
@@ -134,12 +136,14 @@ export default function InstallmentPreviewPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link href={`/installments/${schedule.id}/edit`}>
-            <Button variant="outline" size="sm" className="gap-2 text-slate-700">
-              <Edit className="w-4 h-4" />
-              Edit Schedule
-            </Button>
-          </Link>
+          {!isViewer && (
+            <Link href={`/installments/${schedule.id}/edit`}>
+              <Button variant="outline" size="sm" className="gap-2 text-slate-700">
+                <Edit className="w-4 h-4" />
+                Edit Schedule
+              </Button>
+            </Link>
+          )}
 
           <Button
             onClick={handleDownloadPDF}

@@ -16,6 +16,9 @@ import {
   ExternalLink,
 } from 'lucide-react'
 
+import { useAuthRole } from '@/lib/hooks/use-auth-role'
+import { clearRoleCookie } from '@/lib/auth/role'
+
 interface EntityPortal {
   id: string
   name: string
@@ -90,24 +93,25 @@ const ENTITIES: EntityPortal[] = [
 export default function EntityPortalPage() {
   const router = useRouter()
   const supabase = createClient()
-  const [user, setUser] = useState<User | null>(null)
+  const { role, isViewer, email } = useAuthRole()
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null)
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-    })
-  }, [supabase])
-
-  const email = user?.email || 'admin@isquarebpo.com'
   const initials = email.substring(0, 2).toUpperCase()
 
   async function handleLogout() {
     document.cookie = 'dev-auth-session=; path=/; max-age=0'
+    clearRoleCookie()
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
   }
+
+  const visibleEntities = ENTITIES.filter((entity) => {
+    if (isViewer) {
+      return entity.id === 'aimt' || entity.id === 'stc'
+    }
+    return true
+  })
 
   function handleSelectEntity(entity: EntityPortal) {
     setSelectedEntity(entity.id)
@@ -149,8 +153,8 @@ export default function EntityPortalPage() {
           <div className="hidden sm:flex flex-col text-right">
             <span className="text-xs font-bold text-[#0F1F18]">{email}</span>
             <span className="text-[10px] font-bold text-[#00BF8F] uppercase tracking-wider flex items-center justify-end gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-pulse" />
-              Administrator
+              <span className={`w-1.5 h-1.5 rounded-full ${isViewer ? 'bg-cyan-400' : 'bg-[#25D366]'} animate-pulse`} />
+              {isViewer ? 'Viewer (Read-Only)' : 'Administrator'}
             </span>
           </div>
           <div className="w-9 h-9 rounded-xl bg-[#002D27] text-[#06D6A0] text-xs font-extrabold flex items-center justify-center border border-[#002D27]/20 shadow-xs">
@@ -179,20 +183,22 @@ export default function EntityPortalPage() {
           <div>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#002D27]/5 border border-[#002D27]/10 text-xs font-bold text-[#002D27] mb-2">
               <Sparkles className="w-3.5 h-3.5 text-[#00BF8F]" />
-              Enterprise Workspaces
+              {isViewer ? 'Assigned Workspaces' : 'Enterprise Workspaces'}
             </span>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#002D27] tracking-tight font-['Montserrat']">
               Select Workspace
             </h2>
           </div>
           <p className="text-xs sm:text-sm text-[#5C7B73] font-medium leading-relaxed">
-            Choose which client workspace you wish to access and manage.
+            {isViewer
+              ? 'Access and view AIMT College and States College student records and documents.'
+              : 'Choose which client workspace you wish to access and manage.'}
           </p>
         </div>
 
-        {/* 5 Entities Grid */}
+        {/* Entities Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-          {ENTITIES.map((entity) => {
+          {visibleEntities.map((entity) => {
             return (
               <div
                 key={entity.id}

@@ -26,8 +26,8 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const [email, setEmail] = useState("admin@mis.isquarebpo.com")
-  const [password, setPassword] = useState("admin123")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [adminNotice, setAdminNotice] = useState<{ title: string; message: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -52,9 +52,21 @@ export function LoginForm({
     setError(null)
     setAdminNotice(null)
 
-    // Bypass login for admin credentials to support unconfirmed email locally
-    if (email === 'admin@mis.isquarebpo.com' && password === 'admin123') {
-      document.cookie = 'dev-auth-session=true; path=/; max-age=86400'
+    const cleanEmail = email.trim().toLowerCase()
+
+    // 1. Viewer Credentials Bypass for immediate login
+    if (cleanEmail === 'team@mis.isquarebpo.com' && password === 'Team@1230') {
+      document.cookie = 'dev-auth-session=viewer; path=/; max-age=86400; SameSite=Lax'
+      document.cookie = 'user-role=viewer; path=/; max-age=86400; SameSite=Lax'
+      router.push('/portal')
+      router.refresh()
+      return
+    }
+
+    // 2. Admin Credentials Bypass for immediate login
+    if (cleanEmail === 'admin@mis.isquarebpo.com' && password === 'admin123') {
+      document.cookie = 'dev-auth-session=admin; path=/; max-age=86400; SameSite=Lax'
+      document.cookie = 'user-role=admin; path=/; max-age=86400; SameSite=Lax'
       router.push('/portal')
       router.refresh()
       return
@@ -190,8 +202,16 @@ export function LoginForm({
     }
   }
 
-  async function completeLoginSession() {
-    document.cookie = 'dev-auth-session=true; path=/; max-age=86400; SameSite=Lax; Secure'
+  async function completeLoginSession(authenticatedUser?: any) {
+    const isViewerUser =
+      authenticatedUser?.user_metadata?.role === 'viewer' ||
+      authenticatedUser?.email?.toLowerCase() === 'team@mis.isquarebpo.com' ||
+      email.trim().toLowerCase() === 'team@mis.isquarebpo.com'
+
+    const role = isViewerUser ? 'viewer' : 'admin'
+    document.cookie = `dev-auth-session=${role}; path=/; max-age=86400; SameSite=Lax; Secure`
+    document.cookie = `user-role=${role}; path=/; max-age=86400; SameSite=Lax; Secure`
+
     await logAuditEvent({
       action: 'Successful Login',
       module: 'auth',
@@ -276,7 +296,7 @@ export function LoginForm({
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@mis.isquarebpo.com"
+                    placeholder="name@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
@@ -301,6 +321,7 @@ export function LoginForm({
                   <Input
                     id="password"
                     type="password"
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}

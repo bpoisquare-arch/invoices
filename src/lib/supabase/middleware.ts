@@ -35,7 +35,8 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Check dev session cookie fallback for instant login without email verification delays
-  const devSession = request.cookies.get('dev-auth-session')?.value === 'true'
+  const devSessionVal = request.cookies.get('dev-auth-session')?.value
+  const devSession = !!devSessionVal && devSessionVal !== 'false'
   const isAuthenticated = !!user || devSession
 
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
@@ -61,6 +62,37 @@ export async function updateSession(request: NextRequest) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/portal'
     return NextResponse.redirect(redirectUrl)
+  }
+
+  // Role-Based Access Control for Viewer Role
+  const userRoleCookie = request.cookies.get('user-role')?.value
+  const isViewer =
+    userRoleCookie === 'viewer' ||
+    devSessionVal === 'viewer' ||
+    user?.email?.toLowerCase() === 'team@mis.isquarebpo.com' ||
+    user?.user_metadata?.role === 'viewer'
+
+  if (isAuthenticated && isViewer) {
+    const pathname = request.nextUrl.pathname
+
+    const isRestrictedForViewer =
+      pathname.startsWith('/invoices') ||
+      pathname.startsWith('/companies') ||
+      pathname.startsWith('/attendance') ||
+      pathname.startsWith('/edlink') ||
+      pathname.startsWith('/settings') ||
+      pathname.startsWith('/installments/new') ||
+      pathname.includes('/installments/') && pathname.endsWith('/edit') ||
+      pathname.startsWith('/stc/installments/new') ||
+      pathname.includes('/stc/installments/') && pathname.endsWith('/edit') ||
+      pathname.startsWith('/payslips/new') ||
+      pathname.includes('/payslips/') && pathname.endsWith('/edit')
+
+    if (isRestrictedForViewer) {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/portal'
+      return NextResponse.redirect(redirectUrl)
+    }
   }
 
   // Inject Production-Grade Security Headers

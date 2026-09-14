@@ -54,6 +54,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
+import { useAuthRole } from '@/lib/hooks/use-auth-role'
+import { clearRoleCookie } from '@/lib/auth/role'
+
 interface EntityItem {
   id: string
   name: string
@@ -133,21 +136,26 @@ export default function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const [user, setUser] = useState<User | null>(null)
+  const { role, isViewer, email } = useAuthRole()
   const { setOpenMobile, isMobile } = useSidebar()
 
   const [activeEntity, setActiveEntity] = useState<string>('edlink-pk')
   const [entityMenuOpen, setEntityMenuOpen] = useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-    })
-  }, [supabase])
-
   // Sync entity from pathname or localStorage
   useEffect(() => {
+    if (isViewer) {
+      if (pathname.startsWith('/stc')) {
+        setActiveEntity('stc')
+        if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'stc')
+      } else {
+        setActiveEntity('aimt')
+        if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'aimt')
+      }
+      return
+    }
+
     if (pathname.startsWith('/stc')) {
       setActiveEntity('stc')
       if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'stc')
@@ -171,7 +179,7 @@ export default function AppSidebar() {
         else setActiveEntity('edlink-pk')
       }
     }
-  }, [pathname])
+  }, [pathname, isViewer])
 
   // Click outside to close team switcher dropdown
   useEffect(() => {
@@ -188,11 +196,18 @@ export default function AppSidebar() {
     }
   }, [entityMenuOpen])
 
-  const email = user?.email || 'admin@isquarebpo.com'
   const initials = email.substring(0, 2).toUpperCase()
+
+  const visibleEntities = ENTITIES.filter((entity) => {
+    if (isViewer) {
+      return entity.id === 'aimt' || entity.id === 'stc'
+    }
+    return true
+  })
 
   async function handleLogout() {
     document.cookie = 'dev-auth-session=; path=/; max-age=0'
+    clearRoleCookie()
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
@@ -316,7 +331,7 @@ export default function AppSidebar() {
                 Teams
               </div>
               <div className="space-y-0.5 mt-0.5">
-                {ENTITIES.map((entity) => {
+                {visibleEntities.map((entity) => {
                   const isSelected = entity.id === currentEntityObj.id
                   const IconComp = entity.icon || Building2
                   return (
@@ -412,17 +427,19 @@ export default function AppSidebar() {
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
-                          {/* Create Schedule */}
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton
-                              render={<Link href="/stc/installments/new" onClick={handleNavClick} />}
-                              isActive={pathname === '/stc/installments/new'}
-                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#00BF8F]/20 data-[active=true]:bg-[#00BF8F] data-[active=true]:text-[#001E2F] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                            >
-                              <PlusCircle className="size-3.5 shrink-0" />
-                              <span>Create Schedule</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
+                          {/* Create Schedule - Admin Only */}
+                          {!isViewer && (
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                render={<Link href="/stc/installments/new" onClick={handleNavClick} />}
+                                isActive={pathname === '/stc/installments/new'}
+                                className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#00BF8F]/20 data-[active=true]:bg-[#00BF8F] data-[active=true]:text-[#001E2F] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                              >
+                                <PlusCircle className="size-3.5 shrink-0" />
+                                <span>Create Schedule</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          )}
 
                           {/* Schedules */}
                           <SidebarMenuSubItem>
@@ -479,17 +496,19 @@ export default function AppSidebar() {
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
-                          {/* Create Schedule */}
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton
-                              render={<Link href="/installments/new" onClick={handleNavClick} />}
-                              isActive={pathname === '/installments/new'}
-                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                            >
-                              <PlusCircle className="size-3.5 shrink-0" />
-                              <span>Create Schedule</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
+                          {/* Create Schedule - Admin Only */}
+                          {!isViewer && (
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                render={<Link href="/installments/new" onClick={handleNavClick} />}
+                                isActive={pathname === '/installments/new'}
+                                className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                              >
+                                <PlusCircle className="size-3.5 shrink-0" />
+                                <span>Create Schedule</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          )}
 
                           {/* Schedules */}
                           <SidebarMenuSubItem>
@@ -541,17 +560,19 @@ export default function AppSidebar() {
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
-                          {/* Generate Payslip */}
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton
-                              render={<Link href="/payslips/new" onClick={handleNavClick} />}
-                              isActive={pathname === '/payslips/new'}
-                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                            >
-                              <PlusCircle className="size-3.5 shrink-0" />
-                              <span>Generate Payslip</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
+                          {/* Generate Payslip - Admin Only */}
+                          {!isViewer && (
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                render={<Link href="/payslips/new" onClick={handleNavClick} />}
+                                isActive={pathname === '/payslips/new'}
+                                className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                              >
+                                <PlusCircle className="size-3.5 shrink-0" />
+                                <span>Generate Payslip</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          )}
 
                           {/* All Payslips */}
                           <SidebarMenuSubItem>
@@ -952,7 +973,7 @@ export default function AppSidebar() {
                 {email}
               </span>
               <span className="truncate text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-                Administrator
+                {isViewer ? 'Viewer (Read-Only)' : 'Administrator'}
               </span>
             </div>
             <ChevronsUpDown className="ml-auto size-4 text-slate-400 group-data-[collapsible=icon]:hidden shrink-0" />
@@ -974,7 +995,7 @@ export default function AppSidebar() {
                   {email}
                 </span>
                 <span className="truncate text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-                  Administrator
+                  {isViewer ? 'Viewer (Read-Only)' : 'Administrator'}
                 </span>
               </div>
             </div>

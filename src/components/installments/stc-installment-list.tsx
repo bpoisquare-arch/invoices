@@ -45,9 +45,11 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { useAuthRole } from '@/lib/hooks/use-auth-role'
 
 export default function STCInstallmentList() {
   const router = useRouter()
+  const { isViewer } = useAuthRole()
   const [schedules, setSchedules] = useState<STCStudentInstallmentSchedule[]>([])
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -298,15 +300,17 @@ export default function STCInstallmentList() {
             Refresh
           </Button>
 
-          <Link href="/stc/installments/new" className="w-full sm:w-auto">
-            <Button
-              size="sm"
-              className="w-full sm:w-auto bg-[#009D9E] hover:bg-[#007A7A] text-white font-bold uppercase text-xs h-9 gap-2 shadow-xs justify-center cursor-pointer"
-            >
-              <PlusCircle className="w-4 h-4" />
-              Create Schedule
-            </Button>
-          </Link>
+          {!isViewer && (
+            <Link href="/stc/installments/new" className="w-full sm:w-auto">
+              <Button
+                size="sm"
+                className="w-full sm:w-auto bg-[#009D9E] hover:bg-[#007A7A] text-white font-bold uppercase text-xs h-9 gap-2 shadow-xs justify-center cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4" />
+                Create Schedule
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -567,13 +571,15 @@ export default function STCInstallmentList() {
                             <span>Preview</span>
                           </DropdownMenuItem>
 
-                          <DropdownMenuItem
-                            onClick={() => router.push(`/stc/installments/${item.id}/edit`)}
-                            className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
-                          >
-                            <Edit className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Edit</span>
-                          </DropdownMenuItem>
+                          {!isViewer && (
+                            <DropdownMenuItem
+                              onClick={() => router.push(`/stc/installments/${item.id}/edit`)}
+                              className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
+                            >
+                              <Edit className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Edit</span>
+                            </DropdownMenuItem>
+                          )}
 
                           <DropdownMenuItem
                             onClick={() => handleDownloadPDF(item)}
@@ -588,17 +594,19 @@ export default function STCInstallmentList() {
                             <span>Download PDF</span>
                           </DropdownMenuItem>
 
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => {
-                              setScheduleToDelete(item)
-                              setDeleteModalOpen(true)
-                            }}
-                            className="flex items-center gap-2 px-2.5 py-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg cursor-pointer font-medium transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                            <span>Delete</span>
-                          </DropdownMenuItem>
+                          {!isViewer && (
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => {
+                                setScheduleToDelete(item)
+                                setDeleteModalOpen(true)
+                              }}
+                              className="flex items-center gap-2 px-2.5 py-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg cursor-pointer font-medium transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>

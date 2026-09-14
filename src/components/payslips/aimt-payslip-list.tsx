@@ -33,10 +33,13 @@ import {
   Cloud,
 } from 'lucide-react'
 
+import { useAuthRole } from '@/lib/hooks/use-auth-role'
+
 type FilterPeriod = 'all' | 'today' | '7days' | '30days' | 'month'
 
 export default function AIMTPayslipList() {
   const router = useRouter()
+  const { isViewer } = useAuthRole()
   const [mounted, setMounted] = useState(false)
   const [payslips, setPayslips] = useState<AIMTPayslip[]>([])
   const [loading, setLoading] = useState(true)
@@ -293,13 +296,15 @@ export default function AIMTPayslipList() {
             <span>Refresh</span>
           </button>
 
-          <Link
-            href="/payslips/new"
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#81F5F5] hover:bg-[#6be0e0] text-[#002020] rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md cursor-pointer"
-          >
-            <Plus className="size-4 text-[#002020] stroke-[3]" />
-            <span>CREATE PAYSLIP</span>
-          </Link>
+          {!isViewer && (
+            <Link
+              href="/payslips/new"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#81F5F5] hover:bg-[#6be0e0] text-[#002020] rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md cursor-pointer"
+            >
+              <Plus className="size-4 text-[#002020] stroke-[3]" />
+              <span>CREATE PAYSLIP</span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -563,35 +568,39 @@ export default function AIMTPayslipList() {
             </span>
           </button>
 
-          {/* Edit Payslip */}
-          <button
-            type="button"
-            onClick={() => {
-              const target = menuState.item
-              setMenuState(null)
-              router.push(`/payslips/${target.id}/edit`)
-            }}
-            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-200 hover:bg-[#0E3E5B] hover:text-white transition-colors cursor-pointer text-left"
-          >
-            <Edit2 className="size-3.5 text-slate-400" />
-            <span>Edit Payslip</span>
-          </button>
+          {/* Edit Payslip - Admin Only */}
+          {!isViewer && (
+            <button
+              type="button"
+              onClick={() => {
+                const target = menuState.item
+                setMenuState(null)
+                router.push(`/payslips/${target.id}/edit`)
+              }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-200 hover:bg-[#0E3E5B] hover:text-white transition-colors cursor-pointer text-left"
+            >
+              <Edit2 className="size-3.5 text-slate-400" />
+              <span>Edit Payslip</span>
+            </button>
+          )}
 
-          <div className="h-px bg-white/10 my-1" />
+          {!isViewer && <div className="h-px bg-white/10 my-1" />}
 
-          {/* Delete Payslip */}
-          <button
-            type="button"
-            onClick={() => {
-              const target = menuState.item
-              setMenuState(null)
-              setDeleteTarget(target)
-            }}
-            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors cursor-pointer text-left"
-          >
-            <Trash2 className="size-3.5 text-red-400" />
-            <span>Delete Payslip</span>
-          </button>
+          {/* Delete Payslip - Admin Only */}
+          {!isViewer && (
+            <button
+              type="button"
+              onClick={() => {
+                const target = menuState.item
+                setMenuState(null)
+                setDeleteTarget(target)
+              }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors cursor-pointer text-left"
+            >
+              <Trash2 className="size-3.5 text-red-400" />
+              <span>Delete Payslip</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -628,14 +637,16 @@ export default function AIMTPayslipList() {
                   <span>{downloadingId === previewTarget.id ? 'Exporting...' : 'Download PDF'}</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => router.push(`/payslips/${previewTarget.id}/edit`)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-white/10"
-                >
-                  <Edit2 className="size-3.5 text-slate-300" />
-                  <span>Edit</span>
-                </button>
+                {!isViewer && (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/payslips/${previewTarget.id}/edit`)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-white/10"
+                  >
+                    <Edit2 className="size-3.5 text-slate-300" />
+                    <span>Edit</span>
+                  </button>
+                )}
 
                 <button
                   type="button"

@@ -12,11 +12,13 @@ import {
 import STCScheduleWebPreview from '@/components/installments/stc-schedule-web-preview'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Download, Edit, Printer, Loader2 } from 'lucide-react'
+import { useAuthRole } from '@/lib/hooks/use-auth-role'
 
 export default function STCInstallmentPreviewPage() {
   const params = useParams()
   const id = params.id as string
   const router = useRouter()
+  const { isViewer } = useAuthRole()
 
   const [schedule, setSchedule] = useState<STCStudentInstallmentSchedule | null>(null)
   const [fixedInfo, setFixedInfo] = useState<STCFixedInfo>(getSTCFixedInfo())
@@ -153,16 +155,18 @@ export default function STCInstallmentPreviewPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <Link href={`/stc/installments/${schedule.id}/edit`}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
-            >
-              <Edit className="w-4 h-4 mr-1.5" />
-              Edit
-            </Button>
-          </Link>
+          {!isViewer && (
+            <Link href={`/stc/installments/${schedule.id}/edit`}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
+              >
+                <Edit className="w-4 h-4 mr-1.5" />
+                Edit
+              </Button>
+            </Link>
+          )}
 
           <Button
             variant="outline"

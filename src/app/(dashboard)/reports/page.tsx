@@ -24,8 +24,10 @@ import ImportHistoryDrawer from '@/components/reports/import-history-drawer'
 import ReportRecordDetailModal from '@/components/reports/report-record-detail-modal'
 import AddReportEntryModal from '@/components/reports/add-report-entry-modal'
 import type { AimtReportImport, AimtReportRecord } from '@/lib/supabase/database.types'
+import { useAuthRole } from '@/lib/hooks/use-auth-role'
 
 export default function StudentReportsPage() {
+  const { isViewer } = useAuthRole()
   // Main Data States
   const [records, setRecords] = useState<AimtReportRecord[]>([])
   const [imports, setImports] = useState<AimtReportImport[]>([])
@@ -287,29 +289,33 @@ export default function StudentReportsPage() {
 
         {/* Action Buttons Group */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* 1. ADD ENTRY BUTTON (Prominent on Left of actions group) */}
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditingRecord(null)
-              setIsAddEntryModalOpen(true)
-            }}
-            className="bg-[#003D5C] hover:bg-[#002b42] text-white h-9 px-4 rounded-xl text-xs font-bold gap-2 shadow-xs transition-all cursor-pointer"
-          >
-            <PlusCircle className="size-4 text-cyan-300" />
-            <span>Add Entry</span>
-          </Button>
+          {/* 1. ADD ENTRY BUTTON (Admin Only) */}
+          {!isViewer && (
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingRecord(null)
+                setIsAddEntryModalOpen(true)
+              }}
+              className="bg-[#003D5C] hover:bg-[#002b42] text-white h-9 px-4 rounded-xl text-xs font-bold gap-2 shadow-xs transition-all cursor-pointer"
+            >
+              <PlusCircle className="size-4 text-cyan-300" />
+              <span>Add Entry</span>
+            </Button>
+          )}
 
-          {/* 2. Upload Excel Modal Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsUploadModalOpen(true)}
-            className="border-slate-200 bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 h-9 px-3.5 rounded-xl text-xs font-semibold gap-1.5 shadow-2xs cursor-pointer"
-          >
-            <UploadCloud className="size-4 text-cyan-600" />
-            <span>Import Excel</span>
-          </Button>
+          {/* 2. Upload Excel Modal Button (Admin Only) */}
+          {!isViewer && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsUploadModalOpen(true)}
+              className="border-slate-200 bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 h-9 px-3.5 rounded-xl text-xs font-semibold gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <UploadCloud className="size-4 text-cyan-600" />
+              <span>Import Excel</span>
+            </Button>
+          )}
 
           {/* 3. Import History */}
           <Button
@@ -408,33 +414,41 @@ export default function StudentReportsPage() {
         selectedIds={selectedIds}
         onSelectChange={setSelectedIds}
         onViewRecord={(record) => setDetailModalRecord(record)}
-        onEditRecord={(record) => {
-          setEditingRecord(record)
-          setIsAddEntryModalOpen(true)
-        }}
-        onDeleteRecord={handleDeleteRecord}
+        onEditRecord={
+          isViewer
+            ? undefined
+            : (record) => {
+                setEditingRecord(record)
+                setIsAddEntryModalOpen(true)
+              }
+        }
+        onDeleteRecord={isViewer ? undefined : handleDeleteRecord}
         availableAgents={availableAgents}
         availableIntakes={availableIntakes}
         onExportFiltered={handleExportToExcel}
       />
 
       {/* 5. Modals & Drawers */}
-      <AddReportEntryModal
-        isOpen={isAddEntryModalOpen}
-        onClose={() => {
-          setIsAddEntryModalOpen(false)
-          setEditingRecord(null)
-        }}
-        onSuccess={handleRecordSaved}
-        editRecord={editingRecord}
-        activeImportId={activeImport?.id}
-      />
+      {!isViewer && (
+        <AddReportEntryModal
+          isOpen={isAddEntryModalOpen}
+          onClose={() => {
+            setIsAddEntryModalOpen(false)
+            setEditingRecord(null)
+          }}
+          onSuccess={handleRecordSaved}
+          editRecord={editingRecord}
+          activeImportId={activeImport?.id}
+        />
+      )}
 
-      <UploadReportModal
-        isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
-        onUploadSuccess={handleUploadSuccess}
-      />
+      {!isViewer && (
+        <UploadReportModal
+          isOpen={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          onUploadSuccess={handleUploadSuccess}
+        />
+      )}
 
       <ImportHistoryDrawer
         isOpen={isHistoryDrawerOpen}
@@ -442,7 +456,7 @@ export default function StudentReportsPage() {
         imports={imports}
         activeImportId={activeImport?.id}
         onSelectImport={handleSelectImport}
-        onDeleteImport={handleDeleteImport}
+        onDeleteImport={isViewer ? undefined : handleDeleteImport}
         isLoading={isLoadingImports}
       />
 
@@ -450,11 +464,15 @@ export default function StudentReportsPage() {
         isOpen={Boolean(detailModalRecord)}
         onClose={() => setDetailModalRecord(null)}
         record={detailModalRecord}
-        onEdit={(record) => {
-          setDetailModalRecord(null)
-          setEditingRecord(record)
-          setIsAddEntryModalOpen(true)
-        }}
+        onEdit={
+          isViewer
+            ? undefined
+            : (record) => {
+                setDetailModalRecord(null)
+                setEditingRecord(record)
+                setIsAddEntryModalOpen(true)
+              }
+        }
       />
     </div>
   )
