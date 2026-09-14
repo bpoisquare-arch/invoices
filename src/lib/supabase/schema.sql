@@ -353,6 +353,18 @@ CREATE TABLE IF NOT EXISTS public.employee_deductions (
     CONSTRAINT unique_emp_month_deduction UNIQUE (employee_id, month_year)
 );
 
+-- 16. EMPLOYEE ADJUSTMENTS TABLE
+CREATE TABLE IF NOT EXISTS public.employee_adjustments (
+    id TEXT PRIMARY KEY,
+    employee_id VARCHAR(100) NOT NULL,
+    month_year VARCHAR(20) NOT NULL,
+    amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_emp_month_adjustment UNIQUE (employee_id, month_year)
+);
+
 -- Function for atomic sequential Employee ID generation (e.g. EMP-0001)
 CREATE OR REPLACE FUNCTION public.generate_next_employee_id()
 RETURNS VARCHAR(50)
@@ -385,6 +397,7 @@ CREATE INDEX IF NOT EXISTS idx_attendance_audit_logs_created_at ON public.attend
 CREATE INDEX IF NOT EXISTS idx_gazetted_holidays_date ON public.gazetted_holidays(date);
 CREATE INDEX IF NOT EXISTS idx_employee_commissions_lookup ON public.employee_commissions(employee_id, month_year);
 CREATE INDEX IF NOT EXISTS idx_employee_deductions_lookup ON public.employee_deductions(employee_id, month_year);
+CREATE INDEX IF NOT EXISTS idx_employee_adjustments_lookup ON public.employee_adjustments(employee_id, month_year);
 
 -- Enable RLS
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
@@ -395,6 +408,7 @@ ALTER TABLE public.attendance_audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.gazetted_holidays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employee_commissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employee_deductions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employee_adjustments ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
@@ -452,6 +466,13 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon access to employee_deductions') THEN
         CREATE POLICY "Allow anon access to employee_deductions" ON public.employee_deductions FOR ALL TO anon USING (true) WITH CHECK (true);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated access to employee_adjustments') THEN
+        CREATE POLICY "Allow authenticated access to employee_adjustments" ON public.employee_adjustments FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon access to employee_adjustments') THEN
+        CREATE POLICY "Allow anon access to employee_adjustments" ON public.employee_adjustments FOR ALL TO anon USING (true) WITH CHECK (true);
     END IF;
 END $$;
 -- 13. AIMT PAYSLIPS TABLE

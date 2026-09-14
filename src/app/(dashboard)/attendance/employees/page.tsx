@@ -21,9 +21,11 @@ import {
   Lock,
   Sparkles,
   FileMinus,
+  SlidersHorizontal,
 } from 'lucide-react'
 import EmployeeCommissionModal from '@/components/attendance/employee-commission-modal'
 import EmployeeDeductionModal from '@/components/attendance/employee-deduction-modal'
+import EmployeeAdjustmentModal from '@/components/attendance/employee-adjustment-modal'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -77,9 +79,10 @@ export default function EmployeesPage() {
   const [branchFilter, setBranchFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
 
-  // Commission & Deduction Modal State
+  // Commission, Deduction & Adjustment Modal State
   const [selectedCommissionEmployee, setSelectedCommissionEmployee] = useState<Employee | null>(null)
   const [selectedDeductionEmployee, setSelectedDeductionEmployee] = useState<Employee | null>(null)
+  const [selectedAdjustmentEmployee, setSelectedAdjustmentEmployee] = useState<Employee | null>(null)
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -684,6 +687,13 @@ export default function EmployeesPage() {
                             >
                               <FileMinus className="w-3.5 h-3.5 text-rose-600" />
                               <span>Deduction</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setSelectedAdjustmentEmployee(emp)}
+                              className="flex items-center gap-2 px-2.5 py-2 text-cyan-800 hover:bg-cyan-50 hover:text-cyan-950 rounded-lg cursor-pointer font-medium transition-colors"
+                            >
+                              <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-600" />
+                              <span>Adjustment</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => openEditModal(emp)}
@@ -1388,6 +1398,16 @@ export default function EmployeesPage() {
         isOpen={!!selectedDeductionEmployee}
         onClose={() => setSelectedDeductionEmployee(null)}
         employee={selectedDeductionEmployee}
+        onSaveSuccess={() => {
+          fetchEmployees()
+        }}
+      />
+
+      {/* Employee Adjustment Management Modal */}
+      <EmployeeAdjustmentModal
+        isOpen={!!selectedAdjustmentEmployee}
+        onClose={() => setSelectedAdjustmentEmployee(null)}
+        employee={selectedAdjustmentEmployee}
         onSaveSuccess={() => {
           fetchEmployees()
         }}

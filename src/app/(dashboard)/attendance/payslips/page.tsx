@@ -20,6 +20,9 @@ import {
   FileText,
   DollarSign,
   ArrowUpDown,
+  Sparkles,
+  FileMinus,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,6 +37,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -47,6 +51,9 @@ import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
 import { Employee } from '@/lib/supabase/database.types'
 import { pdf } from '@react-pdf/renderer'
 import PayslipPDFTemplate from '@/components/pdf/payslip-pdf-template'
+import EmployeeCommissionModal from '@/components/attendance/employee-commission-modal'
+import EmployeeDeductionModal from '@/components/attendance/employee-deduction-modal'
+import EmployeeAdjustmentModal from '@/components/attendance/employee-adjustment-modal'
 
 const MONTHS = [
   { value: '01', label: 'January' },
@@ -146,8 +153,14 @@ export default function PayslipsPage() {
   const [commissionsMap, setCommissionsMap] = useState<Record<string, number>>({})
   const [deductionsMap, setDeductionsMap] = useState<Record<string, number>>({})
   const [deductionsNotesMap, setDeductionsNotesMap] = useState<Record<string, string>>({})
+  const [adjustmentsMap, setAdjustmentsMap] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
+
+  // Commission, Deduction & Adjustment Modal States
+  const [selectedCommissionEmployee, setSelectedCommissionEmployee] = useState<Employee | null>(null)
+  const [selectedDeductionEmployee, setSelectedDeductionEmployee] = useState<Employee | null>(null)
+  const [selectedAdjustmentEmployee, setSelectedAdjustmentEmployee] = useState<Employee | null>(null)
 
   // Current Date Defaults
   const now = new Date()
@@ -185,16 +198,17 @@ export default function PayslipsPage() {
     return { startDate: sDate, endDate: eDate, daysInMonth: totalDays, monthLabel: label, monthKey: key }
   }, [selectedMonth, selectedYear])
 
-  // Fetch employees, attendance records, holidays, monthly commissions & deductions for selected month
+  // Fetch employees, attendance records, holidays, monthly commissions, deductions & adjustments for selected month
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const [empRes, attRes, commRes, holRes, dedRes] = await Promise.all([
+      const [empRes, attRes, commRes, holRes, dedRes, adjRes] = await Promise.all([
         fetch('/api/attendance/employees?isActiveOnly=false'),
         fetch(`/api/attendance/records?startDate=${startDate}&endDate=${endDate}&pageSize=10000`),
         fetch(`/api/attendance/commissions?month=${monthKey}`),
         fetch('/api/attendance/holidays'),
         fetch(`/api/attendance/deductions?month=${monthKey}`),
+        fetch(`/api/attendance/adjustments?month=${monthKey}`),
       ])
 
       const empData = await empRes.json()
@@ -245,6 +259,20 @@ export default function PayslipsPage() {
       } else {
         setDeductionsMap({})
         setDeductionsNotesMap({})
+      }
+
+      const adjData = await adjRes.json()
+      if (adjData.success && Array.isArray(adjData.adjustments)) {
+        const aMap: Record<string, number> = {}
+        adjData.adjustments.forEach((a: any) => {
+          if (a.employee_id) {
+            aMap[a.employee_id] = Number(a.amount) || 0
+            aMap[a.employee_id.toLowerCase()] = Number(a.amount) || 0
+          }
+        })
+        setAdjustmentsMap(aMap)
+      } else {
+        setAdjustmentsMap({})
       }
     } catch (e) {
       console.error('Failed to fetch payslip data:', e)
@@ -545,7 +573,12 @@ export default function PayslipsPage() {
       (emp.id ? deductionsNotesMap[emp.id.toLowerCase()] : '') ||
       (emp.employee_id ? deductionsNotesMap[emp.employee_id.toLowerCase()] : '') ||
       'Others Deduction'
-    const adjustments = 0
+    const adjustments =
+      adjustmentsMap[emp.id] ||
+      adjustmentsMap[emp.employee_id] ||
+      (emp.id ? adjustmentsMap[emp.id.toLowerCase()] : 0) ||
+      (emp.employee_id ? adjustmentsMap[emp.employee_id.toLowerCase()] : 0) ||
+      0
     const totalEarnings = basicPay + commission + adjustments
     const totalDeduction = unpaidDeduction + othersDeduction
     const netPay = Math.max(0, totalEarnings - totalDeduction)
@@ -981,6 +1014,32 @@ export default function PayslipsPage() {
                               <Mail className="w-3.5 h-3.5 text-purple-600" />
                               <span>Send Email</span>
                             </DropdownMenuItem>
+
+                            <DropdownMenuSeparator className="my-1 bg-slate-100" />
+
+                            <DropdownMenuItem
+                              onClick={() => setSelectedCommissionEmployee(emp)}
+                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-amber-800 hover:bg-amber-50 hover:text-amber-950 cursor-pointer font-medium transition-colors"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Commission</span>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={() => setSelectedDeductionEmployee(emp)}
+                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-rose-800 hover:bg-rose-50 hover:text-rose-950 cursor-pointer font-medium transition-colors"
+                            >
+                              <FileMinus className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Deduction</span>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={() => setSelectedAdjustmentEmployee(emp)}
+                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-cyan-800 hover:bg-cyan-50 hover:text-cyan-950 cursor-pointer font-medium transition-colors"
+                            >
+                              <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-600" />
+                              <span>Adjustment</span>
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </td>
@@ -1373,6 +1432,36 @@ export default function PayslipsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Employee Commission Management Modal */}
+      <EmployeeCommissionModal
+        isOpen={!!selectedCommissionEmployee}
+        onClose={() => setSelectedCommissionEmployee(null)}
+        employee={selectedCommissionEmployee}
+        onSaveSuccess={() => {
+          fetchData()
+        }}
+      />
+
+      {/* Employee Deduction Management Modal */}
+      <EmployeeDeductionModal
+        isOpen={!!selectedDeductionEmployee}
+        onClose={() => setSelectedDeductionEmployee(null)}
+        employee={selectedDeductionEmployee}
+        onSaveSuccess={() => {
+          fetchData()
+        }}
+      />
+
+      {/* Employee Adjustment Management Modal */}
+      <EmployeeAdjustmentModal
+        isOpen={!!selectedAdjustmentEmployee}
+        onClose={() => setSelectedAdjustmentEmployee(null)}
+        employee={selectedAdjustmentEmployee}
+        onSaveSuccess={() => {
+          fetchData()
+        }}
+      />
     </div>
   )
 }

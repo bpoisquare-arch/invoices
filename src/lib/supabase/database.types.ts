@@ -663,6 +663,36 @@ export interface Database {
         }
         Relationships: []
       }
+      employee_adjustments: {
+        Row: {
+          id: string
+          employee_id: string
+          month_year: string
+          amount: number
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          employee_id: string
+          month_year: string
+          amount?: number
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          employee_id?: string
+          month_year?: string
+          amount?: number
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           id: string
@@ -949,6 +979,7 @@ export type AttendanceAuditLog = Database['public']['Tables']['attendance_audit_
 export type GazettedHoliday = Database['public']['Tables']['gazetted_holidays']['Row']
 export type EmployeeCommission = Database['public']['Tables']['employee_commissions']['Row']
 export type EmployeeDeduction = Database['public']['Tables']['employee_deductions']['Row']
+export type EmployeeAdjustment = Database['public']['Tables']['employee_adjustments']['Row']
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type SecurityAuditLog = Database['public']['Tables']['security_audit_logs']['Row']
 

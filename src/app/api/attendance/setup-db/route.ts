@@ -5,6 +5,7 @@ import { INITIAL_EMPLOYEES } from '@/lib/services/attendance.service'
 import { readAllEmployeeMetadata, readAllHolidays } from '@/lib/services/employee-storage'
 import { getAllCommissions } from '@/lib/services/commission-storage'
 import { getAllDeductions } from '@/lib/services/deduction-storage'
+import { getAllAdjustments } from '@/lib/services/adjustment-storage'
 
 export const dynamic = 'force-dynamic'
 
@@ -128,6 +129,24 @@ export async function GET() {
         if (!error) dedsSynced++
       }
       syncReport.deductions_synced = dedsSynced
+    }
+
+    // 7. Migrate Adjustments to employee_adjustments table
+    const adjs = await getAllAdjustments()
+    let adjsSynced = 0
+    if (adjs.length > 0) {
+      for (const a of adjs) {
+        const { error } = await supabase.from('employee_adjustments').upsert({
+          id: a.id,
+          employee_id: a.employee_id,
+          month_year: a.month_year,
+          amount: a.amount,
+          notes: a.notes || '',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'employee_id,month_year' })
+        if (!error) adjsSynced++
+      }
+      syncReport.adjustments_synced = adjsSynced
     }
 
     return NextResponse.json({
