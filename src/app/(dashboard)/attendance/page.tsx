@@ -96,9 +96,11 @@ export default function EmployeeOverviewPage() {
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesignation, setNewDesignation] = useState('')
+  const [newEmail, setNewEmail] = useState('')
   const [newBranch, setNewBranch] = useState('Multan')
   const [newJoiningDate, setNewJoiningDate] = useState(todayStr)
   const [newIsOldStaff, setNewIsOldStaff] = useState(false)
+  const [newIsAttendanceExempt, setNewIsAttendanceExempt] = useState(false)
   const [newSalary, setNewSalary] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [addWarning, setAddWarning] = useState<string | null>(null)
@@ -108,9 +110,11 @@ export default function EmployeeOverviewPage() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [editName, setEditName] = useState('')
   const [editDesignation, setEditDesignation] = useState('')
+  const [editEmail, setEditEmail] = useState('')
   const [editBranch, setEditBranch] = useState('Multan')
   const [editJoiningDate, setEditJoiningDate] = useState(todayStr)
   const [editIsOldStaff, setEditIsOldStaff] = useState(false)
+  const [editIsAttendanceExempt, setEditIsAttendanceExempt] = useState(false)
   const [editSalary, setEditSalary] = useState('')
   const [editActive, setEditActive] = useState(true)
   const [editError, setEditError] = useState<string | null>(null)
@@ -199,9 +203,11 @@ export default function EmployeeOverviewPage() {
         body: JSON.stringify({
           name: newName.trim(),
           designation: newDesignation.trim(),
+          email: newEmail.trim() || null,
           branch: newBranch,
           joining_date: newIsOldStaff ? null : newJoiningDate,
           is_old_staff: newIsOldStaff,
+          is_attendance_exempt: newIsAttendanceExempt,
           salary: newSalary ? Number(newSalary) : null,
           leave_quotas: {
             annual_leaves: Number(newAnnualLeaves) || 0,
@@ -221,9 +227,11 @@ export default function EmployeeOverviewPage() {
       setIsAddOpen(false)
       setNewName('')
       setNewDesignation('')
+      setNewEmail('')
       setNewBranch('Multan')
       setNewJoiningDate(todayStr)
       setNewIsOldStaff(false)
+      setNewIsAttendanceExempt(false)
       setNewSalary('')
       setNewAnnualLeaves(6)
       setNewSickLeaves(7)
@@ -262,9 +270,11 @@ export default function EmployeeOverviewPage() {
           id: editingEmployee.id,
           name: editName.trim(),
           designation: editDesignation.trim(),
+          email: editEmail.trim() || null,
           branch: editBranch,
           joining_date: editIsOldStaff ? null : editJoiningDate,
           is_old_staff: editIsOldStaff,
+          is_attendance_exempt: editIsAttendanceExempt,
           salary: targetSalary,
           is_active: editActive,
           leave_quotas,
@@ -285,9 +295,11 @@ export default function EmployeeOverviewPage() {
                 ...(data.employee || {}),
                 name: editName.trim(),
                 designation: editDesignation.trim(),
+                email: editEmail.trim() || null,
                 branch: editBranch,
                 joining_date: editIsOldStaff ? null : editJoiningDate,
                 is_old_staff: editIsOldStaff,
+                is_attendance_exempt: editIsAttendanceExempt,
                 salary: targetSalary,
                 is_active: editActive,
               }
@@ -309,13 +321,15 @@ export default function EmployeeOverviewPage() {
     setEditingEmployee(emp)
     setEditName(emp.name)
     setEditDesignation(emp.designation)
+    setEditEmail(emp.email || '')
     setEditBranch(emp.branch || 'Multan')
     setEditIsOldStaff(isOld)
+    setEditIsAttendanceExempt(Boolean(emp.is_attendance_exempt))
     const rawDate = emp.joining_date || (!isOld ? emp.created_at : null)
     setEditJoiningDate(rawDate ? rawDate.split('T')[0] : todayStr)
     setEditSalary(emp.salary !== undefined && emp.salary !== null ? String(emp.salary) : '')
     setEditActive(emp.is_active)
-    const q = emp.leave_quotas || {}
+    const q = emp.base_leave_quotas || emp.leave_quotas || {}
     setEditAnnualLeaves(q.annual_leaves !== undefined ? Number(q.annual_leaves) : 6)
     setEditSickLeaves(q.sick_leaves !== undefined ? Number(q.sick_leaves) : 7)
     setEditCasualLeaves(q.casual_leaves !== undefined ? Number(q.casual_leaves) : 7)
@@ -579,12 +593,19 @@ export default function EmployeeOverviewPage() {
                           >
                             {initial}
                           </div>
-                          <Link
-                            href={`/attendance/employees/${emp.id}`}
-                            className="font-bold text-slate-900 hover:text-[#0058BE] transition-colors text-xs"
-                          >
-                            {emp.name}
-                          </Link>
+                          <div className="flex flex-col">
+                            <Link
+                              href={`/attendance/employees/${emp.id}`}
+                              className="font-bold text-slate-900 hover:text-[#0058BE] transition-colors text-xs"
+                            >
+                              {emp.name}
+                            </Link>
+                            {emp.email && (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {emp.email}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
 
@@ -624,13 +645,20 @@ export default function EmployeeOverviewPage() {
 
                       {/* Attendance */}
                       <TableCell className="py-4 px-4">
-                        <Link
-                          href={`/attendance/employees/${emp.id}`}
-                          className="text-[#0058BE] hover:text-[#004395] font-semibold text-xs inline-flex items-center gap-1.5 hover:underline"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-[#0058BE]" />
-                          View Attendance
-                        </Link>
+                        <div className="flex flex-col items-start gap-1">
+                          <Link
+                            href={`/attendance/employees/${emp.id}`}
+                            className="text-[#0058BE] hover:text-[#004395] font-semibold text-xs inline-flex items-center gap-1.5 hover:underline"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-[#0058BE]" />
+                            View Attendance
+                          </Link>
+                          {emp.is_attendance_exempt && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded">
+                              ⚡ Fixed Full Salary
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
 
                       {/* Status */}
@@ -802,6 +830,20 @@ export default function EmployeeOverviewPage() {
               </Select>
             </div>
 
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Email Address (For Payslip Delivery)
+              </Label>
+              <Input
+                type="email"
+                placeholder="e.g. employee@edlinkservices.info"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                className="text-sm border-slate-200"
+              />
+            </div>
+
             {/* Branch & Joining Date Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -877,6 +919,43 @@ export default function EmployeeOverviewPage() {
                 onChange={(e) => setNewSalary(e.target.value)}
                 className="text-sm border-slate-200 font-mono"
               />
+            </div>
+
+            {/* Attendance Exemption Switch Card */}
+            <div className={`p-3.5 rounded-xl border transition-all ${newIsAttendanceExempt ? 'bg-teal-50/90 border-teal-300 ring-1 ring-teal-200' : 'bg-slate-50/80 border-slate-200'}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-0.5 pr-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="newAttendanceExempt" className="text-xs font-bold text-slate-800 cursor-pointer">
+                      Attendance Exempt / Fixed Full Salary
+                    </Label>
+                    {newIsAttendanceExempt && (
+                      <span className="bg-[#009D9E] text-white text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded shadow-2xs">
+                        Full Pay
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-tight">
+                    Enable for employees whose attendance is not uploaded. Their salary will be calculated 100% in full without absent or unpaid deductions.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  id="newAttendanceExempt"
+                  aria-checked={newIsAttendanceExempt}
+                  onClick={() => setNewIsAttendanceExempt(!newIsAttendanceExempt)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#009D9E]/50 ${
+                    newIsAttendanceExempt ? 'bg-[#009D9E]' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      newIsAttendanceExempt ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Initial Remaining Leave Quotas Section */}
@@ -1067,6 +1146,20 @@ export default function EmployeeOverviewPage() {
               </Select>
             </div>
 
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Email Address (For Payslip Delivery)
+              </Label>
+              <Input
+                type="email"
+                placeholder="e.g. employee@edlinkservices.info"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="text-sm border-slate-200"
+              />
+            </div>
+
             {/* Branch & Joining Date Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -1142,6 +1235,43 @@ export default function EmployeeOverviewPage() {
                 onChange={(e) => setEditSalary(e.target.value)}
                 className="text-sm border-slate-200 font-mono"
               />
+            </div>
+
+            {/* Attendance Exemption Switch Card */}
+            <div className={`p-3.5 rounded-xl border transition-all ${editIsAttendanceExempt ? 'bg-teal-50/90 border-teal-300 ring-1 ring-teal-200' : 'bg-slate-50/80 border-slate-200'}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-0.5 pr-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="editAttendanceExempt" className="text-xs font-bold text-slate-800 cursor-pointer">
+                      Attendance Exempt / Fixed Full Salary
+                    </Label>
+                    {editIsAttendanceExempt && (
+                      <span className="bg-[#009D9E] text-white text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded shadow-2xs">
+                        Full Pay
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-tight">
+                    Enable for employees whose attendance is not uploaded. Their salary will be calculated 100% in full without absent or unpaid deductions.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  id="editAttendanceExempt"
+                  aria-checked={editIsAttendanceExempt}
+                  onClick={() => setEditIsAttendanceExempt(!editIsAttendanceExempt)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#009D9E]/50 ${
+                    editIsAttendanceExempt ? 'bg-[#009D9E]' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      editIsAttendanceExempt ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Locked Remaining Leave Balances Section */}
