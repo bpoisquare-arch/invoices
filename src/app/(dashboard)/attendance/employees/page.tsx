@@ -771,80 +771,100 @@ export default function EmployeesPage() {
 
       {/* Add Employee Modal */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl rounded-xl">
-          <DialogHeader className="border-b border-slate-100 pb-3">
+        <DialogContent className="sm:max-w-xl w-[95vw] sm:w-[580px] max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-2xl p-0 overflow-hidden flex flex-col font-sans">
+          <DialogHeader className="p-5 pb-3.5 shrink-0 border-b border-slate-100 bg-slate-50/60">
             <DialogTitle className="text-base font-bold text-[#003D5C] flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-[#009D9E]" />
               Add New Employee
             </DialogTitle>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 mt-0.5">
               Employee ID will be generated automatically and uniquely.
             </p>
           </DialogHeader>
 
-          {addError && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-lg flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{addError}</span>
-            </div>
-          )}
+          <form onSubmit={handleCreateEmployee} className="flex-1 overflow-y-auto p-5 space-y-3.5">
+            {addError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-lg flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{addError}</span>
+              </div>
+            )}
 
-          {addWarning && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-lg flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{addWarning}</span>
-            </div>
-          )}
+            {addWarning && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-lg flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{addWarning}</span>
+              </div>
+            )}
 
-          <form onSubmit={handleCreateEmployee} className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Employee Name *
-              </Label>
-              <Input
-                type="text"
-                placeholder="e.g. Ayesha Khan"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onBlur={handleNameBlur}
-                required
-                className="text-sm border-slate-200"
-              />
-            </div>
+            {/* Row 1: Name & Designation */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Employee Name *
+                </Label>
+                <Input
+                  type="text"
+                  placeholder="e.g. Ayesha Khan"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onBlur={handleNameBlur}
+                  required
+                  className="text-sm border-slate-200"
+                />
+              </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Designation *
-              </Label>
-              <Select value={newDesignation} onValueChange={(val) => setNewDesignation(val || '')} required>
-                <SelectTrigger className="text-sm border-slate-200 bg-white">
-                  <SelectValue placeholder="Select Designation..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {EMPLOYEE_DESIGNATIONS.map((desig) => (
-                    <SelectItem key={desig} value={desig}>
-                      {desig}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Email Field */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Email Address (For Payslip Delivery)
-              </Label>
-              <Input
-                type="email"
-                placeholder="e.g. employee@edlinkservices.info"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                className="text-sm border-slate-200"
-              />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Designation *
+                </Label>
+                <Select value={newDesignation} onValueChange={(val) => setNewDesignation(val || '')} required>
+                  <SelectTrigger className="text-sm border-slate-200 bg-white">
+                    <SelectValue placeholder="Select Designation..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {EMPLOYEE_DESIGNATIONS.map((desig) => (
+                      <SelectItem key={desig} value={desig}>
+                        {desig}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Branch & Joining Date Row */}
+            {/* Row 2: Email & Salary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Email Address
+                </Label>
+                <Input
+                  type="email"
+                  placeholder="e.g. employee@edlinkservices.info"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="text-sm border-slate-200"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Monthly Salary (PKR)
+                </Label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 75000"
+                  min="0"
+                  step="any"
+                  value={newSalary}
+                  onChange={(e) => setNewSalary(e.target.value)}
+                  className="text-sm border-slate-200 font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Row 3: Branch & Joining Date */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -905,24 +925,8 @@ export default function EmployeesPage() {
               </div>
             </div>
 
-            {/* Salary Field */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Monthly Salary (PKR) (Optional)
-              </Label>
-              <Input
-                type="number"
-                placeholder="e.g. 75000"
-                min="0"
-                step="any"
-                value={newSalary}
-                onChange={(e) => setNewSalary(e.target.value)}
-                className="text-sm border-slate-200 font-mono"
-              />
-            </div>
-
             {/* Attendance Exemption Switch Card */}
-            <div className={`p-3.5 rounded-xl border transition-all ${newIsAttendanceExempt ? 'bg-teal-50/90 border-teal-300 ring-1 ring-teal-200' : 'bg-slate-50/80 border-slate-200'}`}>
+            <div className={`p-3 rounded-xl border transition-all ${newIsAttendanceExempt ? 'bg-teal-50/90 border-teal-300 ring-1 ring-teal-200' : 'bg-slate-50/80 border-slate-200'}`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="space-y-0.5 pr-2">
                   <div className="flex items-center gap-2">
@@ -959,7 +963,7 @@ export default function EmployeesPage() {
             </div>
 
             {/* Initial Remaining Leave Quotas Section */}
-            <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 space-y-2.5">
+            <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[#003D5C] uppercase tracking-wider">
                   <Calendar className="w-3.5 h-3.5 text-[#009D9E]" />
@@ -1044,20 +1048,18 @@ export default function EmployeesPage() {
                 <p className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   {newIsOldStaff
-                    ? 'Old Staff: Probation leaves disabled. Standard leaves (Annual, Sick, Casual, WFH) active.'
-                    : 'Probation completed (> 3 months from joining): Probation leaves disabled. Standard leaves active.'}
+                    ? 'Old Staff: Probation leaves disabled. Standard leaves active.'
+                    : 'Probation completed: Standard leaves active.'}
                 </p>
               )}
             </div>
 
-            <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg text-xs text-slate-500 space-y-1">
-              <p className="font-semibold text-slate-700">Automatic ID Assignment:</p>
-              <p>
-                An immutable sequential identifier (e.g. <span className="font-mono font-bold text-[#003D5C]">EMP-XXXX</span>) will be assigned atomically by the database.
-              </p>
+            <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-[11px] text-slate-500">
+              <span className="font-semibold text-slate-700">Automatic ID Assignment: </span>
+              Sequential ID (e.g. <span className="font-mono font-bold text-[#003D5C]">EMP-XXXX</span>) will be assigned atomically.
             </div>
 
-            <DialogFooter className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+            <DialogFooter className="p-4 shrink-0 border-t border-slate-100 bg-slate-50/80 -mx-5 -mb-5 mt-4 flex items-center justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -1093,9 +1095,9 @@ export default function EmployeesPage() {
 
       {/* Edit Employee Modal */}
       <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
-        <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl rounded-xl">
-          <DialogHeader className="border-b border-slate-100 pb-3">
-            <DialogTitle className="text-lg font-bold text-[#003D5C] flex items-center gap-2">
+        <DialogContent className="sm:max-w-xl w-[95vw] sm:w-[580px] max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-2xl p-0 overflow-hidden flex flex-col font-sans">
+          <DialogHeader className="p-5 pb-3.5 shrink-0 border-b border-slate-100 bg-slate-50/60">
+            <DialogTitle className="text-base font-bold text-[#003D5C] flex items-center gap-2">
               <Edit2 className="w-5 h-5 text-[#009D9E]" />
               Edit Employee
             </DialogTitle>
@@ -1104,63 +1106,83 @@ export default function EmployeesPage() {
             </p>
           </DialogHeader>
 
-          {editError && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-lg flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{editError}</span>
-            </div>
-          )}
+          <form onSubmit={handleUpdateEmployee} className="flex-1 overflow-y-auto p-5 space-y-3.5">
+            {editError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-lg flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{editError}</span>
+              </div>
+            )}
 
-          <form onSubmit={handleUpdateEmployee} className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Employee Name *
-              </Label>
-              <Input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                required
-                className="text-sm border-slate-200"
-              />
-            </div>
+            {/* Row 1: Name & Designation */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Employee Name *
+                </Label>
+                <Input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  required
+                  className="text-sm border-slate-200"
+                />
+              </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Designation *
-              </Label>
-              <Select value={editDesignation} onValueChange={(val) => setEditDesignation(val || '')} required>
-                <SelectTrigger className="text-sm border-slate-200 bg-white">
-                  <SelectValue placeholder="Select Designation..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {EMPLOYEE_DESIGNATIONS.map((desig) => (
-                    <SelectItem key={desig} value={desig}>
-                      {desig}
-                    </SelectItem>
-                  ))}
-                  {editDesignation && !EMPLOYEE_DESIGNATIONS.includes(editDesignation as any) && (
-                    <SelectItem value={editDesignation}>{editDesignation}</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Email Field */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Email Address (For Payslip Delivery)
-              </Label>
-              <Input
-                type="email"
-                placeholder="e.g. employee@edlinkservices.info"
-                value={editEmail}
-                onChange={(e) => setEditEmail(e.target.value)}
-                className="text-sm border-slate-200"
-              />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Designation *
+                </Label>
+                <Select value={editDesignation} onValueChange={(val) => setEditDesignation(val || '')} required>
+                  <SelectTrigger className="text-sm border-slate-200 bg-white">
+                    <SelectValue placeholder="Select Designation..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {EMPLOYEE_DESIGNATIONS.map((desig) => (
+                      <SelectItem key={desig} value={desig}>
+                        {desig}
+                      </SelectItem>
+                    ))}
+                    {editDesignation && !EMPLOYEE_DESIGNATIONS.includes(editDesignation as any) && (
+                      <SelectItem value={editDesignation}>{editDesignation}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Branch & Joining Date Row */}
+            {/* Row 2: Email & Salary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Email Address
+                </Label>
+                <Input
+                  type="email"
+                  placeholder="e.g. employee@edlinkservices.info"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="text-sm border-slate-200"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Monthly Salary (PKR)
+                </Label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 75000"
+                  min="0"
+                  step="any"
+                  value={editSalary}
+                  onChange={(e) => setEditSalary(e.target.value)}
+                  className="text-sm border-slate-200 font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Row 3: Branch & Joining Date */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -1221,24 +1243,8 @@ export default function EmployeesPage() {
               </div>
             </div>
 
-            {/* Salary Field */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Monthly Salary (PKR) (Optional)
-              </Label>
-              <Input
-                type="number"
-                placeholder="e.g. 75000"
-                min="0"
-                step="any"
-                value={editSalary}
-                onChange={(e) => setEditSalary(e.target.value)}
-                className="text-sm border-slate-200 font-mono"
-              />
-            </div>
-
             {/* Attendance Exemption Switch Card */}
-            <div className={`p-3.5 rounded-xl border transition-all ${editIsAttendanceExempt ? 'bg-teal-50/90 border-teal-300 ring-1 ring-teal-200' : 'bg-slate-50/80 border-slate-200'}`}>
+            <div className={`p-3 rounded-xl border transition-all ${editIsAttendanceExempt ? 'bg-teal-50/90 border-teal-300 ring-1 ring-teal-200' : 'bg-slate-50/80 border-slate-200'}`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="space-y-0.5 pr-2">
                   <div className="flex items-center gap-2">
@@ -1275,7 +1281,7 @@ export default function EmployeesPage() {
             </div>
 
             {/* Locked Remaining Leave Balances Section */}
-            <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 space-y-2.5">
+            <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[#003D5C] uppercase tracking-wider">
                   <Lock className="w-3.5 h-3.5 text-amber-600" />
@@ -1350,7 +1356,7 @@ export default function EmployeesPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 pt-0.5">
               <input
                 type="checkbox"
                 id="editActive"
@@ -1363,10 +1369,11 @@ export default function EmployeesPage() {
               </Label>
             </div>
 
-            <DialogFooter className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+            <DialogFooter className="p-4 shrink-0 border-t border-slate-100 bg-slate-50/80 -mx-5 -mb-5 mt-4 flex items-center justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => setEditingEmployee(null)}
                 disabled={isSaving}
                 className="text-xs font-bold"
@@ -1375,10 +1382,11 @@ export default function EmployeesPage() {
               </Button>
               <Button
                 type="submit"
+                size="sm"
                 disabled={isSaving}
                 className="bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5"
               >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                 Save Changes
               </Button>
             </DialogFooter>
