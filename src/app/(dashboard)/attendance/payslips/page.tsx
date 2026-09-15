@@ -355,6 +355,24 @@ export default function PayslipsPage() {
         emp.name?.toLowerCase?.().trim(),
       ].filter(Boolean)
 
+      // If employee is attendance exempt, treat all days as present / full pay
+      if (emp.is_attendance_exempt) {
+        const statsObj = {
+          presentDays: daysInMonth,
+          alDays: 0,
+          clDays: 0,
+          slDays: 0,
+          wfhDays: 0,
+          probationDays: 0,
+          unpaidDays: 0,
+        }
+        if (emp.id) map[emp.id] = statsObj
+        if (emp.employee_id) map[emp.employee_id] = statsObj
+        if (emp.id) map[emp.id.toLowerCase()] = statsObj
+        if (emp.employee_id) map[emp.employee_id.toLowerCase()] = statsObj
+        continue
+      }
+
       let presentDays = 0
       let alDays = 0
       let clDays = 0
@@ -523,20 +541,31 @@ export default function PayslipsPage() {
 
   // Helper calculation for selected employee's payslip data
   const getPayslipData = (emp: Employee) => {
-    const stats =
-      employeeAttendanceStats[emp.id] ||
-      employeeAttendanceStats[emp.employee_id] || {
-        presentDays: 0,
-        alDays: 0,
-        clDays: 0,
-        slDays: 0,
-        wfhDays: 0,
-        probationDays: 0,
-        unpaidDays: 0,
-      }
+    const isExempt = Boolean(emp.is_attendance_exempt)
+    const stats = isExempt
+      ? {
+          presentDays: daysInMonth,
+          alDays: 0,
+          clDays: 0,
+          slDays: 0,
+          wfhDays: 0,
+          probationDays: 0,
+          unpaidDays: 0,
+        }
+      : employeeAttendanceStats[emp.id] ||
+        employeeAttendanceStats[emp.employee_id] || {
+          presentDays: 0,
+          alDays: 0,
+          clDays: 0,
+          slDays: 0,
+          wfhDays: 0,
+          probationDays: 0,
+          unpaidDays: 0,
+        }
 
     const isInProbation = Boolean(
       !emp.is_old_staff &&
+      !isExempt &&
       emp.joining_date &&
       (() => {
         const j = new Date(emp.joining_date.split('T')[0] + 'T00:00:00')
@@ -549,12 +578,12 @@ export default function PayslipsPage() {
     )
 
     const totalWorkingDays = daysInMonth // Monthly Total Days (calendar days e.g. 31)
-    const unpaidDays = stats.unpaidDays
-    const totalPaidDays = Math.max(0, totalWorkingDays - unpaidDays)
+    const unpaidDays = isExempt ? 0 : stats.unpaidDays
+    const totalPaidDays = isExempt ? totalWorkingDays : Math.max(0, totalWorkingDays - unpaidDays)
 
     const basicPay = Number(emp.salary) || 0
     const perDaySalary = totalWorkingDays > 0 ? basicPay / totalWorkingDays : 0
-    const unpaidDeduction = Math.round(perDaySalary * unpaidDays)
+    const unpaidDeduction = isExempt ? 0 : Math.round(perDaySalary * unpaidDays)
     const commission =
       commissionsMap[emp.id] ||
       commissionsMap[emp.employee_id] ||
@@ -605,6 +634,7 @@ export default function PayslipsPage() {
       netPay,
       amountInWords: numberToWordsPKR(netPay),
       isInProbation,
+      isAttendanceExempt: isExempt,
     }
   }
 
@@ -940,9 +970,18 @@ export default function PayslipsPage() {
                             {emp.name?.charAt(0) || 'E'}
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900 leading-tight">{emp.name}</p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-bold text-slate-900 leading-tight">{emp.name}</p>
+                              {emp.is_attendance_exempt && (
+                                <span className="inline-flex items-center text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200">
+                                  Fixed Pay
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-slate-400 font-mono">
-                              {emp.is_old_staff
+                              {emp.is_attendance_exempt
+                                ? 'Attendance Exempt (Full Pay)'
+                                : emp.is_old_staff
                                 ? 'Old Staff (Confirmed)'
                                 : emp.joining_date
                                 ? `Joined: ${emp.joining_date.split('T')[0]}`
@@ -968,9 +1007,13 @@ export default function PayslipsPage() {
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         {hasSalary ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            emp.is_attendance_exempt
+                              ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}>
                             <CheckCircle2 className="w-3 h-3" />
-                            Ready
+                            {emp.is_attendance_exempt ? 'Fixed (100%)' : 'Ready'}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">

@@ -258,6 +258,7 @@ CREATE TABLE IF NOT EXISTS public.employees (
     salary NUMERIC(12, 2),
     joining_date DATE,
     is_old_staff BOOLEAN NOT NULL DEFAULT false,
+    is_attendance_exempt BOOLEAN NOT NULL DEFAULT false,
     leave_quotas JSONB DEFAULT '{"annual_leaves":6,"sick_leaves":7,"casual_leaves":7,"wfh_quota":4,"probation_leaves":3}'::jsonb,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -270,6 +271,7 @@ ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS branch VARCHAR(100) DEFAUL
 ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS salary NUMERIC(12, 2);
 ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS joining_date DATE;
 ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS is_old_staff BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS is_attendance_exempt BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS leave_quotas JSONB DEFAULT '{"annual_leaves":6,"sick_leaves":7,"casual_leaves":7,"wfh_quota":4,"probation_leaves":3}'::jsonb;
 
 -- 9. EMPLOYEE SEQUENCES TABLE (For atomic gapless EMP-0001, EMP-0002 ID generation)

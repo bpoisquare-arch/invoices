@@ -683,11 +683,13 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       })
     }
 
+    const isExempt = Boolean(employee?.is_attendance_exempt)
+
     // Paid Days in active range = Total days - (Absent days + Pre-joining days)
-    const absentDays = rangeStats.absent
-    const unpaidDays = absentDays + preJoiningDays
-    const paidDays = Math.max(0, rangeStats.totalDays - unpaidDays)
-    const absentDeduction = Math.round(unpaidDays * perDaySalary)
+    const absentDays = isExempt ? 0 : rangeStats.absent
+    const unpaidDays = isExempt ? 0 : (absentDays + preJoiningDays)
+    const paidDays = isExempt ? rangeStats.totalDays : Math.max(0, rangeStats.totalDays - unpaidDays)
+    const absentDeduction = isExempt ? 0 : Math.round(unpaidDays * perDaySalary)
     const totalDeductions = absentDeduction + deductionAmount
 
     // Earned Base Salary = Base Salary - Absent/Unpaid Deduction
@@ -698,13 +700,13 @@ export default function EmployeeDetailPage({ params }: PageProps) {
     const hasSalaryConfigured = (baseSalary !== null && baseSalary > 0) || commissionAmount > 0
 
     return {
-      presentDays: rangeStats.present,
+      presentDays: isExempt ? rangeStats.totalDays : rangeStats.present,
       wfhDays: rangeStats.wfh,
       leaveDays: rangeStats.leave,
       holidayDays: rangeStats.holiday,
-      absentDays: rangeStats.absent,
+      absentDays,
       futureDays: rangeStats.future,
-      preJoiningDays,
+      preJoiningDays: isExempt ? 0 : preJoiningDays,
       unpaidDays,
       paidDays,
       totalDaysInMonth: rangeStats.totalDays,
@@ -720,8 +722,9 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       totalDeductions,
       totalEarnedSalary,
       hasSalaryConfigured,
-      isFullSalaryPayable: unpaidDays === 0 && rangeStats.future === 0 && hasSalaryConfigured && deductionAmount === 0,
-      hasAbsents: rangeStats.absent > 0,
+      isFullSalaryPayable: isExempt || (unpaidDays === 0 && rangeStats.future === 0 && hasSalaryConfigured && deductionAmount === 0),
+      hasAbsents: !isExempt && rangeStats.absent > 0,
+      isAttendanceExempt: isExempt,
     }
   }, [fullMonthRecords, records, employee, holidays, monthlyCommission, monthlyDeduction, startDate, endDate, selectedMonth])
 
@@ -752,6 +755,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               <Badge variant="outline" className="font-mono text-xs font-bold bg-[#009D9E]/10 text-[#009D9E] border-[#009D9E]/30">
                 {employee?.employee_id || 'N/A'}
               </Badge>
+              {employee?.is_attendance_exempt && (
+                <Badge className="text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white">
+                  ⚡ Fixed Full Salary
+                </Badge>
+              )}
               <Badge
                 variant={
                   (employee?.branch || '').toLowerCase() === 'lahore'

@@ -224,6 +224,7 @@ export interface PayslipData {
   netPay: number
   amountInWords: string
   isInProbation?: boolean
+  isAttendanceExempt?: boolean
 }
 
 interface PayslipPDFTemplateProps {

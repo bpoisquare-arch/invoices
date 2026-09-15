@@ -5,6 +5,7 @@ export interface EmployeeMetadata {
   salary?: number | null
   joining_date?: string | null
   is_old_staff?: boolean | null
+  is_attendance_exempt?: boolean | null
   name?: string
   designation?: string
   email?: string | null
@@ -72,6 +73,7 @@ export function writeEmployeeMetadata(
     salary?: number | null
     joining_date?: string | null
     is_old_staff?: boolean | null
+    is_attendance_exempt?: boolean | null
     name?: string
     designation?: string
     email?: string | null
@@ -88,6 +90,7 @@ export function writeEmployeeMetadata(
     ...(meta.salary !== undefined ? { salary: meta.salary } : {}),
     ...(meta.joining_date !== undefined ? { joining_date: meta.joining_date } : {}),
     ...(meta.is_old_staff !== undefined ? { is_old_staff: meta.is_old_staff } : {}),
+    ...(meta.is_attendance_exempt !== undefined ? { is_attendance_exempt: meta.is_attendance_exempt } : {}),
     ...(meta.name !== undefined ? { name: meta.name } : {}),
     ...(meta.designation !== undefined ? { designation: meta.designation } : {}),
     ...(meta.email !== undefined ? { email: meta.email } : {}),

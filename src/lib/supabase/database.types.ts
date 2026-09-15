@@ -401,6 +401,7 @@ export interface Database {
           salary?: number | null
           joining_date?: string | null
           is_old_staff?: boolean | null
+          is_attendance_exempt?: boolean | null
           leave_quotas?: Json | null
           is_active: boolean
           created_at: string
@@ -418,6 +419,7 @@ export interface Database {
           salary?: number | null
           joining_date?: string | null
           is_old_staff?: boolean | null
+          is_attendance_exempt?: boolean | null
           leave_quotas?: Json | null
           is_active?: boolean
           created_at?: string
@@ -435,6 +437,7 @@ export interface Database {
           salary?: number | null
           joining_date?: string | null
           is_old_staff?: boolean | null
+          is_attendance_exempt?: boolean | null
           leave_quotas?: Json | null
           is_active?: boolean
           created_at?: string
@@ -965,6 +968,7 @@ export type Employee = Omit<Database['public']['Tables']['employees']['Row'], 'l
   salary?: number | null
   joining_date?: string | null
   is_old_staff?: boolean | null
+  is_attendance_exempt?: boolean | null
   email?: string | null
   leave_quotas?: EmployeeLeaveQuotas
   base_leave_quotas?: EmployeeLeaveQuotas

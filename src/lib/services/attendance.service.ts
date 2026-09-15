@@ -164,7 +164,7 @@ export async function getEmployeeMetadataMap(): Promise<Record<string, EmployeeM
 
 export async function saveEmployeeMetadata(
   idOrEmpId: string,
-  meta: { branch?: string | null; salary?: number | null; joining_date?: string | null; is_old_staff?: boolean | null; email?: string | null; leave_quotas?: EmployeeLeaveQuotas }
+  meta: { branch?: string | null; salary?: number | null; joining_date?: string | null; is_old_staff?: boolean | null; is_attendance_exempt?: boolean | null; email?: string | null; leave_quotas?: EmployeeLeaveQuotas }
 ): Promise<void> {
   // 1. Write immediately to server-side in-memory & file store
   writeEmployeeMetadata(idOrEmpId, meta)
@@ -174,6 +174,7 @@ export async function saveEmployeeMetadata(
     const currentMap = await getEmployeeMetadataMap()
     const existing = currentMap[idOrEmpId] || {}
     const isOldStaffVal = meta.is_old_staff !== undefined ? Boolean(meta.is_old_staff) : existing.is_old_staff
+    const isExemptVal = meta.is_attendance_exempt !== undefined ? Boolean(meta.is_attendance_exempt) : existing.is_attendance_exempt
     const joiningDateVal = isOldStaffVal ? null : (meta.joining_date !== undefined ? meta.joining_date : existing.joining_date)
 
     currentMap[idOrEmpId] = {
@@ -183,6 +184,7 @@ export async function saveEmployeeMetadata(
       ...(meta.email !== undefined ? { email: meta.email } : {}),
       joining_date: joiningDateVal || undefined,
       is_old_staff: isOldStaffVal,
+      is_attendance_exempt: isExemptVal,
       ...(meta.leave_quotas !== undefined ? { leave_quotas: meta.leave_quotas } : {}),
     }
 
@@ -310,6 +312,9 @@ export async function getEmployees(params?: {
       const isOldStaff = emp.is_old_staff !== undefined && emp.is_old_staff !== null
         ? Boolean(emp.is_old_staff)
         : (meta.is_old_staff !== undefined ? Boolean(meta.is_old_staff) : false)
+      const isAttendanceExempt = emp.is_attendance_exempt !== undefined && emp.is_attendance_exempt !== null
+        ? Boolean(emp.is_attendance_exempt)
+        : (meta.is_attendance_exempt !== undefined ? Boolean(meta.is_attendance_exempt) : false)
 
       const used = usedMap.get(emp.id) || usedMap.get(emp.employee_id) || { annual_leaves: 0, sick_leaves: 0, casual_leaves: 0, wfh_quota: 0, probation_leaves: 0 }
 
@@ -333,6 +338,7 @@ export async function getEmployees(params?: {
         salary: emp.salary !== undefined && emp.salary !== null ? emp.salary : (meta.salary !== undefined && meta.salary !== null ? meta.salary : null),
         joining_date: cleanJoining,
         is_old_staff: isOldStaff,
+        is_attendance_exempt: isAttendanceExempt,
         leave_quotas: {
           annual_leaves: Math.max(0, Number((initialAnn - used.annual_leaves).toFixed(2))),
           sick_leaves: Math.max(0, Number((initialSick - used.sick_leaves).toFixed(2))),
@@ -398,6 +404,9 @@ export async function getEmployeeById(idOrEmpId: string): Promise<Employee | nul
     const isOldStaff = data.is_old_staff !== undefined && data.is_old_staff !== null
       ? Boolean(data.is_old_staff)
       : (meta.is_old_staff !== undefined ? Boolean(meta.is_old_staff) : false)
+    const isAttendanceExempt = data.is_attendance_exempt !== undefined && data.is_attendance_exempt !== null
+      ? Boolean(data.is_attendance_exempt)
+      : (meta.is_attendance_exempt !== undefined ? Boolean(meta.is_attendance_exempt) : false)
 
     const used = usedMap.get(data.id) || usedMap.get(data.employee_id) || { annual_leaves: 0, sick_leaves: 0, casual_leaves: 0, wfh_quota: 0, probation_leaves: 0 }
 
@@ -421,6 +430,7 @@ export async function getEmployeeById(idOrEmpId: string): Promise<Employee | nul
       salary: data.salary !== undefined && data.salary !== null ? data.salary : (meta.salary !== undefined && meta.salary !== null ? meta.salary : null),
       joining_date: cleanJoining,
       is_old_staff: isOldStaff,
+      is_attendance_exempt: isAttendanceExempt,
       leave_quotas: {
         annual_leaves: Math.max(0, Number((initialAnn - used.annual_leaves).toFixed(2))),
         sick_leaves: Math.max(0, Number((initialSick - used.sick_leaves).toFixed(2))),
@@ -503,6 +513,7 @@ export async function createEmployee(params: {
   salary?: number | string | null
   joining_date?: string | null
   is_old_staff?: boolean | null
+  is_attendance_exempt?: boolean | null
   leave_quotas?: EmployeeLeaveQuotas
 }): Promise<{ employee: Employee; warning?: string }> {
   const name = params.name.trim()
@@ -511,6 +522,7 @@ export async function createEmployee(params: {
   const branch = params.branch ? params.branch.trim() : 'Multan'
   const salary = params.salary !== undefined && params.salary !== null && params.salary !== '' ? Number(params.salary) : null
   const isOldStaff = Boolean(params.is_old_staff)
+  const isAttendanceExempt = Boolean(params.is_attendance_exempt)
   const joiningDate = isOldStaff ? null : (params.joining_date && params.joining_date.trim() ? params.joining_date.trim() : new Date().toISOString().split('T')[0])
   const normalizedName = normalizeEmployeeName(name)
   const probationEligible = isWithinProbation(joiningDate, isOldStaff)
@@ -545,6 +557,7 @@ export async function createEmployee(params: {
     salary,
     joining_date: joiningDate,
     is_old_staff: isOldStaff,
+    is_attendance_exempt: isAttendanceExempt,
     leave_quotas: leaveQuotas,
     is_active: true,
   }
@@ -568,15 +581,15 @@ export async function createEmployee(params: {
   }
 
   if (data) {
-    await saveEmployeeMetadata(data.id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, email, leave_quotas: leaveQuotas })
-    await saveEmployeeMetadata(data.employee_id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, email, leave_quotas: leaveQuotas })
+    await saveEmployeeMetadata(data.id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, is_attendance_exempt: isAttendanceExempt, email, leave_quotas: leaveQuotas })
+    await saveEmployeeMetadata(data.employee_id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, is_attendance_exempt: isAttendanceExempt, email, leave_quotas: leaveQuotas })
   }
 
   if (!data) {
     throw new Error('Failed to create employee in database')
   }
 
-  return { employee: { ...data, branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, email, designation, leave_quotas: leaveQuotas }, warning }
+  return { employee: { ...data, branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, is_attendance_exempt: isAttendanceExempt, email, designation, leave_quotas: leaveQuotas }, warning }
 }
 
 export async function updateEmployee(
@@ -589,6 +602,7 @@ export async function updateEmployee(
     salary?: number | string | null
     joining_date?: string | null
     is_old_staff?: boolean | null
+    is_attendance_exempt?: boolean | null
     is_active?: boolean
     leave_quotas?: EmployeeLeaveQuotas
   }
@@ -599,6 +613,7 @@ export async function updateEmployee(
   }
 
   const isOldStaff = params.is_old_staff !== undefined ? Boolean(params.is_old_staff) : undefined
+  const isAttendanceExempt = params.is_attendance_exempt !== undefined ? Boolean(params.is_attendance_exempt) : undefined
 
   if (params.name !== undefined) {
     updateData.name = params.name.trim()
@@ -621,6 +636,9 @@ export async function updateEmployee(
   }
   if (isOldStaff !== undefined) {
     updateData.is_old_staff = isOldStaff
+  }
+  if (isAttendanceExempt !== undefined) {
+    updateData.is_attendance_exempt = isAttendanceExempt
   }
   if (params.is_active !== undefined) {
     updateData.is_active = params.is_active
@@ -667,6 +685,7 @@ export async function updateEmployee(
     salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : undefined,
     joining_date: isOldStaff ? null : params.joining_date,
     is_old_staff: isOldStaff,
+    is_attendance_exempt: isAttendanceExempt,
     email: emailVal,
     leave_quotas: finalQuotas,
   })
@@ -676,6 +695,7 @@ export async function updateEmployee(
       salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : undefined,
       joining_date: isOldStaff ? null : params.joining_date,
       is_old_staff: isOldStaff,
+      is_attendance_exempt: isAttendanceExempt,
       email: emailVal,
       leave_quotas: finalQuotas,
     })
@@ -708,6 +728,7 @@ export async function updateEmployee(
     salary: params.salary !== undefined ? (params.salary ? Number(params.salary) : null) : (data.salary ?? null),
     joining_date: isOldStaff ? null : (params.joining_date !== undefined ? params.joining_date : (data.joining_date || null)),
     is_old_staff: isOldStaff !== undefined ? isOldStaff : Boolean(existingMeta.is_old_staff),
+    is_attendance_exempt: isAttendanceExempt !== undefined ? isAttendanceExempt : Boolean(existingMeta.is_attendance_exempt),
     leave_quotas: liveRemQuotas,
     base_leave_quotas: baseQuotas,
   }

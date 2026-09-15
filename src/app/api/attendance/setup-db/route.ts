@@ -64,6 +64,7 @@ export async function GET() {
           if (meta.salary !== undefined) updatePayload.salary = meta.salary
           if (joining !== undefined) updatePayload.joining_date = joining
           if (meta.is_old_staff !== undefined) updatePayload.is_old_staff = isOld
+          if (meta.is_attendance_exempt !== undefined) updatePayload.is_attendance_exempt = Boolean(meta.is_attendance_exempt)
           if (meta.leave_quotas) updatePayload.leave_quotas = meta.leave_quotas
 
           const { error: updateErr } = await supabase
