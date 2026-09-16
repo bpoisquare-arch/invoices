@@ -211,29 +211,33 @@
   },
   "99467505-916d-41f5-967a-5a40bc47b2b9": {
     "branch": "AIMT",
-    "salary": 42500,
-    "joining_date": "2026-08-24",
-    "is_old_staff": false,
+    "salary": 95000,
+    "joining_date": null,
+    "is_old_staff": true,
     "leave_quotas": {
       "annual_leaves": 6,
       "sick_leaves": 7,
       "casual_leaves": 7,
       "wfh_quota": 4,
-      "probation_leaves": 3
-    }
+      "probation_leaves": 0
+    },
+    "is_attendance_exempt": true,
+    "email": "amna.butt@ucp.edu.pk"
   },
   "EMP-0010": {
     "branch": "AIMT",
-    "salary": 42500,
-    "joining_date": "2026-08-24",
-    "is_old_staff": false,
+    "salary": 95000,
+    "joining_date": null,
+    "is_old_staff": true,
     "leave_quotas": {
       "annual_leaves": 6,
       "sick_leaves": 7,
       "casual_leaves": 7,
       "wfh_quota": 4,
-      "probation_leaves": 3
-    }
+      "probation_leaves": 0
+    },
+    "is_attendance_exempt": true,
+    "email": "amna.butt@ucp.edu.pk"
   },
   "93d5c952-48e0-4ea5-8724-701c6b32bddd": {
     "branch": "Multan",
