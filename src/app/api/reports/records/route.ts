@@ -3,6 +3,7 @@ import {
   createReportRecord,
   updateReportRecord,
   deleteReportRecord,
+  deleteReportRecords,
 } from '@/lib/services/report.service'
 
 // POST /api/reports/records - Create a new student report record
@@ -58,25 +59,49 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE /api/reports/records?id={id} - Delete a student report record
+// DELETE /api/reports/records?id={id}&ids={id1,id2} - Delete single or multiple student report records
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
+    const singleId = searchParams.get('id')
+    const idsParam = searchParams.get('ids')
 
-    if (!id) {
+    let idsToDelete: string[] = []
+    if (singleId) {
+      idsToDelete = [singleId]
+    } else if (idsParam) {
+      idsToDelete = idsParam.split(',').map((s) => s.trim()).filter(Boolean)
+    } else {
+      try {
+        const body = await request.json()
+        if (Array.isArray(body.ids)) {
+          idsToDelete = body.ids
+        } else if (body.id) {
+          idsToDelete = [body.id]
+        }
+      } catch {
+        // no body
+      }
+    }
+
+    if (idsToDelete.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Record ID is required for deletion.' },
+        { success: false, error: 'Record ID(s) required for deletion.' },
         { status: 400 }
       )
     }
 
-    const success = await deleteReportRecord(id)
-    return NextResponse.json({ success })
+    if (idsToDelete.length === 1) {
+      const success = await deleteReportRecord(idsToDelete[0])
+      return NextResponse.json({ success, count: 1 })
+    } else {
+      const count = await deleteReportRecords(idsToDelete)
+      return NextResponse.json({ success: true, count })
+    }
   } catch (error: any) {
-    console.error('Error deleting report record:', error)
+    console.error('Error deleting report record(s):', error)
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to delete student record.' },
+      { success: false, error: error.message || 'Failed to delete student record(s).' },
       { status: 500 }
     )
   }

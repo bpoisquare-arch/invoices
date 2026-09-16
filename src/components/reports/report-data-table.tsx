@@ -55,6 +55,7 @@ interface ReportDataTableProps {
   onAddEntry?: () => void
   onEditRecord?: (record: AimtReportRecord) => void
   onDeleteRecord?: (record: AimtReportRecord) => Promise<void>
+  onDeleteSelected?: (ids: string[]) => Promise<void>
   availableAgents?: string[]
   availableIntakes?: string[]
   onExportFiltered?: (exportRows: AimtReportRecord[]) => void
@@ -73,6 +74,7 @@ export default function ReportDataTable({
   onAddEntry,
   onEditRecord,
   onDeleteRecord,
+  onDeleteSelected,
   onExportFiltered,
   onFilteredRecordsChange,
 }: ReportDataTableProps) {
@@ -92,6 +94,10 @@ export default function ReportDataTable({
   // Delete Confirmation State
   const [recordToDelete, setRecordToDelete] = useState<AimtReportRecord | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Bulk Delete State
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
 
   // Compute available document types dynamically
   const availableDocuments = useMemo(() => {
@@ -228,6 +234,19 @@ export default function ReportDataTable({
     }
   }
 
+  const handleConfirmBulkDelete = async () => {
+    if (selectedIds.length === 0 || !onDeleteSelected) return
+    setIsBulkDeleting(true)
+    try {
+      await onDeleteSelected(selectedIds)
+      setIsBulkDeleteOpen(false)
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete selected records.')
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
+
   const hasActiveFilters = Boolean(searchTerm.trim() || selectedStatus !== 'all' || selectedDocument !== 'all')
 
   return (
@@ -322,6 +341,20 @@ export default function ReportDataTable({
             </Button>
           )}
 
+          {/* Bulk Delete Selected Button */}
+          {selectedIds.length > 0 && onDeleteSelected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsBulkDeleteOpen(true)}
+              className="border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-400 h-10 px-3.5 rounded-xl text-xs gap-1.5 shadow-2xs font-bold cursor-pointer shrink-0 animate-in fade-in"
+              title="Delete all selected student records directly from live database"
+            >
+              <Trash2 className="size-3.5 text-rose-600" />
+              <span>Delete ({selectedIds.length})</span>
+            </Button>
+          )}
+
           {/* Export Filtered button in Table Controls */}
           <Button
             variant="outline"
@@ -348,6 +381,46 @@ export default function ReportDataTable({
           )}
         </div>
       </div>
+
+      {/* Selection Action Banner */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-[#003D5C]/5 border border-[#003D5C]/15 rounded-xl text-xs text-slate-800 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-[#003D5C]">{selectedIds.length}</span>
+            <span>student record(s) selected</span>
+            {selectedIds.length < filteredRecords.length && (
+              <button
+                type="button"
+                onClick={() => onSelectChange(filteredRecords.map((r) => r.id))}
+                className="ml-2 font-bold text-cyan-800 hover:underline cursor-pointer"
+              >
+                Select all {filteredRecords.length} records in this view
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onSelectChange([])}
+              className="font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
+            >
+              Clear selection
+            </button>
+            {onDeleteSelected && (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setIsBulkDeleteOpen(true)}
+                className="h-7.5 px-3 text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg gap-1 shadow-2xs cursor-pointer"
+              >
+                <Trash2 className="size-3" />
+                <span>Delete Selected ({selectedIds.length})</span>
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Table Card (Clean Light Aesthetic) */}
       <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
@@ -687,6 +760,58 @@ export default function ReportDataTable({
                 <>
                   <Trash2 className="size-3.5" />
                   <span>Delete Record</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Records Confirmation Dialog */}
+      <Dialog
+        open={isBulkDeleteOpen}
+        onOpenChange={(open) => !open && !isBulkDeleting && setIsBulkDeleteOpen(false)}
+      >
+        <DialogContent className="w-[95vw] max-w-md bg-white border border-slate-200 text-slate-900 p-6 shadow-2xl rounded-2xl">
+          <DialogHeader className="space-y-2">
+            <div className="size-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200">
+              <AlertTriangle className="size-6" />
+            </div>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              Delete {selectedIds.length} Selected Entries?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 leading-relaxed">
+              Are you sure you want to permanently delete all{' '}
+              <span className="font-bold text-rose-700">{selectedIds.length}</span> selected student
+              record(s) from the live database server? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mt-4 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isBulkDeleting}
+              onClick={() => setIsBulkDeleteOpen(false)}
+              className="border-slate-200 bg-white text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-medium cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={isBulkDeleting}
+              onClick={handleConfirmBulkDelete}
+              className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold gap-1.5 shadow-xs cursor-pointer"
+            >
+              {isBulkDeleting ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  <span>Deleting from Database...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="size-3.5" />
+                  <span>Delete {selectedIds.length} Records</span>
                 </>
               )}
             </Button>

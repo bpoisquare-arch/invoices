@@ -116,6 +116,24 @@ export default function StudentReportsPage() {
     await fetchRecords()
   }
 
+  // Handle Bulk Delete Selected Records directly from live database
+  const handleBulkDelete = async (ids: string[]) => {
+    if (ids.length === 0) return
+    const res = await fetch('/api/reports/records', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    })
+    const data = await res.json()
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to delete selected student records.')
+    }
+
+    setSelectedIds([])
+    // Refresh active data from live database
+    await fetchRecords()
+  }
+
   // Handle Export to Excel (exports selected rows, or current filtered view, or all records)
   const handleExportToExcel = async (customRows?: AimtReportRecord[]) => {
     const exportRows = customRows || (
@@ -232,6 +250,7 @@ export default function StudentReportsPage() {
               }
         }
         onDeleteRecord={isViewer ? undefined : handleDeleteRecord}
+        onDeleteSelected={isViewer ? undefined : handleBulkDelete}
         availableAgents={availableAgents}
         availableIntakes={availableIntakes}
         onExportFiltered={handleExportToExcel}

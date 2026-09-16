@@ -1180,3 +1180,71 @@ export async function deleteReportRecord(id: string): Promise<boolean> {
   return true
 }
 
+// 4. Bulk delete student records directly from the database
+export async function deleteReportRecords(ids: string[]): Promise<number> {
+  if (!ids || ids.length === 0) return 0
+  const supabase = await getSupabase()
+
+  // 1. Delete from Supabase (Live Database Server)
+  try {
+    // Find unique import_ids for these records
+    const { data: targets } = await supabase
+      .from('aimt_report_records')
+      .select('import_id')
+      .in('id', ids)
+
+    const importIds = Array.from(
+      new Set(
+        (targets || [])
+          .map((t: any) => t.import_id)
+          .filter(Boolean)
+      )
+    )
+
+    const { error } = await supabase.from('aimt_report_records').delete().in('id', ids)
+    if (error) {
+      console.error('Supabase bulk delete error:', error)
+      throw new Error(`Database bulk delete error: ${error.message}`)
+    }
+
+    // Recalculate batch totals in Supabase for each affected batch
+    for (const impId of importIds) {
+      try {
+        const { data: allRows } = await supabase
+          .from('aimt_report_records')
+          .select('pending_amount, yet_to_raised')
+          .eq('import_id', impId)
+
+        if (allRows) {
+          const totalPending = allRows.reduce((acc, r) => acc + (Number(r.pending_amount) || 0), 0)
+          const totalYet = allRows.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
+          await supabase
+            .from('aimt_report_imports')
+            .update({
+              total_records: allRows.length,
+              total_pending_amount: totalPending,
+              total_yet_to_raised: totalYet,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', impId)
+        }
+      } catch {
+        // ignore
+      }
+    }
+  } catch (err: any) {
+    console.error('CRITICAL: Supabase bulk delete failed:', err)
+    throw err
+  }
+
+  // 2. Delete from server storage backup
+  const idSet = new Set(ids)
+  const store = readLocalReportStorage()
+  for (const bId in store.records) {
+    store.records[bId] = store.records[bId].filter((r) => !idSet.has(r.id))
+  }
+  saveLocalReportStorage(store)
+
+  return ids.length
+}
+
