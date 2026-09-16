@@ -347,8 +347,11 @@ function saveLocalReportStorage(data: LocalReportStorageData) {
   }
 }
 
-// Generate simple UUID fallback
+// Generate standard RFC 4122 UUID
 function generateId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0
     const v = c === 'x' ? r : (r & 0x3) | 0x8
@@ -791,7 +794,7 @@ export async function getOrCreateManualImportBatch(entity: string = 'aimt'): Pro
   const supabase = await getSupabase()
   const nowStr = new Date().toISOString()
   
-  // 1. Try to find latest active batch for this entity
+  // 1. Try to find latest active batch for this entity in Supabase
   try {
     const { data, error } = await supabase
       .from('aimt_report_imports')
@@ -807,15 +810,7 @@ export async function getOrCreateManualImportBatch(entity: string = 'aimt'): Pro
     console.warn('Supabase getOrCreateManualImportBatch query failed:', err)
   }
 
-  // Check local store
-  const store = readLocalReportStorage()
-  const existingImports = Object.values(store.imports || {}).filter((i) => (i.entity || 'aimt') === entity)
-  if (existingImports.length > 0) {
-    existingImports.sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())
-    return existingImports[0]
-  }
-
-  // 2. Create a default "Manual Student Entries" batch
+  // 2. Create a default "Manual Student Records" batch in Supabase
   const manualBatchId = generateId()
   const newBatchPayload: any = {
     id: manualBatchId,
@@ -859,8 +854,11 @@ export async function getOrCreateManualImportBatch(entity: string = 'aimt'): Pro
     updated_at: nowStr,
   } as AimtReportImport
 
+  const store = readLocalReportStorage()
   store.imports[manualBatchId] = createdBatch
-  store.records[manualBatchId] = []
+  if (!store.records[manualBatchId]) {
+    store.records[manualBatchId] = []
+  }
   saveLocalReportStorage(store)
 
   return createdBatch
@@ -897,10 +895,26 @@ export async function createReportRecord(params: {
   const supabase = await getSupabase()
   let targetImportId = params.importId
 
-  // Ensure an import batch exists to associate this record
+  // Ensure an import batch exists in Supabase
   if (!targetImportId) {
     const defaultBatch = await getOrCreateManualImportBatch('aimt')
     targetImportId = defaultBatch.id
+  } else {
+    // Verify targetImportId exists in Supabase
+    try {
+      const { data: existingBatch } = await supabase
+        .from('aimt_report_imports')
+        .select('id')
+        .eq('id', targetImportId)
+        .maybeSingle()
+
+      if (!existingBatch) {
+        const defaultBatch = await getOrCreateManualImportBatch('aimt')
+        targetImportId = defaultBatch.id
+      }
+    } catch {
+      // fallback
+    }
   }
 
   const newId = generateId()
@@ -916,17 +930,16 @@ export async function createReportRecord(params: {
   // Auto-calculated total fee fallback if not supplied
   const totalFeeNum = params.total_fee !== undefined && params.total_fee !== null && params.total_fee !== ''
     ? cleanNumber(params.total_fee)
-    : adminFeeNum + resourceFeeNum + tuitionFeeNum
+    : Math.max(0, adminFeeNum + resourceFeeNum + tuitionFeeNum - (cleanNumber(params.scholarship)))
 
   const paidAmountNum = cleanNumber(params.paid_amount)
 
-  // Find highest Sr No in this batch
+  // Find highest Sr No in Supabase
   let nextSrNo = 1
   try {
     const { data: maxRecord } = await supabase
       .from('aimt_report_records')
       .select('sr_no')
-      .eq('import_id', targetImportId)
       .order('sr_no', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -938,17 +951,9 @@ export async function createReportRecord(params: {
     // fallback
   }
 
-  const store = readLocalReportStorage()
-  if (store.records[targetImportId] && store.records[targetImportId].length > 0) {
-    const maxLocalSr = Math.max(...store.records[targetImportId].map((r) => r.sr_no || 0), 0)
-    if (maxLocalSr >= nextSrNo) {
-      nextSrNo = maxLocalSr + 1
-    }
-  }
-
   const recordPayload: AimtReportRecord = {
     id: newId,
-    import_id: targetImportId,
+    import_id: targetImportId!,
     sr_no: nextSrNo,
     student_name: cleanString(params.student_name) || 'Unnamed Student',
     student_id: cleanString(params.student_id) || null,
@@ -960,7 +965,7 @@ export async function createReportRecord(params: {
     remarks: cleanString(params.remarks) || null,
     dob: cleanString(params.dob) || null,
     document: cleanString(params.document) || null,
-    status: cleanString(params.status) || 'Enrolled',
+    status: cleanString(params.status) || 'Current',
     intake: cleanString(params.intake) || null,
     end_date: cleanString(params.end_date) || null,
     course: cleanString(params.course) || null,
@@ -972,12 +977,13 @@ export async function createReportRecord(params: {
     coe_issued_date: cleanString(params.coe_issued_date) || null,
     email_id: cleanString(params.email_id) || null,
     phone_no: cleanString(params.phone_no) || null,
-    payment_status: cleanString(params.payment_status) || null,
+    payment_status: cleanString(params.payment_status) || 'Pending',
     extra_data: params.extra_data || {},
     created_at: nowStr,
   }
 
-  // 1. Insert into Supabase
+  // 1. Insert into Supabase (Live Database Server)
+  let savedRecord = recordPayload
   try {
     const { data, error } = await supabase
       .from('aimt_report_records')
@@ -985,7 +991,13 @@ export async function createReportRecord(params: {
       .select()
       .single()
 
-    if (!error && data) {
+    if (error) {
+      console.error('Supabase record insert error:', error)
+      throw new Error(`Database insert error: ${error.message}`)
+    }
+
+    if (data) {
+      savedRecord = data as AimtReportRecord
       // Update batch totals in Supabase
       try {
         const { data: allRows } = await supabase
@@ -1010,26 +1022,20 @@ export async function createReportRecord(params: {
         // ignore
       }
     }
-  } catch (err) {
-    console.warn('Supabase record insert failed, keeping server store updated:', err)
+  } catch (err: any) {
+    console.error('CRITICAL: Supabase insert failed:', err)
+    throw err
   }
 
-  // 2. Update local server storage backup
-  if (!store.records[targetImportId]) {
-    store.records[targetImportId] = []
+  // 2. Backup update in local server storage
+  const store = readLocalReportStorage()
+  if (!store.records[targetImportId!]) {
+    store.records[targetImportId!] = []
   }
-  store.records[targetImportId].push(recordPayload)
-  
-  if (store.imports[targetImportId]) {
-    const batchList = store.records[targetImportId]
-    store.imports[targetImportId].total_records = batchList.length
-    store.imports[targetImportId].total_pending_amount = batchList.reduce((acc, r) => acc + (r.pending_amount || 0), 0)
-    store.imports[targetImportId].total_yet_to_raised = batchList.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
-    store.imports[targetImportId].updated_at = nowStr
-  }
+  store.records[targetImportId!].push(savedRecord)
   saveLocalReportStorage(store)
 
-  return recordPayload
+  return savedRecord
 }
 
 // 2. Update a student record directly in the database
@@ -1052,7 +1058,7 @@ export async function updateReportRecord(
 
   let updatedRecord: AimtReportRecord | null = null
 
-  // 1. Supabase Update
+  // 1. Supabase Update (Live Database Server)
   try {
     const { data, error } = await supabase
       .from('aimt_report_records')
@@ -1061,7 +1067,12 @@ export async function updateReportRecord(
       .select()
       .single()
 
-    if (!error && data) {
+    if (error) {
+      console.error('Supabase update error:', error)
+      throw new Error(`Database update error: ${error.message}`)
+    }
+
+    if (data) {
       updatedRecord = data as AimtReportRecord
       const importId = updatedRecord.import_id
       if (importId) {
@@ -1085,8 +1096,9 @@ export async function updateReportRecord(
         }
       }
     }
-  } catch (err) {
-    console.warn('Supabase update failed:', err)
+  } catch (err: any) {
+    console.error('CRITICAL: Supabase update failed:', err)
+    throw err
   }
 
   // 2. Server storage backup update
@@ -1101,13 +1113,6 @@ export async function updateReportRecord(
       if (!updatedRecord) {
         updatedRecord = store.records[importId][recordIndex]
       }
-
-      if (store.imports[importId]) {
-        const batchList = store.records[importId]
-        store.imports[importId].total_pending_amount = batchList.reduce((acc, r) => acc + (r.pending_amount || 0), 0)
-        store.imports[importId].total_yet_to_raised = batchList.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
-        store.imports[importId].updated_at = nowStr
-      }
       saveLocalReportStorage(store)
       break
     }
@@ -1119,12 +1124,10 @@ export async function updateReportRecord(
 // 3. Delete a student record directly from the database
 export async function deleteReportRecord(id: string): Promise<boolean> {
   const supabase = await getSupabase()
-  const nowStr = new Date().toISOString()
   let importId: string | null = null
 
-  // 1. Delete from Supabase
+  // 1. Delete from Supabase (Live Database Server)
   try {
-    // Get import_id first
     const { data: target } = await supabase
       .from('aimt_report_records')
       .select('import_id')
@@ -1136,7 +1139,12 @@ export async function deleteReportRecord(id: string): Promise<boolean> {
     }
 
     const { error } = await supabase.from('aimt_report_records').delete().eq('id', id)
-    if (!error && importId) {
+    if (error) {
+      console.error('Supabase delete error:', error)
+      throw new Error(`Database delete error: ${error.message}`)
+    }
+
+    if (importId) {
       // Recalculate batch totals in Supabase
       const { data: allRows } = await supabase
         .from('aimt_report_records')
@@ -1152,32 +1160,22 @@ export async function deleteReportRecord(id: string): Promise<boolean> {
             total_records: allRows.length,
             total_pending_amount: totalPending,
             total_yet_to_raised: totalYet,
-            updated_at: nowStr,
+            updated_at: new Date().toISOString(),
           })
           .eq('id', importId)
       }
     }
-  } catch (err) {
-    console.warn('Supabase delete record failed:', err)
+  } catch (err: any) {
+    console.error('CRITICAL: Supabase delete failed:', err)
+    throw err
   }
 
   // 2. Delete from server storage backup
   const store = readLocalReportStorage()
   for (const bId in store.records) {
-    const beforeLen = store.records[bId].length
     store.records[bId] = store.records[bId].filter((r) => r.id !== id)
-    if (store.records[bId].length !== beforeLen) {
-      if (store.imports[bId]) {
-        const batchList = store.records[bId]
-        store.imports[bId].total_records = batchList.length
-        store.imports[bId].total_pending_amount = batchList.reduce((acc, r) => acc + (r.pending_amount || 0), 0)
-        store.imports[bId].total_yet_to_raised = batchList.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
-        store.imports[bId].updated_at = nowStr
-      }
-      saveLocalReportStorage(store)
-      return true
-    }
   }
+  saveLocalReportStorage(store)
 
   return true
 }
