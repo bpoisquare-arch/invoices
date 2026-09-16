@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
     // 2. Send Email via Gmail SMTP
     const sendResult = await sendPayslipEmail({
       to: targetEmail,
+      cc: body.cc !== undefined ? body.cc : undefined,
       employeeName: employee.name || 'Employee',
       employeeId: employee.employee_id,
       designation: employee.designation,
@@ -84,11 +85,14 @@ export async function POST(request: NextRequest) {
       customMessage,
     })
 
+    const ccMsg = sendResult.sentCc ? ` (CC: ${sendResult.sentCc})` : ''
+
     return NextResponse.json({
       success: true,
       messageId: sendResult.messageId,
       sentTo: targetEmail,
-      message: `Payslip email sent successfully to ${targetEmail}`,
+      sentCc: sendResult.sentCc,
+      message: `Payslip email sent successfully to ${targetEmail}${ccMsg}`,
     })
   } catch (error: any) {
     console.error('Payslip Email Error:', error)

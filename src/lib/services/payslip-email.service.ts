@@ -1,7 +1,10 @@
 import nodemailer from 'nodemailer'
 
+export const DEFAULT_PAYSLIP_CC_EMAIL = 'fazail@edlinkservices.info'
+
 export interface SendPayslipEmailParams {
   to: string
+  cc?: string | string[]
   employeeName: string
   employeeId?: string
   designation?: string
@@ -16,6 +19,7 @@ export interface SendPayslipEmailResult {
   success: boolean
   messageId?: string
   sentTo: string
+  sentCc?: string | string[]
   error?: string
 }
 
@@ -43,6 +47,7 @@ export async function sendPayslipEmail(params: SendPayslipEmailParams): Promise<
 
   const {
     to,
+    cc,
     employeeName,
     employeeId,
     designation,
@@ -55,6 +60,14 @@ export async function sendPayslipEmail(params: SendPayslipEmailParams): Promise<
 
   if (!to || !to.includes('@')) {
     throw new Error(`Invalid recipient email address: "${to}"`)
+  }
+
+  // Determine CC addresses (can be single or comma-separated string or array)
+  let resolvedCc: string | string[] | undefined = cc
+  if (resolvedCc === undefined) {
+    resolvedCc = DEFAULT_PAYSLIP_CC_EMAIL
+  } else if (typeof resolvedCc === 'string') {
+    resolvedCc = resolvedCc.trim() || undefined
   }
 
   // Create Nodemailer Transporter for Gmail SMTP
@@ -271,7 +284,7 @@ export async function sendPayslipEmail(params: SendPayslipEmailParams): Promise<
 </html>
   `
 
-  const mailOptions = {
+  const mailOptions: any = {
     from: `"${config.fromName}" <${config.user}>`,
     to,
     subject,
@@ -285,11 +298,16 @@ export async function sendPayslipEmail(params: SendPayslipEmailParams): Promise<
     ],
   }
 
+  if (resolvedCc) {
+    mailOptions.cc = resolvedCc
+  }
+
   const info = await transporter.sendMail(mailOptions)
 
   return {
     success: true,
     messageId: info.messageId,
     sentTo: to,
+    sentCc: resolvedCc,
   }
 }

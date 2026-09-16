@@ -179,6 +179,7 @@ export default function PayslipsPage() {
   const [selectedEmailEmployee, setSelectedEmailEmployee] = useState<Employee | null>(null)
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
   const [recipientEmail, setRecipientEmail] = useState('')
+  const [ccEmail, setCcEmail] = useState('fazail@edlinkservices.info')
   const [emailMessage, setEmailMessage] = useState('')
   const [isSendingEmail, setIsSendingEmail] = useState(false)
   const [emailStatus, setEmailStatus] = useState<{
@@ -676,6 +677,7 @@ export default function PayslipsPage() {
   const handleOpenEmailModal = (emp: Employee) => {
     setSelectedEmailEmployee(emp)
     setRecipientEmail(emp.email || '')
+    setCcEmail('fazail@edlinkservices.info')
     setEmailMessage('')
     setEmailStatus({ type: null, message: '' })
     setIsEmailModalOpen(true)
@@ -709,6 +711,7 @@ export default function PayslipsPage() {
           payPeriod,
           monthLabel,
           recipientEmail: emailToSend,
+          cc: ccEmail.trim(),
           customMessage: emailMessage.trim() || undefined,
         }),
       })
@@ -720,7 +723,7 @@ export default function PayslipsPage() {
 
       setEmailStatus({
         type: 'success',
-        message: `Payslip email with PDF attachment was successfully sent to ${emailToSend}!`,
+        message: result.message || `Payslip email with PDF attachment was successfully sent to ${emailToSend}!`,
       })
     } catch (err: any) {
       setEmailStatus({
@@ -1419,6 +1422,28 @@ export default function PayslipsPage() {
                 />
                 <p className="text-[10px] text-slate-400">
                   Pre-filled from employee record. You can change or enter a recipient email here.
+                </p>
+              </div>
+
+              {/* CC Recipient Field (Auto-filled & Editable) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                    CC Email Address
+                  </label>
+                  <span className="text-[10px] font-semibold text-[#009D9E] bg-[#009D9E]/10 px-1.5 py-0.5 rounded">
+                    Pre-filled / Editable
+                  </span>
+                </div>
+                <Input
+                  type="text"
+                  placeholder="e.g. fazail@edlinkservices.info, accounts@example.com"
+                  value={ccEmail}
+                  onChange={(e) => setCcEmail(e.target.value)}
+                  className="text-xs h-9.5 border-slate-200 font-medium"
+                />
+                <p className="text-[10px] text-slate-400">
+                  Pre-filled with fazail@edlinkservices.info. You can modify, remove, or add multiple comma-separated emails.
                 </p>
               </div>
 
