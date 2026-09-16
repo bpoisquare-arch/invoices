@@ -22,6 +22,8 @@ export const EMPLOYEE_DESIGNATIONS = [
   'SM Intern',
   'Student Counsellor',
   'IELTS/PTE Trainer',
+  'Admin Support Officer',
+  'Instructional Designer',
 ] as const
 
 export type EmployeeDesignation = (typeof EMPLOYEE_DESIGNATIONS)[number] | string
