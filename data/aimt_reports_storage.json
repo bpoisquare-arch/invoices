@@ -6,7 +6,7 @@
       "file_size": 66456,
       "uploaded_at": "2026-09-10T07:27:54.236+00:00",
       "uploaded_by": "admin@isquarebpo.com",
-      "total_records": 144,
+      "total_records": 146,
       "total_pending_amount": 31090,
       "total_yet_to_raised": 334759,
       "entity": "aimt",
@@ -39,7 +39,7 @@
         ""
       ],
       "created_at": "2026-09-10T07:27:56.691018+00:00",
-      "updated_at": "2026-09-10T08:44:57.828Z"
+      "updated_at": "2026-09-16T06:46:57.756Z"
     }
   },
   "records": {
@@ -8107,6 +8107,66 @@
           "col_25": ""
         },
         "created_at": "2026-09-10T07:27:54.236Z"
+      },
+      {
+        "id": "280b3327-4009-49eb-afe6-3c6be0610ea7",
+        "import_id": "f57175a1-a8d7-4a79-bce6-12a9f33aad39",
+        "sr_no": 145,
+        "student_name": "Aqsa Bibi",
+        "student_id": "BCP3000465",
+        "agent": null,
+        "scholarship": null,
+        "pending_invoice": null,
+        "pending_amount": 0,
+        "yet_to_raised": null,
+        "remarks": null,
+        "dob": "16/09/26",
+        "document": "Installment Schedule - Aqsa Bibi (BCP3000465) - Australian Institute of Management and Technology",
+        "status": "Current",
+        "intake": null,
+        "end_date": null,
+        "course": null,
+        "admin_fee": 0,
+        "resource_fee": 0,
+        "tuition_fee": 0,
+        "total_fee": 0,
+        "paid_amount": 0,
+        "coe_issued_date": null,
+        "email_id": null,
+        "phone_no": null,
+        "payment_status": "Pending",
+        "extra_data": {},
+        "created_at": "2026-09-16T06:39:36.047Z"
+      },
+      {
+        "id": "b288f0ff-d68b-4801-ab53-6a5250ac4cec",
+        "import_id": "f57175a1-a8d7-4a79-bce6-12a9f33aad39",
+        "sr_no": 146,
+        "student_name": "Aqsa Bibi",
+        "student_id": "60 weeks",
+        "agent": null,
+        "scholarship": null,
+        "pending_invoice": null,
+        "pending_amount": 0,
+        "yet_to_raised": null,
+        "remarks": null,
+        "dob": "22/09/26",
+        "document": "Offer Letter",
+        "status": "Cancelled",
+        "intake": null,
+        "end_date": null,
+        "course": null,
+        "admin_fee": 0,
+        "resource_fee": 0,
+        "tuition_fee": 0,
+        "total_fee": 0,
+        "paid_amount": 0,
+        "coe_issued_date": null,
+        "email_id": null,
+        "phone_no": null,
+        "payment_status": "Pending",
+        "extra_data": {},
+        "created_at": "2026-09-16T06:46:57.756Z"
       }
     ]
   }

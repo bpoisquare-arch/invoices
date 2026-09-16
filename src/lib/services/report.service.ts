@@ -550,31 +550,15 @@ export async function getReportRecords(params: {
   const sortBy = params.sortBy || 'sr_no'
   const sortOrder = params.sortOrder || 'asc'
 
-  // If no importId is provided, default to the latest import batch
   let targetImportId = params.importId
-  if (!targetImportId) {
-    const allImports = await getReportImports('aimt')
-    if (allImports.length > 0) {
-      targetImportId = allImports[0].id
-    }
-  }
-
-  if (!targetImportId) {
-    return {
-      records: [],
-      totalCount: 0,
-      totalPendingAmount: 0,
-      totalYetToRaised: 0,
-      availableAgents: [],
-      availableIntakes: [],
-      availableCourses: [],
-    }
-  }
 
   let query = supabase
     .from('aimt_report_records')
     .select('*', { count: 'exact' })
-    .eq('import_id', targetImportId)
+
+  if (targetImportId) {
+    query = query.eq('import_id', targetImportId)
+  }
 
   if (params.search && params.search.trim()) {
     const q = params.search.trim()
@@ -597,9 +581,11 @@ export async function getReportRecords(params: {
   query = query.order(sortBy, { ascending: sortOrder === 'asc' })
 
   // Pagination
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
-  query = query.range(from, to)
+  if (pageSize !== -1) {
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+    query = query.range(from, to)
+  }
 
   let data: any[] | null = null
   let count: number | null = null
@@ -615,12 +601,17 @@ export async function getReportRecords(params: {
   }
 
   // If Supabase succeeded and returned records
-  if (!error && data && data.length > 0) {
-    // Calculate totals and fetch unique filter options for this import
-    const { data: allBatchRecords } = await supabase
+  if (!error && data !== null) {
+    // Calculate totals and fetch unique filter options
+    let totalsQuery = supabase
       .from('aimt_report_records')
       .select('pending_amount, yet_to_raised, agent, intake, course')
-      .eq('import_id', targetImportId)
+
+    if (targetImportId) {
+      totalsQuery = totalsQuery.eq('import_id', targetImportId)
+    }
+
+    const { data: allBatchRecords } = await totalsQuery
 
     let totalPending = 0
     let totalYetRaised = 0
@@ -640,7 +631,7 @@ export async function getReportRecords(params: {
 
     return {
       records: (data || []) as AimtReportRecord[],
-      totalCount: count || 0,
+      totalCount: count !== null ? count : data.length,
       totalPendingAmount: Number(totalPending.toFixed(2)),
       totalYetToRaised: Number(totalYetRaised.toFixed(2)),
       availableAgents: Array.from(agentSet).sort(),
@@ -651,10 +642,13 @@ export async function getReportRecords(params: {
 
   // Fallback to local server storage
   const store = readLocalReportStorage()
-  let rawBatch = store.records[targetImportId] || []
+  let rawBatch = targetImportId
+    ? store.records[targetImportId] || []
+    : Object.values(store.records || {}).flat()
 
   // Auto-heal / re-parse previously parsed batches if they missed columns due to multi-sheet workbook
   if (
+    targetImportId &&
     rawBatch.length > 0 &&
     (!rawBatch[0].pending_amount && !rawBatch[0].pending_invoice && !rawBatch[0].intake) &&
     store.imports[targetImportId]?.original_file_data

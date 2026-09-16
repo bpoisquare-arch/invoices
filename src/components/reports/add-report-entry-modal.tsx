@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { DatePicker } from '@/components/ui/date-picker'
+import { AIMT_COURSES } from '@/lib/services/installment.service'
 import {
   User,
   GraduationCap,
@@ -62,7 +64,7 @@ export default function AddReportEntryModal({
     remarks: '',
     dob: '',
     document: '',
-    status: 'Enrolled',
+    status: 'Current',
     intake: '',
     end_date: '',
     course: '',
@@ -97,7 +99,7 @@ export default function AddReportEntryModal({
           remarks: editRecord.remarks || '',
           dob: editRecord.dob || '',
           document: editRecord.document || '',
-          status: editRecord.status || 'Enrolled',
+          status: editRecord.status || 'Current',
           intake: editRecord.intake || '',
           end_date: editRecord.end_date || '',
           course: editRecord.course || '',
@@ -124,7 +126,7 @@ export default function AddReportEntryModal({
           remarks: '',
           dob: '',
           document: '',
-          status: 'Enrolled',
+          status: 'Current',
           intake: '',
           end_date: '',
           course: '',
@@ -143,16 +145,17 @@ export default function AddReportEntryModal({
     }
   }, [isOpen, editRecord])
 
-  // Real-time auto-calculation of Total Fee
+  // Real-time auto-calculation of Total Fee: Admin + Resource + Tuition - Scholarship
   const handleFeeChange = (
-    field: 'admin_fee' | 'resource_fee' | 'tuition_fee',
+    field: 'admin_fee' | 'resource_fee' | 'tuition_fee' | 'scholarship',
     value: string
   ) => {
     const updated = { ...formData, [field]: value }
     const admin = parseFloat(updated.admin_fee) || 0
     const resource = parseFloat(updated.resource_fee) || 0
     const tuition = parseFloat(updated.tuition_fee) || 0
-    const sum = admin + resource + tuition
+    const scholarship = parseFloat(updated.scholarship) || 0
+    const sum = Math.max(0, admin + resource + tuition - scholarship)
 
     if (!isManualTotalFee) {
       updated.total_fee = sum > 0 ? String(sum) : ''
@@ -319,37 +322,43 @@ export default function AddReportEntryModal({
                       <select
                         value={formData.status}
                         onChange={(e) => handleChange('status', e.target.value)}
-                        className="w-full h-8.5 text-xs bg-white border border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg px-2.5"
+                        className="w-full h-8.5 text-xs bg-white border border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg px-2.5 font-medium"
                       >
-                        <option value="Enrolled">Enrolled</option>
-                        <option value="Active">Active</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Deferred">Deferred</option>
+                        <option value="Current">Current</option>
+                        <option value="Future">Future</option>
                         <option value="Cancelled">Cancelled</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Deferred">Deferred</option>
                       </select>
                     </div>
 
                     {/* DOB */}
                     <div className="space-y-1">
                       <Label className="text-xs font-semibold text-slate-700">Date of Birth (DOB)</Label>
-                      <Input
+                      <DatePicker
                         value={formData.dob}
-                        onChange={(e) => handleChange('dob', e.target.value)}
-                        placeholder="DD/MM/YYYY"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg"
+                        onChange={(val) => handleChange('dob', val)}
+                        placeholder="DD/MM/YY"
                       />
                     </div>
 
-                    {/* Document Type */}
+                    {/* Document Type Dropdown */}
                     <div className="space-y-1">
                       <Label className="text-xs font-semibold text-slate-700">Document Type</Label>
-                      <Input
+                      <select
                         value={formData.document}
                         onChange={(e) => handleChange('document', e.target.value)}
-                        placeholder="e.g. CoE Issued, Passport"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg"
-                      />
+                        className="w-full h-8.5 text-xs bg-white border border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg px-2.5 font-medium"
+                      >
+                        <option value="">Select document type...</option>
+                        <option value="CoE">CoE</option>
+                        <option value="VoE">VoE</option>
+                        <option value="Offer Letter">Offer Letter</option>
+                        {formData.document &&
+                          !['CoE', 'VoE', 'Offer Letter'].includes(formData.document) && (
+                            <option value={formData.document}>{formData.document}</option>
+                          )}
+                      </select>
                     </div>
 
                     {/* Email ID */}
@@ -385,15 +394,25 @@ export default function AddReportEntryModal({
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Course Name */}
+                    {/* Course Name Dropdown (Populated with AIMT Schedule Plans Courses) */}
                     <div className="space-y-1 sm:col-span-2">
                       <Label className="text-xs font-semibold text-slate-700">Course Name</Label>
-                      <Input
+                      <select
                         value={formData.course}
                         onChange={(e) => handleChange('course', e.target.value)}
-                        placeholder="e.g. Certificate III in Solid Plastering"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg"
-                      />
+                        className="w-full h-8.5 text-xs bg-white border border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg px-2.5 font-medium"
+                      >
+                        <option value="">Select a course...</option>
+                        {AIMT_COURSES.map((c) => (
+                          <option key={c.name} value={c.name}>
+                            {c.name} ({c.duration})
+                          </option>
+                        ))}
+                        {formData.course &&
+                          !AIMT_COURSES.some((c) => c.name === formData.course) && (
+                            <option value={formData.course}>{formData.course}</option>
+                          )}
+                      </select>
                     </div>
 
                     {/* Agent */}
@@ -410,44 +429,30 @@ export default function AddReportEntryModal({
                     {/* Intake Date */}
                     <div className="space-y-1">
                       <Label className="text-xs font-semibold text-slate-700">Intake Date</Label>
-                      <Input
+                      <DatePicker
                         value={formData.intake}
-                        onChange={(e) => handleChange('intake', e.target.value)}
-                        placeholder="DD/MM/YYYY"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg"
+                        onChange={(val) => handleChange('intake', val)}
+                        placeholder="DD/MM/YY"
                       />
                     </div>
 
-                    {/* End Date */}
+                    {/* Course End Date */}
                     <div className="space-y-1">
                       <Label className="text-xs font-semibold text-slate-700">Course End Date</Label>
-                      <Input
+                      <DatePicker
                         value={formData.end_date}
-                        onChange={(e) => handleChange('end_date', e.target.value)}
-                        placeholder="DD/MM/YYYY"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg"
+                        onChange={(val) => handleChange('end_date', val)}
+                        placeholder="DD/MM/YY"
                       />
                     </div>
 
                     {/* COE Issue Date */}
-                    <div className="space-y-1">
+                    <div className="space-y-1 sm:col-span-2">
                       <Label className="text-xs font-semibold text-slate-700">COE Issue Date</Label>
-                      <Input
+                      <DatePicker
                         value={formData.coe_issued_date}
-                        onChange={(e) => handleChange('coe_issued_date', e.target.value)}
-                        placeholder="DD/MM/YYYY"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg"
-                      />
-                    </div>
-
-                    {/* Scholarship */}
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Scholarship</Label>
-                      <Input
-                        value={formData.scholarship}
-                        onChange={(e) => handleChange('scholarship', e.target.value)}
-                        placeholder="e.g. $500"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg"
+                        onChange={(val) => handleChange('coe_issued_date', val)}
+                        placeholder="DD/MM/YY"
                       />
                     </div>
                   </div>
@@ -509,6 +514,19 @@ export default function AddReportEntryModal({
                       />
                     </div>
 
+                    {/* Scholarship (Moved here as requested) */}
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-slate-700">Scholarship ($)</Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        value={formData.scholarship}
+                        onChange={(e) => handleFeeChange('scholarship', e.target.value)}
+                        placeholder="0.00"
+                        className="h-8.5 text-xs bg-white border-slate-200 text-indigo-700 font-semibold rounded-lg font-mono"
+                      />
+                    </div>
+
                     {/* Total Fee (Auto-Calculated) */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
@@ -566,7 +584,7 @@ export default function AddReportEntryModal({
                     </div>
 
                     {/* Yet to Raised */}
-                    <div className="space-y-1">
+                    <div className="space-y-1 sm:col-span-2">
                       <Label className="text-[11px] font-semibold text-slate-700">Yet to Raised</Label>
                       <Input
                         value={formData.yet_to_raised}
@@ -577,16 +595,16 @@ export default function AddReportEntryModal({
                     </div>
                   </div>
 
-                  {/* Payment Plan Status */}
+                  {/* Payment Plan Status: Pending & Raised */}
                   <div className="pt-2 border-t border-slate-200/80">
                     <Label className="text-xs font-semibold text-slate-700">Payment Plan Status</Label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1.5">
-                      {['Pending', 'Raised', 'Partially Paid', 'Completed'].map((st) => (
+                    <div className="grid grid-cols-2 gap-2 mt-1.5">
+                      {['Pending', 'Raised'].map((st) => (
                         <button
                           type="button"
                           key={st}
                           onClick={() => handleChange('payment_status', st)}
-                          className={`py-1 px-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                          className={`py-1.5 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                             formData.payment_status === st
                               ? 'bg-[#003D5C] text-white border-[#003D5C] shadow-xs'
                               : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'

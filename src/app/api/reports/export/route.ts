@@ -23,29 +23,33 @@ export async function POST(request: NextRequest) {
     ]
 
     // Map records to rows
-    const excelRows = records.map((r: any, idx: number) => {
-      const rowObj: Record<string, any> = {}
-
-      rowObj['Sr No'] = r.sr_no || idx + 1
-      rowObj['Student Name'] = r.student_name || ''
-      rowObj['Agent'] = r.agent || '-'
-      rowObj['Pending Invoice'] = r.pending_invoice || '-'
-      rowObj['Pending Amount (AUD)'] = typeof r.pending_amount === 'number' ? r.pending_amount : (parseFloat(r.pending_amount) || 0)
-      rowObj['Yet to Raised'] = r.yet_to_raised || '-'
-      rowObj['Intake'] = r.intake || '-'
-      rowObj['Course'] = r.course || '-'
-
-      // Optional extra columns if present in record
-      if (r.student_id) rowObj['Student ID'] = r.student_id
-      if (r.status) rowObj['Status'] = r.status
-      if (r.dob) rowObj['DOB'] = r.dob
-      if (r.document) rowObj['Document'] = r.document
-      if (r.end_date) rowObj['End Date'] = r.end_date
-      if (r.email_id) rowObj['Email'] = r.email_id
-      if (r.phone_no) rowObj['Phone'] = r.phone_no
-      if (r.payment_status) rowObj['Payment Status'] = r.payment_status
-
-      return rowObj
+    const excelRows: Record<string, any>[] = records.map((r: any, idx: number) => {
+      return {
+        'Sr No': r.sr_no || idx + 1,
+        'Student Name': r.student_name || '',
+        'Student ID': r.student_id || '-',
+        'Student ID Status': r.status || '-',
+        'Document Type': r.document || '-',
+        'Course Name': r.course || '-',
+        'Agent / Agency': r.agent || '-',
+        'Intake Date': r.intake || '-',
+        'Course End Date': r.end_date || '-',
+        'COE Issue Date': r.coe_issued_date || '-',
+        'Date of Birth (DOB)': r.dob || '-',
+        'Admin Fee ($)': typeof r.admin_fee === 'number' ? r.admin_fee : (parseFloat(r.admin_fee) || 0),
+        'Resource Fee ($)': typeof r.resource_fee === 'number' ? r.resource_fee : (parseFloat(r.resource_fee) || 0),
+        'Tuition Fee ($)': typeof r.tuition_fee === 'number' ? r.tuition_fee : (parseFloat(r.tuition_fee) || 0),
+        'Scholarship ($)': r.scholarship || '0',
+        'Total Fee ($)': typeof r.total_fee === 'number' ? r.total_fee : (parseFloat(r.total_fee) || 0),
+        'Paid Amount ($)': typeof r.paid_amount === 'number' ? r.paid_amount : (parseFloat(r.paid_amount) || 0),
+        'Pending Invoice': r.pending_invoice || '-',
+        'Pending Amount (AUD)': typeof r.pending_amount === 'number' ? r.pending_amount : (parseFloat(r.pending_amount) || 0),
+        'Yet to Raised': r.yet_to_raised || '-',
+        'Payment Plan Status': r.payment_status || 'Pending',
+        'Email ID': r.email_id || '-',
+        'Phone No': r.phone_no || '-',
+        'Remarks': r.remarks || '-',
+      }
     })
 
     const worksheet = XLSX.utils.json_to_sheet(excelRows)

@@ -41,6 +41,7 @@ import {
   RotateCcw,
   AlertTriangle,
   Loader2,
+  PlusCircle,
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/lib/supabase/database.types'
 import TablePagination from '@/components/ui/table-pagination'
@@ -51,14 +52,16 @@ interface ReportDataTableProps {
   selectedIds: string[]
   onSelectChange: (ids: string[]) => void
   onViewRecord: (record: AimtReportRecord) => void
+  onAddEntry?: () => void
   onEditRecord?: (record: AimtReportRecord) => void
   onDeleteRecord?: (record: AimtReportRecord) => Promise<void>
-  availableAgents: string[]
-  availableIntakes: string[]
-  onExportFiltered?: () => void
+  availableAgents?: string[]
+  availableIntakes?: string[]
+  onExportFiltered?: (exportRows: AimtReportRecord[]) => void
+  onFilteredRecordsChange?: (filtered: AimtReportRecord[]) => void
 }
 
-type SortField = 'sr_no' | 'student_name' | 'agent' | 'pending_invoice' | 'pending_amount' | 'yet_to_raised' | 'intake' | 'course'
+type SortField = 'sr_no' | 'student_name' | 'pending_invoice' | 'pending_amount' | 'yet_to_raised' | 'course'
 type SortOrder = 'asc' | 'desc'
 
 export default function ReportDataTable({
@@ -67,16 +70,16 @@ export default function ReportDataTable({
   selectedIds,
   onSelectChange,
   onViewRecord,
+  onAddEntry,
   onEditRecord,
   onDeleteRecord,
-  availableAgents,
-  availableIntakes,
   onExportFiltered,
+  onFilteredRecordsChange,
 }: ReportDataTableProps) {
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedAgent, setSelectedAgent] = useState<string>('all')
-  const [selectedIntake, setSelectedIntake] = useState<string>('all')
+  const [selectedStatus, setSelectedStatus] = useState<string>('all')
+  const [selectedDocument, setSelectedDocument] = useState<string>('all')
 
   // Sorting State
   const [sortField, setSortField] = useState<SortField>('sr_no')
@@ -90,6 +93,17 @@ export default function ReportDataTable({
   const [recordToDelete, setRecordToDelete] = useState<AimtReportRecord | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // Compute available document types dynamically
+  const availableDocuments = useMemo(() => {
+    const set = new Set<string>(['CoE', 'VoE', 'Offer Letter'])
+    records.forEach((r) => {
+      if (r.document && r.document.trim()) {
+        set.add(r.document.trim())
+      }
+    })
+    return Array.from(set)
+  }, [records])
+
   // Format Currency
   const formatAUD = (amount: number | null | undefined) => {
     return new Intl.NumberFormat('en-AU', {
@@ -97,20 +111,6 @@ export default function ReportDataTable({
       currency: 'AUD',
       maximumFractionDigits: 0,
     }).format(amount || 0)
-  }
-
-  // Light Agency Badge Colors
-  function getAgentBadgeColor(agentName: string | null) {
-    if (!agentName) return 'bg-slate-100 text-slate-600 border-slate-200'
-    const a = agentName.toLowerCase()
-    if (a.includes('edlink')) return 'bg-cyan-50 text-cyan-800 border-cyan-200'
-    if (a.includes('abc') || a.includes('overseas')) return 'bg-indigo-50 text-indigo-800 border-indigo-200'
-    if (a.includes('nexgen')) return 'bg-amber-50 text-amber-800 border-amber-200'
-    if (a.includes('brightpath')) return 'bg-teal-50 text-teal-800 border-teal-200'
-    if (a.includes('abdul') || a.includes('education')) return 'bg-emerald-50 text-emerald-800 border-emerald-200'
-    if (a.includes('sanguine')) return 'bg-purple-50 text-purple-800 border-purple-200'
-    if (a.includes('grace')) return 'bg-sky-50 text-sky-800 border-sky-200'
-    return 'bg-blue-50 text-blue-800 border-blue-200'
   }
 
   // Filter & Sort Pipeline
@@ -123,24 +123,25 @@ export default function ReportDataTable({
       list = list.filter((r) => {
         return (
           r.student_name?.toLowerCase().includes(q) ||
-          r.agent?.toLowerCase().includes(q) ||
           r.course?.toLowerCase().includes(q) ||
           r.student_id?.toLowerCase().includes(q) ||
-          r.intake?.toLowerCase().includes(q) ||
+          r.document?.toLowerCase().includes(q) ||
+          r.status?.toLowerCase().includes(q) ||
+          r.agent?.toLowerCase().includes(q) ||
           r.email_id?.toLowerCase().includes(q) ||
           r.phone_no?.toLowerCase().includes(q)
         )
       })
     }
 
-    // 2. Agent Filter
-    if (selectedAgent !== 'all') {
-      list = list.filter((r) => r.agent === selectedAgent)
+    // 2. Student ID Status Filter
+    if (selectedStatus !== 'all') {
+      list = list.filter((r) => r.status?.toLowerCase().trim() === selectedStatus.toLowerCase().trim())
     }
 
-    // 3. Intake Filter
-    if (selectedIntake !== 'all') {
-      list = list.filter((r) => r.intake === selectedIntake)
+    // 3. Document Type Filter
+    if (selectedDocument !== 'all') {
+      list = list.filter((r) => r.document?.toLowerCase().trim() === selectedDocument.toLowerCase().trim())
     }
 
     // 4. Sorting
@@ -163,7 +164,12 @@ export default function ReportDataTable({
     })
 
     return list
-  }, [records, searchTerm, selectedAgent, selectedIntake, sortField, sortOrder])
+  }, [records, searchTerm, selectedStatus, selectedDocument, sortField, sortOrder])
+
+  // Notify parent of filtered records
+  React.useEffect(() => {
+    onFilteredRecordsChange?.(filteredRecords)
+  }, [filteredRecords, onFilteredRecordsChange])
 
   // Pagination calculation
   const totalRows = filteredRecords.length
@@ -222,13 +228,15 @@ export default function ReportDataTable({
     }
   }
 
+  const hasActiveFilters = Boolean(searchTerm.trim() || selectedStatus !== 'all' || selectedDocument !== 'all')
+
   return (
     <div className="w-full space-y-4">
-      {/* Top Controls Bar (Light Theme) */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-xs">
-        {/* Left: Search filter input */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+      {/* Top Controls Bar with Filters */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-xs">
+        {/* Left: Search filter input with full remaining width */}
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
           <Input
             value={searchTerm}
             onChange={(e) => {
@@ -236,121 +244,106 @@ export default function ReportDataTable({
               setCurrentPage(1)
             }}
             placeholder="Filter students, agents, courses, IDs..."
-            className="pl-9 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl text-xs h-9.5 focus-visible:ring-1 focus-visible:ring-cyan-500"
+            className="w-full pl-9.5 pr-4 bg-slate-50/80 border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl text-xs h-10 focus-visible:ring-1 focus-visible:ring-cyan-500 shadow-2xs font-medium"
           />
         </div>
 
-        {/* Right: Filter dropdowns */}
+        {/* Right: Separate Status & Document Type Filter Dropdowns + Actions */}
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          {/* Agent Filter */}
-          {availableAgents.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-all cursor-pointer focus:outline-none shadow-2xs">
-                <Building2 className="size-3.5 text-cyan-600" />
-                <span className="truncate max-w-[120px]">
-                  {selectedAgent === 'all' ? 'All Agents' : selectedAgent}
-                </span>
-                <ChevronDown className="size-3 text-slate-400" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-56 bg-white border border-slate-200 text-slate-800 p-1 rounded-xl shadow-xl max-h-64 overflow-y-auto"
-              >
-                <DropdownMenuLabel className="text-[10px] text-slate-400 uppercase tracking-wider px-2 py-1">
-                  Filter by Agent
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setSelectedAgent('all')
-                    setCurrentPage(1)
-                  }}
-                  className={`text-xs px-2.5 py-1.5 rounded-lg cursor-pointer ${
-                    selectedAgent === 'all' ? 'bg-cyan-50 text-cyan-900 font-bold' : 'text-slate-700'
-                  }`}
-                >
-                  All Agents ({records.length})
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-slate-100 my-1" />
-                {availableAgents.map((agent) => (
-                  <DropdownMenuItem
-                    key={agent}
-                    onClick={() => {
-                      setSelectedAgent(agent)
-                      setCurrentPage(1)
-                    }}
-                    className={`text-xs px-2.5 py-1.5 rounded-lg cursor-pointer ${
-                      selectedAgent === agent ? 'bg-cyan-50 text-cyan-900 font-bold' : 'text-slate-700'
-                    }`}
-                  >
-                    {agent}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          {/* 1. Student ID Status Filter */}
+          <div className="relative flex items-center min-w-[145px]">
+            <select
+              value={selectedStatus}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value)
+                setCurrentPage(1)
+              }}
+              className={`w-full h-10 pl-3 pr-8 text-xs font-semibold rounded-xl cursor-pointer focus:outline-none focus:ring-1 focus:ring-cyan-500 shadow-2xs transition-all appearance-none border ${
+                selectedStatus !== 'all'
+                  ? 'border-cyan-400 bg-cyan-50 text-cyan-950 font-bold'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <option value="all">Status: All</option>
+              <option value="Current">Status: Current</option>
+              <option value="Future">Status: Future</option>
+              <option value="Cancelled">Status: Cancelled</option>
+              <option value="Completed">Status: Completed</option>
+              <option value="Deferred">Status: Deferred</option>
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+          </div>
 
-          {/* Intake Filter */}
-          {availableIntakes.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-all cursor-pointer focus:outline-none shadow-2xs">
-                <Calendar className="size-3.5 text-cyan-600" />
-                <span className="truncate max-w-[110px]">
-                  {selectedIntake === 'all' ? 'All Intakes' : selectedIntake}
-                </span>
-                <ChevronDown className="size-3 text-slate-400" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-48 bg-white border border-slate-200 text-slate-800 p-1 rounded-xl shadow-xl max-h-64 overflow-y-auto"
-              >
-                <DropdownMenuLabel className="text-[10px] text-slate-400 uppercase tracking-wider px-2 py-1">
-                  Filter by Intake Date
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setSelectedIntake('all')
-                    setCurrentPage(1)
-                  }}
-                  className={`text-xs px-2.5 py-1.5 rounded-lg cursor-pointer ${
-                    selectedIntake === 'all' ? 'bg-cyan-50 text-cyan-900 font-bold' : 'text-slate-700'
-                  }`}
-                >
-                  All Intakes
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-slate-100 my-1" />
-                {availableIntakes.map((intake) => (
-                  <DropdownMenuItem
-                    key={intake}
-                    onClick={() => {
-                      setSelectedIntake(intake)
-                      setCurrentPage(1)
-                    }}
-                    className={`text-xs px-2.5 py-1.5 rounded-lg cursor-pointer ${
-                      selectedIntake === intake ? 'bg-cyan-50 text-cyan-900 font-bold' : 'text-slate-700'
-                    }`}
-                  >
-                    {intake}
-                  </DropdownMenuItem>
+          {/* 2. Document Type Filter */}
+          <div className="relative flex items-center min-w-[155px]">
+            <select
+              value={selectedDocument}
+              onChange={(e) => {
+                setSelectedDocument(e.target.value)
+                setCurrentPage(1)
+              }}
+              className={`w-full h-10 pl-3 pr-8 text-xs font-semibold rounded-xl cursor-pointer focus:outline-none focus:ring-1 focus:ring-cyan-500 shadow-2xs transition-all appearance-none border ${
+                selectedDocument !== 'all'
+                  ? 'border-cyan-400 bg-cyan-50 text-cyan-950 font-bold'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <option value="all">Document: All</option>
+              <option value="CoE">Document: CoE</option>
+              <option value="VoE">Document: VoE</option>
+              <option value="Offer Letter">Document: Offer Letter</option>
+              {availableDocuments
+                .filter((d) => !['CoE', 'VoE', 'Offer Letter'].includes(d))
+                .map((d) => (
+                  <option key={d} value={d}>
+                    Document: {d}
+                  </option>
                 ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+          </div>
 
-          {/* Reset Filters button if active */}
-          {(searchTerm || selectedAgent !== 'all' || selectedIntake !== 'all') && (
+          {/* Reset Filters button if any filter is active */}
+          {hasActiveFilters && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
                 setSearchTerm('')
-                setSelectedAgent('all')
-                setSelectedIntake('all')
+                setSelectedStatus('all')
+                setSelectedDocument('all')
                 setCurrentPage(1)
               }}
-              className="h-9 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl"
+              className="h-10 px-2.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl cursor-pointer font-semibold shrink-0"
               title="Reset search & filters"
             >
-              <RotateCcw className="size-3.5" />
+              <RotateCcw className="size-3.5 mr-1" />
+              <span>Reset</span>
+            </Button>
+          )}
+
+          {/* Export Filtered button in Table Controls */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onExportFiltered?.(filteredRecords)}
+            disabled={filteredRecords.length === 0}
+            className="border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 h-10 px-3.5 rounded-xl text-xs gap-1.5 shadow-2xs font-semibold cursor-pointer shrink-0"
+            title="Export filtered records to Excel"
+          >
+            <Download className="size-3.5 text-emerald-700" />
+            <span className="hidden sm:inline">Export ({filteredRecords.length})</span>
+          </Button>
+
+          {/* Add Entry Button */}
+          {onAddEntry && (
+            <Button
+              size="sm"
+              onClick={onAddEntry}
+              className="bg-[#003D5C] hover:bg-[#002b42] text-white h-10 px-4 rounded-xl text-xs font-bold gap-1.5 shadow-xs transition-all cursor-pointer shrink-0"
+            >
+              <PlusCircle className="size-4 text-cyan-300" />
+              <span>Add Entry</span>
             </Button>
           )}
         </div>
@@ -360,7 +353,7 @@ export default function ReportDataTable({
       <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            {/* Table Header: Exactly the 8 required columns + checkbox + actions */}
+            {/* Table Header: Exactly SR NO, STUDENT NAME, PENDING INV, PENDING AMOUNT, YET TO RAISED, COURSE, Actions */}
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wider select-none">
                 {/* Checkbox Header */}
@@ -387,7 +380,7 @@ export default function ReportDataTable({
                 {/* 2. Student Name */}
                 <th
                   onClick={() => toggleSort('student_name')}
-                  className="p-3.5 min-w-[200px] cursor-pointer hover:text-slate-900 transition-colors"
+                  className="p-3.5 min-w-[220px] cursor-pointer hover:text-slate-900 transition-colors"
                 >
                   <div className="flex items-center gap-1.5">
                     <span>Student Name</span>
@@ -395,21 +388,10 @@ export default function ReportDataTable({
                   </div>
                 </th>
 
-                {/* 3. Agent */}
-                <th
-                  onClick={() => toggleSort('agent')}
-                  className="p-3.5 min-w-[160px] cursor-pointer hover:text-slate-900 transition-colors"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span>Agent</span>
-                    <ArrowUpDown className="size-3 text-slate-400" />
-                  </div>
-                </th>
-
-                {/* 4. Pending Invoice */}
+                {/* 3. Pending Invoice */}
                 <th
                   onClick={() => toggleSort('pending_invoice')}
-                  className="p-3.5 w-28 text-center cursor-pointer hover:text-slate-900 transition-colors"
+                  className="p-3.5 w-32 text-center cursor-pointer hover:text-slate-900 transition-colors"
                 >
                   <div className="flex items-center justify-center gap-1.5">
                     <span>Pending Inv</span>
@@ -417,10 +399,10 @@ export default function ReportDataTable({
                   </div>
                 </th>
 
-                {/* 5. Pending Amount */}
+                {/* 4. Pending Amount */}
                 <th
                   onClick={() => toggleSort('pending_amount')}
-                  className="p-3.5 min-w-[130px] text-right cursor-pointer hover:text-slate-900 transition-colors"
+                  className="p-3.5 min-w-[140px] text-right cursor-pointer hover:text-slate-900 transition-colors"
                 >
                   <div className="flex items-center justify-end gap-1.5">
                     <span>Pending Amount</span>
@@ -428,10 +410,10 @@ export default function ReportDataTable({
                   </div>
                 </th>
 
-                {/* 6. Yet to Raised */}
+                {/* 5. Yet to Raised */}
                 <th
                   onClick={() => toggleSort('yet_to_raised')}
-                  className="p-3.5 min-w-[120px] text-center cursor-pointer hover:text-slate-900 transition-colors"
+                  className="p-3.5 min-w-[130px] text-center cursor-pointer hover:text-slate-900 transition-colors"
                 >
                   <div className="flex items-center justify-center gap-1.5">
                     <span>Yet to Raised</span>
@@ -439,21 +421,10 @@ export default function ReportDataTable({
                   </div>
                 </th>
 
-                {/* 7. Intake */}
-                <th
-                  onClick={() => toggleSort('intake')}
-                  className="p-3.5 min-w-[110px] cursor-pointer hover:text-slate-900 transition-colors"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span>Intake</span>
-                    <ArrowUpDown className="size-3 text-slate-400" />
-                  </div>
-                </th>
-
-                {/* 8. Course */}
+                {/* 6. Course */}
                 <th
                   onClick={() => toggleSort('course')}
-                  className="p-3.5 min-w-[220px] cursor-pointer hover:text-slate-900 transition-colors"
+                  className="p-3.5 min-w-[260px] cursor-pointer hover:text-slate-900 transition-colors"
                 >
                   <div className="flex items-center gap-1.5">
                     <span>Course</span>
@@ -470,7 +441,7 @@ export default function ReportDataTable({
             <tbody className="divide-y divide-slate-100 text-xs">
               {isLoading ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-16 text-slate-500">
+                  <td colSpan={8} className="text-center py-16 text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="size-6 border-2 border-cyan-600 border-t-transparent rounded-full animate-spin" />
                       <span className="font-medium">Loading student report records...</span>
@@ -479,14 +450,14 @@ export default function ReportDataTable({
                 </tr>
               ) : paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-16 text-slate-500">
+                  <td colSpan={8} className="text-center py-16 text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <GraduationCap className="size-10 text-slate-300" />
                       <span className="font-bold text-slate-700 text-sm">No student records found</span>
                       <span className="text-xs text-slate-500 max-w-sm">
-                        {searchTerm || selectedAgent !== 'all' || selectedIntake !== 'all'
+                        {searchTerm || selectedStatus !== 'all' || selectedDocument !== 'all'
                           ? 'Try adjusting your search query or filters.'
-                          : 'Use "+ Add Entry" or "Import Excel" to add student records.'}
+                          : 'Use "+ Add Entry" to add student records.'}
                       </span>
                     </div>
                   </td>
@@ -536,22 +507,7 @@ export default function ReportDataTable({
                         )}
                       </td>
 
-                      {/* 3. Agent */}
-                      <td className="p-3.5">
-                        {record.agent ? (
-                          <Badge
-                            className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${getAgentBadgeColor(
-                              record.agent
-                            )}`}
-                          >
-                            {record.agent}
-                          </Badge>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
-                      </td>
-
-                      {/* 4. Pending Invoice */}
+                      {/* 3. Pending Invoice */}
                       <td className="p-3.5 text-center">
                         {record.pending_invoice ? (
                           <span className="inline-flex items-center justify-center size-6 rounded-md bg-rose-50 text-rose-700 font-bold border border-rose-200">
@@ -562,7 +518,7 @@ export default function ReportDataTable({
                         )}
                       </td>
 
-                      {/* 5. Pending Amount */}
+                      {/* 4. Pending Amount */}
                       <td className="p-3.5 text-right font-mono font-bold text-amber-600 text-[13px]">
                         {record.pending_amount > 0 ? (
                           formatAUD(record.pending_amount)
@@ -571,7 +527,7 @@ export default function ReportDataTable({
                         )}
                       </td>
 
-                      {/* 6. Yet to Raised */}
+                      {/* 5. Yet to Raised */}
                       <td className="p-3.5 text-center">
                         {record.yet_to_raised && record.yet_to_raised !== '-' ? (
                           <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-mono font-semibold px-2 py-0.5">
@@ -582,13 +538,8 @@ export default function ReportDataTable({
                         )}
                       </td>
 
-                      {/* 7. Intake */}
-                      <td className="p-3.5 font-mono text-slate-700 text-xs">
-                        {record.intake || '-'}
-                      </td>
-
-                      {/* 8. Course */}
-                      <td className="p-3.5 max-w-[260px]">
+                      {/* 6. Course */}
+                      <td className="p-3.5 max-w-[280px]">
                         <span className="truncate block font-medium text-slate-800" title={record.course || ''}>
                           {record.course || '-'}
                         </span>
@@ -607,13 +558,13 @@ export default function ReportDataTable({
                             align="end"
                             className="w-44 bg-white border border-slate-200 text-slate-800 p-1.5 rounded-xl shadow-xl z-50"
                           >
-                            {/* Option 1: View Details */}
+                            {/* Option 1: View All Details */}
                             <DropdownMenuItem
                               onClick={() => onViewRecord(record)}
                               className="text-xs flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-slate-100 text-slate-800 font-medium"
                             >
                               <Eye className="size-3.5 text-cyan-600" />
-                              <span>View Details</span>
+                              <span>View All Details</span>
                             </DropdownMenuItem>
 
                             {/* Option 2: Edit Record */}
