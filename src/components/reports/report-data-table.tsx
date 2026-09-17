@@ -179,7 +179,13 @@ export default function ReportDataTable({
 
     // 3. Document Type Filter
     if (selectedDocument !== 'all') {
-      list = list.filter((r) => r.document?.toLowerCase().trim() === selectedDocument.toLowerCase().trim())
+      list = list.filter((r) => {
+        const doc = (r.document || '').toLowerCase().trim()
+        if (selectedDocument === 'CoE') return doc.includes('coe')
+        if (selectedDocument === 'VoE') return doc.includes('voe')
+        if (selectedDocument === 'Offer Letter') return doc.includes('offer')
+        return doc === selectedDocument.toLowerCase().trim()
+      })
     }
 
     // 4. Sorting
@@ -356,13 +362,6 @@ export default function ReportDataTable({
               <option value="CoE">Document: CoE</option>
               <option value="VoE">Document: VoE</option>
               <option value="Offer Letter">Document: Offer Letter</option>
-              {availableDocuments
-                .filter((d) => !['CoE', 'VoE', 'Offer Letter'].includes(d))
-                .map((d) => (
-                  <option key={d} value={d}>
-                    Document: {d}
-                  </option>
-                ))}
             </select>
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
           </div>

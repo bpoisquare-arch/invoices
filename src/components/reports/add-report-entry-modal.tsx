@@ -106,7 +106,7 @@ export default function AddReportEntryModal({
           yet_to_raised: editRecord.yet_to_raised || '',
           remarks: editRecord.remarks || '',
           dob: editRecord.dob || '',
-          document: editRecord.document || '',
+          document: editRecord.document ? (editRecord.document.toLowerCase().includes('coe') ? 'CoE' : editRecord.document.toLowerCase().includes('voe') ? 'VoE' : editRecord.document.toLowerCase().includes('offer') ? 'Offer Letter' : editRecord.document) : '',
           status: editRecord.status || 'Current',
           intake: editRecord.intake || '',
           end_date: editRecord.end_date || '',
@@ -358,16 +358,12 @@ export default function AddReportEntryModal({
                       <select
                         value={formData.document}
                         onChange={(e) => handleChange('document', e.target.value)}
-                        className="w-full h-9 text-xs bg-white border border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl px-3 font-semibold shadow-2xs"
+                        className="w-full h-9 text-xs bg-white border border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl px-3 font-semibold shadow-2xs cursor-pointer"
                       >
                         <option value="">Select document type...</option>
                         <option value="CoE">CoE</option>
                         <option value="VoE">VoE</option>
                         <option value="Offer Letter">Offer Letter</option>
-                        {formData.document &&
-                          !['CoE', 'VoE', 'Offer Letter'].includes(formData.document) && (
-                            <option value={formData.document}>{formData.document}</option>
-                          )}
                       </select>
                     </div>
 

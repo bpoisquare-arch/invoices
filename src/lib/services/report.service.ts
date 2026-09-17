@@ -64,6 +64,23 @@ function normalizeHeader(header: string): string {
     .trim()
 }
 
+// Normalize document type: e.g. "CoE + Offer Letter" / "COE+OFFER LETTER" / "CoE Received" -> "CoE", "VoE Received" -> "VoE", "Offer Letter" -> "Offer Letter"
+export function normalizeDocumentType(val: any): string {
+  if (!val && val !== 0) return ''
+  const str = String(val).trim()
+  const lower = str.toLowerCase()
+  if (lower.includes('coe')) {
+    return 'CoE'
+  }
+  if (lower.includes('voe')) {
+    return 'VoE'
+  }
+  if (lower.includes('offer')) {
+    return 'Offer Letter'
+  }
+  return str
+}
+
 export interface ParsedStudentRow {
   sr_no: number | null
   student_name: string
@@ -256,7 +273,7 @@ export function parseStudentReportExcel(buffer: ArrayBuffer | Buffer, fileName: 
       yet_to_raised: yetToRaisedRaw || null,
       remarks: colMap.remarks !== -1 ? cleanString(row[colMap.remarks]) || null : null,
       dob: colMap.dob !== -1 ? formatExcelDate(row[colMap.dob]) || null : null,
-      document: colMap.document !== -1 ? cleanString(row[colMap.document]) || null : null,
+      document: colMap.document !== -1 ? normalizeDocumentType(row[colMap.document]) || null : null,
       status: colMap.status !== -1 ? cleanString(row[colMap.status]) || null : null,
       intake: colMap.intake !== -1 ? formatExcelDate(row[colMap.intake]) || null : null,
       end_date: colMap.end_date !== -1 ? formatExcelDate(row[colMap.end_date]) || null : null,
@@ -564,7 +581,7 @@ export async function saveReportImportToDatabase(params: {
           yet_to_raised: incoming.yet_to_raised,
           remarks: incoming.remarks || existing.remarks,
           dob: incoming.dob || existing.dob,
-          document: incoming.document || existing.document,
+          document: normalizeDocumentType(incoming.document || existing.document) || null,
           status: incoming.status || existing.status,
           intake: incoming.intake || existing.intake,
           end_date: incoming.end_date || existing.end_date,
@@ -612,7 +629,7 @@ export async function saveReportImportToDatabase(params: {
       yet_to_raised: incoming.yet_to_raised,
       remarks: incoming.remarks,
       dob: incoming.dob,
-      document: incoming.document,
+      document: normalizeDocumentType(incoming.document) || null,
       status: incoming.status,
       intake: incoming.intake,
       end_date: incoming.end_date,
@@ -1197,7 +1214,7 @@ export async function createReportRecord(params: {
     yet_to_raised: yetToRaisedVal || null,
     remarks: cleanString(params.remarks) || null,
     dob: cleanString(params.dob) || null,
-    document: cleanString(params.document) || null,
+    document: normalizeDocumentType(params.document) || null,
     status: cleanString(params.status) || 'Current',
     intake: cleanString(params.intake) || null,
     end_date: cleanString(params.end_date) || null,
@@ -1294,6 +1311,7 @@ export async function updateReportRecord(
     cleanedUpdates.paid_amount = pAmt
   }
   if (updates.yet_to_raised !== undefined) cleanedUpdates.yet_to_raised = cleanString(updates.yet_to_raised) || null
+  if (updates.document !== undefined) cleanedUpdates.document = normalizeDocumentType(updates.document) || null
 
   let updatedRecord: AimtReportRecord | null = null
 

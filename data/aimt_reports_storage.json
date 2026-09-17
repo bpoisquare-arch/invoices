@@ -172,6 +172,32 @@
       ],
       "created_at": "2026-09-17T10:00:07.187Z",
       "updated_at": "2026-09-17T10:00:07.187Z"
+    },
+    "fd1a4f79-c66b-44d5-b81a-533870ee5651": {
+      "id": "fd1a4f79-c66b-44d5-b81a-533870ee5651",
+      "file_name": "test_doc.csv",
+      "file_size": 212,
+      "uploaded_at": "2026-09-17T10:15:53.513Z",
+      "uploaded_by": "admin@isquarebpo.com",
+      "total_records": 36,
+      "total_pending_amount": 17446,
+      "total_yet_to_raised": 211739,
+      "entity": "aimt",
+      "original_file_data": "U3IgTm8sU3R1ZGVudCBOYW1lLFN0dWRlbnQgSUQsQWdlbnQsRG9jdW1lbnQsSW50YWtlLENvdXJzZSxQZW5kaW5nIEludm9pY2UsUGVuZGluZyBBbW91bnQsWWV0IHRvIFJhaXNlZAoxLFRlc3QgQ29FIE5vcm1hbGl6YXRpb24sMjAyNjg4ODgsR2xvYmFsIEFnZW5jeSxDb0UgKyBPZmZlciBMZXR0ZXIsMTMvMDEvMjAyNSxDZXJ0aWZpY2F0ZSBJSUksSU5WLTEyMywxMDAwLDA=",
+      "raw_headers": [
+        "Sr No",
+        "Student Name",
+        "Student ID",
+        "Agent",
+        "Document",
+        "Intake",
+        "Course",
+        "Pending Invoice",
+        "Pending Amount",
+        "Yet to Raised"
+      ],
+      "created_at": "2026-09-17T10:15:53.513Z",
+      "updated_at": "2026-09-17T10:15:53.513Z"
     }
   },
   "records": {
@@ -9648,7 +9674,7 @@
         "yet_to_raised": "7650",
         "remarks": "Live DB Verified",
         "dob": "20/12/1993",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "19/08/2026",
         "end_date": "17/08/2027",
@@ -9663,11 +9689,23 @@
         "phone_no": "0494608770",
         "payment_status": "Raised",
         "extra_data": {
+          "Agent": "Study Direct",
+          "Sr No": 1,
+          "Course": "Certificate III in Commercial Cookery",
+          "Intake": "13/01/2025",
           "col_22": "ok",
           "col_23": 100,
+          "remarks": null,
           "raw_index": 0,
+          "Student ID": 20230230,
+          "Total Paid": 1200,
           "total_paid": 1200,
-          "initial_payment": 1000
+          "Student Name": "Muhammad Wali Azhar",
+          "Yet to Raised": 0,
+          "Pending Amount": 1500,
+          "Initial Payment": 1000,
+          "Pending Invoice": "INV-001",
+          "initial_payment": 1200
         },
         "created_at": "2026-09-17T09:32:47.736Z"
       },
@@ -9684,7 +9722,7 @@
         "yet_to_raised": "8010",
         "remarks": null,
         "dob": "05/03/2000",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "17/08/2026",
         "end_date": "15/08/2027",
@@ -9699,9 +9737,9 @@
         "phone_no": "0415537338",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 1,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 1,
           "total_paid": 600,
           "initial_payment": 600
         },
@@ -9720,7 +9758,7 @@
         "yet_to_raised": "6300",
         "remarks": null,
         "dob": "17/10/2003",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "19/08/2026",
         "end_date": "17/08/2027",
@@ -9735,9 +9773,9 @@
         "phone_no": "0426479051",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 2,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 2,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -9756,7 +9794,7 @@
         "yet_to_raised": "7200",
         "remarks": null,
         "dob": "05/12/2001",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "19/08/2026",
         "end_date": "17/08/2027",
@@ -9771,9 +9809,9 @@
         "phone_no": "0437890690",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 3,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 3,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -9792,7 +9830,7 @@
         "yet_to_raised": "8000",
         "remarks": null,
         "dob": "28/03/1998",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "15/07/2026",
         "end_date": "13/07/2027",
@@ -9807,9 +9845,9 @@
         "phone_no": "0481360741",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 4,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 4,
           "total_paid": 400,
           "initial_payment": 400
         },
@@ -9828,7 +9866,7 @@
         "yet_to_raised": "0",
         "remarks": null,
         "dob": "25/11/1998",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Cancelled",
         "intake": "15/07/2026",
         "end_date": "14/07/2027",
@@ -9843,9 +9881,9 @@
         "phone_no": null,
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 5,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 5,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -9864,7 +9902,7 @@
         "yet_to_raised": "8000",
         "remarks": null,
         "dob": "21/12/1990",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "15/07/2026",
         "end_date": "15/07/2026",
@@ -9879,9 +9917,9 @@
         "phone_no": "0469353577",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 6,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 6,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -9900,7 +9938,7 @@
         "yet_to_raised": "11700",
         "remarks": null,
         "dob": "14/02/2007",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "17/08/2026",
         "end_date": "16/08/2027",
@@ -9915,9 +9953,9 @@
         "phone_no": "0406093206",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 7,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 7,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -9936,7 +9974,7 @@
         "yet_to_raised": "8499",
         "remarks": null,
         "dob": "02/12/1999",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "17/08/2026",
         "end_date": "16/08/2027",
@@ -9951,9 +9989,9 @@
         "phone_no": "61470241918",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 8,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 8,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -9972,7 +10010,7 @@
         "yet_to_raised": "7556",
         "remarks": null,
         "dob": "13/04/2000",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "17/08/2026",
         "end_date": "16/08/2027",
@@ -9987,9 +10025,9 @@
         "phone_no": "61470403005",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 9,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 9,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -10008,7 +10046,7 @@
         "yet_to_raised": "8000",
         "remarks": null,
         "dob": "10/08/2000",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "17/08/2026",
         "end_date": "16/08/2027",
@@ -10023,9 +10061,9 @@
         "phone_no": "0423863581",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 10,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 10,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10044,7 +10082,7 @@
         "yet_to_raised": "7650",
         "remarks": null,
         "dob": "07/04/2002",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "17/08/2026",
         "end_date": "15/08/2027",
@@ -10059,9 +10097,9 @@
         "phone_no": null,
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 11,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 11,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -10080,7 +10118,7 @@
         "yet_to_raised": "8000",
         "remarks": null,
         "dob": "03/07/2003",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "17/08/2026",
         "end_date": "15/08/2027",
@@ -10095,9 +10133,9 @@
         "phone_no": "0435923148",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 12,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 12,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10116,7 +10154,7 @@
         "yet_to_raised": "6489",
         "remarks": null,
         "dob": "13/11/1996",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "17/08/2026",
         "end_date": "15/08/2027",
@@ -10131,9 +10169,9 @@
         "phone_no": "0424558422",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 13,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 13,
           "total_paid": 1200,
           "initial_payment": 1200
         },
@@ -10152,7 +10190,7 @@
         "yet_to_raised": "7200",
         "remarks": null,
         "dob": "20/02/2003",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "17/08/2026",
         "end_date": "15/08/2027",
@@ -10167,9 +10205,9 @@
         "phone_no": "0406808380",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 14,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 14,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -10188,7 +10226,7 @@
         "yet_to_raised": "8415",
         "remarks": null,
         "dob": "16/03/1998",
-        "document": "VoE Received",
+        "document": "VoE",
         "status": "Current",
         "intake": "15/07/2026",
         "end_date": "14/07/2027",
@@ -10203,9 +10241,9 @@
         "phone_no": null,
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 15,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 15,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -10224,7 +10262,7 @@
         "yet_to_raised": "8000",
         "remarks": null,
         "dob": "02/07/2001",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "25/08/2026",
         "end_date": "23/08/2027",
@@ -10239,9 +10277,9 @@
         "phone_no": "0425711609",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 16,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 16,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10260,7 +10298,7 @@
         "yet_to_raised": "8000",
         "remarks": null,
         "dob": "25/02/1987",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "12/10/2026",
         "end_date": "10/10/2027",
@@ -10275,9 +10313,9 @@
         "phone_no": "0416773679",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 17,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 17,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10296,7 +10334,7 @@
         "yet_to_raised": "0",
         "remarks": null,
         "dob": "10/10/1999",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10311,9 +10349,9 @@
         "phone_no": "0461254972",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 18,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 18,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10332,7 +10370,7 @@
         "yet_to_raised": null,
         "remarks": null,
         "dob": "30/12/2001",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10347,9 +10385,9 @@
         "phone_no": "0480439245",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 19,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 19,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10368,7 +10406,7 @@
         "yet_to_raised": null,
         "remarks": null,
         "dob": "01/11/2000",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10383,9 +10421,9 @@
         "phone_no": "0451132823",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 20,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 20,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -10404,7 +10442,7 @@
         "yet_to_raised": null,
         "remarks": null,
         "dob": "17/11/1998",
-        "document": "VoE Received",
+        "document": "VoE",
         "status": "Current",
         "intake": "13/07/2026",
         "end_date": "11/07/2027",
@@ -10419,9 +10457,9 @@
         "phone_no": "0470506531",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 21,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 21,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -10440,7 +10478,7 @@
         "yet_to_raised": "8500",
         "remarks": null,
         "dob": "26/01/2000",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10455,9 +10493,9 @@
         "phone_no": "0428086671",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 22,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 22,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -10476,7 +10514,7 @@
         "yet_to_raised": "7500",
         "remarks": null,
         "dob": "26/09/2002",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10491,9 +10529,9 @@
         "phone_no": "0431844302",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 23,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 23,
           "total_paid": 2500,
           "initial_payment": 2500
         },
@@ -10512,7 +10550,7 @@
         "yet_to_raised": "7500",
         "remarks": null,
         "dob": "02/07/2004",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10527,9 +10565,9 @@
         "phone_no": "0468844352",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 24,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 24,
           "total_paid": 2500,
           "initial_payment": 2500
         },
@@ -10548,7 +10586,7 @@
         "yet_to_raised": "8000",
         "remarks": null,
         "dob": "12/08/1999",
-        "document": "VoE Received",
+        "document": "VoE",
         "status": "Current",
         "intake": "13/07/2026",
         "end_date": "11/07/2027",
@@ -10563,9 +10601,9 @@
         "phone_no": "0474596444",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 25,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 25,
           "total_paid": 1500,
           "initial_payment": 1500
         },
@@ -10584,7 +10622,7 @@
         "yet_to_raised": "8500",
         "remarks": null,
         "dob": "06/06/2005",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10599,9 +10637,9 @@
         "phone_no": "0432783656",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 26,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 26,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -10620,7 +10658,7 @@
         "yet_to_raised": null,
         "remarks": null,
         "dob": "28/08/2000",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10635,9 +10673,9 @@
         "phone_no": null,
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 27,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 27,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10656,7 +10694,7 @@
         "yet_to_raised": "9000",
         "remarks": null,
         "dob": "11/06/2004",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10671,9 +10709,9 @@
         "phone_no": null,
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 28,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 28,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10692,7 +10730,7 @@
         "yet_to_raised": "9000",
         "remarks": null,
         "dob": "19/04/2005",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10707,9 +10745,9 @@
         "phone_no": null,
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 29,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 29,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10728,7 +10766,7 @@
         "yet_to_raised": "10250",
         "remarks": null,
         "dob": "07/02/1996",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "02/10/2026",
         "end_date": "30/09/2027",
@@ -10743,9 +10781,9 @@
         "phone_no": null,
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 30,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 30,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10764,7 +10802,7 @@
         "yet_to_raised": null,
         "remarks": null,
         "dob": "30/01/2004",
-        "document": "CoE + Offer Letter",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10779,9 +10817,9 @@
         "phone_no": null,
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 31,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 31,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10800,7 +10838,7 @@
         "yet_to_raised": "9000",
         "remarks": null,
         "dob": "05/11/2001",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10815,9 +10853,9 @@
         "phone_no": null,
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 32,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 32,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10836,7 +10874,7 @@
         "yet_to_raised": null,
         "remarks": null,
         "dob": "21/08/2001",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "14/09/2026",
         "end_date": "12/09/2027",
@@ -10851,9 +10889,9 @@
         "phone_no": "0478960865",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 33,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 33,
           "total_paid": 1000,
           "initial_payment": 1000
         },
@@ -10872,7 +10910,7 @@
         "yet_to_raised": "7470",
         "remarks": null,
         "dob": "03/11/1994",
-        "document": "CoE Received",
+        "document": "CoE",
         "status": "Current",
         "intake": "07/04/2025",
         "end_date": "05/04/2026",
@@ -10887,9 +10925,9 @@
         "phone_no": "61412586387",
         "payment_status": "Raised",
         "extra_data": {
-          "raw_index": 34,
           "col_22": "ok",
           "col_23": 100,
+          "raw_index": 34,
           "total_paid": 500,
           "initial_payment": 500
         },
@@ -10897,6 +10935,7 @@
       }
     ],
     "1842de70-fe55-41c6-8dac-d81d39ba5c23": [],
-    "1bc91832-ad0b-4eef-8f58-fe4784bb53b5": []
+    "1bc91832-ad0b-4eef-8f58-fe4784bb53b5": [],
+    "fd1a4f79-c66b-44d5-b81a-533870ee5651": []
   }
 }
