@@ -365,124 +365,336 @@ function generateId(): string {
   })
 }
 
-// Save parsed report and raw original file to Supabase Database (with local server storage fallback)
+// Preview an Excel file before committing to database (detects matches vs new records)
+export async function previewReportImport(buffer: ArrayBuffer | Buffer, fileName: string): Promise<{
+  totalRecords: number
+  matchingCount: number
+  newCount: number
+  sampleMatches: { student_name: string; student_id?: string | null; course?: string | null }[]
+  sampleNew: { student_name: string; student_id?: string | null; course?: string | null }[]
+  totalPendingAmount: number
+  totalYetToRaised: number
+}> {
+  const parseResult = parseStudentReportExcel(buffer, fileName)
+  const supabase = await getSupabase()
+
+  let existingRecords: AimtReportRecord[] = []
+  try {
+    const { data } = await supabase.from('aimt_report_records').select('id, student_name, student_id, course')
+    if (data) existingRecords = data as AimtReportRecord[]
+  } catch {
+    // fallback
+  }
+
+  const existingById = new Map<string, AimtReportRecord>()
+  const existingByName = new Map<string, AimtReportRecord>()
+
+  existingRecords.forEach((r) => {
+    if (r.student_id && r.student_id.trim()) {
+      existingById.set(r.student_id.trim().toLowerCase(), r)
+    }
+    if (r.student_name && r.student_name.trim()) {
+      existingByName.set(r.student_name.trim().toLowerCase(), r)
+    }
+  })
+
+  const sampleMatches: any[] = []
+  const sampleNew: any[] = []
+  let matchingCount = 0
+  let newCount = 0
+
+  parseResult.records.forEach((incoming) => {
+    const idKey = incoming.student_id ? incoming.student_id.trim().toLowerCase() : ''
+    const nameKey = incoming.student_name ? incoming.student_name.trim().toLowerCase() : ''
+
+    const matched = (idKey && existingById.get(idKey)) || (nameKey && existingByName.get(nameKey))
+
+    if (matched) {
+      matchingCount++
+      if (sampleMatches.length < 5) {
+        sampleMatches.push({
+          student_name: incoming.student_name,
+          student_id: incoming.student_id,
+          course: incoming.course,
+        })
+      }
+    } else {
+      newCount++
+      if (sampleNew.length < 5) {
+        sampleNew.push({
+          student_name: incoming.student_name,
+          student_id: incoming.student_id,
+          course: incoming.course,
+        })
+      }
+    }
+  })
+
+  return {
+    totalRecords: parseResult.records.length,
+    matchingCount,
+    newCount,
+    sampleMatches,
+    sampleNew,
+    totalPendingAmount: parseResult.totalPendingAmount,
+    totalYetToRaised: parseResult.totalYetToRaised,
+  }
+}
+
+// Save or Update imported Excel data to Supabase Live Database
 export async function saveReportImportToDatabase(params: {
   fileName: string
   fileSize: number
-  uploadedBy?: string | null
-  originalBase64: string
-  rawHeaders: string[]
+  uploadedBy?: string
+  originalBase64?: string
+  rawHeaders?: string[]
   records: ParsedStudentRow[]
   entity?: string
-}): Promise<{ importBatch: AimtReportImport; recordCount: number }> {
+  duplicateStrategy?: 'override' | 'skip' | 'replace'
+}): Promise<{
+  importBatch: AimtReportImport
+  recordCount: number
+  overriddenCount: number
+  skippedCount: number
+  newCount: number
+}> {
   const supabase = await getSupabase()
   const entity = params.entity || 'aimt'
-
-  const totalPendingAmount = params.records.reduce((acc, r) => acc + (r.pending_amount || 0), 0)
-  const totalYetToRaised = params.records.reduce((acc, r) => acc + (cleanNumber(r.yet_to_raised) || 0), 0)
+  const duplicateStrategy = params.duplicateStrategy || 'override'
   const nowStr = new Date().toISOString()
   const fallbackId = generateId()
 
+  let importBatchId = fallbackId
+
+  // 1. Fetch all existing records in Supabase to compare
+  let existingRecords: AimtReportRecord[] = []
+  try {
+    const { data: dbRecords } = await supabase.from('aimt_report_records').select('*')
+    if (dbRecords) {
+      existingRecords = dbRecords as AimtReportRecord[]
+    }
+  } catch (err) {
+    console.warn('Could not fetch existing records from Supabase:', err)
+  }
+
+  // Create lookup maps by student_id and student_name
+  const existingById = new Map<string, AimtReportRecord>()
+  const existingByName = new Map<string, AimtReportRecord>()
+
+  existingRecords.forEach((r) => {
+    if (r.student_id && r.student_id.trim()) {
+      existingById.set(r.student_id.trim().toLowerCase(), r)
+    }
+    if (r.student_name && r.student_name.trim()) {
+      existingByName.set(r.student_name.trim().toLowerCase(), r)
+    }
+  })
+
+  // 2. Handle 'replace' strategy (clears prior data)
+  if (duplicateStrategy === 'replace') {
+    try {
+      await supabase.from('aimt_report_records').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      existingRecords = []
+      existingById.clear()
+      existingByName.clear()
+    } catch (err) {
+      console.error('Error clearing existing records for replace strategy:', err)
+    }
+  }
+
+  // 3. Process records according to strategy
+  let overriddenCount = 0
+  let skippedCount = 0
+  let newCount = 0
+
+  const recordsToInsert: any[] = []
+
+  // Create or get import batch
   const importPayload = {
+    id: importBatchId,
     file_name: params.fileName,
     file_size: params.fileSize,
     uploaded_at: nowStr,
     uploaded_by: params.uploadedBy || 'admin@isquarebpo.com',
-    total_records: params.records.length,
-    total_pending_amount: totalPendingAmount,
-    total_yet_to_raised: totalYetToRaised,
+    total_records: 0,
+    total_pending_amount: 0,
+    total_yet_to_raised: 0,
     entity: entity,
     original_file_data: params.originalBase64,
-    raw_headers: params.rawHeaders as any,
+    raw_headers: (params.rawHeaders || []) as any,
+    created_at: nowStr,
+    updated_at: nowStr,
   }
 
-  let importData: AimtReportImport | null = null
-  let useSupabase = true
-
-  // 1. Insert into aimt_report_imports
   try {
-    const { data, error: importError } = await supabase
-      .from('aimt_report_imports')
-      .insert(importPayload)
-      .select()
-      .single()
-
-    if (importError || !data) {
-      console.warn('Supabase aimt_report_imports not accessible, using server storage fallback:', importError?.message)
-      useSupabase = false
-    } else {
-      importData = data as unknown as AimtReportImport
+    const { data, error } = await supabase.from('aimt_report_imports').insert(importPayload).select().single()
+    if (!error && data) {
+      importBatchId = data.id
     }
   } catch (err) {
-    console.warn('Supabase query failed, using server storage fallback:', err)
-    useSupabase = false
+    console.warn('Error creating import batch in Supabase:', err)
   }
 
-  if (!importData) {
-    importData = {
-      id: fallbackId,
-      ...importPayload,
+  // Find max sr_no
+  let nextSrNo = existingRecords.reduce((max, r) => Math.max(max, r.sr_no || 0), 0) + 1
+  if (duplicateStrategy === 'replace') {
+    nextSrNo = 1
+  }
+
+  for (let idx = 0; idx < params.records.length; idx++) {
+    const incoming = params.records[idx]
+    const studentIdKey = incoming.student_id ? incoming.student_id.trim().toLowerCase() : ''
+    const nameKey = incoming.student_name ? incoming.student_name.trim().toLowerCase() : ''
+
+    const existing = (studentIdKey && existingById.get(studentIdKey)) || (nameKey && existingByName.get(nameKey))
+
+    if (existing && duplicateStrategy !== 'replace') {
+      if (duplicateStrategy === 'skip') {
+        skippedCount++
+        continue
+      } else if (duplicateStrategy === 'override') {
+        // Update the existing record in Supabase
+        const updatedPayload: any = {
+          student_name: incoming.student_name,
+          student_id: incoming.student_id || existing.student_id,
+          agent: incoming.agent || existing.agent,
+          scholarship: incoming.scholarship || existing.scholarship,
+          pending_invoice: incoming.pending_invoice,
+          pending_amount: incoming.pending_amount,
+          yet_to_raised: incoming.yet_to_raised,
+          remarks: incoming.remarks || existing.remarks,
+          dob: incoming.dob || existing.dob,
+          document: incoming.document || existing.document,
+          status: incoming.status || existing.status,
+          intake: incoming.intake || existing.intake,
+          end_date: incoming.end_date || existing.end_date,
+          course: incoming.course || existing.course,
+          admin_fee: incoming.admin_fee,
+          resource_fee: incoming.resource_fee,
+          tuition_fee: incoming.tuition_fee,
+          total_fee: incoming.total_fee,
+          paid_amount: incoming.paid_amount,
+          coe_issued_date: incoming.coe_issued_date || existing.coe_issued_date,
+          email_id: incoming.email_id || existing.email_id,
+          phone_no: incoming.phone_no || existing.phone_no,
+          payment_status: incoming.payment_status || existing.payment_status,
+          extra_data: {
+            ...((existing.extra_data as Record<string, any>) || {}),
+            ...(incoming.extra_data || {}),
+            total_paid: incoming.total_paid || incoming.paid_amount,
+            initial_payment: incoming.paid_amount,
+          },
+        }
+
+        try {
+          await supabase.from('aimt_report_records').update(updatedPayload).eq('id', existing.id)
+          overriddenCount++
+        } catch (err) {
+          console.error(`Error overriding student ${incoming.student_name}:`, err)
+        }
+        continue
+      }
+    }
+
+    // New non-matching record: prepare insert
+    newCount++
+    const newSrNo = incoming.sr_no || nextSrNo++
+    recordsToInsert.push({
+      id: generateId(),
+      import_id: importBatchId,
+      sr_no: newSrNo,
+      student_name: incoming.student_name,
+      student_id: incoming.student_id,
+      agent: incoming.agent,
+      scholarship: incoming.scholarship,
+      pending_invoice: incoming.pending_invoice,
+      pending_amount: incoming.pending_amount,
+      yet_to_raised: incoming.yet_to_raised,
+      remarks: incoming.remarks,
+      dob: incoming.dob,
+      document: incoming.document,
+      status: incoming.status,
+      intake: incoming.intake,
+      end_date: incoming.end_date,
+      course: incoming.course,
+      admin_fee: incoming.admin_fee,
+      resource_fee: incoming.resource_fee,
+      tuition_fee: incoming.tuition_fee,
+      total_fee: incoming.total_fee,
+      paid_amount: incoming.paid_amount,
+      coe_issued_date: incoming.coe_issued_date,
+      email_id: incoming.email_id,
+      phone_no: incoming.phone_no,
+      payment_status: incoming.payment_status,
+      extra_data: {
+        ...(incoming.extra_data || {}),
+        total_paid: incoming.total_paid || incoming.paid_amount,
+        initial_payment: incoming.paid_amount,
+      },
       created_at: nowStr,
-      updated_at: nowStr,
-    } as AimtReportImport
+    })
   }
 
-  const importId = importData.id
-
-  // 2. Batch format records
-  const recordsToInsert: AimtReportRecord[] = params.records.map((r, idx) => ({
-    id: generateId(),
-    import_id: importId,
-    sr_no: r.sr_no || idx + 1,
-    student_name: r.student_name,
-    student_id: r.student_id,
-    agent: r.agent,
-    scholarship: r.scholarship,
-    pending_invoice: r.pending_invoice,
-    pending_amount: r.pending_amount,
-    yet_to_raised: r.yet_to_raised,
-    remarks: r.remarks,
-    dob: r.dob,
-    document: r.document,
-    status: r.status,
-    intake: r.intake,
-    end_date: r.end_date,
-    course: r.course,
-    admin_fee: r.admin_fee,
-    resource_fee: r.resource_fee,
-    tuition_fee: r.tuition_fee,
-    total_fee: r.total_fee,
-    paid_amount: r.paid_amount,
-    coe_issued_date: r.coe_issued_date,
-    email_id: r.email_id,
-    phone_no: r.phone_no,
-    payment_status: r.payment_status,
-    extra_data: r.extra_data as any,
-    created_at: nowStr,
-  }))
-
-  // Insert to Supabase if available
-  if (useSupabase) {
-    const chunkSize = 200
+  // Insert new records in chunks to Supabase
+  if (recordsToInsert.length > 0) {
+    const chunkSize = 100
     for (let i = 0; i < recordsToInsert.length; i += chunkSize) {
       const chunk = recordsToInsert.slice(i, i + chunkSize)
       try {
         await supabase.from('aimt_report_records').insert(chunk)
       } catch (err) {
-        console.error('Error inserting report records chunk to Supabase:', err)
+        console.error('Error inserting records chunk to Supabase:', err)
       }
     }
   }
 
-  // Also save to server storage backup
+  // Recalculate totals in Supabase
+  let finalTotalRecords = 0
+  let finalPendingAmount = 0
+  let finalYetToRaised = 0
+
+  try {
+    const { data: allFinalRows } = await supabase.from('aimt_report_records').select('pending_amount, yet_to_raised')
+    if (allFinalRows) {
+      finalTotalRecords = allFinalRows.length
+      finalPendingAmount = allFinalRows.reduce((sum, r) => sum + (Number(r.pending_amount) || 0), 0)
+      finalYetToRaised = allFinalRows.reduce((sum, r) => sum + cleanNumber(r.yet_to_raised), 0)
+
+      await supabase.from('aimt_report_imports').update({
+        total_records: finalTotalRecords,
+        total_pending_amount: finalPendingAmount,
+        total_yet_to_raised: finalYetToRaised,
+        updated_at: nowStr,
+      }).eq('id', importBatchId)
+    }
+  } catch {
+    // ignore
+  }
+
+  // Update server storage backup
   const store = readLocalReportStorage()
-  store.imports[importId] = importData
-  store.records[importId] = recordsToInsert
+  if (duplicateStrategy === 'replace') {
+    store.records = {}
+    store.records[importBatchId] = recordsToInsert
+  } else {
+    if (!store.records[importBatchId]) store.records[importBatchId] = []
+    store.records[importBatchId].push(...recordsToInsert)
+  }
+  store.imports[importBatchId] = {
+    ...importPayload,
+    id: importBatchId,
+    total_records: finalTotalRecords,
+    total_pending_amount: finalPendingAmount,
+    total_yet_to_raised: finalYetToRaised,
+  } as AimtReportImport
   saveLocalReportStorage(store)
 
   return {
-    importBatch: importData,
-    recordCount: recordsToInsert.length,
+    importBatch: store.imports[importBatchId],
+    recordCount: finalTotalRecords,
+    overriddenCount,
+    skippedCount,
+    newCount,
   }
 }
 

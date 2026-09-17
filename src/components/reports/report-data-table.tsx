@@ -44,6 +44,7 @@ import {
   AlertTriangle,
   Loader2,
   PlusCircle,
+  UploadCloud,
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/lib/supabase/database.types'
 import TablePagination from '@/components/ui/table-pagination'
@@ -55,6 +56,7 @@ interface ReportDataTableProps {
   onSelectChange: (ids: string[]) => void
   onViewRecord: (record: AimtReportRecord) => void
   onAddEntry?: () => void
+  onImportExcel?: () => void
   onEditRecord?: (record: AimtReportRecord) => void
   onDeleteRecord?: (record: AimtReportRecord) => Promise<void>
   onDeleteSelected?: (ids: string[]) => Promise<void>
@@ -101,6 +103,7 @@ export default function ReportDataTable({
   onSelectChange,
   onViewRecord,
   onAddEntry,
+  onImportExcel,
   onEditRecord,
   onDeleteRecord,
   onDeleteSelected,
@@ -409,6 +412,20 @@ export default function ReportDataTable({
             <Download className="size-4 text-emerald-600" />
             <span className="hidden sm:inline">Export Excel ({filteredRecords.length})</span>
           </Button>
+
+          {/* Import Excel Button in Table Controls */}
+          {onImportExcel && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onImportExcel}
+              className="border-cyan-300/90 bg-gradient-to-r from-cyan-50 to-teal-50 text-[#003D5C] hover:bg-cyan-100/70 hover:border-cyan-400 h-10 px-4 rounded-xl text-xs gap-2 shadow-2xs font-bold cursor-pointer shrink-0 transition-all"
+              title="Import student Excel report"
+            >
+              <UploadCloud className="size-4 text-[#009D9E]" />
+              <span className="hidden sm:inline">Import Excel</span>
+            </Button>
+          )}
 
           {/* Add Entry Button */}
           {onAddEntry && (

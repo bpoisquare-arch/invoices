@@ -9,11 +9,13 @@ import {
   Loader2,
   GraduationCap,
   PlusCircle,
+  UploadCloud,
 } from 'lucide-react'
 import ReportStatsCards from '@/components/reports/report-stats-cards'
 import ReportDataTable from '@/components/reports/report-data-table'
 import ReportRecordDetailModal from '@/components/reports/report-record-detail-modal'
 import AddReportEntryModal from '@/components/reports/add-report-entry-modal'
+import UploadReportModal from '@/components/reports/upload-report-modal'
 import type { AimtReportRecord } from '@/lib/supabase/database.types'
 import { useAuthRole } from '@/lib/hooks/use-auth-role'
 
@@ -33,6 +35,7 @@ export default function StudentReportsPage() {
 
   // Modal States
   const [isAddEntryModalOpen, setIsAddEntryModalOpen] = useState(false)
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<AimtReportRecord | null>(null)
   const [detailModalRecord, setDetailModalRecord] = useState<AimtReportRecord | null>(null)
 
@@ -217,6 +220,19 @@ export default function StudentReportsPage() {
             <RotateCcw className={`size-3.5 text-[#009D9E] ${isLoadingRecords ? 'animate-spin' : ''}`} />
             <span>Refresh Data</span>
           </Button>
+
+          {/* Import Excel */}
+          {!isViewer && (
+            <Button
+              size="sm"
+              onClick={() => setIsUploadModalOpen(true)}
+              className="bg-gradient-to-r from-[#009D9E] to-[#007A7A] hover:from-[#007A7A] hover:to-[#005c5c] text-white h-9.5 px-4 rounded-xl text-xs gap-2 shadow-2xs font-bold cursor-pointer transition-all border border-cyan-400/20"
+              title="Import student Excel report into database"
+            >
+              <UploadCloud className="size-4" />
+              <span>Import Excel</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -236,6 +252,7 @@ export default function StudentReportsPage() {
         selectedIds={selectedIds}
         onSelectChange={setSelectedIds}
         onViewRecord={(record) => setDetailModalRecord(record)}
+        onImportExcel={isViewer ? undefined : () => setIsUploadModalOpen(true)}
         onAddEntry={
           isViewer
             ? undefined
@@ -262,15 +279,25 @@ export default function StudentReportsPage() {
 
       {/* 4. Modals */}
       {!isViewer && (
-        <AddReportEntryModal
-          isOpen={isAddEntryModalOpen}
-          onClose={() => {
-            setIsAddEntryModalOpen(false)
-            setEditingRecord(null)
-          }}
-          onSuccess={handleRecordSaved}
-          editRecord={editingRecord}
-        />
+        <>
+          <AddReportEntryModal
+            isOpen={isAddEntryModalOpen}
+            onClose={() => {
+              setIsAddEntryModalOpen(false)
+              setEditingRecord(null)
+            }}
+            onSuccess={handleRecordSaved}
+            editRecord={editingRecord}
+          />
+
+          <UploadReportModal
+            isOpen={isUploadModalOpen}
+            onClose={() => setIsUploadModalOpen(false)}
+            onUploadSuccess={async () => {
+              await fetchRecords()
+            }}
+          />
+        </>
       )}
 
       <ReportRecordDetailModal

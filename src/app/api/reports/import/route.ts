@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { parseStudentReportExcel, saveReportImportToDatabase } from '@/lib/services/report.service'
+import { parseStudentReportExcel, previewReportImport, saveReportImportToDatabase } from '@/lib/services/report.service'
 import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    const isPreview = formData.get('preview') === 'true' || request.nextUrl.searchParams.get('preview') === 'true'
+    const duplicateStrategy = (formData.get('duplicateStrategy') as 'override' | 'skip' | 'replace') || 'override'
 
     if (!file) {
       return NextResponse.json({ success: false, error: 'No file provided in the request.' }, { status: 400 })
@@ -30,12 +32,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Convert file to ArrayBuffer and Base64 (for storing the exact original file)
+    // Convert file to ArrayBuffer
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
-    const originalBase64 = buffer.toString('base64')
 
-    // Parse Excel content into structured student rows
+    // 1. If this is a preview request, run preview and return match analysis
+    if (isPreview) {
+      const preview = await previewReportImport(buffer, fileName)
+      return NextResponse.json({
+        success: true,
+        preview: true,
+        fileName,
+        fileSize,
+        ...preview,
+      })
+    }
+
+    // 2. Otherwise parse and commit to live database
+    const originalBase64 = buffer.toString('base64')
     const parseResult = parseStudentReportExcel(buffer, fileName)
 
     if (!parseResult.records || parseResult.records.length === 0) {
@@ -57,7 +71,7 @@ export async function POST(request: NextRequest) {
       // ignore
     }
 
-    // Save directly to Supabase Database
+    // Save directly to Supabase Live Database
     const saved = await saveReportImportToDatabase({
       fileName,
       fileSize,
@@ -66,6 +80,7 @@ export async function POST(request: NextRequest) {
       rawHeaders: parseResult.rawHeaders,
       records: parseResult.records,
       entity: 'aimt',
+      duplicateStrategy,
     })
 
     return NextResponse.json({
@@ -74,9 +89,13 @@ export async function POST(request: NextRequest) {
       fileName: saved.importBatch.file_name,
       uploadedAt: saved.importBatch.uploaded_at,
       totalRecords: saved.recordCount,
+      overriddenCount: saved.overriddenCount,
+      skippedCount: saved.skippedCount,
+      newCount: saved.newCount,
+      duplicateStrategy,
       totalPendingAmount: saved.importBatch.total_pending_amount,
       totalYetToRaised: saved.importBatch.total_yet_to_raised,
-      message: `Successfully imported ${saved.recordCount} student records from ${fileName}.`,
+      message: `Successfully processed ${parseResult.records.length} records (${saved.newCount} new, ${saved.overriddenCount} updated, ${saved.skippedCount} skipped).`,
     })
   } catch (error: any) {
     console.error('Error importing report Excel file:', error)
