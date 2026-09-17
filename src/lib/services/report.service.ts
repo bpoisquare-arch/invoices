@@ -189,41 +189,65 @@ export function parseStudentReportExcel(buffer: ArrayBuffer | Buffer, fileName: 
   const rawHeaders: string[] = (rawRows[headerRowIndex] || []).map((h) => cleanString(h))
   const normalizedHeaders = rawHeaders.map((h) => normalizeHeader(h))
 
-  // Find column index helper
-  function findColIndex(possibleNames: string[]): number {
+  // Find column index helper with exact-first priority and exclusion filters
+  function findColIndex(possibleNames: string[], excludeWords: string[] = []): number {
+    // Phase 1: Exact match
     for (const name of possibleNames) {
-      const idx = normalizedHeaders.findIndex((h) => h === name || h.includes(name))
+      const idx = normalizedHeaders.findIndex((h) => {
+        if (excludeWords.some((ew) => h.includes(ew))) return false
+        return h === name
+      })
       if (idx !== -1) return idx
     }
+
+    // Phase 2: Whole word match
+    for (const name of possibleNames) {
+      const idx = normalizedHeaders.findIndex((h) => {
+        if (excludeWords.some((ew) => h.includes(ew))) return false
+        const regex = new RegExp(`(^|\\s)${name}(\\s|$)`, 'i')
+        return regex.test(h)
+      })
+      if (idx !== -1) return idx
+    }
+
+    // Phase 3: Substring match (with exclusions)
+    for (const name of possibleNames) {
+      const idx = normalizedHeaders.findIndex((h) => {
+        if (excludeWords.some((ew) => h.includes(ew))) return false
+        return h.includes(name)
+      })
+      if (idx !== -1) return idx
+    }
+
     return -1
   }
 
   const colMap = {
-    sr_no: findColIndex(['sr no', 'sr', 'srno', 's no', 'sno', 'serial no', 'no']),
-    student_name: findColIndex(['student name', 'name of student', 'student', 'candidate name', 'name']),
-    student_id: findColIndex(['student id', 'student no', 'studentid', 'id', 'student number']),
-    agent: findColIndex(['agent', 'agency', 'agent name', 'consultant', 'recruiter']),
-    scholarship: findColIndex(['scholarship', 'scholarship amount']),
-    pending_invoice: findColIndex(['pending invoice', 'pending invoices', 'pending inv', 'inv pending', 'pending inv count']),
-    pending_amount: findColIndex(['pending amount', 'amount pending', 'pending balance', 'pending', 'due amount', 'balance due']),
-    yet_to_raised: findColIndex(['yet to raised', 'yet to be raised', 'yet to raise', 'unraised', 'yet raised', 'yet to issue']),
-    remarks: findColIndex(['remarks', 'remark', 'comments', 'notes']),
-    dob: findColIndex(['dob', 'date of birth', 'birth date']),
-    document: findColIndex(['document', 'documents', 'doc status', 'coe status', 'doc']),
-    status: findColIndex(['status', 'student status', 'enrollment status']),
-    intake: findColIndex(['intake', 'intake date', 'start date', 'commencement date']),
-    end_date: findColIndex(['end date', 'completion date', 'course end date']),
-    course: findColIndex(['course', 'course name', 'qualification', 'program']),
-    admin_fee: findColIndex(['admin fee', 'administration fee']),
-    resource_fee: findColIndex(['resource fee', 'resources fee', 'materials fee']),
-    tuition_fee: findColIndex(['tuition fee', 'tuition']),
-    total_fee: findColIndex(['total fee', 'total fees', 'course fee']),
-    paid_amount: findColIndex(['paid amount', 'amount paid', 'fee paid', 'paid', 'initial payment', 'initial paid']),
-    total_paid: findColIndex(['total paid', 'total fee paid', 'total amount paid', 'total paid amount']),
-    coe_issued_date: findColIndex(['coe issued date', 'coe date', 'coe issued']),
-    email_id: findColIndex(['email id', 'email', 'student email', 'email address']),
-    phone_no: findColIndex(['phone no', 'phone', 'mobile no', 'mobile', 'contact']),
-    payment_status: findColIndex(['payment status', 'pay status', 'invoice status']),
+    sr_no: findColIndex(['sr no', 'sr_no', 'srno', 's no', 's_no', 'sno', 'serial no', 'serial number', 'sl no', 'sr #', 'sr. no'], ['phone', 'mobile', 'contact', 'invoice', 'student', 'inv', 'account', 'card']),
+    student_name: findColIndex(['student name', 'name of student', 'candidate name', 'student full name', 'student', 'candidate', 'name'], ['agent', 'agency', 'course', 'company', 'consultant']),
+    student_id: findColIndex(['student id', 'student no', 'student number', 'student_id', 'studentid', 'student code', 'candidate id'], ['email', 'mail', 'phone', 'contact']),
+    agent: findColIndex(['agent name', 'agent', 'agency', 'agency name', 'consultant', 'recruiter', 'education agent'], ['student', 'candidate']),
+    scholarship: findColIndex(['scholarship', 'scholarship amount', 'scholarship fee', 'scholarship ($)']),
+    pending_invoice: findColIndex(['pending invoice', 'pending invoices', 'pending inv', 'inv pending', 'invoice pending', 'pending inv count']),
+    pending_amount: findColIndex(['pending amount', 'amount pending', 'pending balance', 'pending amt', 'due amount', 'balance due', 'pending ($)']),
+    yet_to_raised: findColIndex(['yet to raised', 'yet to be raised', 'yet to raise', 'unraised', 'yet raised', 'yet to issue', 'unraised amount']),
+    remarks: findColIndex(['remarks', 'remark', 'comments', 'comment', 'notes', 'note']),
+    dob: findColIndex(['dob', 'date of birth', 'birth date', 'birthdate', 'd.o.b']),
+    document: findColIndex(['document type', 'document', 'documents', 'doc status', 'coe status', 'doc type', 'doc']),
+    status: findColIndex(['student id status', 'student status', 'enrollment status', 'status']),
+    intake: findColIndex(['intake date', 'intake', 'start date', 'commencement date', 'course start date']),
+    end_date: findColIndex(['course end date', 'end date', 'completion date', 'course completion date', 'finish date']),
+    course: findColIndex(['course name', 'qualification', 'course', 'program', 'course title']),
+    admin_fee: findColIndex(['admin fee', 'administration fee', 'admin fees', 'admin ($)'], ['tuition', 'resource', 'total']),
+    resource_fee: findColIndex(['resource fee', 'resources fee', 'materials fee', 'material fee', 'resource ($)'], ['admin', 'tuition', 'total']),
+    tuition_fee: findColIndex(['tuition fee', 'tuition fees', 'tuition', 'tuition ($)'], ['admin', 'resource', 'total']),
+    total_fee: findColIndex(['total fee', 'total fees', 'course fee', 'total course fee', 'total ($)'], ['paid', 'initial', 'admin', 'resource', 'tuition']),
+    paid_amount: findColIndex(['initial payment', 'initial paid', 'initial fee', 'first payment', 'paid amount', 'amount paid', 'fee paid'], ['total paid']),
+    total_paid: findColIndex(['total paid', 'total fee paid', 'total amount paid', 'total paid amount', 'total paid ($)'], ['initial']),
+    coe_issued_date: findColIndex(['coe issued date', 'coe date', 'coe issued', 'date coe issued']),
+    email_id: findColIndex(['email id', 'student email', 'email address', 'email', 'e-mail'], ['student id', 'candidate id']),
+    phone_no: findColIndex(['phone no', 'mobile no', 'contact no', 'phone number', 'mobile number', 'contact number', 'phone', 'mobile', 'contact'], ['sr', 'serial', 'invoice', 'inv']),
+    payment_status: findColIndex(['payment status', 'pay status', 'invoice status', 'payment plan status', 'plan status']),
   }
 
   const parsedRecords: ParsedStudentRow[] = []
@@ -244,7 +268,10 @@ export function parseStudentReportExcel(buffer: ArrayBuffer | Buffer, fileName: 
     // Fallback if student name is empty but other columns exist
     const finalStudentName = studentName || (colMap.student_id !== -1 && row[colMap.student_id] ? `Student (${row[colMap.student_id]})` : `Record #${r}`)
 
-    const srNoVal = colMap.sr_no !== -1 ? cleanNumber(row[colMap.sr_no]) : (r - headerRowIndex)
+    let srNoVal = colMap.sr_no !== -1 ? cleanNumber(row[colMap.sr_no]) : (r - headerRowIndex)
+    if (srNoVal <= 0 || srNoVal > 100000) {
+      srNoVal = r - headerRowIndex
+    }
     const pendingAmount = colMap.pending_amount !== -1 ? cleanNumber(row[colMap.pending_amount]) : 0
     const yetToRaisedRaw = colMap.yet_to_raised !== -1 ? cleanString(row[colMap.yet_to_raised]) : ''
     const yetToRaisedNum = cleanNumber(yetToRaisedRaw)
@@ -624,7 +651,10 @@ export async function saveReportImportToDatabase(params: {
 
     // New non-matching record: prepare insert
     newCount++
-    const newSrNo = incoming.sr_no || nextSrNo++
+    let newSrNo = incoming.sr_no || nextSrNo++
+    if (newSrNo <= 0 || newSrNo > 100000) {
+      newSrNo = nextSrNo++
+    }
     recordsToInsert.push({
       id: generateId(),
       import_id: importBatchId,
