@@ -1008,9 +1008,10 @@ export async function createReportRecord(params: {
   // 1. Insert into Supabase (Live Database Server)
   let savedRecord = recordPayload
   try {
+    const { initial_payment, total_paid, ...dbPayload } = recordPayload as any
     const { data, error } = await supabase
       .from('aimt_report_records')
-      .insert(recordPayload)
+      .insert(dbPayload)
       .select()
       .single()
 
@@ -1079,15 +1080,6 @@ export async function updateReportRecord(
   if (updates.paid_amount !== undefined || updates.initial_payment !== undefined) {
     const pAmt = cleanNumber(updates.paid_amount ?? updates.initial_payment)
     cleanedUpdates.paid_amount = pAmt
-    cleanedUpdates.initial_payment = pAmt
-  }
-  if (updates.total_paid !== undefined) {
-    const tp = cleanNumber(updates.total_paid)
-    cleanedUpdates.total_paid = tp
-    cleanedUpdates.extra_data = {
-      ...(cleanedUpdates.extra_data || {}),
-      total_paid: tp,
-    }
   }
   if (updates.yet_to_raised !== undefined) cleanedUpdates.yet_to_raised = cleanString(updates.yet_to_raised) || null
 
@@ -1095,6 +1087,24 @@ export async function updateReportRecord(
 
   // 1. Supabase Update (Live Database Server)
   try {
+    // Fetch existing extra_data to merge safely
+    const { data: existingRec } = await supabase
+      .from('aimt_report_records')
+      .select('extra_data, import_id')
+      .eq('id', id)
+      .maybeSingle()
+
+    const mergedExtraData = {
+      ...((existingRec?.extra_data as Record<string, any>) || {}),
+      ...((cleanedUpdates.extra_data as Record<string, any>) || {}),
+      ...(updates.total_paid !== undefined ? { total_paid: cleanNumber(updates.total_paid) } : {}),
+      ...(updates.initial_payment !== undefined || updates.paid_amount !== undefined ? { initial_payment: cleanNumber(updates.paid_amount ?? updates.initial_payment) } : {}),
+    }
+
+    cleanedUpdates.extra_data = mergedExtraData
+    delete cleanedUpdates.initial_payment
+    delete cleanedUpdates.total_paid
+
     const { data, error } = await supabase
       .from('aimt_report_records')
       .update(cleanedUpdates)
