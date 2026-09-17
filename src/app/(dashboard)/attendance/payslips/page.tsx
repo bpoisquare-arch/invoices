@@ -309,6 +309,7 @@ export default function PayslipsPage() {
     const map: Record<
       string,
       {
+        totalWorkingDays: number
         presentDays: number
         alDays: number
         clDays: number
@@ -356,10 +357,25 @@ export default function PayslipsPage() {
         emp.name?.toLowerCase?.().trim(),
       ].filter(Boolean)
 
-      // If employee is attendance exempt, treat all days as present / full pay
+      // Count active working / calendar days in this month on/after employee's joining date
+      let activeWorkingDays = 0
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0')
+        const dStr = `${y}-${String(m).padStart(2, '0')}-${dayStr}`
+        const isBeforeJoining =
+          !emp.is_old_staff && emp.joining_date
+            ? dStr < emp.joining_date.split('T')[0]
+            : false
+        if (!isBeforeJoining) {
+          activeWorkingDays += 1
+        }
+      }
+
+      // If employee is attendance exempt, treat all active days as present / full pay
       if (emp.is_attendance_exempt) {
         const statsObj = {
-          presentDays: daysInMonth,
+          totalWorkingDays: activeWorkingDays,
+          presentDays: activeWorkingDays,
           alDays: 0,
           clDays: 0,
           slDays: 0,
@@ -393,6 +409,11 @@ export default function PayslipsPage() {
           !emp.is_old_staff && emp.joining_date
             ? dStr < emp.joining_date.split('T')[0]
             : false
+
+        // Pre-joining unworked days are NOT counted in working days and are NOT unpaid days
+        if (isBeforeJoining) {
+          continue
+        }
 
         // Look for record for this employee on dStr
         let rec: any = null
@@ -484,10 +505,7 @@ export default function PayslipsPage() {
         } else if (hasPunches) {
           presentDays += 1
         } else if (isExplicitHoliday) {
-          // Paid Sunday or Paid Gazetted Holiday (not absent)
-        } else if (isBeforeJoining) {
-          // Pre-joining unworked day (unpaid for salary calculation)
-          unpaidDays += 1
+          // Paid Sunday or Paid Gazetted Holiday on/after joining date (not absent)
         } else if (isFuture || arrStatus === '--' || depStatus === '--') {
           // Future day or neutral placeholder
         } else {
@@ -496,7 +514,16 @@ export default function PayslipsPage() {
         }
       }
 
-      const statsObj = { presentDays, alDays, clDays, slDays, wfhDays, probationDays, unpaidDays }
+      const statsObj = {
+        totalWorkingDays: activeWorkingDays,
+        presentDays,
+        alDays,
+        clDays,
+        slDays,
+        wfhDays,
+        probationDays,
+        unpaidDays,
+      }
       if (emp.id) map[emp.id] = statsObj
       if (emp.employee_id) map[emp.employee_id] = statsObj
       if (emp.id) map[emp.id.toLowerCase()] = statsObj
@@ -544,7 +571,9 @@ export default function PayslipsPage() {
   const getPayslipData = (emp: Employee) => {
     const isExempt = Boolean(emp.is_attendance_exempt)
     const stats = isExempt
-      ? {
+      ? employeeAttendanceStats[emp.id] ||
+        employeeAttendanceStats[emp.employee_id] || {
+          totalWorkingDays: daysInMonth,
           presentDays: daysInMonth,
           alDays: 0,
           clDays: 0,
@@ -555,6 +584,7 @@ export default function PayslipsPage() {
         }
       : employeeAttendanceStats[emp.id] ||
         employeeAttendanceStats[emp.employee_id] || {
+          totalWorkingDays: daysInMonth,
           presentDays: 0,
           alDays: 0,
           clDays: 0,
@@ -578,12 +608,13 @@ export default function PayslipsPage() {
       })()
     )
 
-    const totalWorkingDays = daysInMonth // Monthly Total Days (calendar days e.g. 31)
+    const totalWorkingDays = stats.totalWorkingDays !== undefined ? stats.totalWorkingDays : daysInMonth
     const unpaidDays = isExempt ? 0 : stats.unpaidDays
     const totalPaidDays = isExempt ? totalWorkingDays : Math.max(0, totalWorkingDays - unpaidDays)
 
-    const basicPay = Number(emp.salary) || 0
-    const perDaySalary = totalWorkingDays > 0 ? basicPay / totalWorkingDays : 0
+    const contractedSalary = Number(emp.salary) || 0
+    const perDaySalary = daysInMonth > 0 ? contractedSalary / daysInMonth : 0
+    const basicPay = totalWorkingDays === daysInMonth ? contractedSalary : Math.round(perDaySalary * totalWorkingDays)
     const unpaidDeduction = isExempt ? 0 : Math.round(perDaySalary * unpaidDays)
     const commission =
       commissionsMap[emp.id] ||
