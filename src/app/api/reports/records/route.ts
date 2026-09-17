@@ -6,6 +6,10 @@ import {
   deleteReportRecords,
 } from '@/lib/services/report.service'
 
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const revalidate = 0
+
 // POST /api/reports/records - Create a new student report record
 export async function POST(request: NextRequest) {
   try {

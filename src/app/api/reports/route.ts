@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getReportRecords, getReportImports } from '@/lib/services/report.service'
 
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const revalidate = 0
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)

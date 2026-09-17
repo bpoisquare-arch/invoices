@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { parseStudentReportExcel, previewReportImport, saveReportImportToDatabase } from '@/lib/services/report.service'
 import { createClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const revalidate = 0
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()

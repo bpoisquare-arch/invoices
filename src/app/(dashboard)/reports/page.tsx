@@ -54,7 +54,10 @@ export default function StudentReportsPage() {
   const fetchRecords = useCallback(async () => {
     setIsLoadingRecords(true)
     try {
-      const res = await fetch('/api/reports?pageSize=1000')
+      const res = await fetch(`/api/reports?pageSize=1000&t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      })
       const data = await res.json()
 
       if (data.success && Array.isArray(data.records)) {
@@ -192,7 +195,7 @@ export default function StudentReportsPage() {
           </div>
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-[#003D5C] tracking-tight font-['Montserrat']">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-[#003D5C] tracking-tight font-['Geist']">
                 Student Report Management
               </h1>
               <span className="inline-flex items-center gap-1 bg-gradient-to-r from-cyan-50 to-teal-50 text-cyan-900 border border-cyan-200 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">

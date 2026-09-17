@@ -537,7 +537,6 @@ export async function saveReportImportToDatabase(params: {
     total_pending_amount: 0,
     total_yet_to_raised: 0,
     entity: entity,
-    original_file_data: params.originalBase64,
     raw_headers: (params.rawHeaders || []) as any,
     created_at: nowStr,
     updated_at: nowStr,
@@ -547,6 +546,12 @@ export async function saveReportImportToDatabase(params: {
     const { data, error } = await supabase.from('aimt_report_imports').insert(importPayload).select().single()
     if (!error && data) {
       importBatchId = data.id
+    } else if (error) {
+      console.warn('Import batch insert with ID failed, attempting fallback query:', error)
+      const { data: defaultBatch } = await supabase.from('aimt_report_imports').select('id').limit(1).maybeSingle()
+      if (defaultBatch) {
+        importBatchId = defaultBatch.id
+      }
     }
   } catch (err) {
     console.warn('Error creating import batch in Supabase:', err)
@@ -604,8 +609,12 @@ export async function saveReportImportToDatabase(params: {
         }
 
         try {
-          await supabase.from('aimt_report_records').update(updatedPayload).eq('id', existing.id)
-          overriddenCount++
+          const { error: updErr } = await supabase.from('aimt_report_records').update(updatedPayload).eq('id', existing.id)
+          if (updErr) {
+            console.error(`Error overriding student ${incoming.student_name}:`, updErr)
+          } else {
+            overriddenCount++
+          }
         } catch (err) {
           console.error(`Error overriding student ${incoming.student_name}:`, err)
         }
@@ -658,9 +667,14 @@ export async function saveReportImportToDatabase(params: {
     for (let i = 0; i < recordsToInsert.length; i += chunkSize) {
       const chunk = recordsToInsert.slice(i, i + chunkSize)
       try {
-        await supabase.from('aimt_report_records').insert(chunk)
+        const { error: insErr } = await supabase.from('aimt_report_records').insert(chunk)
+        if (insErr) {
+          console.error('CRITICAL: Error inserting records chunk to Supabase:', insErr)
+          throw new Error(insErr.message)
+        }
       } catch (err) {
         console.error('Error inserting records chunk to Supabase:', err)
+        throw err
       }
     }
   }
