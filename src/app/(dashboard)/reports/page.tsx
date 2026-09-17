@@ -178,24 +178,27 @@ export default function StudentReportsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto pb-14">
-      {/* 1. Light Theme Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
-        <div className="flex items-center gap-3.5">
-          <div className="size-11 rounded-2xl bg-[#003D5C] text-cyan-300 flex items-center justify-center shadow-xs shrink-0">
+    <div className="space-y-6 max-w-[1600px] mx-auto pb-14 font-sans">
+      {/* 1. Premium Classic Header Section */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-white via-slate-50/70 to-slate-50 border border-slate-200/90 p-5 sm:p-6 rounded-2xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#003D5C] via-[#009D9E] to-cyan-400" />
+        
+        <div className="flex items-center gap-4">
+          <div className="size-12 rounded-2xl bg-gradient-to-br from-[#003D5C] to-[#002233] text-cyan-300 flex items-center justify-center shadow-md shadow-[#003D5C]/20 shrink-0 border border-cyan-500/20">
             <GraduationCap className="size-6" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-['Geist']">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-[#003D5C] tracking-tight font-['Montserrat']">
                 Student Report Management
               </h1>
-              <Badge className="bg-cyan-50 text-cyan-800 border-cyan-200 text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider">
-                AIMT College
-              </Badge>
+              <span className="inline-flex items-center gap-1 bg-gradient-to-r from-cyan-50 to-teal-50 text-cyan-900 border border-cyan-200 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
+                <span className="size-1.5 rounded-full bg-cyan-600" />
+                AIMT Entity
+              </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5 font-medium">
-              Direct database student invoices, fee tracking, real-time entries & exports
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              Real-time student fee tracking, pending invoice management, live ledger, and Excel reports.
             </p>
           </div>
         </div>
@@ -208,16 +211,16 @@ export default function StudentReportsPage() {
             size="sm"
             onClick={() => fetchRecords()}
             disabled={isLoadingRecords}
-            className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 h-9 px-3 rounded-xl text-xs gap-1.5 shadow-2xs font-medium"
+            className="border-slate-300/90 bg-white text-slate-700 hover:bg-slate-100/80 hover:text-slate-900 h-9.5 px-3.5 rounded-xl text-xs gap-2 shadow-2xs font-semibold cursor-pointer transition-all"
             title="Refresh database records"
           >
-            <RotateCcw className={`size-3.5 ${isLoadingRecords ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
+            <RotateCcw className={`size-3.5 text-[#009D9E] ${isLoadingRecords ? 'animate-spin' : ''}`} />
+            <span>Refresh Data</span>
           </Button>
         </div>
       </div>
 
-      {/* 2. Top Metrics / KPI Cards (Light Theme) */}
+      {/* 2. Top Metrics / KPI Cards */}
       <ReportStatsCards
         totalStudents={stats.totalStudents}
         totalPendingAmount={stats.totalPendingAmount}

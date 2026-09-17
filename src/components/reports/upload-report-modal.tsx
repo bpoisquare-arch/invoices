@@ -9,7 +9,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react'
+import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, X, Sparkles } from 'lucide-react'
 
 interface UploadReportModalProps {
   isOpen: boolean
@@ -103,32 +103,37 @@ export default function UploadReportModal({
         }
       }}
     >
-      <DialogContent className="w-[95vw] max-w-lg bg-white border border-slate-200 text-slate-900 p-6 shadow-2xl rounded-2xl">
-        <DialogHeader className="space-y-1">
-          <DialogTitle className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2 font-['Montserrat']">
-            <div className="size-8 rounded-lg bg-cyan-50 text-cyan-700 flex items-center justify-center border border-cyan-200">
-              <UploadCloud className="size-4.5" />
+      <DialogContent className="w-[95vw] max-w-lg bg-white border border-slate-200/90 text-slate-900 p-0 shadow-2xl rounded-2xl overflow-hidden font-sans">
+        {/* Header with Navy Gradient */}
+        <div className="bg-gradient-to-r from-[#002D42] via-[#003D5C] to-[#00283d] p-5 text-white flex items-center justify-between border-b border-[#002D42]">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl bg-white/10 backdrop-blur-md text-cyan-300 flex items-center justify-center border border-cyan-400/20 shadow-inner shrink-0">
+              <UploadCloud className="size-5" />
             </div>
-            Upload Student Excel Report
-          </DialogTitle>
-          <DialogDescription className="text-xs text-slate-500">
-            Upload student spreadsheet to automatically extract pending invoices, courses, agents & amounts.
-          </DialogDescription>
-        </DialogHeader>
+            <div>
+              <DialogTitle className="text-base sm:text-lg font-extrabold text-white tracking-tight font-['Montserrat']">
+                Upload Student Excel Report
+              </DialogTitle>
+              <DialogDescription className="text-xs text-cyan-200/80 mt-0.5">
+                Automatically extract student invoices, courses, agents & amounts.
+              </DialogDescription>
+            </div>
+          </div>
+        </div>
 
-        <div className="space-y-4 my-2">
+        <div className="p-6 space-y-4">
           {/* Dropzone */}
           <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-7 text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+            className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
               isDragging
-                ? 'border-cyan-500 bg-cyan-50/50 scale-[0.99]'
+                ? 'border-[#009D9E] bg-cyan-50/50 scale-[0.99]'
                 : file
-                ? 'border-emerald-500 bg-emerald-50/50'
-                : 'border-slate-200 hover:border-slate-300 bg-slate-50/50 hover:bg-slate-50'
+                ? 'border-emerald-500 bg-emerald-50/40'
+                : 'border-slate-300/80 hover:border-[#009D9E] bg-slate-50/60 hover:bg-slate-50'
             }`}
           >
             <input
@@ -144,29 +149,29 @@ export default function UploadReportModal({
             />
 
             {file ? (
-              <div className="space-y-2">
-                <div className="size-12 rounded-2xl bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center border border-emerald-200 shadow-xs">
+              <div className="space-y-2.5">
+                <div className="size-13 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white mx-auto flex items-center justify-center shadow-md shadow-emerald-500/20">
                   <FileSpreadsheet className="size-6" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-900 truncate max-w-[320px]">
+                  <p className="text-sm font-extrabold text-slate-900 truncate max-w-[320px]">
                     {file.name}
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {(file.size / 1024).toFixed(1)} KB • Click to choose another file
+                  <p className="text-xs text-emerald-700 font-semibold mt-0.5">
+                    {(file.size / 1024).toFixed(1)} KB • Ready to process
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
-                <div className="size-12 rounded-2xl bg-cyan-50 text-cyan-700 mx-auto flex items-center justify-center border border-cyan-200/80 shadow-xs">
+              <div className="space-y-2.5">
+                <div className="size-13 rounded-2xl bg-cyan-50 text-[#009D9E] mx-auto flex items-center justify-center border border-cyan-200/80 shadow-2xs">
                   <UploadCloud className="size-6" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    Click to browse or drag & drop file here
+                  <p className="text-sm font-bold text-slate-800">
+                    Click to browse or drag & drop spreadsheet
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-400 mt-0.5">
                     Supports Microsoft Excel (.xlsx, .xls) and CSV
                   </p>
                 </div>
@@ -176,34 +181,31 @@ export default function UploadReportModal({
 
           {/* Error notice */}
           {error && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
               <AlertCircle className="size-4 shrink-0 text-rose-600" />
-              <span>{error}</span>
+              <span className="font-semibold">{error}</span>
             </div>
           )}
 
           {/* Info note */}
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-600 space-y-1">
-            <span className="font-bold text-slate-800 block">
-              💡 Extracted 8 Columns for Data Table:
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 text-xs text-slate-600 space-y-1">
+            <span className="font-bold text-[#003D5C] flex items-center gap-1.5">
+              <Sparkles className="size-3.5 text-[#009D9E]" /> Automatically Parsed Columns:
             </span>
-            <p>
-              Sr No, Student Name, Agent, Pending Invoice, Pending Amount, Yet to Raised, Intake, Course.
-            </p>
-            <p className="text-slate-500 text-[10px]">
-              The original file is stored in the database for exact downloads at any time.
+            <p className="text-[11.5px] text-slate-500 leading-relaxed">
+              Sr No, Student Name, Agent, Pending Invoice, Pending Amount, Yet to Raised, Intake Date, and Course.
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+        <div className="flex items-center justify-end gap-2.5 p-4.5 bg-slate-50/80 border-t border-slate-200">
           <Button
             type="button"
             variant="outline"
             disabled={isUploading}
             onClick={onClose}
-            className="border-slate-200 bg-white text-slate-700 hover:bg-slate-100 rounded-xl text-xs"
+            className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold cursor-pointer"
           >
             Cancel
           </Button>
@@ -212,7 +214,7 @@ export default function UploadReportModal({
             type="button"
             disabled={!file || isUploading}
             onClick={handleUpload}
-            className="bg-[#003D5C] hover:bg-[#002b42] text-white font-bold gap-1.5 shadow-sm rounded-xl text-xs cursor-pointer"
+            className="bg-[#003D5C] hover:bg-[#002b42] text-white font-bold gap-2 shadow-sm rounded-xl text-xs cursor-pointer border border-cyan-500/20"
           >
             {isUploading ? (
               <>
@@ -221,7 +223,7 @@ export default function UploadReportModal({
               </>
             ) : (
               <>
-                <FileSpreadsheet className="size-4" />
+                <FileSpreadsheet className="size-4 text-cyan-300" />
                 <span>Process & Import</span>
               </>
             )}

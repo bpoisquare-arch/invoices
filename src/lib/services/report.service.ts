@@ -85,6 +85,7 @@ export interface ParsedStudentRow {
   tuition_fee: number
   total_fee: number
   paid_amount: number
+  total_paid?: number
   coe_issued_date: string | null
   email_id: string | null
   phone_no: string | null
@@ -200,7 +201,8 @@ export function parseStudentReportExcel(buffer: ArrayBuffer | Buffer, fileName: 
     resource_fee: findColIndex(['resource fee', 'resources fee', 'materials fee']),
     tuition_fee: findColIndex(['tuition fee', 'tuition']),
     total_fee: findColIndex(['total fee', 'total fees', 'course fee']),
-    paid_amount: findColIndex(['paid amount', 'amount paid', 'fee paid', 'paid']),
+    paid_amount: findColIndex(['paid amount', 'amount paid', 'fee paid', 'paid', 'initial payment', 'initial paid']),
+    total_paid: findColIndex(['total paid', 'total fee paid', 'total amount paid', 'total paid amount']),
     coe_issued_date: findColIndex(['coe issued date', 'coe date', 'coe issued']),
     email_id: findColIndex(['email id', 'email', 'student email', 'email address']),
     phone_no: findColIndex(['phone no', 'phone', 'mobile no', 'mobile', 'contact']),
@@ -240,6 +242,9 @@ export function parseStudentReportExcel(buffer: ArrayBuffer | Buffer, fileName: 
       extraData[headerTitle] = cellVal
     })
 
+    const totalPaidNum = colMap.total_paid !== -1 ? cleanNumber(row[colMap.total_paid]) : (cleanNumber(extraData['Total Paid']) || cleanNumber(extraData['Total Paid ($)']) || 0)
+    extraData['total_paid'] = totalPaidNum
+
     parsedRecords.push({
       sr_no: srNoVal > 0 ? srNoVal : r - headerRowIndex,
       student_name: finalStudentName,
@@ -261,6 +266,7 @@ export function parseStudentReportExcel(buffer: ArrayBuffer | Buffer, fileName: 
       tuition_fee: colMap.tuition_fee !== -1 ? cleanNumber(row[colMap.tuition_fee]) : 0,
       total_fee: colMap.total_fee !== -1 ? cleanNumber(row[colMap.total_fee]) : 0,
       paid_amount: colMap.paid_amount !== -1 ? cleanNumber(row[colMap.paid_amount]) : 0,
+      total_paid: totalPaidNum,
       coe_issued_date: colMap.coe_issued_date !== -1 ? formatExcelDate(row[colMap.coe_issued_date]) || null : null,
       email_id: colMap.email_id !== -1 ? cleanString(row[colMap.email_id]) || null : null,
       phone_no: colMap.phone_no !== -1 ? cleanString(row[colMap.phone_no]) || null : null,
@@ -632,8 +638,14 @@ export async function getReportRecords(params: {
       })
     }
 
+    const formattedRecords: AimtReportRecord[] = (data || []).map((r: any) => ({
+      ...r,
+      total_paid: r.total_paid !== undefined && r.total_paid !== null ? Number(r.total_paid) : (r.extra_data?.total_paid !== undefined ? Number(r.extra_data.total_paid) : 0),
+      paid_amount: r.paid_amount !== undefined && r.paid_amount !== null ? Number(r.paid_amount) : 0,
+    }))
+
     return {
-      records: (data || []) as AimtReportRecord[],
+      records: formattedRecords,
       totalCount: count !== null ? count : data.length,
       totalPendingAmount: Number(totalPending.toFixed(2)),
       totalYetToRaised: Number(totalYetRaised.toFixed(2)),
@@ -886,6 +898,8 @@ export async function createReportRecord(params: {
   tuition_fee?: number | string | null
   total_fee?: number | string | null
   paid_amount?: number | string | null
+  total_paid?: number | string | null
+  initial_payment?: number | string | null
   coe_issued_date?: string | null
   email_id?: string | null
   phone_no?: string | null
@@ -932,7 +946,8 @@ export async function createReportRecord(params: {
     ? cleanNumber(params.total_fee)
     : Math.max(0, adminFeeNum + resourceFeeNum + tuitionFeeNum - (cleanNumber(params.scholarship)))
 
-  const paidAmountNum = cleanNumber(params.paid_amount)
+  const paidAmountNum = cleanNumber(params.paid_amount || params.initial_payment)
+  const totalPaidNum = cleanNumber(params.total_paid)
 
   // Find highest Sr No in Supabase
   let nextSrNo = 1
@@ -949,6 +964,12 @@ export async function createReportRecord(params: {
     }
   } catch {
     // fallback
+  }
+
+  const extraData = {
+    ...(params.extra_data || {}),
+    total_paid: totalPaidNum,
+    initial_payment: paidAmountNum,
   }
 
   const recordPayload: AimtReportRecord = {
@@ -974,11 +995,13 @@ export async function createReportRecord(params: {
     tuition_fee: tuitionFeeNum,
     total_fee: totalFeeNum,
     paid_amount: paidAmountNum,
+    total_paid: totalPaidNum,
+    initial_payment: paidAmountNum,
     coe_issued_date: cleanString(params.coe_issued_date) || null,
     email_id: cleanString(params.email_id) || null,
     phone_no: cleanString(params.phone_no) || null,
     payment_status: cleanString(params.payment_status) || 'Pending',
-    extra_data: params.extra_data || {},
+    extra_data: extraData,
     created_at: nowStr,
   }
 
@@ -1053,7 +1076,19 @@ export async function updateReportRecord(
   if (updates.resource_fee !== undefined) cleanedUpdates.resource_fee = cleanNumber(updates.resource_fee)
   if (updates.tuition_fee !== undefined) cleanedUpdates.tuition_fee = cleanNumber(updates.tuition_fee)
   if (updates.total_fee !== undefined) cleanedUpdates.total_fee = cleanNumber(updates.total_fee)
-  if (updates.paid_amount !== undefined) cleanedUpdates.paid_amount = cleanNumber(updates.paid_amount)
+  if (updates.paid_amount !== undefined || updates.initial_payment !== undefined) {
+    const pAmt = cleanNumber(updates.paid_amount ?? updates.initial_payment)
+    cleanedUpdates.paid_amount = pAmt
+    cleanedUpdates.initial_payment = pAmt
+  }
+  if (updates.total_paid !== undefined) {
+    const tp = cleanNumber(updates.total_paid)
+    cleanedUpdates.total_paid = tp
+    cleanedUpdates.extra_data = {
+      ...(cleanedUpdates.extra_data || {}),
+      total_paid: tp,
+    }
+  }
   if (updates.yet_to_raised !== undefined) cleanedUpdates.yet_to_raised = cleanString(updates.yet_to_raised) || null
 
   let updatedRecord: AimtReportRecord | null = null

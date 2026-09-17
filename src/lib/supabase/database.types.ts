@@ -841,6 +841,8 @@ export interface Database {
           tuition_fee: number
           total_fee: number
           paid_amount: number
+          total_paid?: number | null
+          initial_payment?: number | null
           coe_issued_date: string | null
           email_id: string | null
           phone_no: string | null
@@ -871,6 +873,8 @@ export interface Database {
           tuition_fee?: number
           total_fee?: number
           paid_amount?: number
+          total_paid?: number | null
+          initial_payment?: number | null
           coe_issued_date?: string | null
           email_id?: string | null
           phone_no?: string | null
@@ -901,6 +905,8 @@ export interface Database {
           tuition_fee?: number
           total_fee?: number
           paid_amount?: number
+          total_paid?: number | null
+          initial_payment?: number | null
           coe_issued_date?: string | null
           email_id?: string | null
           phone_no?: string | null

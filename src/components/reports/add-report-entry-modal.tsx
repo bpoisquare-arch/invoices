@@ -32,6 +32,7 @@ import {
   PlusCircle,
   Edit,
   Sparkles,
+  BookOpen,
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/lib/supabase/database.types'
 
@@ -52,7 +53,7 @@ export default function AddReportEntryModal({
 }: AddReportEntryModalProps) {
   const isEditMode = Boolean(editRecord)
 
-  // 23 Fields Form State
+  // 24 Fields Form State
   const [formData, setFormData] = useState({
     student_name: '',
     student_id: '',
@@ -73,6 +74,7 @@ export default function AddReportEntryModal({
     tuition_fee: '',
     total_fee: '',
     paid_amount: '',
+    total_paid: '',
     coe_issued_date: '',
     email_id: '',
     phone_no: '',
@@ -88,6 +90,12 @@ export default function AddReportEntryModal({
     if (isOpen) {
       setErrorMessage(null)
       if (editRecord) {
+        const totalPaidVal = (editRecord as any).total_paid !== undefined && (editRecord as any).total_paid !== null
+          ? String((editRecord as any).total_paid)
+          : (editRecord.extra_data as any)?.total_paid !== undefined
+          ? String((editRecord.extra_data as any).total_paid)
+          : ''
+
         setFormData({
           student_name: editRecord.student_name || '',
           student_id: editRecord.student_id || '',
@@ -108,6 +116,7 @@ export default function AddReportEntryModal({
           tuition_fee: editRecord.tuition_fee ? String(editRecord.tuition_fee) : '',
           total_fee: editRecord.total_fee ? String(editRecord.total_fee) : '',
           paid_amount: editRecord.paid_amount ? String(editRecord.paid_amount) : '',
+          total_paid: totalPaidVal,
           coe_issued_date: editRecord.coe_issued_date || '',
           email_id: editRecord.email_id || '',
           phone_no: editRecord.phone_no || '',
@@ -135,6 +144,7 @@ export default function AddReportEntryModal({
           tuition_fee: '',
           total_fee: '',
           paid_amount: '',
+          total_paid: '',
           coe_issued_date: '',
           email_id: '',
           phone_no: '',
@@ -244,18 +254,18 @@ export default function AddReportEntryModal({
         if (!open && !isSubmitting) onClose()
       }}
     >
-      <DialogContent className="w-[96vw] max-w-5xl lg:max-w-6xl max-h-[92vh] bg-white border border-slate-200 text-slate-900 p-0 overflow-hidden shadow-2xl rounded-2xl flex flex-col">
+      <DialogContent className="w-[96vw] max-w-5xl lg:max-w-6xl max-h-[92vh] bg-white border border-slate-200/90 text-slate-900 p-0 overflow-hidden shadow-2xl rounded-2xl flex flex-col font-sans">
         {/* Modal Header */}
-        <div className="bg-slate-50 p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-[#003D5C] text-cyan-300 flex items-center justify-center shadow-xs">
+        <div className="relative bg-gradient-to-r from-[#002D42] via-[#003D5C] to-[#00283d] p-5 sm:p-6 text-white flex items-center justify-between shrink-0 border-b border-[#002D42]">
+          <div className="flex items-center gap-3.5">
+            <div className="size-11 rounded-2xl bg-white/10 backdrop-blur-md text-cyan-300 flex items-center justify-center border border-cyan-400/20 shadow-inner shrink-0">
               {isEditMode ? <Edit className="size-5" /> : <PlusCircle className="size-5" />}
             </div>
             <div>
-              <DialogTitle className="text-base sm:text-lg font-bold text-slate-900 tracking-tight font-['Montserrat']">
+              <DialogTitle className="text-lg sm:text-xl font-extrabold text-white tracking-tight font-['Montserrat']">
                 {isEditMode ? 'Edit Student Record' : 'Add New Student Entry'}
               </DialogTitle>
-              <DialogDescription className="text-xs text-slate-500 mt-0.5">
+              <DialogDescription className="text-xs text-cyan-200/80 mt-0.5">
                 {isEditMode
                   ? 'Update details in database. Changes will reflect across all metrics and reports.'
                   : 'Add a new student invoice record directly to the database.'}
@@ -263,19 +273,19 @@ export default function AddReportEntryModal({
             </div>
           </div>
 
-          <Badge className="bg-cyan-50 text-cyan-800 border-cyan-200 text-[11px] font-bold px-2.5 py-1">
-            AIMT College
-          </Badge>
+          <span className="bg-cyan-500/20 text-cyan-200 border border-cyan-400/30 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+            AIMT Entity
+          </span>
         </div>
 
         {/* Modal Body Form: 2-Column Wide Grid on Desktop */}
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden bg-slate-50/50">
+          <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 text-xs">
             {/* Error banner */}
             {errorMessage && (
-              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2.5 shadow-xs">
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2.5 shadow-2xs">
                 <AlertCircle className="size-4.5 shrink-0 text-rose-600" />
-                <span className="font-medium">{errorMessage}</span>
+                <span className="font-semibold">{errorMessage}</span>
               </div>
             )}
 
@@ -284,16 +294,16 @@ export default function AddReportEntryModal({
               {/* LEFT COLUMN: Student, Personal, Course & Agency Info */}
               <div className="space-y-4">
                 {/* 1. Student & Personal Details */}
-                <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200/90 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    <User className="size-4 text-cyan-700" />
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3.5">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#003D5C] uppercase tracking-wider border-b border-slate-100 pb-2.5">
+                    <User className="size-4 text-[#009D9E]" />
                     <span>1. Student & Personal Details</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     {/* Student Name */}
-                    <div className="space-y-1 sm:col-span-2">
-                      <Label className="text-xs font-semibold text-slate-700">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label className="text-xs font-bold text-slate-700">
                         Student Name <span className="text-rose-500">*</span>
                       </Label>
                       <Input
@@ -301,28 +311,28 @@ export default function AddReportEntryModal({
                         onChange={(e) => handleChange('student_name', e.target.value)}
                         placeholder="e.g. Abdul Rehman"
                         required
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg"
+                        className="h-9 text-xs bg-white border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl shadow-2xs font-semibold"
                       />
                     </div>
 
                     {/* Student ID */}
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Student ID</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-700">Student ID</Label>
                       <Input
                         value={formData.student_id}
                         onChange={(e) => handleChange('student_id', e.target.value)}
                         placeholder="e.g. AIMT00195"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg font-mono font-semibold text-cyan-800"
+                        className="h-9 text-xs bg-white border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl font-mono font-bold text-[#003D5C] shadow-2xs"
                       />
                     </div>
 
                     {/* Status */}
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Student ID Status</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-700">Student ID Status</Label>
                       <select
                         value={formData.status}
                         onChange={(e) => handleChange('status', e.target.value)}
-                        className="w-full h-8.5 text-xs bg-white border border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg px-2.5 font-medium"
+                        className="w-full h-9 text-xs bg-white border border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl px-3 font-semibold shadow-2xs"
                       >
                         <option value="Current">Current</option>
                         <option value="Future">Future</option>
@@ -333,8 +343,8 @@ export default function AddReportEntryModal({
                     </div>
 
                     {/* DOB */}
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Date of Birth (DOB)</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-700">Date of Birth (DOB)</Label>
                       <DatePicker
                         value={formData.dob}
                         onChange={(val) => handleChange('dob', val)}
@@ -343,12 +353,12 @@ export default function AddReportEntryModal({
                     </div>
 
                     {/* Document Type Dropdown */}
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Document Type</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-700">Document Type</Label>
                       <select
                         value={formData.document}
                         onChange={(e) => handleChange('document', e.target.value)}
-                        className="w-full h-8.5 text-xs bg-white border border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg px-2.5 font-medium"
+                        className="w-full h-9 text-xs bg-white border border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl px-3 font-semibold shadow-2xs"
                       >
                         <option value="">Select document type...</option>
                         <option value="CoE">CoE</option>
@@ -362,45 +372,45 @@ export default function AddReportEntryModal({
                     </div>
 
                     {/* Email ID */}
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Email ID</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-700">Email ID</Label>
                       <Input
                         type="email"
                         value={formData.email_id}
                         onChange={(e) => handleChange('email_id', e.target.value)}
                         placeholder="student@example.com"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg"
+                        className="h-9 text-xs bg-white border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl shadow-2xs"
                       />
                     </div>
 
                     {/* Phone No */}
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Phone No</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-700">Phone No</Label>
                       <Input
                         value={formData.phone_no}
                         onChange={(e) => handleChange('phone_no', e.target.value)}
                         placeholder="+61 400 123 456"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg font-mono"
+                        className="h-9 text-xs bg-white border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl font-mono shadow-2xs"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* 2. Course & Agency Details */}
-                <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200/90 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    <GraduationCap className="size-4 text-cyan-700" />
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3.5">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#003D5C] uppercase tracking-wider border-b border-slate-100 pb-2.5">
+                    <GraduationCap className="size-4 text-[#009D9E]" />
                     <span>2. Course & Agency Details</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     {/* Course Name Dropdown (Populated with AIMT Schedule Plans Courses) */}
-                    <div className="space-y-1 sm:col-span-2">
-                      <Label className="text-xs font-semibold text-slate-700">Course Name</Label>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label className="text-xs font-bold text-slate-700">Course Name</Label>
                       <select
                         value={formData.course}
                         onChange={(e) => handleChange('course', e.target.value)}
-                        className="w-full h-8.5 text-xs bg-white border border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg px-2.5 font-medium"
+                        className="w-full h-9 text-xs bg-white border border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl px-3 font-semibold shadow-2xs"
                       >
                         <option value="">Select a course...</option>
                         {AIMT_COURSES.map((c) => (
@@ -416,19 +426,19 @@ export default function AddReportEntryModal({
                     </div>
 
                     {/* Agent */}
-                    <div className="space-y-1 sm:col-span-2">
-                      <Label className="text-xs font-semibold text-slate-700">Agent / Agency</Label>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label className="text-xs font-bold text-slate-700">Agent / Agency</Label>
                       <Input
                         value={formData.agent}
                         onChange={(e) => handleChange('agent', e.target.value)}
                         placeholder="e.g. Edlink Australia"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg"
+                        className="h-9 text-xs bg-white border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl shadow-2xs"
                       />
                     </div>
 
                     {/* Intake Date */}
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Intake Date</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-700">Intake Date</Label>
                       <DatePicker
                         value={formData.intake}
                         onChange={(val) => handleChange('intake', val)}
@@ -437,8 +447,8 @@ export default function AddReportEntryModal({
                     </div>
 
                     {/* Course End Date */}
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Course End Date</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-700">Course End Date</Label>
                       <DatePicker
                         value={formData.end_date}
                         onChange={(val) => handleChange('end_date', val)}
@@ -447,8 +457,8 @@ export default function AddReportEntryModal({
                     </div>
 
                     {/* COE Issue Date */}
-                    <div className="space-y-1 sm:col-span-2">
-                      <Label className="text-xs font-semibold text-slate-700">COE Issue Date</Label>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label className="text-xs font-bold text-slate-700">COE Issue Date</Label>
                       <DatePicker
                         value={formData.coe_issued_date}
                         onChange={(val) => handleChange('coe_issued_date', val)}
@@ -462,76 +472,76 @@ export default function AddReportEntryModal({
               {/* RIGHT COLUMN: Fees, Invoicing & Remarks */}
               <div className="space-y-4">
                 {/* 3. Invoicing, Fees & Financials */}
-                <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200/90 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider">
                       <DollarSign className="size-4 text-emerald-600" />
                       <span>3. Invoicing & Fee Breakdown</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[10px] text-cyan-800 bg-cyan-100/80 px-2 py-0.5 rounded-md font-semibold border border-cyan-200">
-                      <Calculator className="size-3" />
+                    <div className="flex items-center gap-1.5 text-[10.5px] text-[#003D5C] bg-cyan-50 px-2.5 py-0.5 rounded-lg font-bold border border-cyan-200">
+                      <Calculator className="size-3 text-[#009D9E]" />
                       <span>Auto Total Fee</span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {/* Admin Fee */}
                     <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-slate-700">Admin Fee ($)</Label>
+                      <Label className="text-[11px] font-bold text-slate-700">Admin Fee ($)</Label>
                       <Input
                         type="number"
                         step="any"
                         value={formData.admin_fee}
                         onChange={(e) => handleFeeChange('admin_fee', e.target.value)}
                         placeholder="0.00"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 rounded-lg font-mono"
+                        className="h-9 text-xs bg-white border-slate-200 text-slate-900 rounded-xl font-mono shadow-2xs"
                       />
                     </div>
 
                     {/* Resource Fee */}
                     <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-slate-700">Resource Fee ($)</Label>
+                      <Label className="text-[11px] font-bold text-slate-700">Resource Fee ($)</Label>
                       <Input
                         type="number"
                         step="any"
                         value={formData.resource_fee}
                         onChange={(e) => handleFeeChange('resource_fee', e.target.value)}
                         placeholder="0.00"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 rounded-lg font-mono"
+                        className="h-9 text-xs bg-white border-slate-200 text-slate-900 rounded-xl font-mono shadow-2xs"
                       />
                     </div>
 
                     {/* Tuition Fee */}
                     <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-slate-700">Tuition Fee ($)</Label>
+                      <Label className="text-[11px] font-bold text-slate-700">Tuition Fee ($)</Label>
                       <Input
                         type="number"
                         step="any"
                         value={formData.tuition_fee}
                         onChange={(e) => handleFeeChange('tuition_fee', e.target.value)}
                         placeholder="0.00"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 rounded-lg font-mono"
+                        className="h-9 text-xs bg-white border-slate-200 text-slate-900 rounded-xl font-mono shadow-2xs"
                       />
                     </div>
 
-                    {/* Scholarship (Moved here as requested) */}
+                    {/* Scholarship */}
                     <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-slate-700">Scholarship ($)</Label>
+                      <Label className="text-[11px] font-bold text-slate-700">Scholarship ($)</Label>
                       <Input
                         type="number"
                         step="any"
                         value={formData.scholarship}
                         onChange={(e) => handleFeeChange('scholarship', e.target.value)}
                         placeholder="0.00"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-indigo-700 font-semibold rounded-lg font-mono"
+                        className="h-9 text-xs bg-white border-slate-200 text-indigo-700 font-bold rounded-xl font-mono shadow-2xs"
                       />
                     </div>
 
                     {/* Total Fee (Auto-Calculated) */}
-                    <div className="space-y-1">
+                    <div className="space-y-1 sm:col-span-2">
                       <div className="flex items-center justify-between">
-                        <Label className="text-[11px] font-bold text-slate-900">Total Fee ($)</Label>
-                        <span className="text-[9px] text-cyan-700 font-bold">Auto</span>
+                        <Label className="text-[11px] font-extrabold text-emerald-900">Total Fee ($)</Label>
+                        <span className="text-[9.5px] text-emerald-700 font-extrabold">Auto calculated</span>
                       </div>
                       <Input
                         type="number"
@@ -542,71 +552,84 @@ export default function AddReportEntryModal({
                           handleChange('total_fee', e.target.value)
                         }}
                         placeholder="0.00"
-                        className="h-8.5 text-xs bg-emerald-50 border-emerald-300 text-emerald-900 font-bold rounded-lg font-mono"
+                        className="h-9 text-xs bg-emerald-50/80 border-emerald-300 text-emerald-950 font-extrabold rounded-xl font-mono shadow-2xs"
                       />
                     </div>
 
-                    {/* Paid Amount */}
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-slate-700">Paid Amount ($)</Label>
+                    {/* Initial Payment ($) - previously Paid Amount */}
+                    <div className="space-y-1 sm:col-span-1">
+                      <Label className="text-[11px] font-bold text-slate-700">Initial Payment ($)</Label>
                       <Input
                         type="number"
                         step="any"
                         value={formData.paid_amount}
                         onChange={(e) => handleChange('paid_amount', e.target.value)}
                         placeholder="0.00"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 rounded-lg font-mono font-semibold text-emerald-700"
+                        className="h-9 text-xs bg-white border-slate-200 text-emerald-700 font-extrabold rounded-xl font-mono shadow-2xs"
+                      />
+                    </div>
+
+                    {/* Total Paid ($) - New Field */}
+                    <div className="space-y-1 sm:col-span-1">
+                      <Label className="text-[11px] font-bold text-slate-700">Total Paid ($)</Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        value={formData.total_paid}
+                        onChange={(e) => handleChange('total_paid', e.target.value)}
+                        placeholder="0.00"
+                        className="h-9 text-xs bg-white border-slate-200 text-teal-700 font-extrabold rounded-xl font-mono shadow-2xs"
                       />
                     </div>
 
                     {/* Pending Invoice */}
                     <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-slate-700">Pending Inv</Label>
+                      <Label className="text-[11px] font-bold text-slate-700">Pending Inv</Label>
                       <Input
                         value={formData.pending_invoice}
                         onChange={(e) => handleChange('pending_invoice', e.target.value)}
                         placeholder="e.g. 1"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 rounded-lg"
+                        className="h-9 text-xs bg-white border-slate-200 text-rose-700 font-bold rounded-xl shadow-2xs"
                       />
                     </div>
 
                     {/* Pending Amount */}
                     <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-slate-700">Pending Amt ($)</Label>
+                      <Label className="text-[11px] font-bold text-slate-700">Pending Amt ($)</Label>
                       <Input
                         type="number"
                         step="any"
                         value={formData.pending_amount}
                         onChange={(e) => handleChange('pending_amount', e.target.value)}
                         placeholder="0.00"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-amber-700 font-bold rounded-lg font-mono"
+                        className="h-9 text-xs bg-white border-slate-200 text-amber-600 font-extrabold rounded-xl font-mono shadow-2xs"
                       />
                     </div>
 
                     {/* Yet to Raised */}
                     <div className="space-y-1 sm:col-span-2">
-                      <Label className="text-[11px] font-semibold text-slate-700">Yet to Raised</Label>
+                      <Label className="text-[11px] font-bold text-slate-700">Yet to Raised</Label>
                       <Input
                         value={formData.yet_to_raised}
                         onChange={(e) => handleChange('yet_to_raised', e.target.value)}
                         placeholder="e.g. 8100"
-                        className="h-8.5 text-xs bg-white border-slate-200 text-slate-900 rounded-lg font-mono"
+                        className="h-9 text-xs bg-white border-slate-200 text-emerald-800 font-bold rounded-xl font-mono shadow-2xs"
                       />
                     </div>
                   </div>
 
                   {/* Payment Plan Status: Pending & Raised */}
-                  <div className="pt-2 border-t border-slate-200/80">
-                    <Label className="text-xs font-semibold text-slate-700">Payment Plan Status</Label>
+                  <div className="pt-3 border-t border-slate-100">
+                    <Label className="text-xs font-bold text-slate-700">Payment Plan Status</Label>
                     <div className="grid grid-cols-2 gap-2 mt-1.5">
                       {['Pending', 'Raised'].map((st) => (
                         <button
                           type="button"
                           key={st}
                           onClick={() => handleChange('payment_status', st)}
-                          className={`py-1.5 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                          className={`py-2 px-3 rounded-xl border text-xs font-extrabold transition-all cursor-pointer ${
                             formData.payment_status === st
-                              ? 'bg-[#003D5C] text-white border-[#003D5C] shadow-xs'
+                              ? 'bg-[#003D5C] text-white border-[#003D5C] shadow-sm'
                               : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                           }`}
                         >
@@ -618,9 +641,9 @@ export default function AddReportEntryModal({
                 </div>
 
                 {/* 4. Remarks & Notes */}
-                <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200/90 space-y-2">
-                  <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                    <FileText className="size-4 text-slate-600" />
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+                  <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <FileText className="size-4 text-slate-500" />
                     <span>Remarks & Notes</span>
                   </Label>
                   <textarea
@@ -628,7 +651,7 @@ export default function AddReportEntryModal({
                     onChange={(e) => handleChange('remarks', e.target.value)}
                     placeholder="Enter notes, payment installments breakdown or agent remarks..."
                     rows={3}
-                    className="w-full text-xs p-2.5 bg-white border border-slate-200 text-slate-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg resize-none"
+                    className="w-full text-xs p-3 bg-white border border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl resize-none shadow-2xs font-medium"
                   />
                 </div>
               </div>
@@ -636,13 +659,13 @@ export default function AddReportEntryModal({
           </div>
 
           {/* Modal Footer Actions */}
-          <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+          <div className="p-4.5 bg-white border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={isSubmitting}
-              className="border-slate-200 bg-white text-slate-700 hover:bg-slate-100 h-9 px-4 rounded-xl text-xs font-semibold"
+              className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 h-10 px-5 rounded-xl text-xs font-bold cursor-pointer"
             >
               Cancel
             </Button>
@@ -650,7 +673,7 @@ export default function AddReportEntryModal({
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="bg-[#003D5C] hover:bg-[#002b42] text-white font-bold h-9 px-5 rounded-xl text-xs gap-2 shadow-sm transition-all cursor-pointer"
+              className="bg-[#003D5C] hover:bg-[#002b42] text-white font-bold h-10 px-6 rounded-xl text-xs gap-2 shadow-sm transition-all cursor-pointer border border-cyan-500/20"
             >
               {isSubmitting ? (
                 <>

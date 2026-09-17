@@ -628,6 +628,7 @@ CREATE TABLE IF NOT EXISTS public.aimt_report_records (
     tuition_fee NUMERIC(14, 2) DEFAULT 0.00,
     total_fee NUMERIC(14, 2) DEFAULT 0.00,
     paid_amount NUMERIC(14, 2) DEFAULT 0.00,
+    total_paid NUMERIC(14, 2) DEFAULT 0.00,
     coe_issued_date VARCHAR(100),
     email_id VARCHAR(255),
     phone_no VARCHAR(100),
