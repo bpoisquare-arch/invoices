@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   CreditCard,
   Sparkles,
+  MessageSquare,
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/lib/supabase/database.types'
 
@@ -299,13 +300,25 @@ export default function ReportRecordDetailModal({
             </div>
           </div>
 
-          {/* Remarks */}
+          {/* Installment BreakUp */}
           {record.remarks && (
             <div className="p-4.5 rounded-2xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 space-y-1 shadow-2xs">
               <span className="font-extrabold flex items-center gap-1.5 text-amber-800">
-                <FileText className="size-4" /> Remarks / Ledger Notes:
+                <FileText className="size-4" /> Installment BreakUp:
               </span>
               <p className="whitespace-pre-wrap font-medium">{record.remarks}</p>
+            </div>
+          )}
+
+          {/* Follow-up */}
+          {Boolean((record as any).follow_up || (record.extra_data as any)?.follow_up) && (
+            <div className="p-4.5 rounded-2xl bg-cyan-50/90 border border-cyan-200 text-xs text-[#003D5C] space-y-1 shadow-2xs">
+              <span className="font-extrabold flex items-center gap-1.5 text-[#009D9E]">
+                <MessageSquare className="size-4" /> Follow-up:
+              </span>
+              <p className="whitespace-pre-wrap font-medium">
+                {String((record as any).follow_up || (record.extra_data as any)?.follow_up || '')}
+              </p>
             </div>
           )}
         </div>

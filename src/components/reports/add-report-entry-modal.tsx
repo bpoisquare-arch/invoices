@@ -33,6 +33,7 @@ import {
   Edit,
   Sparkles,
   BookOpen,
+  MessageSquare,
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/lib/supabase/database.types'
 
@@ -63,6 +64,7 @@ export default function AddReportEntryModal({
     pending_amount: '',
     yet_to_raised: '',
     remarks: '',
+    follow_up: '',
     dob: '',
     document: '',
     status: 'Current',
@@ -96,6 +98,12 @@ export default function AddReportEntryModal({
           ? String((editRecord.extra_data as any).total_paid)
           : ''
 
+        const followUpVal = (editRecord as any).follow_up !== undefined && (editRecord as any).follow_up !== null
+          ? String((editRecord as any).follow_up)
+          : (editRecord.extra_data as any)?.follow_up !== undefined
+          ? String((editRecord.extra_data as any).follow_up)
+          : ''
+
         setFormData({
           student_name: editRecord.student_name || '',
           student_id: editRecord.student_id || '',
@@ -105,6 +113,7 @@ export default function AddReportEntryModal({
           pending_amount: editRecord.pending_amount ? String(editRecord.pending_amount) : '',
           yet_to_raised: editRecord.yet_to_raised || '',
           remarks: editRecord.remarks || '',
+          follow_up: followUpVal,
           dob: editRecord.dob || '',
           document: editRecord.document ? (editRecord.document.toLowerCase().includes('coe') ? 'CoE' : editRecord.document.toLowerCase().includes('voe') ? 'VoE' : editRecord.document.toLowerCase().includes('offer') ? 'Offer Letter' : editRecord.document) : '',
           status: editRecord.status || 'Current',
@@ -133,6 +142,7 @@ export default function AddReportEntryModal({
           pending_amount: '',
           yet_to_raised: '',
           remarks: '',
+          follow_up: '',
           dob: '',
           document: '',
           status: 'Current',
@@ -636,16 +646,31 @@ export default function AddReportEntryModal({
                   </div>
                 </div>
 
-                {/* 4. Remarks & Notes */}
+                {/* 4. Installment BreakUp */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
                   <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <FileText className="size-4 text-slate-500" />
-                    <span>Remarks & Notes</span>
+                    <span>Installment BreakUp</span>
                   </Label>
                   <textarea
                     value={formData.remarks}
                     onChange={(e) => handleChange('remarks', e.target.value)}
-                    placeholder="Enter notes, payment installments breakdown or agent remarks..."
+                    placeholder="Enter notes, payment installments breakdown or schedule..."
+                    rows={3}
+                    className="w-full text-xs p-3 bg-white border border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl resize-none shadow-2xs font-medium"
+                  />
+                </div>
+
+                {/* 5. Follow-up */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+                  <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <MessageSquare className="size-4 text-[#009D9E]" />
+                    <span>Follow-up</span>
+                  </Label>
+                  <textarea
+                    value={formData.follow_up}
+                    onChange={(e) => handleChange('follow_up', e.target.value)}
+                    placeholder="Enter follow-up notes, student call history, discussion updates or reminders..."
                     rows={3}
                     className="w-full text-xs p-3 bg-white border border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl resize-none shadow-2xs font-medium"
                   />

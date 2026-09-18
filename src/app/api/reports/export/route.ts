@@ -49,7 +49,8 @@ export async function POST(request: NextRequest) {
         'Payment Plan Status': r.payment_status || 'Pending',
         'Email ID': r.email_id || '-',
         'Phone No': r.phone_no || '-',
-        'Remarks': r.remarks || '-',
+        'Installment BreakUp': r.remarks || '-',
+        'Follow-up': (r as any).follow_up || (r.extra_data as any)?.follow_up || '-',
       }
     })
 

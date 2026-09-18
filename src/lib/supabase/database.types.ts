@@ -843,6 +843,7 @@ export interface Database {
           paid_amount: number
           total_paid?: number | null
           initial_payment?: number | null
+          follow_up?: string | null
           coe_issued_date: string | null
           email_id: string | null
           phone_no: string | null
@@ -875,6 +876,7 @@ export interface Database {
           paid_amount?: number
           total_paid?: number | null
           initial_payment?: number | null
+          follow_up?: string | null
           coe_issued_date?: string | null
           email_id?: string | null
           phone_no?: string | null
@@ -907,6 +909,7 @@ export interface Database {
           paid_amount?: number
           total_paid?: number | null
           initial_payment?: number | null
+          follow_up?: string | null
           coe_issued_date?: string | null
           email_id?: string | null
           phone_no?: string | null

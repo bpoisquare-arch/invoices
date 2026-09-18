@@ -103,6 +103,7 @@ export interface ParsedStudentRow {
   total_fee: number
   paid_amount: number
   total_paid?: number
+  follow_up?: string | null
   coe_issued_date: string | null
   email_id: string | null
   phone_no: string | null
@@ -231,7 +232,8 @@ export function parseStudentReportExcel(buffer: ArrayBuffer | Buffer, fileName: 
     pending_invoice: findColIndex(['pending invoice', 'pending invoices', 'pending inv', 'inv pending', 'invoice pending', 'pending inv count']),
     pending_amount: findColIndex(['pending amount', 'amount pending', 'pending balance', 'pending amt', 'due amount', 'balance due', 'pending ($)']),
     yet_to_raised: findColIndex(['yet to raised', 'yet to be raised', 'yet to raise', 'unraised', 'yet raised', 'yet to issue', 'unraised amount']),
-    remarks: findColIndex(['remarks', 'remark', 'comments', 'comment', 'notes', 'note']),
+    remarks: findColIndex(['installment breakup', 'installment break up', 'installment breakdown', 'breakup', 'remarks', 'remark', 'comments', 'comment', 'notes', 'note']),
+    follow_up: findColIndex(['follow-up', 'follow up', 'followup', 'follow up notes', 'follow up status', 'follow up note']),
     dob: findColIndex(['dob', 'date of birth', 'birth date', 'birthdate', 'd.o.b']),
     document: findColIndex(['document type', 'document', 'documents', 'doc status', 'coe status', 'doc type', 'doc']),
     status: findColIndex(['student id status', 'student status', 'enrollment status', 'status']),
@@ -289,6 +291,11 @@ export function parseStudentReportExcel(buffer: ArrayBuffer | Buffer, fileName: 
     const totalPaidNum = colMap.total_paid !== -1 ? cleanNumber(row[colMap.total_paid]) : (cleanNumber(extraData['Total Paid']) || cleanNumber(extraData['Total Paid ($)']) || 0)
     extraData['total_paid'] = totalPaidNum
 
+    const followUpVal = colMap.follow_up !== -1 ? cleanString(row[colMap.follow_up]) : (cleanString(extraData['Follow-up']) || cleanString(extraData['Follow up']) || cleanString(extraData['follow_up']) || '')
+    if (followUpVal) {
+      extraData['follow_up'] = followUpVal
+    }
+
     parsedRecords.push({
       sr_no: srNoVal > 0 ? srNoVal : r - headerRowIndex,
       student_name: finalStudentName,
@@ -299,6 +306,7 @@ export function parseStudentReportExcel(buffer: ArrayBuffer | Buffer, fileName: 
       pending_amount: pendingAmount,
       yet_to_raised: yetToRaisedRaw || null,
       remarks: colMap.remarks !== -1 ? cleanString(row[colMap.remarks]) || null : null,
+      follow_up: followUpVal || null,
       dob: colMap.dob !== -1 ? formatExcelDate(row[colMap.dob]) || null : null,
       document: colMap.document !== -1 ? normalizeDocumentType(row[colMap.document]) || null : null,
       status: colMap.status !== -1 ? cleanString(row[colMap.status]) || null : null,
@@ -915,6 +923,7 @@ export async function getReportRecords(params: {
       ...r,
       total_paid: r.total_paid !== undefined && r.total_paid !== null ? Number(r.total_paid) : (r.extra_data?.total_paid !== undefined ? Number(r.extra_data.total_paid) : 0),
       paid_amount: r.paid_amount !== undefined && r.paid_amount !== null ? Number(r.paid_amount) : 0,
+      follow_up: r.follow_up !== undefined && r.follow_up !== null ? r.follow_up : (r.extra_data?.follow_up || null),
     }))
 
     return {
@@ -1173,6 +1182,7 @@ export async function createReportRecord(params: {
   paid_amount?: number | string | null
   total_paid?: number | string | null
   initial_payment?: number | string | null
+  follow_up?: string | null
   coe_issued_date?: string | null
   email_id?: string | null
   phone_no?: string | null
@@ -1221,6 +1231,7 @@ export async function createReportRecord(params: {
 
   const paidAmountNum = cleanNumber(params.paid_amount || params.initial_payment)
   const totalPaidNum = cleanNumber(params.total_paid)
+  const followUpVal = cleanString(params.follow_up) || null
 
   // Find highest Sr No in Supabase
   let nextSrNo = 1
@@ -1243,6 +1254,7 @@ export async function createReportRecord(params: {
     ...(params.extra_data || {}),
     total_paid: totalPaidNum,
     initial_payment: paidAmountNum,
+    follow_up: followUpVal,
   }
 
   const recordPayload: AimtReportRecord = {
@@ -1257,6 +1269,7 @@ export async function createReportRecord(params: {
     pending_amount: pendingAmountNum,
     yet_to_raised: yetToRaisedVal || null,
     remarks: cleanString(params.remarks) || null,
+    follow_up: followUpVal,
     dob: cleanString(params.dob) || null,
     document: normalizeDocumentType(params.document) || null,
     status: cleanString(params.status) || 'Current',
@@ -1281,7 +1294,7 @@ export async function createReportRecord(params: {
   // 1. Insert into Supabase (Live Database Server)
   let savedRecord = recordPayload
   try {
-    const { initial_payment, total_paid, ...dbPayload } = recordPayload as any
+    const { initial_payment, total_paid, follow_up, ...dbPayload } = recordPayload as any
     const { data, error } = await supabase
       .from('aimt_report_records')
       .insert(dbPayload)
@@ -1294,7 +1307,11 @@ export async function createReportRecord(params: {
     }
 
     if (data) {
-      savedRecord = data as AimtReportRecord
+      savedRecord = {
+        ...data,
+        total_paid: totalPaidNum,
+        follow_up: followUpVal,
+      } as AimtReportRecord
       // Update batch totals in Supabase
       try {
         const { data: allRows } = await supabase
@@ -1373,11 +1390,13 @@ export async function updateReportRecord(
       ...((cleanedUpdates.extra_data as Record<string, any>) || {}),
       ...(updates.total_paid !== undefined ? { total_paid: cleanNumber(updates.total_paid) } : {}),
       ...(updates.initial_payment !== undefined || updates.paid_amount !== undefined ? { initial_payment: cleanNumber(updates.paid_amount ?? updates.initial_payment) } : {}),
+      ...(updates.follow_up !== undefined ? { follow_up: cleanString(updates.follow_up) || null } : {}),
     }
 
     cleanedUpdates.extra_data = mergedExtraData
     delete cleanedUpdates.initial_payment
     delete cleanedUpdates.total_paid
+    delete cleanedUpdates.follow_up
 
     const { data, error } = await supabase
       .from('aimt_report_records')
@@ -1392,7 +1411,11 @@ export async function updateReportRecord(
     }
 
     if (data) {
-      updatedRecord = data as AimtReportRecord
+      updatedRecord = {
+        ...data,
+        total_paid: data.total_paid !== undefined && data.total_paid !== null ? Number(data.total_paid) : (mergedExtraData.total_paid || 0),
+        follow_up: data.follow_up !== undefined && data.follow_up !== null ? data.follow_up : (mergedExtraData.follow_up || null),
+      } as AimtReportRecord
       const importId = updatedRecord.import_id
       if (importId) {
         // Recalculate batch totals in Supabase
