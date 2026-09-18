@@ -17,7 +17,9 @@ async function getSupabase() {
 // Clean and normalize strings
 function cleanString(val: any): string {
   if (val === null || val === undefined) return ''
-  return String(val).trim()
+  const str = String(val).trim()
+  if (str === 'null' || str === 'undefined') return ''
+  return str
 }
 
 // Clean and parse monetary / numeric values
@@ -919,12 +921,20 @@ export async function getReportRecords(params: {
       })
     }
 
-    const formattedRecords: AimtReportRecord[] = (data || []).map((r: any) => ({
-      ...r,
-      total_paid: r.total_paid !== undefined && r.total_paid !== null ? Number(r.total_paid) : (r.extra_data?.total_paid !== undefined ? Number(r.extra_data.total_paid) : 0),
-      paid_amount: r.paid_amount !== undefined && r.paid_amount !== null ? Number(r.paid_amount) : 0,
-      follow_up: r.follow_up !== undefined && r.follow_up !== null ? r.follow_up : (r.extra_data?.follow_up || null),
-    }))
+    const formattedRecords: AimtReportRecord[] = (data || []).map((r: any) => {
+      const rawFollowUp = r.follow_up !== undefined && r.follow_up !== null ? r.follow_up : r.extra_data?.follow_up
+      const safeFollowUp =
+        rawFollowUp && String(rawFollowUp).trim() !== 'null' && String(rawFollowUp).trim() !== 'undefined'
+          ? String(rawFollowUp).trim()
+          : null
+
+      return {
+        ...r,
+        total_paid: r.total_paid !== undefined && r.total_paid !== null ? Number(r.total_paid) : (r.extra_data?.total_paid !== undefined ? Number(r.extra_data.total_paid) : 0),
+        paid_amount: r.paid_amount !== undefined && r.paid_amount !== null ? Number(r.paid_amount) : 0,
+        follow_up: safeFollowUp,
+      }
+    })
 
     return {
       records: formattedRecords,

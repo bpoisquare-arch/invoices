@@ -311,16 +311,22 @@ export default function ReportRecordDetailModal({
           )}
 
           {/* Follow-up */}
-          {Boolean((record as any).follow_up || (record.extra_data as any)?.follow_up) && (
-            <div className="p-4.5 rounded-2xl bg-cyan-50/90 border border-cyan-200 text-xs text-[#003D5C] space-y-1 shadow-2xs">
-              <span className="font-extrabold flex items-center gap-1.5 text-[#009D9E]">
-                <MessageSquare className="size-4" /> Follow-up:
-              </span>
-              <p className="whitespace-pre-wrap font-medium">
-                {String((record as any).follow_up || (record.extra_data as any)?.follow_up || '')}
-              </p>
-            </div>
-          )}
+          {(() => {
+            const rawFollowUp = (record as any).follow_up ?? (record.extra_data as any)?.follow_up
+            const safeFollowUp =
+              rawFollowUp && String(rawFollowUp).trim() !== 'null' && String(rawFollowUp).trim() !== 'undefined'
+                ? String(rawFollowUp).trim()
+                : null
+            if (!safeFollowUp) return null
+            return (
+              <div className="p-4.5 rounded-2xl bg-cyan-50/90 border border-cyan-200 text-xs text-[#003D5C] space-y-1 shadow-2xs">
+                <span className="font-extrabold flex items-center gap-1.5 text-[#009D9E]">
+                  <MessageSquare className="size-4" /> Follow-up:
+                </span>
+                <p className="whitespace-pre-wrap font-medium">{safeFollowUp}</p>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Footer */}

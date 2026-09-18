@@ -98,11 +98,26 @@ export default function AddReportEntryModal({
           ? String((editRecord.extra_data as any).total_paid)
           : ''
 
-        const followUpVal = (editRecord as any).follow_up !== undefined && (editRecord as any).follow_up !== null
-          ? String((editRecord as any).follow_up)
-          : (editRecord.extra_data as any)?.follow_up !== undefined
-          ? String((editRecord.extra_data as any).follow_up)
-          : ''
+        const rawFollowUp = (editRecord as any).follow_up !== undefined && (editRecord as any).follow_up !== null
+          ? (editRecord as any).follow_up
+          : (editRecord.extra_data as any)?.follow_up
+
+        const followUpVal =
+          rawFollowUp !== null &&
+          rawFollowUp !== undefined &&
+          String(rawFollowUp).trim() !== 'null' &&
+          String(rawFollowUp).trim() !== 'undefined'
+            ? String(rawFollowUp).trim()
+            : ''
+
+        const rawRemarks = editRecord.remarks
+        const remarksVal =
+          rawRemarks !== null &&
+          rawRemarks !== undefined &&
+          String(rawRemarks).trim() !== 'null' &&
+          String(rawRemarks).trim() !== 'undefined'
+            ? String(rawRemarks)
+            : ''
 
         setFormData({
           student_name: editRecord.student_name || '',
@@ -112,7 +127,7 @@ export default function AddReportEntryModal({
           pending_invoice: editRecord.pending_invoice || '',
           pending_amount: editRecord.pending_amount ? String(editRecord.pending_amount) : '',
           yet_to_raised: editRecord.yet_to_raised || '',
-          remarks: editRecord.remarks || '',
+          remarks: remarksVal,
           follow_up: followUpVal,
           dob: editRecord.dob || '',
           document: editRecord.document ? (editRecord.document.toLowerCase().includes('coe') ? 'CoE' : editRecord.document.toLowerCase().includes('voe') ? 'VoE' : editRecord.document.toLowerCase().includes('offer') ? 'Offer Letter' : editRecord.document) : '',
