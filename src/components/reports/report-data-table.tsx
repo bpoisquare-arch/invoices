@@ -66,7 +66,7 @@ interface ReportDataTableProps {
   onFilteredRecordsChange?: (filtered: AimtReportRecord[]) => void
 }
 
-type SortField = 'sr_no' | 'student_name' | 'pending_invoice' | 'pending_amount' | 'yet_to_raised' | 'course' | 'intake' | 'end_date'
+type SortField = 'student_name' | 'pending_invoice' | 'pending_amount' | 'yet_to_raised' | 'course' | 'intake' | 'end_date'
 type SortOrder = 'asc' | 'desc'
 
 function parseDateValue(val: string | null | undefined): number {
@@ -116,7 +116,7 @@ export default function ReportDataTable({
   const [selectedDocument, setSelectedDocument] = useState<string>('all')
 
   // Sorting State
-  const [sortField, setSortField] = useState<SortField>('sr_no')
+  const [sortField, setSortField] = useState<SortField>('student_name')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
 
   // Pagination State
@@ -206,7 +206,7 @@ export default function ReportDataTable({
       let aVal: any = a[sortField] ?? ''
       let bVal: any = b[sortField] ?? ''
 
-      if (sortField === 'pending_amount' || sortField === 'sr_no') {
+      if (sortField === 'pending_amount') {
         aVal = Number(aVal) || 0
         bVal = Number(bVal) || 0
         return sortOrder === 'asc' ? aVal - bVal : bVal - aVal
@@ -488,7 +488,7 @@ export default function ReportDataTable({
       <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            {/* Table Header: Exactly SR NO, STUDENT NAME, PENDING INV, PENDING AMOUNT, YET TO RAISED, COURSE, INTAKE DATE, END DATE, Actions */}
+            {/* Table Header: Exactly STUDENT NAME, PENDING INV, PENDING AMOUNT, YET TO RAISED, COURSE, INTAKE DATE, END DATE, Actions */}
             <thead>
               <tr className="bg-[#002D42] text-white text-[11px] font-bold uppercase tracking-wider select-none border-b border-[#002D42]">
                 {/* Checkbox Header */}
@@ -501,27 +501,7 @@ export default function ReportDataTable({
                   />
                 </th>
 
-                {/* 1. Sr No */}
-                <th
-                  onClick={() => toggleSort('sr_no')}
-                  className="p-3.5 w-16 cursor-pointer hover:text-cyan-300 transition-colors group select-none"
-                  title="Sort by Serial Number"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span>Sr No</span>
-                    {sortField === 'sr_no' ? (
-                      sortOrder === 'asc' ? (
-                        <ArrowUp className="size-3.5 text-cyan-300 stroke-[2.5]" />
-                      ) : (
-                        <ArrowDown className="size-3.5 text-cyan-300 stroke-[2.5]" />
-                      )
-                    ) : (
-                      <ArrowUpDown className="size-3 text-cyan-400/40 group-hover:text-cyan-300" />
-                    )}
-                  </div>
-                </th>
-
-                {/* 2. Student Name */}
+                {/* 1. Student Name */}
                 <th
                   onClick={() => toggleSort('student_name')}
                   className="p-3.5 min-w-[200px] cursor-pointer hover:text-cyan-300 transition-colors group select-none"
@@ -541,7 +521,7 @@ export default function ReportDataTable({
                   </div>
                 </th>
 
-                {/* 3. Pending Invoice */}
+                {/* 2. Pending Invoice */}
                 <th
                   onClick={() => toggleSort('pending_invoice')}
                   className="p-3.5 w-28 text-center cursor-pointer hover:text-cyan-300 transition-colors group select-none"
@@ -561,7 +541,7 @@ export default function ReportDataTable({
                   </div>
                 </th>
 
-                {/* 4. Pending Amount */}
+                {/* 3. Pending Amount */}
                 <th
                   onClick={() => toggleSort('pending_amount')}
                   className="p-3.5 min-w-[130px] text-right cursor-pointer hover:text-cyan-300 transition-colors group select-none font-mono"
@@ -581,7 +561,7 @@ export default function ReportDataTable({
                   </div>
                 </th>
 
-                {/* 5. Yet to Raised */}
+                {/* 4. Yet to Raised */}
                 <th
                   onClick={() => toggleSort('yet_to_raised')}
                   className="p-3.5 min-w-[120px] text-center cursor-pointer hover:text-cyan-300 transition-colors group select-none"
@@ -601,7 +581,7 @@ export default function ReportDataTable({
                   </div>
                 </th>
 
-                {/* 6. Course */}
+                {/* 5. Course */}
                 <th
                   onClick={() => toggleSort('course')}
                   className="p-3.5 min-w-[220px] cursor-pointer hover:text-cyan-300 transition-colors group select-none"
@@ -621,7 +601,7 @@ export default function ReportDataTable({
                   </div>
                 </th>
 
-                {/* 7. Intake Date */}
+                {/* 6. Intake Date */}
                 <th
                   onClick={() => toggleSort('intake')}
                   className="p-3.5 min-w-[120px] cursor-pointer hover:text-cyan-300 transition-colors group select-none"
@@ -641,7 +621,7 @@ export default function ReportDataTable({
                   </div>
                 </th>
 
-                {/* 8. Course End Date */}
+                {/* 7. Course End Date */}
                 <th
                   onClick={() => toggleSort('end_date')}
                   className="p-3.5 min-w-[130px] cursor-pointer hover:text-cyan-300 transition-colors group select-none"
@@ -670,7 +650,7 @@ export default function ReportDataTable({
             <tbody className="divide-y divide-slate-200/70 text-xs">
               {isLoading ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-16 text-slate-500">
+                  <td colSpan={9} className="text-center py-16 text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2.5">
                       <div className="size-7 border-3 border-[#009D9E] border-t-transparent rounded-full animate-spin" />
                       <span className="font-semibold text-slate-700">Loading student report records...</span>
@@ -679,7 +659,7 @@ export default function ReportDataTable({
                 </tr>
               ) : paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-16 text-slate-500">
+                  <td colSpan={9} className="text-center py-16 text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2.5">
                       <div className="size-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
                         <GraduationCap className="size-7" />
@@ -696,7 +676,6 @@ export default function ReportDataTable({
               ) : (
                 paginatedRecords.map((record, index) => {
                   const isSelected = selectedIds.includes(record.id)
-                  const srNoDisplay = record.sr_no || (currentPage - 1) * pageSize + index + 1
 
                   return (
                     <tr
@@ -723,12 +702,7 @@ export default function ReportDataTable({
                         />
                       </td>
 
-                      {/* 1. Sr No */}
-                      <td className="p-3.5 font-mono text-slate-600 text-xs font-bold">
-                        {srNoDisplay}
-                      </td>
-
-                      {/* 2. Student Name */}
+                      {/* 1. Student Name */}
                       <td className="p-3.5">
                         <div className="flex items-center gap-2.5">
                           <div className="size-8 rounded-full bg-gradient-to-br from-[#003D5C]/15 to-[#009D9E]/25 text-[#003D5C] font-extrabold text-xs flex items-center justify-center shrink-0 border border-cyan-500/20 shadow-2xs">

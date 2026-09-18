@@ -39,16 +39,59 @@ export default function StudentReportsPage() {
   const [editingRecord, setEditingRecord] = useState<AimtReportRecord | null>(null)
   const [detailModalRecord, setDetailModalRecord] = useState<AimtReportRecord | null>(null)
 
-  // Filtered records state for accurate export
+  // Filtered records state for accurate export & dynamic overview calculation
   const [filteredRecords, setFilteredRecords] = useState<AimtReportRecord[]>([])
 
-  // Summary Metrics State
-  const [stats, setStats] = useState({
-    totalStudents: 0,
-    totalPendingAmount: 0,
-    pendingInvoicesCount: 0,
-    totalYetToRaised: 0,
-  })
+  // Dynamically calculate overview stats from filteredRecords (or all records if unfiltered)
+  const activeStats = React.useMemo(() => {
+    if (records.length === 0) {
+      return {
+        totalStudents: 0,
+        totalPendingAmount: 0,
+        pendingInvoicesCount: 0,
+        totalYetToRaised: 0,
+      }
+    }
+
+    const currentList = filteredRecords
+
+    let totalPendingAmount = 0
+    let pendingInvoicesCount = 0
+    let totalYetToRaised = 0
+
+    currentList.forEach((r) => {
+      // Pending amount
+      const pAmt =
+        typeof r.pending_amount === 'number'
+          ? r.pending_amount
+          : parseFloat(String(r.pending_amount || '0').replace(/[^0-9.-]+/g, '')) || 0
+      totalPendingAmount += pAmt
+
+      // Pending invoices count
+      if (
+        r.pending_invoice &&
+        r.pending_invoice !== '-' &&
+        r.pending_invoice !== '0' &&
+        r.pending_invoice !== ''
+      ) {
+        pendingInvoicesCount++
+      }
+
+      // Yet to raised
+      const yAmt =
+        typeof r.yet_to_raised === 'number'
+          ? r.yet_to_raised
+          : parseFloat(String(r.yet_to_raised || '0').replace(/[^0-9.-]+/g, '')) || 0
+      totalYetToRaised += yAmt
+    })
+
+    return {
+      totalStudents: currentList.length,
+      totalPendingAmount: Math.round(totalPendingAmount * 100) / 100,
+      pendingInvoicesCount,
+      totalYetToRaised: Math.round(totalYetToRaised * 100) / 100,
+    }
+  }, [filteredRecords, records])
 
   // Fetch Live Database Report Records
   const fetchRecords = useCallback(async () => {
@@ -65,31 +108,9 @@ export default function StudentReportsPage() {
         setFilteredRecords(data.records)
         setAvailableAgents(data.availableAgents || [])
         setAvailableIntakes(data.availableIntakes || [])
-
-        // Count pending invoices
-        const pendingInvsCount = data.records.filter(
-          (r: AimtReportRecord) =>
-            r.pending_invoice &&
-            r.pending_invoice !== '-' &&
-            r.pending_invoice !== '0' &&
-            r.pending_invoice !== ''
-        ).length
-
-        setStats({
-          totalStudents: data.totalCount || data.records.length,
-          totalPendingAmount: data.totalPendingAmount || 0,
-          pendingInvoicesCount: pendingInvsCount,
-          totalYetToRaised: data.totalYetToRaised || 0,
-        })
       } else {
         setRecords([])
         setFilteredRecords([])
-        setStats({
-          totalStudents: 0,
-          totalPendingAmount: 0,
-          pendingInvoicesCount: 0,
-          totalYetToRaised: 0,
-        })
       }
     } catch (err) {
       console.error('Failed to load report records:', err)
@@ -239,12 +260,12 @@ export default function StudentReportsPage() {
         </div>
       </div>
 
-      {/* 2. Top Metrics / KPI Cards */}
+      {/* 2. Top Metrics / KPI Cards (Dynamically synced with filters) */}
       <ReportStatsCards
-        totalStudents={stats.totalStudents}
-        totalPendingAmount={stats.totalPendingAmount}
-        pendingInvoicesCount={stats.pendingInvoicesCount}
-        totalYetToRaised={stats.totalYetToRaised}
+        totalStudents={activeStats.totalStudents}
+        totalPendingAmount={activeStats.totalPendingAmount}
+        pendingInvoicesCount={activeStats.pendingInvoicesCount}
+        totalYetToRaised={activeStats.totalYetToRaised}
         selectedCount={selectedIds.length}
       />
 

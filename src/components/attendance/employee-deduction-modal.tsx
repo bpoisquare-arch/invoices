@@ -316,10 +316,10 @@ export default function EmployeeDeductionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-4xl bg-white border border-slate-200 shadow-2xl rounded-2xl p-4 sm:p-5 font-sans overflow-hidden">
+      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-4xl max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-2xl p-4 sm:p-5 font-sans flex flex-col overflow-y-auto">
         {/* Compact Header with Employee Info */}
         <DialogHeader className="border-b border-slate-100 pb-2.5">
-          <div className="flex items-center justify-between gap-3 pr-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 pr-6">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-[#131B2E] text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
                 {employee.name?.charAt(0)?.toUpperCase() || 'E'}
@@ -336,7 +336,7 @@ export default function EmployeeDeductionModal({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
                 Base: <strong className="font-mono text-slate-900">{baseSalary > 0 ? `PKR ${baseSalary.toLocaleString()}` : 'Not Set'}</strong>
               </span>
@@ -416,7 +416,7 @@ export default function EmployeeDeductionModal({
               </div>
 
               {/* Amount & Note/Type */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-[10px] font-bold text-slate-600 uppercase">
                     Amount (PKR) *
@@ -453,16 +453,16 @@ export default function EmployeeDeductionModal({
               </div>
 
               {/* Compact Live Calculation Banner */}
-              <div className="bg-white border border-rose-200/80 rounded-lg p-2 flex items-center justify-between gap-2 text-xs shadow-2xs">
-                <div className="flex items-center gap-1.5 min-w-0">
+              <div className="bg-white border border-rose-200/80 rounded-lg p-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 sm:gap-2 text-xs shadow-2xs">
+                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                   <span className="text-[10px] font-bold px-1.5 py-0.5 bg-rose-100 text-rose-900 border border-rose-300 rounded shrink-0 font-mono">
                     {currentSelectedLabel}
                   </span>
-                  <span className="text-[11px] text-slate-600 truncate">
+                  <span className="text-[11px] text-slate-600">
                     Base <strong className="text-slate-900 font-bold">{baseSalary.toLocaleString()}</strong> - Ded <strong className="text-rose-800 font-bold">-{numAmount.toLocaleString()}</strong>
                   </span>
                 </div>
-                <div className="flex items-center gap-1 font-bold shrink-0">
+                <div className="flex items-center gap-1 font-bold shrink-0 self-end sm:self-auto">
                   <span className="text-[10px] text-slate-400">Total:</span>
                   <span className="text-emerald-700 text-xs font-mono font-extrabold">
                     PKR {totalAfterDeduction.toLocaleString()}
@@ -472,11 +472,11 @@ export default function EmployeeDeductionModal({
             </div>
 
             {/* Save Button */}
-            <div className="pt-1 flex items-center justify-end">
+            <div className="pt-2 flex items-center justify-end">
               <Button
                 type="submit"
                 disabled={isSaving}
-                className="w-full sm:w-auto h-8 px-4 bg-black hover:bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider gap-1.5 shadow-sm cursor-pointer"
+                className="w-full sm:w-auto h-8 px-4 bg-black hover:bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider gap-1.5 shadow-sm cursor-pointer justify-center"
               >
                 {isSaving ? (
                   <>

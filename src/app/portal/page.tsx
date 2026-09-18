@@ -135,8 +135,8 @@ export default function EntityPortalPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-['Montserrat'] text-base sm:text-lg font-extrabold text-[#002D27] tracking-tight">
-                Client Management System
+              <h1 className="font-['Geist'] text-base sm:text-lg font-extrabold text-[#002D27] tracking-tight">
+                 Management Information System
               </h1>
               <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#00BF8F]/10 text-[#002D27] border border-[#00BF8F]/25">
                 ISquare BPO
@@ -185,7 +185,7 @@ export default function EntityPortalPage() {
               <Sparkles className="w-3.5 h-3.5 text-[#00BF8F]" />
               {isViewer ? 'Assigned Workspaces' : 'Enterprise Workspaces'}
             </span>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#002D27] tracking-tight font-['Montserrat']">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#002D27] tracking-tight font-['Geist']">
               Select Workspace
             </h2>
           </div>

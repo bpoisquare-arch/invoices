@@ -424,22 +424,22 @@ export default function EmployeeOverviewPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-full mx-auto font-sans">
+    <div className="space-y-4 sm:space-y-6 max-w-full mx-auto font-sans">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-['Montserrat'] text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="font-['Montserrat'] text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             Employees
           </h1>
-          <p className="text-sm text-slate-500 mt-1 font-medium">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 font-medium">
             Manage employees, branch assignments, salaries, and their attendance profiles.
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto">
+        <div className="flex items-stretch sm:items-center gap-2.5 sm:gap-3 flex-col sm:flex-row w-full sm:w-auto">
           <Link href="/attendance/import" className="w-full sm:w-auto">
             <Button
               variant="outline"
-              className="w-full sm:w-auto h-9 px-4 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold uppercase tracking-wider gap-2 shadow-2xs cursor-pointer transition-colors justify-center"
+              className="w-full sm:w-auto h-9 sm:h-9 px-4 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold uppercase tracking-wider gap-2 shadow-2xs cursor-pointer transition-colors justify-center"
             >
               <FileSpreadsheet className="w-4 h-4 text-[#009D9E]" />
               Upload Excel Files
@@ -457,7 +457,7 @@ export default function EmployeeOverviewPage() {
               setAddError(null)
               setAddWarning(null)
             }}
-            className="w-full sm:w-auto h-9 px-4 bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5 shadow-sm cursor-pointer transition-all justify-center"
+            className="w-full sm:w-auto h-9 sm:h-9 px-4 bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5 shadow-sm cursor-pointer transition-all justify-center"
           >
             <Plus className="w-4 h-4" />
             ADD EMPLOYEE
@@ -466,10 +466,10 @@ export default function EmployeeOverviewPage() {
       </div>
 
       {/* Search, Filter & Counter Bar */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="bg-white border border-slate-200/90 rounded-xl p-3 sm:p-4 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-3xl">
           {/* Search Input */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
             <Input
               type="text"
@@ -483,52 +483,55 @@ export default function EmployeeOverviewPage() {
             />
           </div>
 
-          {/* Branch Filter */}
-          <div className="w-full sm:w-44">
-            <Select
-              value={branchFilter}
-              onValueChange={(val) => {
-                setBranchFilter(val || 'all')
-                setPage(1)
-              }}
-            >
-              <SelectTrigger className="h-9 w-full text-xs border-slate-200 bg-white">
-                <SelectValue placeholder="All Branches" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Branches</SelectItem>
-                {allBranches.map((b) => (
-                  <SelectItem key={b} value={b}>
-                    {b}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Filters Container: 2 columns on mobile (<sm), flex on sm+ */}
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2.5 w-full sm:w-auto">
+            {/* Branch Filter */}
+            <div className="w-full sm:w-40 md:w-44">
+              <Select
+                value={branchFilter}
+                onValueChange={(val) => {
+                  setBranchFilter(val || 'all')
+                  setPage(1)
+                }}
+              >
+                <SelectTrigger className="h-9 w-full text-xs border-slate-200 bg-white">
+                  <SelectValue placeholder="All Branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Branches</SelectItem>
+                  {allBranches.map((b) => (
+                    <SelectItem key={b} value={b}>
+                      {b}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Status Filter */}
-          <div className="w-full sm:w-36">
-            <Select
-              value={statusFilter}
-              onValueChange={(val) => {
-                setStatusFilter(val || 'all')
-                setPage(1)
-              }}
-            >
-              <SelectTrigger className="h-9 w-full text-xs border-slate-200 bg-white">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active Only</SelectItem>
-                <SelectItem value="inactive">Inactive Only</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Status Filter */}
+            <div className="w-full sm:w-32 md:w-36">
+              <Select
+                value={statusFilter}
+                onValueChange={(val) => {
+                  setStatusFilter(val || 'all')
+                  setPage(1)
+                }}
+              >
+                <SelectTrigger className="h-9 w-full text-xs border-slate-200 bg-white">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active Only</SelectItem>
+                  <SelectItem value="inactive">Inactive Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
         {/* Counter Info */}
-        <div className="flex items-center gap-3 text-xs text-slate-500 font-semibold shrink-0 pt-1 lg:pt-0">
+        <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3 text-xs text-slate-500 font-semibold shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 flex-wrap">
           <span>Total Staff: <strong className="text-slate-900">{filteredEmployees.length}</strong></span>
           <span>•</span>
           <span>Active: <strong className="text-emerald-600">{filteredEmployees.filter((e) => e.is_active).length}</strong></span>
@@ -541,21 +544,22 @@ export default function EmployeeOverviewPage() {
         </div>
       </div>
 
-      {/* Data Table Card */}
+      {/* Main Data Container: Responsive Table on Tablet/Desktop (md+) + Card List on Mobile (<md) */}
       <div className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto w-full">
+        {/* Desktop & Tablet Table (Hidden on Mobile <md) */}
+        <div className="hidden md:block overflow-x-auto w-full">
           <Table className="w-full text-left text-xs min-w-[850px]">
             <TableHeader className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="py-3.5 px-4 font-bold text-slate-500">EMPLOYEE ID</TableHead>
+                <TableHead className="py-3.5 px-4 font-bold text-slate-500 whitespace-nowrap">EMPLOYEE ID</TableHead>
                 <TableHead className="py-3.5 px-4 font-bold text-slate-500">EMPLOYEE NAME</TableHead>
                 <TableHead className="py-3.5 px-4 font-bold text-slate-500">DESIGNATION</TableHead>
-                <TableHead className="py-3.5 px-3 text-center font-bold text-slate-500">BRANCH</TableHead>
-                <TableHead className="py-3.5 px-4 text-right font-bold text-slate-500">SALARY</TableHead>
-                <TableHead className="py-3.5 px-4 font-bold text-slate-500">ATTENDANCE</TableHead>
-                <TableHead className="py-3.5 px-3 text-center font-bold text-slate-500">STATUS</TableHead>
-                <TableHead className="py-3.5 px-4 font-bold text-slate-500">JOINING DATE</TableHead>
-                <TableHead className="py-3.5 px-4 text-right font-bold text-slate-500">ACTIONS</TableHead>
+                <TableHead className="py-3.5 px-3 text-center font-bold text-slate-500 whitespace-nowrap">BRANCH</TableHead>
+                <TableHead className="py-3.5 px-4 text-right font-bold text-slate-500 whitespace-nowrap">SALARY</TableHead>
+                <TableHead className="py-3.5 px-4 font-bold text-slate-500 whitespace-nowrap">ATTENDANCE</TableHead>
+                <TableHead className="py-3.5 px-3 text-center font-bold text-slate-500 whitespace-nowrap">STATUS</TableHead>
+                <TableHead className="py-3.5 px-4 font-bold text-slate-500 whitespace-nowrap">JOINING DATE</TableHead>
+                <TableHead className="py-3.5 px-4 text-right font-bold text-slate-500 whitespace-nowrap">ACTIONS</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-slate-100 text-slate-700">
@@ -581,7 +585,7 @@ export default function EmployeeOverviewPage() {
                   return (
                     <TableRow key={emp.id} className="hover:bg-slate-50/80 transition-colors group">
                       {/* Employee ID */}
-                      <TableCell className="py-4 px-4 font-mono font-bold text-xs text-slate-600">
+                      <TableCell className="py-4 px-4 font-mono font-bold text-xs text-slate-600 whitespace-nowrap">
                         {emp.employee_id}
                       </TableCell>
 
@@ -593,15 +597,15 @@ export default function EmployeeOverviewPage() {
                           >
                             {initial}
                           </div>
-                          <div className="flex flex-col">
+                          <div className="flex flex-col min-w-0">
                             <Link
                               href={`/attendance/employees/${emp.id}`}
-                              className="font-bold text-slate-900 hover:text-[#0058BE] transition-colors text-xs"
+                              className="font-bold text-slate-900 hover:text-[#0058BE] transition-colors text-xs truncate"
                             >
                               {emp.name}
                             </Link>
                             {emp.email && (
-                              <span className="text-[10px] text-slate-400 font-mono">
+                              <span className="text-[10px] text-slate-400 font-mono truncate">
                                 {emp.email}
                               </span>
                             )}
@@ -615,7 +619,7 @@ export default function EmployeeOverviewPage() {
                       </TableCell>
 
                       {/* Branch */}
-                      <TableCell className="py-4 px-3 text-center">
+                      <TableCell className="py-4 px-3 text-center whitespace-nowrap">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold ${getBranchBadgeClass(
                             branch
@@ -626,7 +630,7 @@ export default function EmployeeOverviewPage() {
                       </TableCell>
 
                       {/* Salary */}
-                      <TableCell className="py-4 px-4 text-right font-mono text-xs">
+                      <TableCell className="py-4 px-4 text-right font-mono text-xs whitespace-nowrap">
                         <div className="flex flex-col items-end gap-1">
                           <span className="font-bold text-slate-800">
                             {emp.salary ? `PKR ${Number(emp.salary).toLocaleString()}` : '—'}
@@ -644,7 +648,7 @@ export default function EmployeeOverviewPage() {
                       </TableCell>
 
                       {/* Attendance */}
-                      <TableCell className="py-4 px-4">
+                      <TableCell className="py-4 px-4 whitespace-nowrap">
                         <div className="flex flex-col items-start gap-1">
                           <Link
                             href={`/attendance/employees/${emp.id}`}
@@ -662,7 +666,7 @@ export default function EmployeeOverviewPage() {
                       </TableCell>
 
                       {/* Status */}
-                      <TableCell className="py-4 px-3 text-center">
+                      <TableCell className="py-4 px-3 text-center whitespace-nowrap">
                         <Badge
                           variant={emp.is_active ? 'success' : 'secondary'}
                           className="text-xs font-bold"
@@ -672,7 +676,7 @@ export default function EmployeeOverviewPage() {
                       </TableCell>
 
                       {/* Joining Date */}
-                      <TableCell className="py-4 px-4 text-slate-600 font-medium text-xs">
+                      <TableCell className="py-4 px-4 text-slate-600 font-medium text-xs whitespace-nowrap">
                         {emp.is_old_staff ? (
                           <Badge variant="warning" className="text-[11px] font-bold">
                             Old Staff
@@ -740,19 +744,193 @@ export default function EmployeeOverviewPage() {
           </Table>
         </div>
 
+        {/* Mobile Employee Cards List (Visible only on < md) */}
+        <div className="block md:hidden divide-y divide-slate-100">
+          {isLoading ? (
+            <div className="py-16 text-center text-slate-400">
+              <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#009D9E]" />
+              <span className="text-xs">Loading employees...</span>
+            </div>
+          ) : filteredEmployees.length === 0 ? (
+            <div className="py-16 text-center text-slate-400">
+              <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+              <span className="text-xs">No employees found matching your filters.</span>
+            </div>
+          ) : (
+            paginatedEmployees.map((emp) => {
+              const initial = emp.name.trim().charAt(0).toUpperCase() || 'E'
+              const avatarColor = getAvatarColor(emp.name)
+              const branch = emp.branch || 'Multan'
+              return (
+                <div key={emp.id} className="p-3.5 sm:p-4 space-y-3 hover:bg-slate-50/70 transition-colors">
+                  {/* Top: Avatar, Name, Email, ID & Dropdown Actions */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-9 h-9 rounded-full ${avatarColor} font-extrabold text-xs flex items-center justify-center shrink-0 shadow-2xs`}
+                      >
+                        {initial}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <Link
+                          href={`/attendance/employees/${emp.id}`}
+                          className="font-bold text-slate-900 hover:text-[#0058BE] transition-colors text-sm truncate"
+                        >
+                          {emp.name}
+                        </Link>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span className="font-mono font-bold text-[10px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                            {emp.employee_id}
+                          </span>
+                          {emp.email && (
+                            <span className="text-[10px] text-slate-400 font-mono truncate max-w-[140px] sm:max-w-xs">
+                              {emp.email}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Top Right: Status Badge & Dropdown Actions Menu */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge
+                        variant={emp.is_active ? 'success' : 'secondary'}
+                        className="text-[10px] font-bold px-1.5 py-0.5"
+                      >
+                        {emp.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors shadow-2xs cursor-pointer focus:outline-none">
+                          <MoreHorizontal className="w-4 h-4" />
+                          <span className="sr-only">Actions</span>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 shadow-lg rounded-xl p-1 text-xs">
+                          <DropdownMenuItem
+                            onClick={() => setSelectedCommissionEmployee(emp)}
+                            className="flex items-center gap-2 px-2.5 py-2 text-amber-800 hover:bg-amber-50 hover:text-amber-950 rounded-lg cursor-pointer font-medium transition-colors"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Commission</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setSelectedDeductionEmployee(emp)}
+                            className="flex items-center gap-2 px-2.5 py-2 text-rose-800 hover:bg-rose-50 hover:text-rose-950 rounded-lg cursor-pointer font-medium transition-colors"
+                          >
+                            <FileMinus className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Deduction</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setSelectedAdjustmentEmployee(emp)}
+                            className="flex items-center gap-2 px-2.5 py-2 text-cyan-800 hover:bg-cyan-50 hover:text-cyan-950 rounded-lg cursor-pointer font-medium transition-colors"
+                          >
+                            <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-600" />
+                            <span>Adjustment</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => openEditModal(emp)}
+                            className="flex items-center gap-2 px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg cursor-pointer font-medium transition-colors"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Edit Profile</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => {
+                              setEmployeeToDelete(emp)
+                              setDeleteError(null)
+                            }}
+                            className="flex items-center gap-2 px-2.5 py-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg cursor-pointer font-medium transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Delete</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+
+                  {/* Card Details: 2 Columns */}
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50/80 p-2.5 rounded-lg border border-slate-200/70 text-xs">
+                    {/* Left: Designation & Branch */}
+                    <div className="space-y-1 min-w-0">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Designation</span>
+                      <p className="font-semibold text-slate-700 text-xs truncate" title={emp.designation}>
+                        {emp.designation}
+                      </p>
+                      <div>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${getBranchBadgeClass(branch)}`}>
+                          {branch}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Right: Salary & Commission */}
+                    <div className="text-right flex flex-col items-end space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Salary</span>
+                      <span className="font-mono font-bold text-slate-900 text-xs">
+                        {emp.salary ? `PKR ${Number(emp.salary).toLocaleString()}` : '—'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCommissionEmployee(emp)}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 px-1.5 py-0.5 rounded shadow-2xs transition-colors cursor-pointer"
+                      >
+                        <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+                        <span>+ Commission</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card Bottom Row: Joining Date & Attendance Link */}
+                  <div className="flex items-center justify-between gap-2 pt-0.5 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-400 text-[11px]">Joined:</span>
+                      {emp.is_old_staff ? (
+                        <Badge variant="warning" className="text-[10px] font-bold px-1.5 py-0">
+                          Old Staff
+                        </Badge>
+                      ) : (
+                        <span className="font-medium text-slate-700 text-[11px]">
+                          {formatJoiningDate(emp.joining_date || emp.created_at)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {emp.is_attendance_exempt && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded">
+                          ⚡ Full Pay
+                        </span>
+                      )}
+                      <Link
+                        href={`/attendance/employees/${emp.id}`}
+                        className="text-[#0058BE] hover:text-[#004395] font-bold text-xs inline-flex items-center gap-1 hover:underline bg-blue-50/90 px-2 py-1 rounded border border-blue-100"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-[#0058BE]" />
+                        <span>Attendance</span>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
         {/* Pagination Footer */}
-        <div className="p-4 border-t border-slate-200 bg-white flex items-center justify-between text-xs text-slate-500">
-          <span>
+        <div className="p-3.5 sm:p-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+          <span className="text-center sm:text-left">
             Showing {filteredEmployees.length > 0 ? (page - 1) * pageSize + 1 : 0} to{' '}
             {Math.min(page * pageSize, filteredEmployees.length)} of {filteredEmployees.length} entries
           </span>
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto justify-center sm:justify-end">
             <Button
               variant="outline"
               size="sm"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(p - 1, 1))}
-              className="h-8 px-3 text-xs font-medium border-slate-200 text-slate-700 disabled:opacity-40 cursor-pointer"
+              className="flex-1 sm:flex-none h-8 px-3 text-xs font-medium border-slate-200 text-slate-700 disabled:opacity-40 cursor-pointer"
             >
               Previous
             </Button>
@@ -761,7 +939,7 @@ export default function EmployeeOverviewPage() {
               size="sm"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-              className="h-8 px-3 text-xs font-medium border-slate-200 text-slate-700 disabled:opacity-40 cursor-pointer"
+              className="flex-1 sm:flex-none h-8 px-3 text-xs font-medium border-slate-200 text-slate-700 disabled:opacity-40 cursor-pointer"
             >
               Next
             </Button>
@@ -771,8 +949,8 @@ export default function EmployeeOverviewPage() {
 
       {/* Add Employee Modal */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="sm:max-w-xl w-[95vw] sm:w-[580px] max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-2xl p-0 overflow-hidden flex flex-col font-sans">
-          <DialogHeader className="p-5 pb-3.5 shrink-0 border-b border-slate-100 bg-slate-50/60">
+        <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-2xl p-0 overflow-hidden flex flex-col font-sans">
+          <DialogHeader className="p-4 sm:p-5 pb-3 sm:pb-3.5 shrink-0 border-b border-slate-100 bg-slate-50/60">
             <DialogTitle className="text-base font-bold text-[#003D5C] flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-[#009D9E]" />
               Add New Employee
@@ -782,7 +960,7 @@ export default function EmployeeOverviewPage() {
             </p>
           </DialogHeader>
 
-          <form onSubmit={handleCreateEmployee} className="flex-1 overflow-y-auto p-5 space-y-3.5">
+          <form onSubmit={handleCreateEmployee} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
             {addError && (
               <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-lg flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1059,14 +1237,14 @@ export default function EmployeeOverviewPage() {
               Sequential ID (e.g. <span className="font-mono font-bold text-[#003D5C]">EMP-XXXX</span>) will be assigned atomically.
             </div>
 
-            <DialogFooter className="p-4 shrink-0 border-t border-slate-100 bg-slate-50/80 -mx-5 -mb-5 mt-4 flex items-center justify-end gap-2">
+            <DialogFooter className="p-3.5 sm:p-4 shrink-0 border-t border-slate-100 bg-slate-50/80 -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 mt-4 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setIsAddOpen(false)}
                 disabled={isSaving}
-                className="text-xs"
+                className="w-full sm:w-auto text-xs"
               >
                 Cancel
               </Button>
@@ -1074,7 +1252,7 @@ export default function EmployeeOverviewPage() {
                 type="submit"
                 size="sm"
                 disabled={isSaving || !newDesignation}
-                className="bg-[#003D5C] hover:bg-[#002D44] text-white text-xs font-bold"
+                className="w-full sm:w-auto bg-[#003D5C] hover:bg-[#002D44] text-white text-xs font-bold justify-center"
               >
                 {isSaving ? (
                   <>
@@ -1095,8 +1273,8 @@ export default function EmployeeOverviewPage() {
 
       {/* Edit Employee Modal */}
       <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
-        <DialogContent className="sm:max-w-xl w-[95vw] sm:w-[580px] max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-2xl p-0 overflow-hidden flex flex-col font-sans">
-          <DialogHeader className="p-5 pb-3.5 shrink-0 border-b border-slate-100 bg-slate-50/60">
+        <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-2xl p-0 overflow-hidden flex flex-col font-sans">
+          <DialogHeader className="p-4 sm:p-5 pb-3 sm:pb-3.5 shrink-0 border-b border-slate-100 bg-slate-50/60">
             <DialogTitle className="text-base font-bold text-[#003D5C] flex items-center gap-2">
               <Edit2 className="w-5 h-5 text-[#009D9E]" />
               Edit Employee
@@ -1106,7 +1284,7 @@ export default function EmployeeOverviewPage() {
             </p>
           </DialogHeader>
 
-          <form onSubmit={handleUpdateEmployee} className="flex-1 overflow-y-auto p-5 space-y-3.5">
+          <form onSubmit={handleUpdateEmployee} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
             {editError && (
               <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-lg flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1369,14 +1547,14 @@ export default function EmployeeOverviewPage() {
               </Label>
             </div>
 
-            <DialogFooter className="p-4 shrink-0 border-t border-slate-100 bg-slate-50/80 -mx-5 -mb-5 mt-4 flex items-center justify-end gap-2">
+            <DialogFooter className="p-3.5 sm:p-4 shrink-0 border-t border-slate-100 bg-slate-50/80 -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 mt-4 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setEditingEmployee(null)}
                 disabled={isSaving}
-                className="text-xs font-bold"
+                className="w-full sm:w-auto text-xs font-bold"
               >
                 Cancel
               </Button>
@@ -1384,7 +1562,7 @@ export default function EmployeeOverviewPage() {
                 type="submit"
                 size="sm"
                 disabled={isSaving}
-                className="bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5"
+                className="w-full sm:w-auto bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider gap-1.5 justify-center"
               >
                 {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                 Save Changes
@@ -1396,10 +1574,10 @@ export default function EmployeeOverviewPage() {
 
       {/* Delete Employee Modal */}
       <Dialog open={!!employeeToDelete} onOpenChange={(open: boolean) => !open && setEmployeeToDelete(null)}>
-        <DialogContent className="sm:max-w-md bg-white border border-[#E2E8F0] shadow-xl rounded-xl font-sans">
+        <DialogContent className="w-[95vw] sm:max-w-md bg-white border border-[#E2E8F0] shadow-xl rounded-xl font-sans p-4 sm:p-6">
           <DialogHeader className="border-b border-[#E2E8F0] pb-3 space-y-2">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200">
+              <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 shrink-0">
                 <Trash2 className="w-5 h-5 text-rose-600" />
               </div>
               <div>
@@ -1449,19 +1627,19 @@ export default function EmployeeOverviewPage() {
             </div>
           )}
 
-          <DialogFooter className="pt-3 border-t border-[#E2E8F0] gap-2 flex items-center justify-end">
+          <DialogFooter className="pt-3 border-t border-[#E2E8F0] gap-2 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={() => setEmployeeToDelete(null)}
               disabled={isDeleting}
-              className="text-xs font-semibold h-9 px-4 border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md cursor-pointer"
+              className="w-full sm:w-auto text-xs font-semibold h-9 px-4 border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md cursor-pointer justify-center"
             >
               Cancel
             </Button>
             <Button
               type="button"
-              className="bg-rose-600 hover:bg-rose-700 text-white font-bold uppercase text-xs h-9 px-4 rounded-md shadow-xs gap-1.5 transition-colors cursor-pointer"
+              className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-bold uppercase text-xs h-9 px-4 rounded-md shadow-xs gap-1.5 transition-colors cursor-pointer justify-center"
               onClick={handleDeleteEmployee}
               disabled={isDeleting}
             >
