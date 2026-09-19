@@ -1,144 +1,165 @@
 # Supabase (PostgreSQL) to Hostinger MySQL Migration Blueprint
 
-> **Status:** Planned / Ready for Execution  
-> **Target Date:** Next Session  
-> **Goal:** 100% safe migration from Supabase Free Tier to Hostinger MySQL with **0.0% data loss** and **zero system downtime/crash**.
+> **Status:** Ready for Execution (Planned for Tomorrow / Next 48 Hours)  
+> **Target Deployments:**  
+> 1. **Vercel Live:** `https://invoices-swart-five.vercel.app/` (Connected to GitHub)  
+> 2. **Hostinger Live:** `https://mis.isquarebpo.com/` (Connected to GitHub)  
+> **Current Database:** Supabase Live (PostgreSQL)  
+> **Target Database:** Hostinger MySQL 8.0  
+> **Goal:** 100% safe migration with **0.0% data loss**, **0% feature loss**, and **zero system crash/downtime**.
 
 ---
 
-## 1. Executive Summary & Objective
+## 1. Executive Summary & Dual Deployment Setup
 
-The application currently relies on **Supabase** (PostgreSQL) for:
-- Database storage (Invoices, Schedules, Attendance, Deductions, Payslips, Reports, etc.)
-- Authentication & session handling (`auth.users`, `@supabase/ssr`, `middleware.ts`)
-- Client-side queries via `@supabase/supabase-js`
+The application is deployed and actively used in two locations, both feeding into the same live Supabase database:
+- **Vercel Production:** `https://invoices-swart-five.vercel.app/`
+- **Hostinger Production:** `https://mis.isquarebpo.com/`
 
-**The Goal:**
-Migrate the database to **Hostinger MySQL** to eliminate Supabase free tier limitations/pauses while preserving all data integrity, relational constraints, sequences, and application functionality without any disruption to current users.
+Both production apps auto-deploy from the GitHub repository. Because of this dual setup, **no changes should ever be pushed directly to the `main` branch until the new MySQL database is completely migrated and tested**.
 
 ---
 
-## 2. Key Architecture & Technical Changes
+## 2. Business Operations & Work Continuity During Migration
 
-| Component | Current (Supabase) | Proposed (Hostinger MySQL) | Reason / Solution |
+### Can the team continue working during migration?
+**YES (95% of the time).** Routine operations do not need to stop during the migration process.
+
+| Phase | Duration | Can Team Work & Enter Data? | Which Website to Use? | How is Data Kept Safe? |
+| :--- | :--- | :--- | :--- | :--- |
+| **Phase 1: Setup & Initial ETL (Background)** | ~2 – 3 Hours | **YES (Normal Work)** | Either `invoices-swart-five.vercel.app` or `mis.isquarebpo.com` | Live traffic continues writing to Supabase. We work in a separate Git branch and test in background. |
+| **Phase 2: Final Switch Window (Cutover)** | **10 – 15 Minutes** | **PAUSE (Brief Data Freeze)** | None (Maintenance window) | A **Delta Sync Script** runs to fetch every single record added/edited during Phase 1. Both sites are switched to MySQL. |
+| **Phase 3: Post-Cutover** | Immediate | **YES (Normal Work Resumes)** | Both websites fully functional | Data is now saving directly to Hostinger MySQL. |
+
+### How does newly entered data during migration reach MySQL?
+1. During Phase 1, the initial data export copies existing data to MySQL.
+2. During the 10–15 minute cutover window, a dedicated **Delta Sync Script** runs:
+   ```typescript
+   // Delta Sync Query Logic:
+   // Fetches any row where created_at >= migration_start_time OR updated_at >= migration_start_time
+   ```
+3. It inserts or updates these records into Hostinger MySQL.
+4. Record counts are verified 1-to-1 between Supabase and MySQL before completing the switch.
+5. Result: **Zero records lost, zero sequence numbers skipped.**
+
+---
+
+## 3. Architecture & Technical Differences
+
+| Component | Current (Supabase) | Proposed (Hostinger MySQL) | Technical Reason / Solution |
 | :--- | :--- | :--- | :--- |
-| **Database Engine** | PostgreSQL (Supabase Cloud) | MySQL 8.0 / MariaDB (Hostinger) | Types adjusted (`UUID` $\rightarrow$ `VARCHAR(36)`, `JSONB` $\rightarrow$ `JSON`, `TIMESTAMPTZ` $\rightarrow$ `DATETIME`, `NUMERIC` $\rightarrow$ `DECIMAL`). |
-| **Data Access Layer** | Direct browser query (`@supabase/supabase-js`) | **Prisma ORM** + Next.js Server Actions / API Routes | Browser cannot directly connect to MySQL safely. Prisma provides type safety, connection pooling, and secure server-side queries. |
-| **Authentication** | Supabase Auth (`auth.users`, JWT) | Custom Auth / Session JWT with `users` table | MySQL does not have native Supabase Auth. Session management will be handled cleanly via JWT and hashed credentials in MySQL. |
-| **Remote Access** | Port 443 (HTTPS REST API) | Port 3306 (MySQL TCP) | Hostinger hPanel mein **Remote MySQL** access enable kiya jaye ga (`%` wildcard with strong password). |
+| **Database Engine** | PostgreSQL (Supabase Cloud) | MySQL 8.0 (Hostinger) | Types adjusted: `UUID` $\rightarrow$ `VARCHAR(36)`, `JSONB` $\rightarrow$ `JSON`, `TIMESTAMPTZ` $\rightarrow$ `DATETIME`, `NUMERIC` $\rightarrow$ `DECIMAL(12,2)`. |
+| **Data Access Layer** | Direct browser query (`@supabase/supabase-js`) | **Prisma ORM** + Next.js Server Actions / API Routes | Browsers cannot connect directly to MySQL securely. Prisma provides type safety, connection pooling, and secure server-side execution. |
+| **Authentication** | Supabase Auth (`auth.users`, JWT) | Custom Auth / Session JWT with `users` table | Migrating user accounts and passwords/sessions cleanly to MySQL. |
+| **Remote Access** | Port 443 (HTTPS REST API) | Port 3306 (MySQL TCP) | Hostinger hPanel **Remote MySQL** enabled with `%` wildcard and strong password so Vercel can connect. |
+| **Connection Pooling** | Supabase connection pooler | Prisma `connection_limit=5` | Prevents serverless lambdas on Vercel from exhausting Hostinger's MySQL connection limits. |
 | **Sequencing** | `company_sequences` table | `company_sequences` with MySQL Transactions | Concurrency-safe transactions (`prisma.$transaction`) ensure zero duplicate invoice numbers. |
 
 ---
 
-## 3. Downtime & Crash Risk Analysis
+## 4. Downtime & Crash Risk Analysis
 
-- **Live Application Downtime:** **0% (Zero Downtime)**.
+- **Live Application Downtime:** **0% (Zero Downtime)** during development and initial sync.
+- **Maintenance Window:** **10 – 15 minutes** only for the final Delta sync and environment cutover.
 - **Crash Risk:** **0%**.
-- **Reason:** We will use a **Parallel (Shadow) Migration Strategy**:
-  1. The live app remains 100% active on Supabase during development, schema creation, data ETL, and testing.
-  2. All code updates and testing will take place in an isolated branch / local environment.
-  3. The final cutover only involves updating production environment variables (`DATABASE_URL`) during standard deployment (1–2 minutes build time).
-  4. **Instant 60-Second Rollback:** If any issue occurs, reverting the `.env` back to Supabase restores normal operations in under a minute.
+- **Instant 60-Second Rollback:** Supabase will remain active for 72 hours after migration. If any unexpected issue arises on MySQL, reverting the environment variables on Vercel and Hostinger immediately restores normal Supabase operation.
 
 ---
 
-## 4. Estimated Timeline Breakdown
+## 5. Step-by-Step Execution Plan
 
-| Phase | Tasks | Estimated Duration |
-| :--- | :--- | :--- |
-| **Phase 1 & 2** | Hostinger MySQL DB setup, Remote MySQL access, Prisma initialization & schema mapping | **30 - 45 mins** |
-| **Phase 3** | Automated ETL Data Migration script (Export Supabase $\rightarrow$ Transform $\rightarrow$ Load to MySQL) | **30 - 45 mins** |
-| **Phase 4** | Refactoring service layer (`invoice.service.ts`, `installment.service.ts`, `attendance.service.ts`, Auth) | **1.5 - 2.0 hours** |
-| **Phase 5** | Complete functional testing (PDF generator, Email logs, Sequences, Payslips, Excel import/export) | **45 - 60 mins** |
-| **Phase 6** | Final delta sync & production cutover | **10 - 15 mins** |
-| **Total Estimated Time** | | **~3.5 - 4.5 Hours** |
+### Step 1: Pre-Migration Safety & Backups
+- [ ] Create a dedicated migration branch in Git:
+  ```bash
+  git checkout -b feat/hostinger-mysql-migration
+  ```
+- [ ] Export full database dump from Supabase (CSV/JSON backups of all tables).
+- [ ] Notify team of the planned 15-minute maintenance window time.
 
----
+### Step 2: Hostinger MySQL Database Setup
+- [ ] In **Hostinger hPanel** $\rightarrow$ **Databases** $\rightarrow$ **MySQL Databases**:
+  - Create database (e.g. `u123456_invoicedb`).
+  - Create MySQL user with a strong 32+ character password.
+- [ ] In **Hostinger hPanel** $\rightarrow$ **Remote MySQL**:
+  - Add Host/IP: `%` (allows Vercel cloud and local deployment to connect).
+  - Select the created database and save.
+- [ ] Note down the connection string:
+  ```env
+  DATABASE_URL="mysql://username:password@sqlXXX.hostinger.com:3306/u123456_invoicedb?connection_limit=5"
+  ```
 
-## 5. Phase-by-Phase Execution Plan (Step-by-Step)
+### Step 3: Prisma ORM Initialization & Schema Mapping
+- [ ] Install Prisma dependencies:
+  ```bash
+  npm install prisma @prisma/client mysql2
+  npx prisma init --datasource-provider mysql
+  ```
+- [ ] Map all tables in `prisma/schema.prisma`:
+  - `companies`, `company_sequences`, `templates`
+  - `invoices`, `invoice_items`
+  - `installment_schedules`, `installment_email_logs`
+  - `stc_installment_schedules`, `stc_installment_email_logs`
+  - `employees`, `attendance_records`, `deductions`, `commissions`, `adjustments`, `payslips`
+  - `aimt_report_records`, `aimt_report_imports`
+  - `stc_report_records`, `stc_report_imports`
+  - `users`, `profiles`, `security_audit_logs`
+- [ ] Push schema to Hostinger:
+  ```bash
+  npx prisma db push
+  ```
 
-### Phase 1: Safety & Backups
-1. Create a safety backup branch in Git:
-   ```bash
-   git checkout -b backup-supabase-stable
-   git push origin backup-supabase-stable
-   git checkout -b feat/hostinger-mysql-migration
-   ```
-2. Full data export from Supabase (all tables exported to JSON/CSV backups).
+### Step 4: Automated Data Migration (ETL Script)
+- [ ] Create migration script `scripts/migrate-supabase-to-mysql.ts`.
+- [ ] Read all data from Supabase in relational order:
+  1. Master tables (`companies`, `templates`, `users`).
+  2. Main entities (`invoices`, `employees`, `installment_schedules`, `aimt_report_imports`, `stc_report_imports`).
+  3. Relational child records (`invoice_items`, `attendance_records`, `aimt_report_records`, `stc_report_records`).
+- [ ] Transform PostgreSQL types (UUIDs, ISO dates) to MySQL format.
+- [ ] Batch insert into Hostinger MySQL.
+- [ ] Run validation assertions (assert `supabase_count === mysql_count` for every table).
 
-### Phase 2: Hostinger MySQL Setup
-1. Hostinger hPanel $\rightarrow$ **Databases** $\rightarrow$ **MySQL Databases**:
-   - Create Database name (e.g. `u123_invoicedb`)
-   - Create User & Strong Password
-2. Hostinger hPanel $\rightarrow$ **Remote MySQL**:
-   - Add Host/IP: `%` (allows secure connection from deployment platforms/local machine)
-   - Assign to the created database.
-3. Formulate Database Connection String:
-   ```env
-   DATABASE_URL="mysql://username:password@sql.hostinger.com:3306/database_name?connection_limit=10"
-   ```
+### Step 5: Service Layer Refactoring
+- [ ] Update service files from `@/lib/supabase/client` to server-side Prisma calls / API routes:
+  - `src/lib/services/invoice.service.ts`
+  - `src/lib/services/installment.service.ts`
+  - `src/lib/services/stc-installment.service.ts`
+  - `src/lib/services/attendance.service.ts`
+  - `src/lib/services/company.service.ts`
+  - `src/lib/services/template.service.ts`
+  - `src/lib/services/report.service.ts` (AIMT Report parsing & duplicate logic preserved)
+  - `src/lib/services/edlink-payslip.service.ts`
+- [ ] Implement MySQL-backed Auth session handling.
 
-### Phase 3: Prisma ORM Schema Mapping
-1. Install Prisma & MySQL dependencies:
-   ```bash
-   npm install prisma @prisma/client mysql2
-   npx prisma init --datasource-provider mysql
-   ```
-2. Map all 15+ existing Supabase tables into `prisma/schema.prisma`:
-   - `companies`
-   - `company_sequences`
-   - `templates`
-   - `invoices` & `invoice_items`
-   - `installment_schedules` & `installment_email_logs`
-   - `stc_installment_schedules` & `stc_installment_email_logs`
-   - `employees`, `attendance_records`, `deductions`, `commissions`, `adjustments`, `payslips`
-   - `reports` & `import_history`
-   - `users`, `profiles`, `security_audit_logs`
-3. Push schema to Hostinger:
-   ```bash
-   npx prisma db push
-   ```
+### Step 6: Functional Testing (Local & Preview)
+- [ ] Verify user login, logout, and role access control.
+- [ ] Verify sequential invoice creation (`INV-XXXX`) with zero duplicate risk.
+- [ ] Verify PDF generation for invoices, STC schedules, and payslips.
+- [ ] Verify biometric attendance calculation.
+- [ ] Verify AIMT Excel report upload, preview, and duplicate checking.
+- [ ] Verify email logs.
 
-### Phase 4: Automated Data Migration Script (ETL)
-1. Create migration script (`scripts/migrate-supabase-to-mysql.ts`):
-   - Reads records from Supabase REST API in relational order.
-   - Converts UUIDs and date strings to MySQL compatible formats.
-   - Batch inserts records into Hostinger MySQL.
-   - Runs validation assertions: checks that row count in Supabase equals row count in MySQL.
+### Step 7: Final Cutover Window (10 – 15 Minutes)
+- [ ] Announce 15-minute maintenance pause to users.
+- [ ] Run **Delta Sync Script** (syncs records created/updated during testing).
+- [ ] Confirm row counts between Supabase and MySQL match 100%.
+- [ ] Add `DATABASE_URL` in **Vercel Project Settings** $\rightarrow$ **Environment Variables**.
+- [ ] Add `DATABASE_URL` in **Hostinger Environment Configuration**.
+- [ ] Merge `feat/hostinger-mysql-migration` into `main` and push to GitHub.
+- [ ] Both Vercel (`invoices-swart-five.vercel.app`) and Hostinger (`mis.isquarebpo.com`) deploy automatically.
+- [ ] Announce maintenance window complete.
 
-### Phase 5: Service Layer Refactoring
-1. Update core service files from `supabase.from('...').select()` to Prisma client calls:
-   - `src/lib/services/invoice.service.ts`
-   - `src/lib/services/installment.service.ts`
-   - `src/lib/services/stc-installment.service.ts`
-   - `src/lib/services/attendance.service.ts`
-   - `src/lib/services/company.service.ts`
-   - `src/lib/services/template.service.ts`
-   - `src/lib/services/report.service.ts`
-   - `src/lib/services/edlink-payslip.service.ts`
-2. Update Authentication & Session handling to work independently of Supabase Auth.
-
-### Phase 6: Comprehensive Verification Checklist
-- [ ] User login, logout, and role access control (Admin / User).
-- [ ] Invoice creation with automated sequential numbering (`company_sequences`).
-- [ ] PDF rendering and export for invoices, STC schedules, and payslips.
-- [ ] Email dispatch and email logging (`installment_email_logs`).
-- [ ] Biometric attendance record upload & calculation.
-- [ ] Excel/CSV import and export.
-- [ ] Audit logs recording accurately.
-
-### Phase 7: Production Cutover & Cleanup
-1. Run final delta sync (for any new records created during testing).
-2. Update production `.env` with Hostinger `DATABASE_URL`.
-3. Deploy new build.
-4. Keep Supabase active for 48–72 hours as a safety fallback before decommissioning.
+### Step 8: Post-Migration Safety Buffer
+- [ ] Keep Supabase project active and untouched for **72 hours**.
+- [ ] Monitor both sites for any performance or connection bottlenecks.
+- [ ] After 72 hours of stable operation, decommission Supabase.
 
 ---
 
-## 6. Information Needed From User Before Starting Tomorrow
-When resuming work tomorrow, please have the following Hostinger details ready:
+## 6. Information Needed From Hostinger Before Execution
+
+When ready to start migration, keep these 4 details ready:
 1. **Hostinger MySQL Host / Server Name** (e.g. `sqlXXX.hostinger.com` or IP)
 2. **Database Name** (e.g. `u123456789_dbname`)
 3. **Database Username** (e.g. `u123456789_dbuser`)
 4. **Database Password**
-5. Hostinger Remote MySQL access set to allow external connections (`%`).
+5. Remote MySQL access verified (`%` host added in hPanel).

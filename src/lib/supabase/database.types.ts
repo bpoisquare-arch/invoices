@@ -927,6 +927,164 @@ export interface Database {
           }
         ]
       }
+      stc_report_imports: {
+        Row: {
+          id: string
+          file_name: string
+          file_size: number
+          uploaded_at: string
+          uploaded_by: string | null
+          total_records: number
+          total_pending_amount: number
+          total_yet_to_raised: number
+          entity: string
+          original_file_data: string | null
+          raw_headers: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          file_name: string
+          file_size?: number
+          uploaded_at?: string
+          uploaded_by?: string | null
+          total_records?: number
+          total_pending_amount?: number
+          total_yet_to_raised?: number
+          entity?: string
+          original_file_data?: string | null
+          raw_headers?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          file_name?: string
+          file_size?: number
+          uploaded_at?: string
+          uploaded_by?: string | null
+          total_records?: number
+          total_pending_amount?: number
+          total_yet_to_raised?: number
+          entity?: string
+          original_file_data?: string | null
+          raw_headers?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      stc_report_records: {
+        Row: {
+          id: string
+          import_id: string
+          sr_no: number | null
+          student_name: string
+          student_id: string | null
+          agent: string | null
+          scholarship: string | null
+          pending_invoice: string | null
+          pending_amount: number
+          yet_to_raised: string | null
+          remarks: string | null
+          dob: string | null
+          document: string | null
+          status: string | null
+          intake: string | null
+          end_date: string | null
+          course: string | null
+          admin_fee: number
+          resource_fee: number
+          tuition_fee: number
+          total_fee: number
+          paid_amount: number
+          total_paid?: number | null
+          initial_payment?: number | null
+          follow_up?: string | null
+          coe_issued_date: string | null
+          email_id: string | null
+          phone_no: string | null
+          payment_status: string | null
+          extra_data: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          import_id: string
+          sr_no?: number | null
+          student_name: string
+          student_id?: string | null
+          agent?: string | null
+          scholarship?: string | null
+          pending_invoice?: string | null
+          pending_amount?: number
+          yet_to_raised?: string | null
+          remarks?: string | null
+          dob?: string | null
+          document?: string | null
+          status?: string | null
+          intake?: string | null
+          end_date?: string | null
+          course?: string | null
+          admin_fee?: number
+          resource_fee?: number
+          tuition_fee?: number
+          total_fee?: number
+          paid_amount?: number
+          total_paid?: number | null
+          initial_payment?: number | null
+          follow_up?: string | null
+          coe_issued_date?: string | null
+          email_id?: string | null
+          phone_no?: string | null
+          payment_status?: string | null
+          extra_data?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          import_id?: string
+          sr_no?: number | null
+          student_name?: string
+          student_id?: string | null
+          agent?: string | null
+          scholarship?: string | null
+          pending_invoice?: string | null
+          pending_amount?: number
+          yet_to_raised?: string | null
+          remarks?: string | null
+          dob?: string | null
+          document?: string | null
+          status?: string | null
+          intake?: string | null
+          end_date?: string | null
+          course?: string | null
+          admin_fee?: number
+          resource_fee?: number
+          tuition_fee?: number
+          total_fee?: number
+          paid_amount?: number
+          total_paid?: number | null
+          initial_payment?: number | null
+          follow_up?: string | null
+          coe_issued_date?: string | null
+          email_id?: string | null
+          phone_no?: string | null
+          payment_status?: string | null
+          extra_data?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stc_report_records_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "stc_report_imports"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1000,6 +1158,11 @@ export type AimtReportImport = Database['public']['Tables']['aimt_report_imports
 export type AimtReportImportInsert = Database['public']['Tables']['aimt_report_imports']['Insert']
 export type AimtReportRecord = Database['public']['Tables']['aimt_report_records']['Row']
 export type AimtReportRecordInsert = Database['public']['Tables']['aimt_report_records']['Insert']
+
+export type StcReportImport = Database['public']['Tables']['stc_report_imports']['Row']
+export type StcReportImportInsert = Database['public']['Tables']['stc_report_imports']['Insert']
+export type StcReportRecord = Database['public']['Tables']['stc_report_records']['Row']
+export type StcReportRecordInsert = Database['public']['Tables']['stc_report_records']['Insert']
 
 export interface RawPunch {
   time: string // e.g. "10:43 AM" or "10:43:00"

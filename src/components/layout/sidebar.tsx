@@ -240,7 +240,8 @@ export default function AppSidebar() {
   const isPayslipsActive = pathname.startsWith('/payslips')
   const isReportsActive = pathname.startsWith('/reports')
   const isEdLinkPayslipsActive = pathname.startsWith('/edlink/payslips')
-  const isStcInstallmentsActive = pathname.startsWith('/stc/installments') || pathname.startsWith('/stc')
+  const isStcInstallmentsActive = pathname.startsWith('/stc/installments')
+  const isStcReportsActive = pathname.startsWith('/stc/reports')
 
   const [invoicesOpen, setInvoicesOpen] = useState(true)
   const [payrollOpen, setPayrollOpen] = useState(true)
@@ -249,6 +250,7 @@ export default function AppSidebar() {
   const [reportsOpen, setReportsOpen] = useState(true)
   const [edlinkPayslipsOpen, setEdlinkPayslipsOpen] = useState(true)
   const [stcInstallmentsOpen, setStcInstallmentsOpen] = useState(true)
+  const [stcReportsOpen, setStcReportsOpen] = useState(true)
 
   useEffect(() => {
     if (isInvoiceActive) setInvoicesOpen(true)
@@ -277,6 +279,10 @@ export default function AppSidebar() {
   useEffect(() => {
     if (isStcInstallmentsActive) setStcInstallmentsOpen(true)
   }, [isStcInstallmentsActive])
+
+  useEffect(() => {
+    if (isStcReportsActive) setStcReportsOpen(true)
+  }, [isStcReportsActive])
 
   const isStc = activeEntity === 'stc' || pathname.startsWith('/stc')
   const isEdLinkAu = !isStc && (activeEntity === 'edlink-au' || pathname.startsWith('/edlink'))
@@ -450,6 +456,56 @@ export default function AppSidebar() {
                             >
                               <FileText className="size-3.5 shrink-0" />
                               <span>Schedules</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* 2. STC Reports Module */}
+            <SidebarGroup className="p-0 mt-3">
+              <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#00BF8F]/80 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
+                STC Reports
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <Collapsible
+                    open={stcReportsOpen}
+                    onOpenChange={setStcReportsOpen}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton
+                            tooltip="Reports"
+                            className={`text-[13px] font-medium transition-all hover:bg-[#00BF8F]/20 hover:text-white rounded-lg px-2.5 py-2 ${
+                              isStcReportsActive
+                                ? 'text-[#00BF8F] bg-[#00BF8F]/15 font-bold'
+                                : 'text-slate-300'
+                            }`}
+                          />
+                        }
+                      >
+                        <FileSpreadsheet className="size-4 shrink-0 text-[#00BF8F]" />
+                        <span className="font-semibold text-slate-200">Reports</span>
+                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
+                          {/* Report Management */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/stc/reports" onClick={handleNavClick} />}
+                              isActive={pathname === '/stc/reports'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#00BF8F]/20 data-[active=true]:bg-[#00BF8F] data-[active=true]:text-[#001E2F] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <FileText className="size-3.5 shrink-0" />
+                              <span>Report Management</span>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         </SidebarMenuSub>
