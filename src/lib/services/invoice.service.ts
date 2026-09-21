@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/client'
 import { InvoiceWithDetails, TemplateSnapshot } from '@/lib/supabase/database.types'
 import { subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from 'date-fns'
 import { getTemplateByCompanyId } from '@/lib/services/template.service'
+import { numberToWords } from '@/lib/utils/number-to-words'
 
 export interface InvoiceItemInput {
   description: string
@@ -30,6 +31,8 @@ export interface CreateInvoiceInput {
   footer_terms?: string | null
   is_anonymous?: boolean | null
   logo_size?: number | string | null
+  gst_rate?: number | null
+  gst_amount?: number | null
 }
 
 export interface UpdateInvoiceInput {
@@ -50,6 +53,8 @@ export interface UpdateInvoiceInput {
   footer_terms?: string | null
   is_anonymous?: boolean | null
   logo_size?: number | string | null
+  gst_rate?: number | null
+  gst_amount?: number | null
 }
 
 export interface InvoiceFilterParams {
@@ -327,6 +332,17 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
   })
 
   const subtotal = Number(preparedItems.reduce((sum, item) => sum + item.line_total, 0).toFixed(2))
+  const gstRate = input.gst_rate !== undefined && input.gst_rate !== null ? Number(input.gst_rate) : (input.company_id === 'nsc-company-id' || input.company_id === 'nsc' ? 10 : 0)
+  const gstAmount = Number(((subtotal * gstRate) / 100).toFixed(2))
+  const totalAmount = Number((subtotal + gstAmount).toFixed(2))
+  const currencyToUse = input.currency || (input.company_id === 'isquare-bpo-company-id' || input.company_id === 'isq' ? 'USD' : 'AUD')
+  const amountInWords = numberToWords(totalAmount, currencyToUse)
+
+  // Attach GST info into templateSnapshot
+  templateSnapshot.gst_rate = gstRate
+  templateSnapshot.gst_amount = gstAmount
+  templateSnapshot.amount_in_words = amountInWords
+  templateSnapshot.includes_gst = gstRate > 0
 
   const { data: invoice, error } = await supabase
     .from('invoices')
@@ -340,7 +356,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
       invoice_date: input.invoice_date,
       due_date: input.due_date || input.invoice_date,
       subtotal,
-      total_amount: subtotal,
+      total_amount: totalAmount,
     })
     .select('*, companies(*)')
     .single()
@@ -391,10 +407,31 @@ export async function updateInvoice(
   if (input.invoice_date !== undefined) updateData.invoice_date = input.invoice_date
   if (input.due_date !== undefined) updateData.due_date = input.due_date
 
-  if (preparedItems) {
-    const subtotal = Number(preparedItems.reduce((sum, item) => sum + item.line_total, 0).toFixed(2))
+  const existing = await getInvoiceById(invoiceId)
+  if (preparedItems || input.gst_rate !== undefined) {
+    const items = preparedItems || existing?.invoice_items || []
+    const subtotal = Number(items.reduce((sum: number, item: any) => sum + (Number(item.line_total) || 0), 0).toFixed(2))
+    const gstRate = Number(
+      input.gst_rate !== undefined && input.gst_rate !== null
+        ? input.gst_rate
+        : (existing?.template_snapshot?.gst_rate ?? (existing?.companies?.prefix === 'NSC' ? 10 : 0))
+    )
+    const gstAmount = Number(((subtotal * gstRate) / 100).toFixed(2))
+    const totalAmount = Number((subtotal + gstAmount).toFixed(2))
+    const currencyToUse = String(input.currency || existing?.template_snapshot?.currency || 'AUD')
+    const amountInWords = numberToWords(totalAmount, currencyToUse)
+
     updateData.subtotal = subtotal
-    updateData.total_amount = subtotal
+    updateData.total_amount = totalAmount
+    if (existing?.template_snapshot) {
+      updateData.template_snapshot = {
+        ...existing.template_snapshot,
+        gst_rate: gstRate,
+        gst_amount: gstAmount,
+        amount_in_words: amountInWords,
+        includes_gst: gstRate > 0,
+      }
+    }
   }
 
   const { error } = await supabase.from('invoices').update(updateData).eq('id', invoiceId)

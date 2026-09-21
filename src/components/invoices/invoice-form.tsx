@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Company, Template, InvoiceWithDetails, TemplateSnapshot } from '@/lib/supabase/database.types'
 import { createInvoice, updateInvoice, generateNextInvoiceNumber, InvoiceItemInput } from '@/lib/services/invoice.service'
+import { numberToWords } from '@/lib/utils/number-to-words'
 import { renderInvoiceWebPreview } from '@/lib/services/template-registry'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -97,6 +98,11 @@ export default function InvoiceForm({
   const [referenceAddress, setReferenceAddress] = useState<string>(
     existingInvoice?.reference_name || (company.prefix === 'NSC' ? '22 Cheviot Avenue Berwick' : '')
   )
+  const [gstRate, setGstRate] = useState<number>(
+    existingInvoice?.template_snapshot?.gst_rate !== undefined && existingInvoice?.template_snapshot?.gst_rate !== null
+      ? Number(existingInvoice.template_snapshot.gst_rate)
+      : (company.prefix === 'NSC' ? 10 : 0)
+  )
   const [invoiceDate, setInvoiceDate] = useState(existingInvoice?.invoice_date || todayStr)
   const [dueDate, setDueDate] = useState(existingInvoice?.due_date || (isAnonymous ? '' : dueStr))
 
@@ -164,9 +170,12 @@ export default function InvoiceForm({
     return { ...item, lineTotal }
   })
 
-  const grandTotal = Number(
+  const subtotal = Number(
     calculatedItems.reduce((acc, item) => acc + item.lineTotal, 0).toFixed(2)
   )
+  const gstAmount = Number(((subtotal * (Number(gstRate) || 0)) / 100).toFixed(2))
+  const grandTotal = Number((subtotal + gstAmount).toFixed(2))
+  const amountInWords = numberToWords(grandTotal, selectedCurrency)
 
   // Live snapshot reflecting real-time updates
   const dynamicSnapshot: TemplateSnapshot = isAnonymous
@@ -185,8 +194,13 @@ export default function InvoiceForm({
         bill_to_label: 'Issued to:',
         is_anonymous: true,
         logo_size: logoSize,
+        gst_rate: gstRate,
+        gst_amount: gstAmount,
+        amount_in_words: amountInWords,
+        includes_gst: gstRate > 0,
       }
-    : (existingInvoice?.template_snapshot || {
+    : {
+        ...(existingInvoice?.template_snapshot || {}),
         company_name: template?.company_name || company.name,
         address: template?.address || '',
         phone: template?.phone || '',
@@ -201,7 +215,11 @@ export default function InvoiceForm({
         bill_to_label: 'BILL TO',
         is_anonymous: false,
         logo_size: 58,
-      })
+        gst_rate: gstRate,
+        gst_amount: gstAmount,
+        amount_in_words: amountInWords,
+        includes_gst: gstRate > 0,
+      }
 
   // Live preview invoice object updated in real-time
   const livePreviewInvoice: Partial<InvoiceWithDetails> = {
@@ -211,7 +229,7 @@ export default function InvoiceForm({
     invoice_date: invoiceDate,
     due_date: dueDate || '',
     total_amount: grandTotal,
-    subtotal: grandTotal,
+    subtotal: subtotal,
     companies: company,
     templates: template,
     template_snapshot: dynamicSnapshot,
@@ -259,6 +277,8 @@ export default function InvoiceForm({
           invoice_date: invoiceDate,
           due_date: dueDate || null,
           items,
+          gst_rate: gstRate,
+          gst_amount: gstAmount,
           custom_company_name: isAnonymous ? customCompanyName : undefined,
           custom_address: isAnonymous ? customAddress : undefined,
           custom_phone: isAnonymous ? customPhone : undefined,
@@ -280,6 +300,8 @@ export default function InvoiceForm({
           invoice_date: invoiceDate,
           due_date: dueDate || null,
           items,
+          gst_rate: gstRate,
+          gst_amount: gstAmount,
           custom_company_name: isAnonymous ? customCompanyName : undefined,
           custom_address: isAnonymous ? customAddress : undefined,
           custom_phone: isAnonymous ? customPhone : undefined,
@@ -734,41 +756,74 @@ export default function InvoiceForm({
                   <tbody className="divide-y divide-slate-100">
                     {calculatedItems.map((item, idx) => (
                       <tr key={idx}>
-                        <td className="py-2 px-2.5">
-                          <Input
-                            placeholder="Service / Item Description"
-                            value={item.description}
-                            onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
-                            className="h-8 text-xs w-full"
-                          />
+                        <td className="py-2 px-2.5 align-top">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const current = item.description || ''
+                                  const updated = current.endsWith('\n') || current === ''
+                                    ? `${current}• `
+                                    : `${current}\n• `
+                                  handleItemChange(idx, 'description', updated)
+                                }}
+                                className="text-[10.5px] text-teal-600 hover:text-teal-800 font-bold flex items-center gap-0.5 px-1 py-0.5 rounded hover:bg-teal-50 cursor-pointer"
+                                title="Add bullet point"
+                              >
+                                <span className="font-extrabold">•</span> Add Point / Bullet
+                              </button>
+                            </div>
+                            <textarea
+                              rows={Math.max(2, (item.description || '').split('\n').length)}
+                              placeholder="Type description or click '• Add Point'"
+                              value={item.description}
+                              onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const val = e.currentTarget.value
+                                  const selStart = e.currentTarget.selectionStart
+                                  const before = val.substring(0, selStart)
+                                  const lastLine = before.split('\n').pop() || ''
+                                  if (lastLine.trim().startsWith('•')) {
+                                    e.preventDefault()
+                                    const after = val.substring(selStart)
+                                    const nextText = before + '\n• ' + after
+                                    handleItemChange(idx, 'description', nextText)
+                                  }
+                                }
+                              }}
+                              className="w-full text-xs p-1.5 rounded-md border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#003D5C] resize-y min-h-[44px] leading-relaxed font-sans"
+                            />
+                          </div>
                         </td>
-                        <td className="py-2 px-1.5 text-center">
+                        <td className="py-2 px-1.5 text-center align-top">
                           <Input
                             type="number"
                             step="1"
                             min="1"
                             value={item.quantity}
                             onChange={(e) => handleItemChange(idx, 'quantity', parseFloat(e.target.value) || 0)}
-                            className="h-8 text-xs text-center font-mono w-full min-w-0 px-1"
+                            className="h-8 text-xs text-center font-mono w-full min-w-0 px-1 mt-6"
                           />
                         </td>
-                        <td className="py-2 px-1.5 text-right">
+                        <td className="py-2 px-1.5 text-right align-top">
                           <Input
                             type="number"
                             step="0.01"
                             min="0"
                             value={item.amount || ''}
                             onChange={(e) => handleItemChange(idx, 'amount', parseFloat(e.target.value) || 0)}
-                            className="h-8 text-xs text-right font-mono w-full min-w-0 px-1"
+                            className="h-8 text-xs text-right font-mono w-full min-w-0 px-1 mt-6"
                             placeholder="0.00"
                           />
                         </td>
-                        <td className="py-2 px-1 text-center">
+                        <td className="py-2 px-1 text-center align-top">
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 mx-auto"
+                            className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 mx-auto mt-6.5"
                             onClick={() => handleRemoveItem(idx)}
                             disabled={items.length <= 1}
                             title="Delete Row"
@@ -782,26 +837,68 @@ export default function InvoiceForm({
                 </table>
               </div>
 
-              {/* Total Calculation Row */}
-              <div className="p-3 sm:p-4 bg-[#F8FAFC] border-t border-[#E2E8F0] flex justify-between items-center">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddItem}
-                  className="gap-1.5 text-[#009D9E] border-[#009D9E]/40 hover:bg-teal-50 font-bold text-xs h-8"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add Row
-                </Button>
+              {/* Total Calculation Row with GST Rate Option */}
+              <div className="p-3 sm:p-4 bg-[#F8FAFC] border-t border-[#E2E8F0] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddItem}
+                    className="gap-1.5 text-[#009D9E] border-[#009D9E]/40 hover:bg-teal-50 font-bold text-xs h-8"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Row
+                  </Button>
 
-                <div className="text-right">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                    Total Amount Due
-                  </span>
-                  <span className="font-mono text-xl sm:text-2xl font-extrabold text-[#003D5C] block">
-                    {grandTotal.toFixed(2)} <span className="text-xs font-sans text-slate-500">{selectedCurrency}</span>
-                  </span>
+                  {/* GST Percentage Input Option */}
+                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                      GST Rate:
+                    </label>
+                    <div className="relative w-16">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={gstRate}
+                        onChange={(e) => setGstRate(parseFloat(e.target.value) || 0)}
+                        className="h-7 text-xs text-center font-bold font-mono pr-4"
+                        placeholder="0"
+                      />
+                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        %
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right space-y-0.5 ml-auto">
+                  <div className="flex items-center justify-end gap-3 text-xs text-slate-500">
+                    <span>Subtotal:</span>
+                    <span className="font-mono font-semibold text-slate-700">
+                      {subtotal.toFixed(2)} {selectedCurrency}
+                    </span>
+                  </div>
+
+                  {gstRate > 0 && (
+                    <div className="flex items-center justify-end gap-3 text-xs text-slate-500">
+                      <span>GST ({gstRate}%):</span>
+                      <span className="font-mono font-semibold text-slate-700">
+                        {gstAmount.toFixed(2)} {selectedCurrency}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="pt-1 border-t border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Total Including GST
+                    </span>
+                    <span className="font-mono text-xl sm:text-2xl font-extrabold text-[#003D5C] block">
+                      {grandTotal.toFixed(2)} <span className="text-xs font-sans text-slate-500">{selectedCurrency}</span>
+                    </span>
+                  </div>
                 </div>
               </div>
             </CardContent>

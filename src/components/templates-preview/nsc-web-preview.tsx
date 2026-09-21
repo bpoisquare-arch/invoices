@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { InvoiceWithDetails, TemplateSnapshot } from '@/lib/supabase/database.types'
+import { numberToWords } from '@/lib/utils/number-to-words'
 
 interface NSCWebPreviewProps {
   invoice: Partial<InvoiceWithDetails>
@@ -12,7 +13,19 @@ export default function NSCWebPreview({ invoice, snapshot }: NSCWebPreviewProps)
   const companyName = snapshot?.company_name || 'Neighbourhood Shine Co.'
   const logoUrl = snapshot?.logo_url || '/Neighbourhood-Shine.png'
   const items = invoice.invoice_items || []
-  const totalAmount = invoice.total_amount || invoice.subtotal || 0
+
+  // Subtotal from items or invoice
+  const subtotal = invoice.subtotal !== undefined && invoice.subtotal !== null
+    ? Number(invoice.subtotal)
+    : items.reduce((sum, item) => sum + (Number(item.line_total) || (Number(item.quantity || 1) * Number(item.amount || 0))), 0)
+
+  // GST calculation
+  const gstRate = Number(invoice.template_snapshot?.gst_rate ?? snapshot?.gst_rate ?? 10)
+  const gstAmount = Number(invoice.template_snapshot?.gst_amount ?? ((subtotal * gstRate) / 100))
+  const totalIncludingGst = Number(invoice.total_amount ?? (subtotal + gstAmount))
+  const amountInWords = invoice.template_snapshot?.amount_in_words
+    ? String(invoice.template_snapshot.amount_in_words)
+    : numberToWords(totalIncludingGst, invoice.template_snapshot?.currency || snapshot?.currency || 'AUD')
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A'
@@ -48,45 +61,51 @@ export default function NSCWebPreview({ invoice, snapshot }: NSCWebPreviewProps)
         </div>
 
         {/* Right Side: Logo */}
-        <div className="flex justify-center sm:justify-end items-center w-full sm:w-auto self-center sm:self-start pt-2 sm:pt-0">
-          <img
-            src={logoUrl}
-            alt="Neighbourhood Shine Co."
-            className="h-24 sm:h-28 object-contain"
-          />
+        <div className="shrink-0 flex items-center justify-end">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="Neighbourhood Shine Co. Logo"
+              className="max-h-[90px] max-w-[170px] object-contain"
+            />
+          ) : (
+            <div className="h-16 w-32 border border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400">
+              No Logo
+            </div>
+          )}
         </div>
       </div>
 
       {/* 2. Metadata Tables Row */}
-      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+      <div className="grid grid-cols-12 gap-3 sm:gap-4 items-start">
         {/* Left: Bill To & Address Table */}
-        <div className="w-full sm:w-[50%] border-2 border-black text-xs font-semibold">
+        <div className="col-span-12 sm:col-span-7 border-2 border-black text-xs">
           <div className="grid grid-cols-12 border-b-2 border-black">
-            <div className="col-span-4 p-2 bg-white border-r-2 border-black font-bold text-black">
+            <div className="col-span-4 p-1.5 border-r-2 border-black font-bold text-black">
               Bill To
             </div>
-            <div className="col-span-8 p-2 bg-white text-black font-bold">
+            <div className="col-span-8 p-1.5 font-bold text-black">
               {invoice.customer_name || '[Customer Name]'}
             </div>
           </div>
           <div className="grid grid-cols-12">
-            <div className="col-span-4 p-2 bg-white border-r-2 border-black font-bold text-black">
+            <div className="col-span-4 p-1.5 border-r-2 border-black font-bold text-black">
               Address
             </div>
-            <div className="col-span-8 p-2 bg-white text-black">
+            <div className="col-span-8 p-1.5 text-black">
               {invoice.reference_name || snapshot?.address || '22 Cheviot Avenue Berwick'}
             </div>
           </div>
         </div>
 
-        {/* Right: Invoice #, Date, ABN # Table & Total Paid */}
-        <div className="w-full sm:w-[38%] space-y-3">
-          <div className="border-2 border-black text-xs font-semibold">
+        {/* Right: Invoice #, Date, ABN #, Total Paid Table */}
+        <div className="col-span-12 sm:col-span-5 space-y-2">
+          <div className="border-2 border-black text-xs">
             <div className="grid grid-cols-12 border-b-2 border-black">
               <div className="col-span-6 p-1.5 border-r-2 border-black font-bold text-black">
                 Invoice #
               </div>
-              <div className="col-span-6 p-1.5 text-center font-bold text-black">
+              <div className="col-span-6 p-1.5 text-center font-bold text-black font-mono">
                 {invoice.invoice_number || '1001'}
               </div>
             </div>
@@ -108,13 +127,13 @@ export default function NSCWebPreview({ invoice, snapshot }: NSCWebPreviewProps)
             </div>
           </div>
 
-          {/* Total Paid(AUD) */}
+          {/* Total Paid(AUD) reflects Total Including GST */}
           <div className="border-2 border-black text-xs font-bold grid grid-cols-12">
             <div className="col-span-6 p-1.5 border-r-2 border-black bg-white text-black">
               Total Paid(AUD)
             </div>
-            <div className="col-span-6 p-1.5 text-center bg-white text-black">
-              AUD {Number(totalAmount).toFixed(2)}
+            <div className="col-span-6 p-1.5 text-center bg-white text-black font-extrabold text-[12.5px]">
+              AUD {totalIncludingGst.toFixed(2)}
             </div>
           </div>
         </div>
@@ -146,7 +165,7 @@ export default function NSCWebPreview({ invoice, snapshot }: NSCWebPreviewProps)
             const rate = qty > 0 ? (amt / qty).toFixed(2) : amt.toFixed(2)
             return (
               <div key={idx} className="grid grid-cols-12 border-b border-black font-medium min-h-[42px] items-center">
-                <div className="col-span-7 p-2.5 border-r-2 border-black whitespace-pre-line text-black text-[12px]">
+                <div className="col-span-7 p-2.5 border-r-2 border-black whitespace-pre-line text-black text-[12px] leading-relaxed">
                   {item.description || 'General Cleaning Services'}
                 </div>
                 <div className="col-span-1 p-2.5 border-r-2 border-black text-center text-black">
@@ -163,28 +182,51 @@ export default function NSCWebPreview({ invoice, snapshot }: NSCWebPreviewProps)
           })
         ) : (
           <div className="grid grid-cols-12 border-b border-black font-medium min-h-[50px] items-center">
-            <div className="col-span-7 p-2.5 border-r-2 border-black whitespace-pre-line text-black text-[12px]">
+            <div className="col-span-7 p-2.5 border-r-2 border-black whitespace-pre-line text-black text-[12px] leading-relaxed">
               3 bedrooms 2 bathrooms
             </div>
             <div className="col-span-1 p-2.5 border-r-2 border-black text-center text-black">
               1
             </div>
             <div className="col-span-2 p-2.5 border-r-2 border-black text-center text-black">
-              {Number(totalAmount).toFixed(2)}
+              {Number(subtotal).toFixed(2)}
             </div>
             <div className="col-span-2 p-2.5 text-center font-bold text-black">
-              {Number(totalAmount).toFixed(2)}
+              {Number(subtotal).toFixed(2)}
             </div>
           </div>
         )}
 
-        {/* Total Amount Due */}
-        <div className="grid grid-cols-12 font-bold text-xs bg-white">
-          <div className="col-span-8 p-2.5 border-r-2 border-black text-center uppercase tracking-wide">
-            Total Amount Due
+        {/* Row 1: Amount In Word & Subtotal */}
+        <div className="grid grid-cols-12 font-bold text-xs bg-white border-t-2 border-black">
+          <div className="col-span-8 p-2 border-r-2 border-black text-left flex items-center gap-1.5 overflow-hidden">
+            <span className="font-bold text-black uppercase text-[11px] shrink-0">Amount In Word:</span>
+            <span className="font-semibold italic text-slate-800 text-[11px] truncate capitalize">
+              {amountInWords}
+            </span>
           </div>
-          <div className="col-span-4 p-2.5 text-center text-[13px]">
-            AUD {Number(totalAmount).toFixed(2)}
+          <div className="col-span-4 p-2 text-center font-bold text-black text-[12px]">
+            AUD {subtotal.toFixed(2)}
+          </div>
+        </div>
+
+        {/* Row 2: GST % and GST Amount */}
+        <div className="grid grid-cols-12 font-bold text-xs bg-white border-t border-black">
+          <div className="col-span-8 p-2 border-r-2 border-black text-right pr-4 uppercase text-[11px]">
+            GST {gstRate > 0 ? `(${gstRate}%)` : '%'}
+          </div>
+          <div className="col-span-4 p-2 text-center font-bold text-black text-[12px]">
+            AUD {gstAmount.toFixed(2)}
+          </div>
+        </div>
+
+        {/* Row 3: Total Including GST */}
+        <div className="grid grid-cols-12 font-bold text-xs bg-white border-t-2 border-black">
+          <div className="col-span-8 p-2.5 border-r-2 border-black text-right pr-4 uppercase text-[11px] tracking-wide">
+            Total Including GST
+          </div>
+          <div className="col-span-4 p-2.5 text-center font-extrabold text-black text-[13px]">
+            AUD {totalIncludingGst.toFixed(2)}
           </div>
         </div>
       </div>

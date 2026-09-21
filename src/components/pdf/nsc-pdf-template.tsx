@@ -1,6 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Image, Svg, Polygon } from '@react-pdf/renderer'
 import { InvoiceWithDetails, TemplateSnapshot } from '@/lib/supabase/database.types'
+import { numberToWords } from '@/lib/utils/number-to-words'
 
 const styles = StyleSheet.create({
   page: {
@@ -209,6 +210,45 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
     fontSize: 8.5,
   },
+  summaryRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#000000',
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 8,
+  },
+  summaryRowLast: {
+    flexDirection: 'row',
+    borderTopWidth: 1.5,
+    borderTopColor: '#000000',
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 8.5,
+  },
+  amountInWordsLabel: {
+    width: '72%',
+    borderRightWidth: 1.5,
+    borderRightColor: '#000000',
+    padding: 4,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  summaryRightLabel: {
+    width: '72%',
+    borderRightWidth: 1.5,
+    borderRightColor: '#000000',
+    padding: 4,
+    textAlign: 'right',
+    paddingRight: 8,
+    fontFamily: 'Helvetica-Bold',
+  },
+  summaryValue: {
+    width: '28%',
+    padding: 4,
+    textAlign: 'center',
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 8,
+  },
   totalDueRow: {
     flexDirection: 'row',
     fontFamily: 'Helvetica-Bold',
@@ -284,7 +324,19 @@ export default function NSCPDFTemplate({ invoice, snapshot, resolvedLogoUrl }: N
   const companyName = snapshot?.company_name || 'Neighbourhood Shine Co.'
   const logoSrc = resolvedLogoUrl || snapshot?.logo_url || '/Neighbourhood-Shine.png'
   const items = invoice.invoice_items || []
-  const totalAmount = invoice.total_amount || invoice.subtotal || 0
+  
+  // Subtotal calculation
+  const subtotal = invoice.subtotal !== undefined && invoice.subtotal !== null
+    ? Number(invoice.subtotal)
+    : items.reduce((sum, item) => sum + (Number(item.line_total) || (Number(item.quantity || 1) * Number(item.amount || 0))), 0)
+
+  // GST calculation
+  const gstRate = Number(invoice.template_snapshot?.gst_rate ?? snapshot?.gst_rate ?? 10)
+  const gstAmount = Number(invoice.template_snapshot?.gst_amount ?? ((subtotal * gstRate) / 100))
+  const totalIncludingGst = Number(invoice.total_amount ?? (subtotal + gstAmount))
+  const amountInWords = invoice.template_snapshot?.amount_in_words
+    ? String(invoice.template_snapshot.amount_in_words)
+    : numberToWords(totalIncludingGst, invoice.template_snapshot?.currency || snapshot?.currency || 'AUD')
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A'
@@ -299,7 +351,7 @@ export default function NSCPDFTemplate({ invoice, snapshot, resolvedLogoUrl }: N
   }
 
   return (
-    <Document title={`Invoice-${invoice.invoice_number || 'NSC-149'}`}>
+    <Document title={`Invoice-${invoice.invoice_number || '1001'}`}>
       <Page size="A4" style={styles.page}>
         <View style={styles.outerContainer}>
           {/* Top Section: Header, Meta Information and Items Table */}
@@ -354,7 +406,7 @@ export default function NSCPDFTemplate({ invoice, snapshot, resolvedLogoUrl }: N
                   <View style={styles.tableRow}>
                     <Text style={styles.metaLabelCell}>Invoice #</Text>
                     <Text style={[styles.metaValueCell, styles.headerBold]}>
-                      {invoice.invoice_number || '149'}
+                      {invoice.invoice_number || '1001'}
                     </Text>
                   </View>
                   <View style={styles.tableRow}>
@@ -371,7 +423,7 @@ export default function NSCPDFTemplate({ invoice, snapshot, resolvedLogoUrl }: N
 
                 <View style={styles.totalPaidBox}>
                   <Text style={styles.totalPaidLabel}>Total Paid(AUD)</Text>
-                  <Text style={styles.totalPaidValue}>AUD {Number(totalAmount).toFixed(2)}</Text>
+                  <Text style={styles.totalPaidValue}>AUD {totalIncludingGst.toFixed(2)}</Text>
                 </View>
               </View>
             </View>
@@ -392,7 +444,17 @@ export default function NSCPDFTemplate({ invoice, snapshot, resolvedLogoUrl }: N
                   const rate = qty > 0 ? (amt / qty).toFixed(2) : amt.toFixed(2)
                   return (
                     <View key={idx} style={styles.itemRow}>
-                      <Text style={styles.colDesc}>{item.description || 'General Cleaning Services'}</Text>
+                      <View style={styles.colDesc}>
+                        {item.description ? (
+                          item.description.split('\n').map((line, lIdx) => (
+                            <Text key={lIdx} style={{ marginBottom: line.trim() === '' ? 2 : 1 }}>
+                              {line}
+                            </Text>
+                          ))
+                        ) : (
+                          <Text>General Cleaning Services</Text>
+                        )}
+                      </View>
                       <Text style={styles.colQty}>{qty}</Text>
                       <Text style={styles.colRate}>{rate}</Text>
                       <Text style={styles.colAmount}>{amt.toFixed(2)}</Text>
@@ -401,17 +463,40 @@ export default function NSCPDFTemplate({ invoice, snapshot, resolvedLogoUrl }: N
                 })
               ) : (
                 <View style={styles.itemRow}>
-                  <Text style={styles.colDesc}>3 bedrooms 2 bathrooms</Text>
+                  <View style={styles.colDesc}>
+                    <Text>3 bedrooms 2 bathrooms</Text>
+                  </View>
                   <Text style={styles.colQty}>1</Text>
-                  <Text style={styles.colRate}>{Number(totalAmount).toFixed(2)}</Text>
-                  <Text style={styles.colAmount}>{Number(totalAmount).toFixed(2)}</Text>
+                  <Text style={styles.colRate}>{Number(subtotal).toFixed(2)}</Text>
+                  <Text style={styles.colAmount}>{Number(subtotal).toFixed(2)}</Text>
                 </View>
               )}
 
-              {/* Total Amount Due */}
-              <View style={styles.totalDueRow}>
-                <Text style={styles.totalDueLabel}>TOTAL AMOUNT DUE</Text>
-                <Text style={styles.totalDueValue}>AUD {Number(totalAmount).toFixed(2)}</Text>
+              {/* Row 1: Amount In Word & Subtotal */}
+              <View style={styles.summaryRow}>
+                <View style={styles.amountInWordsLabel}>
+                  <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7.5 }}>Amount In Word: </Text>
+                  <Text style={{ fontFamily: 'Helvetica-Oblique', fontSize: 7.5 }}>
+                    {amountInWords}
+                  </Text>
+                </View>
+                <Text style={styles.summaryValue}>AUD {subtotal.toFixed(2)}</Text>
+              </View>
+
+              {/* Row 2: GST % and GST Amount */}
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryRightLabel}>
+                  GST {gstRate > 0 ? `(${gstRate}%)` : '%'}
+                </Text>
+                <Text style={styles.summaryValue}>AUD {gstAmount.toFixed(2)}</Text>
+              </View>
+
+              {/* Row 3: Total Including GST */}
+              <View style={styles.summaryRowLast}>
+                <Text style={styles.summaryRightLabel}>
+                  TOTAL INCLUDING GST
+                </Text>
+                <Text style={[styles.summaryValue, { fontSize: 8.5 }]}>AUD {totalIncludingGst.toFixed(2)}</Text>
               </View>
             </View>
           </View>
