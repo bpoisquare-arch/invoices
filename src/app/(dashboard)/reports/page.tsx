@@ -244,6 +244,19 @@ export default function StudentReportsPage() {
             <RotateCcw className={`size-3.5 text-[#009D9E] ${isLoadingRecords ? 'animate-spin' : ''}`} />
             <span>Refresh Data</span>
           </Button>
+
+          {/* Import Excel */}
+          {!isViewer && (
+            <Button
+              size="sm"
+              onClick={() => setIsUploadModalOpen(true)}
+              className="bg-gradient-to-r from-[#003D5C] to-[#002233] hover:from-[#002233] hover:to-[#001520] text-cyan-300 h-9.5 px-4 rounded-xl text-xs gap-2 shadow-2xs font-extrabold cursor-pointer transition-all border border-cyan-500/20"
+              title="Import AIMT student Excel report into database"
+            >
+              <UploadCloud className="size-4 text-cyan-300" />
+              <span>Import Excel</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -263,6 +276,7 @@ export default function StudentReportsPage() {
         selectedIds={selectedIds}
         onSelectChange={setSelectedIds}
         onViewRecord={(record) => setDetailModalRecord(record)}
+        onImportExcel={isViewer ? undefined : () => setIsUploadModalOpen(true)}
         onAddEntry={
           isViewer
             ? undefined
