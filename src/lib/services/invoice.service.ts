@@ -55,7 +55,7 @@ export interface UpdateInvoiceInput {
 export interface InvoiceFilterParams {
   search?: string
   companyId?: string
-  entityType?: 'edlink-pk' | 'edlink-au' | 'all'
+  entityType?: 'edlink-pk' | 'edlink-au' | 'nsc' | 'isquare-bpo' | 'all'
   dateFilter?: 'all' | 'today' | '7days' | '30days' | 'this_month' | 'last_month' | 'this_year' | 'custom'
   startDate?: string
   endDate?: string
@@ -79,18 +79,95 @@ if (typeof window !== 'undefined') {
   }
 }
 
-export async function generateNextInvoiceNumber(companyId: string): Promise<string> {
-  let maxSeq = 326 // Baseline starting number
+export function getInvoicePdfFilename(invoice: Partial<InvoiceWithDetails>): string {
+  const isAnonymous = Boolean(
+    invoice.template_snapshot?.is_anonymous ||
+    invoice.template_snapshot?.layout_type === 'anonymous_v1' ||
+    invoice.companies?.prefix === 'ANO' ||
+    invoice.companies?.name?.toLowerCase() === 'anonymous'
+  )
+
+  const compName = (invoice.template_snapshot?.company_name || invoice.companies?.name || '').toLowerCase()
+  let entityName = 'EdLink Australia'
+  if (isAnonymous) {
+    entityName = 'EdLink Pakistan'
+  } else if (
+    invoice.companies?.prefix === 'NSC' ||
+    invoice.template_snapshot?.layout_type === 'nsc_v1' ||
+    compName.includes('neighbourhood')
+  ) {
+    entityName = 'Neighbourhood Shine'
+  } else if (
+    invoice.companies?.prefix === 'ISQ' ||
+    compName.includes('isquare')
+  ) {
+    entityName = 'Isquare BPO'
+  } else if (compName.includes('edlink')) {
+    entityName = 'EdLink Australia'
+  } else if (invoice.template_snapshot?.company_name) {
+    entityName = invoice.template_snapshot.company_name
+  } else if (invoice.companies?.name) {
+    entityName = invoice.companies.name
+  }
+
+  const safeEntity = entityName.replace(/[/\\?%*:|"<>]/g, '').trim()
+  const safeCustomer = (invoice.customer_name || 'Customer').replace(/[/\\?%*:|"<>]/g, '').trim()
+  const safeNumber = (invoice.invoice_number || '1001').replace(/[/\\?%*:|"<>]/g, '').trim()
+
+  return `${safeEntity}-${safeCustomer}-${safeNumber}.pdf`
+}
+
+export async function generateNextInvoiceNumber(companyId: string, isAnonymous?: boolean): Promise<string> {
+  let maxSeq = 1000 // Each entity starts at 1001 (1000 + 1)
 
   try {
     const supabase = createClient()
+
+    // 1. Identify target entity category
+    let targetEntity: 'nsc' | 'isq' | 'edlink-pk' | 'edlink-au' = 'edlink-au'
+    if (isAnonymous || companyId === 'anonymous-company-id') {
+      targetEntity = 'edlink-pk'
+    } else if (companyId === 'nsc-company-id' || companyId === 'nsc') {
+      targetEntity = 'nsc'
+    } else if (companyId === 'isquare-bpo-company-id' || companyId === 'isquare-bpo' || companyId === 'isq') {
+      targetEntity = 'isq'
+    } else if (isValidUUID(companyId)) {
+      const { data: comp } = await supabase.from('companies').select('prefix, name').eq('id', companyId).single()
+      if (comp) {
+        const cname = (comp.name || '').toLowerCase()
+        if (comp.prefix === 'NSC' || cname.includes('neighbourhood')) {
+          targetEntity = 'nsc'
+        } else if (comp.prefix === 'ISQ' || cname.includes('isquare')) {
+          targetEntity = 'isq'
+        } else if (comp.prefix === 'ANO' || cname.includes('anonymous')) {
+          targetEntity = 'edlink-pk'
+        }
+      }
+    }
+
+    // 2. Query invoices from DB to find the maximum existing sequence for THIS entity
     const { data: existingInvoices } = await supabase
       .from('invoices')
-      .select('invoice_number')
+      .select('invoice_number, template_snapshot, companies(prefix, name)')
 
     if (existingInvoices && existingInvoices.length > 0) {
-      existingInvoices.forEach((inv) => {
-        if (inv.invoice_number) {
+      existingInvoices.forEach((inv: any) => {
+        const compName = (inv.template_snapshot?.company_name || inv.companies?.name || '').toLowerCase()
+        const isAnon = Boolean(
+          inv.template_snapshot?.is_anonymous ||
+          inv.template_snapshot?.layout_type === 'anonymous_v1' ||
+          inv.companies?.prefix === 'ANO' ||
+          inv.companies?.name?.toLowerCase() === 'anonymous'
+        )
+        const isNsc = inv.companies?.prefix === 'NSC' || inv.template_snapshot?.layout_type === 'nsc_v1' || compName.includes('neighbourhood')
+        const isIsq = inv.companies?.prefix === 'ISQ' || compName.includes('isquare')
+
+        let entity: 'nsc' | 'isq' | 'edlink-pk' | 'edlink-au' = 'edlink-au'
+        if (isNsc) entity = 'nsc'
+        else if (isIsq) entity = 'isq'
+        else if (isAnon || compName.includes('edlink pakistan')) entity = 'edlink-pk'
+
+        if (entity === targetEntity && inv.invoice_number) {
           const match = inv.invoice_number.match(/\d+/)
           if (match) {
             const num = parseInt(match[0], 10)
@@ -106,7 +183,7 @@ export async function generateNextInvoiceNumber(companyId: string): Promise<stri
   }
 
   const nextSeq = maxSeq + 1
-  return String(nextSeq).padStart(5, '0')
+  return String(nextSeq)
 }
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceWithDetails> {
@@ -117,6 +194,30 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
   let email = 'finance@edlink.com.au'
   let phone = '+61 432 536 123'
   let paymentDetails = `Account Name: Riaz & Sons PTY Ltd\nBSB: 083-543\nAccount No: 72-996-1834\nABN: 62 658 488 469`
+  let companyLogo: string | null = '/edlink-logo.png'
+  let layoutType = 'edlink_v1'
+  let primaryColor = '#2563eb'
+  let footerTerms = 'Thank you for getting services from us'
+
+  if (input.company_id === 'nsc-company-id' || input.company_id === 'nsc') {
+    companyName = 'Neighbourhood Shine Co.'
+    companyLogo = '/Neighbourhood-Shine.png'
+    layoutType = 'nsc_v1'
+    primaryColor = '#8CB34E'
+    address = '22 Cheviot Avenue Berwick'
+    paymentDetails = `BANK ACCOUNT DETAILS\nBank Name: Common Wealth Bank\nAccount Name: Neighbourhood Shine Co\nAccount Number: 313369861\nBSB / IFSC: 083-004\n\nPAY ID DETAILS\nAccount Name: Neighbourhood Shine Co\nPAY ID: 0421 953 400`
+    footerTerms = `• Payment is required on arrival on the day of service.\n• The customer is responsible for arranging suitable parking for our service vehicle.\n• Access to electricity and running hot water must be available at the property.\n• While we make every effort, complete removal of pet hair cannot be guaranteed.\n• The property must be vacant at the time of cleaning.\n• Quoted pricing is based on properties in standard/normal condition. Heavily soiled properties may incur additional charges.\n• Ceilings and garage walls are excluded from the service.\n• Payment can be made via cash, bank transfer, or Pay ID.`
+  } else if (input.company_id === 'isquare-bpo-company-id' || input.company_id === 'isquare-bpo' || input.company_id === 'isq') {
+    companyName = 'ISquare BPO'
+    companyLogo = '/isquarebpo.png'
+    layoutType = 'edlink_v1'
+    primaryColor = '#003D5C'
+    address = 'Suite 500, Tech Park, Islamabad, Pakistan'
+    email = 'invoicing@isquarebpo.com'
+    phone = '+92 51 111 222 333'
+    paymentDetails = 'Account Name: iSquare BPO Solutions\nSWIFT: ISQBPOPK\nAccount No: 9876543210'
+    footerTerms = 'Payment due within 15 days of invoice date.'
+  }
 
   // 1. Resolve Company ID to a valid database UUID
   let resolvedCompanyId = input.company_id
@@ -131,6 +232,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
       if (company) {
         companyName = company.name
         resolvedCompanyId = company.id
+        if (company.logo_url) companyLogo = company.logo_url
       }
     } else {
       // If company_id is not a valid UUID (e.g. fallback string), get the first company from DB
@@ -141,18 +243,20 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
         .single()
 
       if (firstCompany) {
-        companyName = firstCompany.name
         resolvedCompanyId = firstCompany.id
       }
     }
 
-    const activeTemplate = await getTemplateByCompanyId(resolvedCompanyId)
+    const activeTemplate = await getTemplateByCompanyId(input.company_id || resolvedCompanyId)
     if (activeTemplate) {
       if (activeTemplate.company_name) companyName = activeTemplate.company_name
       if (activeTemplate.address) address = activeTemplate.address
       if (activeTemplate.email) email = activeTemplate.email
       if (activeTemplate.phone) phone = activeTemplate.phone
       if (activeTemplate.payment_details) paymentDetails = activeTemplate.payment_details
+      if (activeTemplate.footer_terms) footerTerms = activeTemplate.footer_terms
+      if (activeTemplate.layout_type) layoutType = activeTemplate.layout_type
+      if (activeTemplate.primary_color) primaryColor = activeTemplate.primary_color
     }
   } catch (err) {
     // Ignore error
@@ -168,7 +272,12 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
     input.is_anonymous ||
     input.company_id === 'anonymous-company-id' ||
     companyName.toLowerCase() === 'anonymous'
-  )
+  ) &&
+    input.company_id !== 'nsc-company-id' &&
+    input.company_id !== 'nsc' &&
+    input.company_id !== 'isquare-bpo-company-id' &&
+    input.company_id !== 'isquare-bpo' &&
+    input.company_id !== 'isq'
 
   const templateSnapshot: TemplateSnapshot = isAnonymous
     ? {
@@ -193,17 +302,17 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
       phone,
       email,
       payment_details: paymentDetails,
-      currency: input.currency || 'AUD',
-      footer_terms: 'Thank you for getting services from us',
-      primary_color: '#2563eb',
-      layout_type: 'edlink_v1',
-      logo_url: '/edlink-logo.png',
+      currency: input.currency || (input.company_id === 'isquare-bpo-company-id' || input.company_id === 'isq' ? 'USD' : 'AUD'),
+      footer_terms: input.footer_terms || footerTerms,
+      primary_color: primaryColor,
+      layout_type: layoutType,
+      logo_url: companyLogo,
       header_mode: 'logo',
       bill_to_label: 'BILL TO',
       is_anonymous: false,
     }
 
-  const invoiceNumber = input.invoice_number || (await generateNextInvoiceNumber(resolvedCompanyId))
+  const invoiceNumber = input.invoice_number || (await generateNextInvoiceNumber(resolvedCompanyId, isAnonymous))
 
   const preparedItems = input.items.map((item) => {
     const qty = Number(item.quantity) || 0
@@ -467,6 +576,66 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
 
     const { data, count, error } = await query
 
+    const filterByEntity = (invoices: InvoiceWithDetails[], entityType?: string): InvoiceWithDetails[] => {
+      if (!entityType || entityType === 'all') return invoices
+
+      if (entityType === 'nsc') {
+        return invoices.filter((inv) => {
+          const compName = (inv.template_snapshot?.company_name || inv.companies?.name || '').toLowerCase()
+          return (
+            inv.companies?.prefix === 'NSC' ||
+            inv.company_id === 'nsc-company-id' ||
+            inv.template_snapshot?.layout_type === 'nsc_v1' ||
+            compName.includes('neighbourhood')
+          )
+        })
+      }
+
+      if (entityType === 'isquare-bpo') {
+        return invoices.filter((inv) => {
+          const compName = (inv.template_snapshot?.company_name || inv.companies?.name || '').toLowerCase()
+          return (
+            inv.companies?.prefix === 'ISQ' ||
+            inv.company_id === 'isquare-bpo-company-id' ||
+            compName.includes('isquare')
+          )
+        })
+      }
+
+      if (entityType === 'edlink-pk') {
+        return invoices.filter((inv) => {
+          const compName = (inv.template_snapshot?.company_name || inv.companies?.name || '').toLowerCase()
+          if (compName.includes('neighbourhood') || compName.includes('isquare') || inv.template_snapshot?.layout_type === 'nsc_v1') {
+            return false
+          }
+          const isAnon = Boolean(
+            inv.template_snapshot?.is_anonymous ||
+            inv.template_snapshot?.layout_type === 'anonymous_v1' ||
+            inv.companies?.prefix === 'ANO' ||
+            inv.companies?.name?.toLowerCase() === 'anonymous'
+          )
+          return isAnon || compName.includes('edlink pakistan')
+        })
+      }
+
+      if (entityType === 'edlink-au') {
+        return invoices.filter((inv) => {
+          const compName = (inv.template_snapshot?.company_name || inv.companies?.name || '').toLowerCase()
+          const isNsc = compName.includes('neighbourhood') || inv.template_snapshot?.layout_type === 'nsc_v1' || inv.companies?.prefix === 'NSC'
+          const isIsq = compName.includes('isquare') || inv.companies?.prefix === 'ISQ'
+          const isAnon = Boolean(
+            inv.template_snapshot?.is_anonymous ||
+            inv.template_snapshot?.layout_type === 'anonymous_v1' ||
+            inv.companies?.prefix === 'ANO' ||
+            inv.companies?.name?.toLowerCase() === 'anonymous'
+          )
+          return !isAnon && !isNsc && !isIsq
+        })
+      }
+
+      return invoices
+    }
+
     if (error) {
       console.warn('Primary invoice fetch failed, running fallback query:', error.message)
 
@@ -479,26 +648,7 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
 
       if (fallback.data) {
         const rawInvoices = (fallback.data as InvoiceWithDetails[]) || []
-        let filteredInvoices = rawInvoices.map(normalizeInvoice)
-        if (params.entityType === 'edlink-pk') {
-          filteredInvoices = filteredInvoices.filter((inv) => {
-            return Boolean(
-              inv.template_snapshot?.is_anonymous ||
-              inv.template_snapshot?.layout_type === 'anonymous_v1' ||
-              inv.companies?.prefix === 'ANO' ||
-              inv.companies?.name?.toLowerCase() === 'anonymous'
-            )
-          })
-        } else if (params.entityType === 'edlink-au') {
-          filteredInvoices = filteredInvoices.filter((inv) => {
-            return !Boolean(
-              inv.template_snapshot?.is_anonymous ||
-              inv.template_snapshot?.layout_type === 'anonymous_v1' ||
-              inv.companies?.prefix === 'ANO' ||
-              inv.companies?.name?.toLowerCase() === 'anonymous'
-            )
-          })
-        }
+        const filteredInvoices = filterByEntity(rawInvoices.map(normalizeInvoice), params.entityType)
         return {
           invoices: filteredInvoices,
           totalCount: filteredInvoices.length,
@@ -511,29 +661,7 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
     }
 
     const rawInvoices = ((data || []) as InvoiceWithDetails[]).map(normalizeInvoice)
-
-    let filteredInvoices = rawInvoices
-    if (params.entityType === 'edlink-pk') {
-      filteredInvoices = rawInvoices.filter((inv) => {
-        const isAnon = Boolean(
-          inv.template_snapshot?.is_anonymous ||
-          inv.template_snapshot?.layout_type === 'anonymous_v1' ||
-          inv.companies?.prefix === 'ANO' ||
-          inv.companies?.name?.toLowerCase() === 'anonymous'
-        )
-        return isAnon
-      })
-    } else if (params.entityType === 'edlink-au') {
-      filteredInvoices = rawInvoices.filter((inv) => {
-        const isAnon = Boolean(
-          inv.template_snapshot?.is_anonymous ||
-          inv.template_snapshot?.layout_type === 'anonymous_v1' ||
-          inv.companies?.prefix === 'ANO' ||
-          inv.companies?.name?.toLowerCase() === 'anonymous'
-        )
-        return !isAnon
-      })
-    }
+    const filteredInvoices = filterByEntity(rawInvoices, params.entityType)
 
     return {
       invoices: filteredInvoices,

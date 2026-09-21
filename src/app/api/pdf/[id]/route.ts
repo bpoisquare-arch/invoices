@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { renderToStream } from '@react-pdf/renderer'
-import { getInvoiceById } from '@/lib/services/invoice.service'
+import { getInvoiceById, getInvoicePdfFilename } from '@/lib/services/invoice.service'
 import { renderInvoicePDFDocument } from '@/lib/services/template-registry'
 import fs from 'fs'
 import path from 'path'
@@ -63,7 +63,7 @@ export async function GET(
     const doc = renderInvoicePDFDocument(invoice, invoice.template_snapshot, resolvedLogoUrl)
     const stream = await renderToStream(doc)
 
-    const filename = `${invoice.invoice_number || 'Invoice'}.pdf`
+    const filename = getInvoicePdfFilename(invoice)
 
     return new NextResponse(stream as any, {
       status: 200,

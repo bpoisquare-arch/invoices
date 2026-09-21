@@ -170,6 +170,26 @@ export default function AppSidebar() {
       if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'edlink-pk')
     } else {
       if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search)
+        const entityParam = urlParams.get('entity') || urlParams.get('company')
+        if (entityParam === 'nsc') {
+          setActiveEntity('nsc')
+          localStorage.setItem('active_entity', 'nsc')
+          return
+        } else if (entityParam === 'isq' || entityParam === 'isquare-bpo') {
+          setActiveEntity('isquare-bpo')
+          localStorage.setItem('active_entity', 'isquare-bpo')
+          return
+        } else if (entityParam === 'edlink' || entityParam === 'edlink-au') {
+          setActiveEntity('edlink-au')
+          localStorage.setItem('active_entity', 'edlink-au')
+          return
+        } else if (entityParam === 'anonymous' || entityParam === 'edlink-pk') {
+          setActiveEntity('edlink-pk')
+          localStorage.setItem('active_entity', 'edlink-pk')
+          return
+        }
+
         const stored = localStorage.getItem('active_entity')
         if (stored === 'stc') setActiveEntity('stc')
         else if (stored === 'aimt') setActiveEntity('aimt')
@@ -287,7 +307,7 @@ export default function AppSidebar() {
   const isStc = activeEntity === 'stc' || pathname.startsWith('/stc')
   const isEdLinkAu = !isStc && (activeEntity === 'edlink-au' || pathname.startsWith('/edlink'))
   const isAimt = !isStc && !isEdLinkAu && (activeEntity === 'aimt' || pathname.startsWith('/installments') || pathname.startsWith('/payslips') || pathname.startsWith('/reports'))
-  const isEdLinkPk = !isStc && !isAimt && !isEdLinkAu && activeEntity !== 'nsc' && activeEntity !== 'isquare-bpo'
+  const isEdLinkPk = !isStc && !isAimt && !isEdLinkAu && (activeEntity === 'edlink-pk' || pathname.startsWith('/attendance'))
 
   const currentEntityObj =
     ENTITIES.find((e) => e.id === activeEntity) ||
@@ -879,10 +899,23 @@ export default function AppSidebar() {
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
-                          {/* Generate Invoice (Directly to Anonymous/Custom template) */}
+                          {/* Generate Invoice */}
                           <SidebarMenuSubItem>
                             <SidebarMenuSubButton
-                              render={<Link href="/invoices/new?company=anonymous" onClick={handleNavClick} />}
+                              render={
+                                <Link
+                                  href={
+                                    activeEntity === 'nsc'
+                                      ? '/invoices/new?company=nsc'
+                                      : activeEntity === 'isquare-bpo'
+                                      ? '/invoices/new?company=isq'
+                                      : isEdLinkAu
+                                      ? '/invoices/new?company=edlink'
+                                      : '/invoices/new?company=anonymous'
+                                  }
+                                  onClick={handleNavClick}
+                                />
+                              }
                               isActive={pathname.startsWith('/invoices/new')}
                               className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
                             >
@@ -894,7 +927,18 @@ export default function AppSidebar() {
                           {/* Invoices List */}
                           <SidebarMenuSubItem>
                             <SidebarMenuSubButton
-                              render={<Link href="/invoices" onClick={handleNavClick} />}
+                              render={
+                                <Link
+                                  href={
+                                    activeEntity === 'nsc'
+                                      ? '/invoices?entity=nsc'
+                                      : activeEntity === 'isquare-bpo'
+                                      ? '/invoices?entity=isq'
+                                      : '/invoices'
+                                  }
+                                  onClick={handleNavClick}
+                                />
+                              }
                               isActive={
                                 pathname === '/invoices' ||
                                 (pathname.startsWith('/invoices') && !pathname.includes('/new'))
@@ -914,105 +958,107 @@ export default function AppSidebar() {
             </SidebarGroup>
 
             {/* Payroll Module Group (Specific to EdLink Pakistan) */}
-            <SidebarGroup className="p-0">
-              <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#81F5F5]/70 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
-                Payroll Module
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="gap-1">
-                  <Collapsible
-                    open={payrollOpen}
-                    onOpenChange={setPayrollOpen}
-                    className="group/collapsible"
-                  >
-                    <SidebarMenuItem>
-                      <CollapsibleTrigger
-                        render={
-                          <SidebarMenuButton
-                            tooltip="Payroll"
-                            className={`text-[13px] font-medium transition-all hover:bg-[#0E3E5B]/80 hover:text-white rounded-lg px-2.5 py-2 ${
-                              isPayrollActive
-                                ? 'text-[#81F5F5] bg-[#0E3E5B]'
-                                : 'text-slate-300'
-                            }`}
-                          />
-                        }
-                      >
-                        <Banknote className="size-4 shrink-0 text-[#81F5F5]" />
-                        <span className="font-semibold text-slate-200">Payroll</span>
-                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
-                          {/* Attendance Records */}
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton
-                              render={<Link href="/attendance/records" onClick={handleNavClick} />}
-                              isActive={pathname === '/attendance/records'}
-                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                            >
-                              <Clock className="size-3.5 shrink-0" />
-                              <span>Attendance Records</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
+            {isEdLinkPk && (
+              <SidebarGroup className="p-0">
+                <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#81F5F5]/70 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
+                  Payroll Module
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="gap-1">
+                    <Collapsible
+                      open={payrollOpen}
+                      onOpenChange={setPayrollOpen}
+                      className="group/collapsible"
+                    >
+                      <SidebarMenuItem>
+                        <CollapsibleTrigger
+                          render={
+                            <SidebarMenuButton
+                              tooltip="Payroll"
+                              className={`text-[13px] font-medium transition-all hover:bg-[#0E3E5B]/80 hover:text-white rounded-lg px-2.5 py-2 ${
+                                isPayrollActive
+                                  ? 'text-[#81F5F5] bg-[#0E3E5B]'
+                                  : 'text-slate-300'
+                              }`}
+                            />
+                          }
+                        >
+                          <Banknote className="size-4 shrink-0 text-[#81F5F5]" />
+                          <span className="font-semibold text-slate-200">Payroll</span>
+                          <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
+                            {/* Attendance Records */}
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                render={<Link href="/attendance/records" onClick={handleNavClick} />}
+                                isActive={pathname === '/attendance/records'}
+                                className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                              >
+                                <Clock className="size-3.5 shrink-0" />
+                                <span>Attendance Records</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
 
-                          {/* Employee Overview */}
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton
-                              render={<Link href="/attendance" onClick={handleNavClick} />}
-                              isActive={
-                                pathname === '/attendance' ||
-                                pathname.startsWith('/attendance/employees')
-                              }
-                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                            >
-                              <Users className="size-3.5 shrink-0" />
-                              <span>Employee Overview</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
+                            {/* Employee Overview */}
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                render={<Link href="/attendance" onClick={handleNavClick} />}
+                                isActive={
+                                  pathname === '/attendance' ||
+                                  pathname.startsWith('/attendance/employees')
+                                }
+                                className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                              >
+                                <Users className="size-3.5 shrink-0" />
+                                <span>Employee Overview</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
 
-                          {/* Import Excel */}
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton
-                              render={<Link href="/attendance/import" onClick={handleNavClick} />}
-                              isActive={pathname === '/attendance/import'}
-                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                            >
-                              <FileSpreadsheet className="size-3.5 shrink-0" />
-                              <span>Import Excel</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
+                            {/* Import Excel */}
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                render={<Link href="/attendance/import" onClick={handleNavClick} />}
+                                isActive={pathname === '/attendance/import'}
+                                className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                              >
+                                <FileSpreadsheet className="size-3.5 shrink-0" />
+                                <span>Import Excel</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
 
-                          {/* Payslip */}
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton
-                              render={<Link href="/attendance/payslips" onClick={handleNavClick} />}
-                              isActive={pathname.startsWith('/attendance/payslips')}
-                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                            >
-                              <Receipt className="size-3.5 shrink-0" />
-                              <span>Payslip</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
+                            {/* Payslip */}
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                render={<Link href="/attendance/payslips" onClick={handleNavClick} />}
+                                isActive={pathname.startsWith('/attendance/payslips')}
+                                className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                              >
+                                <Receipt className="size-3.5 shrink-0" />
+                                <span>Payslip</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
 
-                          {/* Settings */}
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton
-                              render={<Link href="/attendance/settings" onClick={handleNavClick} />}
-                              isActive={pathname === '/attendance/settings'}
-                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
-                            >
-                              <SlidersHorizontal className="size-3.5 shrink-0" />
-                              <span>Settings</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        </SidebarMenuSub>
+                            {/* Settings */}
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                render={<Link href="/attendance/settings" onClick={handleNavClick} />}
+                                isActive={pathname === '/attendance/settings'}
+                                className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                              >
+                                <SlidersHorizontal className="size-3.5 shrink-0" />
+                                <span>Settings</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          </SidebarMenuSub>
                       </CollapsibleContent>
                     </SidebarMenuItem>
                   </Collapsible>
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
+            )}
           </>
         )}
       </SidebarContent>

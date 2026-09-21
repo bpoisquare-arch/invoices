@@ -9,6 +9,7 @@ import {
   duplicateInvoice,
   InvoiceFilterParams,
   syncLocalInvoicesToSupabase,
+  getInvoicePdfFilename,
 } from '@/lib/services/invoice.service'
 import { getCompanies } from '@/lib/services/company.service'
 import { renderInvoicePDFDocument } from '@/lib/services/template-registry'
@@ -82,8 +83,15 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('active_entity') || 'edlink-pk'
-      setActiveEntity(stored)
+      const urlParams = new URLSearchParams(window.location.search)
+      const entityParam = urlParams.get('entity') || urlParams.get('company')
+      let entity = localStorage.getItem('active_entity') || 'edlink-pk'
+      if (entityParam === 'nsc') entity = 'nsc'
+      else if (entityParam === 'isq' || entityParam === 'isquare-bpo') entity = 'isquare-bpo'
+      else if (entityParam === 'edlink' || entityParam === 'edlink-au') entity = 'edlink-au'
+      else if (entityParam === 'anonymous' || entityParam === 'edlink-pk') entity = 'edlink-pk'
+      setActiveEntity(entity)
+      localStorage.setItem('active_entity', entity)
     }
   }, [])
 
@@ -100,7 +108,7 @@ export default function InvoicesPage() {
       const params: InvoiceFilterParams = {
         search: debouncedSearch,
         companyId: selectedCompany,
-        entityType: currentEntity === 'edlink-au' ? 'edlink-au' : 'edlink-pk',
+        entityType: (currentEntity === 'edlink-au' || currentEntity === 'nsc' || currentEntity === 'isquare-bpo' || currentEntity === 'edlink-pk') ? (currentEntity as any) : 'edlink-pk',
         dateFilter,
         startDate: dateFilter === 'custom' ? startDate : undefined,
         endDate: dateFilter === 'custom' ? endDate : undefined,
@@ -146,12 +154,38 @@ export default function InvoicesPage() {
   async function handleDownloadPDF(inv: InvoiceWithDetails) {
     try {
       setDownloadingId(inv.id)
+      // 1. Fetch from server endpoint first (fast, reliable)
+      try {
+        const response = await fetch(`/api/pdf/${inv.id}`)
+        if (response.ok) {
+          const blob = await response.blob()
+          if (blob && blob.size > 0) {
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = getInvoicePdfFilename(inv)
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+            return
+          }
+        }
+      } catch (serverErr) {
+        console.warn('Server streaming failed, trying client renderer:', serverErr)
+      }
+
+      // 2. Client-side fallback with timeout
       const doc = renderInvoicePDFDocument(inv, inv.template_snapshot)
-      const blob = await pdf(doc).toBlob()
+      const blobPromise = pdf(doc).toBlob()
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('PDF generation timed out')), 4000)
+      )
+      const blob = await Promise.race([blobPromise, timeoutPromise])
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `Invoice-${inv.invoice_number || 'EDL'}.pdf`
+      a.download = getInvoicePdfFilename(inv)
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -164,8 +198,27 @@ export default function InvoicesPage() {
   }
 
   const isEdLinkAu = activeEntity === 'edlink-au'
-  const isEdLinkPk = !isEdLinkAu
-  const quickGenerateHref = isEdLinkAu ? '/invoices/new?company=edlink' : '/invoices/new?company=anonymous'
+  const isEdLinkPk = activeEntity === 'edlink-pk'
+  const entityTitle =
+    activeEntity === 'edlink-au'
+      ? 'EdLink Australia'
+      : activeEntity === 'nsc'
+      ? 'Neighbourhood Shine Co.'
+      : activeEntity === 'isquare-bpo'
+      ? 'ISquare BPO'
+      : activeEntity === 'stc'
+      ? 'States College Australia'
+      : activeEntity === 'aimt'
+      ? 'AIMT College'
+      : 'EdLink Pakistan'
+  const quickGenerateHref =
+    activeEntity === 'nsc'
+      ? '/invoices/new?company=nsc'
+      : activeEntity === 'isquare-bpo'
+      ? '/invoices/new?company=isq'
+      : isEdLinkAu
+      ? '/invoices/new?company=edlink'
+      : '/invoices/new?company=anonymous'
 
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 
@@ -175,7 +228,7 @@ export default function InvoicesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-[#003D5C] tracking-tight">
-            Overview ({isEdLinkAu ? 'EdLink Australia' : 'EdLink Pakistan'})
+            Overview ({entityTitle})
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Manage your enterprise billing operations.
@@ -415,138 +468,235 @@ export default function InvoicesPage() {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto w-full">
-              <table className="w-full text-left text-xs border-collapse min-w-[700px]">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-600 font-semibold border-y border-slate-200">
-                    <th className="py-3.5 px-4 sm:px-6">Invoice Number</th>
-                    <th className="py-3.5 px-4 sm:px-6">Company</th>
-                    <th className="py-3.5 px-4 sm:px-6">Customer Name</th>
-                    <th className="py-3.5 px-4 sm:px-6">Invoice Date</th>
-                    <th className="py-3.5 px-4 sm:px-6 text-right">Total Amount</th>
-                    <th className="py-3.5 px-4 sm:px-6 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {invoices.map((inv) => {
-                    const rawName = inv.template_snapshot?.company_name || inv.companies?.name || 'Company'
-                    const compName = rawName === 'EdLink Pakistan' ? 'EdLink Australia' : rawName
-                    const compLogo = inv.template_snapshot?.logo_url || inv.companies?.logo_url || (compName.toLowerCase().includes('edlink') || compName.toLowerCase().includes('australia') ? '/edlink-logo.png' : compName.toLowerCase().includes('aimt') ? '/aimt-logo.png' : null)
-                    const curr = inv.template_snapshot?.currency || inv.companies?.currency || 'AUD'
+            <>
+              {/* Desktop Table View (visible on md+) */}
+              <div className="hidden md:block overflow-x-auto w-full">
+                <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-600 font-semibold border-y border-slate-200">
+                      <th className="py-3.5 px-4 sm:px-6">Invoice Number</th>
+                      <th className="py-3.5 px-4 sm:px-6">Company</th>
+                      <th className="py-3.5 px-4 sm:px-6">Customer Name</th>
+                      <th className="py-3.5 px-4 sm:px-6">Invoice Date</th>
+                      <th className="py-3.5 px-4 sm:px-6 text-right">Total Amount</th>
+                      <th className="py-3.5 px-4 sm:px-6 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {invoices.map((inv) => {
+                      const rawName = inv.template_snapshot?.company_name || inv.companies?.name || 'Company'
+                      const compName = rawName === 'EdLink Pakistan' ? 'EdLink Australia' : rawName
+                      const compLogo = inv.template_snapshot?.logo_url || inv.companies?.logo_url || (compName.toLowerCase().includes('edlink') || compName.toLowerCase().includes('australia') ? '/edlink-logo.png' : compName.toLowerCase().includes('aimt') ? '/aimt-logo.png' : null)
+                      const curr = inv.template_snapshot?.currency || inv.companies?.currency || 'AUD'
 
-                    return (
-                      <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
-                        {/* Invoice Number */}
-                        <td className="py-4 px-4 sm:px-6">
+                      return (
+                        <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
+                          {/* Invoice Number */}
+                          <td className="py-4 px-4 sm:px-6">
+                            <Link
+                              href={`/invoices/${inv.id}/preview`}
+                              className="font-bold text-blue-600 hover:underline block"
+                            >
+                              {inv.invoice_number}
+                            </Link>
+                            {inv.reference_name && (
+                              <span className="text-[11px] text-slate-500 block mt-0.5 truncate max-w-[200px]">
+                                Ref: {inv.reference_name}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Company */}
+                          <td className="py-4 px-4 sm:px-6 text-slate-700 font-medium">
+                            <div className="flex items-center gap-2">
+                              {compLogo ? (
+                                <div className="h-6 w-12 rounded bg-slate-50 border border-slate-200 p-0.5 flex items-center justify-center shrink-0 overflow-hidden">
+                                  <img
+                                    src={compLogo}
+                                    alt={compName}
+                                    className="max-h-full max-w-full object-contain"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="p-1 rounded bg-blue-50 text-blue-600 shrink-0">
+                                  <Building2 className="w-3.5 h-3.5" />
+                                </div>
+                              )}
+                              <span className="truncate max-w-[150px]">{compName}</span>
+                            </div>
+                          </td>
+
+                          {/* Customer */}
+                          <td className="py-4 px-4 sm:px-6 text-slate-900 font-bold">
+                            {inv.customer_name}
+                          </td>
+
+                          {/* Date */}
+                          <td className="py-4 px-4 sm:px-6 text-slate-600 whitespace-nowrap">
+                            {inv.invoice_date}
+                          </td>
+
+                          {/* Total Amount */}
+                          <td className="py-4 px-4 sm:px-6 text-right font-extrabold text-slate-900 text-sm whitespace-nowrap">
+                            {Number(inv.total_amount).toFixed(2)}{' '}
+                            <span className="text-[10px] text-slate-500 font-semibold">{curr}</span>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-4 px-4 sm:px-6">
+                            <div className="flex items-center justify-center gap-1">
+                              <Link href={`/invoices/${inv.id}/preview`}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-slate-600 hover:text-blue-600"
+                                  title="Preview Invoice"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              </Link>
+
+                              <Link href={`/invoices/${inv.id}/edit`}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-slate-600 hover:text-blue-600"
+                                  title="Edit Invoice"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </Link>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={downloadingId === inv.id}
+                                onClick={() => handleDownloadPDF(inv)}
+                                className="h-8 w-8 p-0 text-slate-600 hover:text-emerald-600"
+                                title="Download PDF"
+                              >
+                                {downloadingId === inv.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                                ) : (
+                                  <Download className="w-4 h-4" />
+                                )}
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedInvoice(inv)
+                                  setDeleteDialogOpen(true)
+                                }}
+                                className="h-8 w-8 p-0 text-slate-600 hover:text-rose-600"
+                                title="Delete Invoice"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card List View (visible on <md) */}
+              <div className="block md:hidden divide-y divide-slate-100">
+                {invoices.map((inv) => {
+                  const rawName = inv.template_snapshot?.company_name || inv.companies?.name || 'Company'
+                  const compName = rawName === 'EdLink Pakistan' ? 'EdLink Australia' : rawName
+                  const compLogo = inv.template_snapshot?.logo_url || inv.companies?.logo_url || (compName.toLowerCase().includes('edlink') || compName.toLowerCase().includes('australia') ? '/edlink-logo.png' : compName.toLowerCase().includes('aimt') ? '/aimt-logo.png' : null)
+                  const curr = inv.template_snapshot?.currency || inv.companies?.currency || 'AUD'
+
+                  return (
+                    <div key={inv.id} className="p-4 space-y-3 bg-white hover:bg-slate-50/80 transition-colors">
+                      {/* Top row: Company & Date */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {compLogo ? (
+                            <div className="h-5 w-8 rounded bg-slate-50 border border-slate-200 p-0.5 flex items-center justify-center shrink-0 overflow-hidden">
+                              <img src={compLogo} alt={compName} className="max-h-full max-w-full object-contain" />
+                            </div>
+                          ) : (
+                            <div className="p-0.5 rounded bg-blue-50 text-blue-600 shrink-0">
+                              <Building2 className="w-3 h-3" />
+                            </div>
+                          )}
+                          <span className="text-[11px] font-semibold text-slate-700 truncate">{compName}</span>
+                        </div>
+                        <span className="text-[11px] text-slate-500 shrink-0">{inv.invoice_date}</span>
+                      </div>
+
+                      {/* Middle row: Invoice Number, Customer & Amount */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
                           <Link
                             href={`/invoices/${inv.id}/preview`}
-                            className="font-bold text-blue-600 hover:underline block"
+                            className="font-bold text-sm text-blue-600 hover:underline block truncate"
                           >
                             {inv.invoice_number}
                           </Link>
+                          <p className="text-xs font-bold text-slate-900 mt-0.5 truncate">{inv.customer_name}</p>
                           {inv.reference_name && (
-                            <span className="text-[11px] text-slate-500 block mt-0.5 truncate max-w-[200px]">
-                              Ref: {inv.reference_name}
-                            </span>
+                            <p className="text-[11px] text-slate-500 truncate mt-0.5">Ref: {inv.reference_name}</p>
                           )}
-                        </td>
+                        </div>
 
-                        {/* Company */}
-                        <td className="py-4 px-4 sm:px-6 text-slate-700 font-medium">
-                          <div className="flex items-center gap-2">
-                            {compLogo ? (
-                              <div className="h-6 w-12 rounded bg-slate-50 border border-slate-200 p-0.5 flex items-center justify-center shrink-0 overflow-hidden">
-                                <img
-                                  src={compLogo}
-                                  alt={compName}
-                                  className="max-h-full max-w-full object-contain"
-                                />
-                              </div>
-                            ) : (
-                              <div className="p-1 rounded bg-blue-50 text-blue-600 shrink-0">
-                                <Building2 className="w-3.5 h-3.5" />
-                              </div>
-                            )}
-                            <span className="truncate max-w-[150px]">{compName}</span>
-                          </div>
-                        </td>
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] text-slate-500 uppercase block font-medium">Total</span>
+                          <span className="text-base font-extrabold text-slate-900">
+                            {Number(inv.total_amount).toFixed(2)}{' '}
+                            <span className="text-[10px] font-semibold text-slate-500">{curr}</span>
+                          </span>
+                        </div>
+                      </div>
 
-                        {/* Customer */}
-                        <td className="py-4 px-4 sm:px-6 text-slate-900 font-bold">
-                          {inv.customer_name}
-                        </td>
-
-                        {/* Date */}
-                        <td className="py-4 px-4 sm:px-6 text-slate-600 whitespace-nowrap">
-                          {inv.invoice_date}
-                        </td>
-
-                        {/* Total Amount */}
-                        <td className="py-4 px-4 sm:px-6 text-right font-extrabold text-slate-900 text-sm whitespace-nowrap">
-                          {Number(inv.total_amount).toFixed(2)}{' '}
-                          <span className="text-[10px] text-slate-500 font-semibold">{curr}</span>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="py-4 px-4 sm:px-6">
-                          <div className="flex items-center justify-center gap-1">
-                            <Link href={`/invoices/${inv.id}/preview`}>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-slate-600 hover:text-blue-600"
-                                title="Preview Invoice"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                            </Link>
-
-                            <Link href={`/invoices/${inv.id}/edit`}>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-slate-600 hover:text-blue-600"
-                                title="Edit Invoice"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            </Link>
-
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={downloadingId === inv.id}
-                              onClick={() => handleDownloadPDF(inv)}
-                              className="h-8 w-8 p-0 text-slate-600 hover:text-emerald-600"
-                              title="Download PDF"
-                            >
-                              {downloadingId === inv.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                              ) : (
-                                <Download className="w-4 h-4" />
-                              )}
-                            </Button>
-
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedInvoice(inv)
-                                setDeleteDialogOpen(true)
-                              }}
-                              className="h-8 w-8 p-0 text-slate-600 hover:text-rose-600"
-                              title="Delete Invoice"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                      {/* Actions row: Touch-friendly action buttons */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+                        <Link href={`/invoices/${inv.id}/preview`} className="flex-1 sm:flex-none">
+                          <Button variant="outline" size="sm" className="w-full sm:w-auto h-8 text-xs gap-1 text-slate-700">
+                            <Eye className="w-3.5 h-3.5" /> Preview
+                          </Button>
+                        </Link>
+                        <Link href={`/invoices/${inv.id}/edit`} className="flex-1 sm:flex-none">
+                          <Button variant="outline" size="sm" className="w-full sm:w-auto h-8 text-xs gap-1 text-slate-700">
+                            <Edit className="w-3.5 h-3.5" /> Edit
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={downloadingId === inv.id}
+                          onClick={() => handleDownloadPDF(inv)}
+                          className="h-8 text-xs gap-1 text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                        >
+                          {downloadingId === inv.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5" />
+                          )}
+                          PDF
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedInvoice(inv)
+                            setDeleteDialogOpen(true)
+                          }}
+                          className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
           )}
 
           {/* Server-side Pagination Footer */}

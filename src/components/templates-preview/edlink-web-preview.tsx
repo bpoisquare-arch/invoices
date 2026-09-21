@@ -30,21 +30,21 @@ export default function EdLinkWebPreview({ invoice, snapshot }: EdLinkWebPreview
   }
 
   return (
-    <div className="mx-auto w-full max-w-[850px] bg-white p-8 sm:p-12 shadow-sm font-sans text-slate-800 border border-slate-200 rounded-md">
+    <div className="mx-auto w-full max-w-[850px] bg-white p-4 sm:p-8 md:p-12 shadow-sm font-sans text-slate-800 border border-slate-200 rounded-md">
       {/* Top Header Row */}
-      <div className="flex flex-col sm:flex-row justify-between items-start gap-6 pb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-6 pb-6">
         {/* Left Column: Logo & Company Contact */}
-        <div className="space-y-3 max-w-[340px]">
+        <div className="space-y-3 max-w-[340px] w-full sm:w-auto">
           {/* Logo reproduction */}
           <div className="flex justify-start items-start">
             <img
               src={snapshot?.logo_url || invoice.companies?.logo_url || '/edlink-logo.png'}
               alt={companyName}
-              className="h-16 object-contain object-left"
+              className="h-12 sm:h-16 object-contain object-left"
             />
           </div>
 
-          <div className="text-[12.5px] leading-snug text-slate-800 space-y-0.5 pt-1">
+          <div className="text-[11.5px] sm:text-[12.5px] leading-snug text-slate-800 space-y-0.5 pt-1">
             <p><span className="font-bold text-slate-900">Add:</span> {address}</p>
             <p><span className="font-bold text-slate-900">Email:</span> {email}</p>
             <p><span className="font-bold text-slate-900">Phone:</span> {phone}</p>
@@ -52,20 +52,20 @@ export default function EdLinkWebPreview({ invoice, snapshot }: EdLinkWebPreview
         </div>
 
         {/* Right Column: Title & Header Metadata Box */}
-        <div className="flex flex-col items-end w-full sm:w-auto">
-          <h1 className="text-4xl font-extrabold tracking-wider text-[#5C7C99] uppercase mb-4">
+        <div className="flex flex-col items-start sm:items-end w-full sm:w-auto">
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-wider text-[#5C7C99] uppercase mb-2 sm:mb-4">
             INVOICE
           </h1>
 
           {/* Header Metadata Table */}
           <div className="w-full sm:w-[340px] border border-slate-300 text-center text-xs">
-            <div className="grid grid-cols-3 bg-[#DCE6F1] font-bold text-slate-800 border-b border-slate-300 py-2 px-2 uppercase text-[12px]">
+            <div className="grid grid-cols-3 bg-[#DCE6F1] font-bold text-slate-800 border-b border-slate-300 py-1.5 sm:py-2 px-2 uppercase text-[11px] sm:text-[12px]">
               <div>INVOICE #</div>
               <div>DATE</div>
               <div>DUE DATE</div>
             </div>
-            <div className="grid grid-cols-3 py-2.5 px-2 text-slate-900 font-bold text-[13px]">
-              <div>{invoice.invoice_number || '00327'}</div>
+            <div className="grid grid-cols-3 py-2 px-2 text-slate-900 font-bold text-[11.5px] sm:text-[13px]">
+              <div className="truncate">{invoice.invoice_number || '00327'}</div>
               <div>{formatDate(invoice.invoice_date)}</div>
               <div>{formatDate(invoice.due_date)}</div>
             </div>
@@ -74,11 +74,11 @@ export default function EdLinkWebPreview({ invoice, snapshot }: EdLinkWebPreview
       </div>
 
       {/* Bill To Section */}
-      <div className="mt-6 mb-6 max-w-[340px] border border-slate-300">
-        <div className="bg-[#DCE6F1] px-3 py-1.5 text-[12px] font-bold uppercase text-slate-800 tracking-wider border-b border-slate-300">
+      <div className="mt-4 sm:mt-6 mb-4 sm:mb-6 w-full sm:max-w-[340px] border border-slate-300">
+        <div className="bg-[#DCE6F1] px-3 py-1.5 text-[11px] sm:text-[12px] font-bold uppercase text-slate-800 tracking-wider border-b border-slate-300">
           BILL TO
         </div>
-        <div className="p-3.5 text-[15px] font-bold text-slate-900 bg-white min-h-[50px]">
+        <div className="p-3 sm:p-3.5 text-[13px] sm:text-[15px] font-bold text-slate-900 bg-white min-h-[44px] sm:min-h-[50px]">
           {invoice.customer_name ? (
             <p>{invoice.customer_name}</p>
           ) : (
@@ -91,37 +91,37 @@ export default function EdLinkWebPreview({ invoice, snapshot }: EdLinkWebPreview
       </div>
 
       {/* Main Details Table */}
-      <div className="my-6 border border-slate-300 rounded-xs overflow-hidden text-xs">
+      <div className="my-4 sm:my-6 border border-slate-300 rounded-xs overflow-hidden text-xs">
         {/* Table Header */}
-        <div className="grid grid-cols-12 bg-[#DCE6F1] font-bold text-slate-800 border-b border-slate-300 uppercase text-[12px]">
-          <div className="col-span-9 py-2.5 px-4 border-r border-slate-300">DESCRIPTION</div>
-          <div className="col-span-3 py-2.5 px-4 text-right">AMOUNT</div>
+        <div className="grid grid-cols-12 bg-[#DCE6F1] font-bold text-slate-800 border-b border-slate-300 uppercase text-[11px] sm:text-[12px]">
+          <div className="col-span-8 sm:col-span-9 py-2 sm:py-2.5 px-3 sm:px-4 border-r border-slate-300">DESCRIPTION</div>
+          <div className="col-span-4 sm:col-span-3 py-2 sm:py-2.5 px-3 sm:px-4 text-right">AMOUNT</div>
         </div>
 
         {/* Table Body with Vertical Column Divider */}
-        <div className="min-h-[290px] bg-white grid grid-cols-12">
+        <div className="min-h-[220px] sm:min-h-[290px] bg-white grid grid-cols-12">
           {/* Left Description Column */}
-          <div className="col-span-9 border-r border-slate-300 p-4 space-y-3">
+          <div className="col-span-8 sm:col-span-9 border-r border-slate-300 p-3 sm:p-4 space-y-3">
             {items.length > 0 ? (
               items.map((item, idx) => (
                 <div key={idx} className="space-y-0.5">
-                  <p className="text-[14px] font-medium text-slate-900">{item.description || 'Service Description'}</p>
+                  <p className="text-[12.5px] sm:text-[14px] font-medium text-slate-900">{item.description || 'Service Description'}</p>
                   {item.quantity > 1 && (
-                    <p className="text-[12px] text-slate-500">Qty: {item.quantity} × {item.amount} {currency}</p>
+                    <p className="text-[11px] sm:text-[12px] text-slate-500">Qty: {item.quantity} × {item.amount} {currency}</p>
                   )}
                 </div>
               ))
             ) : (
-              <p className="text-slate-400 italic text-[13px]">No items added</p>
+              <p className="text-slate-400 italic text-[12px] sm:text-[13px]">No items added</p>
             )}
           </div>
 
           {/* Right Amount Column */}
-          <div className="col-span-3 p-4 space-y-3 text-right">
+          <div className="col-span-4 sm:col-span-3 p-3 sm:p-4 space-y-3 text-right">
             {items.length > 0 ? (
               items.map((item, idx) => (
                 <div key={idx} className="space-y-0.5">
-                  <p className="text-[14px] font-bold text-slate-900">
+                  <p className="text-[12.5px] sm:text-[14px] font-bold text-slate-900">
                     {Number(item.line_total || item.amount * item.quantity).toFixed(2)} {currency}
                   </p>
                   {item.quantity > 1 && (
@@ -130,20 +130,20 @@ export default function EdLinkWebPreview({ invoice, snapshot }: EdLinkWebPreview
                 </div>
               ))
             ) : (
-              <p className="text-slate-400 text-[13px]">0.00 {currency}</p>
+              <p className="text-slate-400 text-[12px] sm:text-[13px]">0.00 {currency}</p>
             )}
           </div>
         </div>
 
         {/* Footer Row inside Table */}
-        <div className="grid grid-cols-12 border-t border-slate-300 bg-white py-3 px-4 font-semibold text-slate-900">
-          <div className="col-span-7 text-slate-800 text-[13px] self-center">
+        <div className="grid grid-cols-12 border-t border-slate-300 bg-white py-2.5 sm:py-3 px-3 sm:px-4 font-semibold text-slate-900 gap-y-2">
+          <div className="col-span-12 sm:col-span-6 text-slate-800 text-[11px] sm:text-[13px] self-center">
             {footerTerms}
           </div>
-          <div className="col-span-2 text-right uppercase font-bold text-slate-900 text-[14px] self-center border-r border-slate-300 pr-3">
+          <div className="col-span-6 sm:col-span-3 text-left sm:text-right uppercase font-bold text-slate-900 text-[12px] sm:text-[14px] self-center sm:border-r sm:border-slate-300 sm:pr-3">
             TOTAL DUE
           </div>
-          <div className="col-span-3 text-right font-extrabold text-[15px] text-slate-900 self-center">
+          <div className="col-span-6 sm:col-span-3 text-right font-extrabold text-[13px] sm:text-[15px] text-slate-900 self-center">
             {Number(totalAmount).toFixed(2)} {currency}
           </div>
         </div>

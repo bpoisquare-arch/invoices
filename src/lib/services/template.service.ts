@@ -94,10 +94,78 @@ export const ANONYMOUS_TEMPLATE: Template = {
   updated_at: new Date().toISOString(),
 }
 
+export const NSC_TEMPLATE: Template = {
+  id: 'nsc-template-id',
+  company_id: 'nsc-company-id',
+  name: 'Neighbourhood Shine Co. Standard Template',
+  company_name: 'Neighbourhood Shine Co.',
+  address: '22 Cheviot Avenue Berwick',
+  email: '',
+  phone: '',
+  payment_details: `BANK ACCOUNT DETAILS\nBank Name: Common Wealth Bank\nAccount Name: Neighbourhood Shine Co\nAccount Number: 313369861\nBSB / IFSC: 083-004\n\nPAY ID DETAILS\nAccount Name: Neighbourhood Shine Co\nPAY ID: 0421 953 400`,
+  bank_details: 'Common Wealth Bank (BSB: 083-004, Acc: 313369861, PAY ID: 0421 953 400)',
+  currency: 'AUD',
+  footer_terms: `• Payment is required on arrival on the day of service.\n• The customer is responsible for arranging suitable parking for our service vehicle.\n• Access to electricity and running hot water must be available at the property.\n• While we make every effort, complete removal of pet hair cannot be guaranteed.\n• The property must be vacant at the time of cleaning.\n• Quoted pricing is based on properties in standard/normal condition. Heavily soiled properties may incur additional charges.\n• Ceilings and garage walls are excluded from the service.\n• Payment can be made via cash, bank transfer, or Pay ID.`,
+  primary_color: '#8CB34E',
+  layout_type: 'nsc_v1',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
+
+export const ISQUARE_TEMPLATE: Template = {
+  id: 'isquare-bpo-template-id',
+  company_id: 'isquare-bpo-company-id',
+  name: 'ISquare BPO Standard Template',
+  company_name: 'ISquare BPO',
+  address: 'Suite 500, Tech Park, Islamabad, Pakistan',
+  email: 'invoicing@isquarebpo.com',
+  phone: '+92 51 111 222 333',
+  payment_details: 'Account Name: iSquare BPO Solutions\nSWIFT: ISQBPOPK\nAccount No: 9876543210',
+  bank_details: 'iSquare BPO Solutions',
+  currency: 'USD',
+  footer_terms: 'Payment due within 15 days of invoice date.',
+  primary_color: '#003D5C',
+  layout_type: 'edlink_v1',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
+
 export async function getTemplateByCompanyId(companyId: string): Promise<Template | null> {
   const clean = (companyId || '').toLowerCase().trim()
-  if (clean === 'anonymous-company-id' || clean === 'anonymous' || clean === 'ano' || clean === 'custom') {
+  if (clean === 'anonymous-company-id' || clean === 'anonymous' || clean === 'ano' || clean === 'custom' || clean === 'edlink-pk') {
     return ANONYMOUS_TEMPLATE
+  }
+
+  if (clean === 'nsc' || clean === 'nsc-company-id' || clean === 'nsc-template-id' || clean === 'neighbourhood-shine' || clean === 'neighbourhood shine' || clean === 'neighbourhood shine co.') {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('templates')
+        .select('*')
+        .or('name.ilike.%Neighbourhood%,company_name.ilike.%Neighbourhood%')
+        .limit(1)
+        .maybeSingle()
+      if (data) return normalizeTemplate({ ...data, layout_type: 'nsc_v1' })
+    } catch {
+      // Ignore
+    }
+    return NSC_TEMPLATE
+  }
+
+  if (clean === 'isq' || clean === 'isquare' || clean === 'isquare-bpo' || clean === 'isquare-bpo-company-id' || clean === 'isquare-bpo-template-id') {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('templates')
+        .select('*')
+        .or('name.ilike.%ISquare%,company_name.ilike.%ISquare%')
+        .limit(1)
+        .maybeSingle()
+      if (data) return normalizeTemplate(data)
+    } catch {
+      // Ignore
+    }
+    return ISQUARE_TEMPLATE
   }
 
   try {

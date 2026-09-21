@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { InvoiceWithDetails } from '@/lib/supabase/database.types'
-import { getInvoiceById } from '@/lib/services/invoice.service'
+import { getInvoiceById, getInvoicePdfFilename } from '@/lib/services/invoice.service'
 import { renderInvoiceWebPreview, renderInvoicePDFDocument } from '@/lib/services/template-registry'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Download, Edit3, Loader2 } from 'lucide-react'
@@ -43,19 +43,45 @@ export default function InvoicePreviewPage() {
     if (!invoice) return
     try {
       setIsDownloading(true)
+      // 1. Fetch from server endpoint first (reliable, handles local filesystem images & base64)
+      try {
+        const response = await fetch(`/api/pdf/${invoice.id}`)
+        if (response.ok) {
+          const blob = await response.blob()
+          if (blob && blob.size > 0) {
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = getInvoicePdfFilename(invoice)
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+            return
+          }
+        }
+      } catch (serverErr) {
+        console.warn('Server streaming failed, trying client renderer:', serverErr)
+      }
+
+      // 2. Client-side fallback with timeout to never hang
       const doc = renderInvoicePDFDocument(invoice, invoice.template_snapshot)
-      const blob = await pdf(doc).toBlob()
+      const blobPromise = pdf(doc).toBlob()
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('PDF generation timed out')), 4000)
+      )
+      const blob = await Promise.race([blobPromise, timeoutPromise])
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `Invoice-${invoice.invoice_number || 'EDL'}.pdf`
+      a.download = getInvoicePdfFilename(invoice)
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (err: any) {
       console.error('PDF download error:', err)
-      // Fallback to server route
+      // Direct browser fallback
       window.open(`/api/pdf/${invoice.id}`, '_blank')
     } finally {
       setIsDownloading(false)
@@ -80,46 +106,47 @@ export default function InvoicePreviewPage() {
             variant="outline"
             size="sm"
             onClick={() => router.push('/invoices')}
-            className="gap-2 text-slate-700"
+            className="gap-2 text-slate-700 shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Invoices
+            <span className="hidden sm:inline">Back to Invoices</span>
+            <span className="sm:hidden">Back</span>
           </Button>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
               Invoice Preview: {invoice.invoice_number}
             </h1>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 truncate">
               Customer: <span className="font-semibold text-slate-700">{invoice.customer_name}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => router.push(`/invoices/${invoice.id}/edit`)}
-            className="gap-2 text-slate-700"
+            className="flex-1 sm:flex-none gap-2 text-slate-700 justify-center"
           >
             <Edit3 className="w-4 h-4" />
-            Edit Invoice
+            <span>Edit Invoice</span>
           </Button>
 
           <Button
             onClick={handleDownloadPDF}
             disabled={isDownloading}
-            className="bg-blue-600 hover:bg-blue-700 text-white gap-2 font-semibold shadow-sm cursor-pointer"
+            className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white gap-2 font-semibold shadow-sm cursor-pointer justify-center"
           >
             {isDownloading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Generating PDF...
+                <span>Generating PDF...</span>
               </>
             ) : (
               <>
                 <Download className="w-4 h-4" />
-                Download PDF ({invoice.invoice_number}.pdf)
+                <span>Download PDF</span>
               </>
             )}
           </Button>
@@ -127,7 +154,7 @@ export default function InvoicePreviewPage() {
       </div>
 
       {/* Render Web Replica Preview Component */}
-      <div className="py-4 flex justify-center">
+      <div className="py-2 sm:py-4 w-full overflow-x-auto flex justify-center">
         {renderInvoiceWebPreview(invoice, invoice.template_snapshot)}
       </div>
     </div>

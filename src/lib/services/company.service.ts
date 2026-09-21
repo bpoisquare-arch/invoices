@@ -23,6 +23,28 @@ export const ANONYMOUS_COMPANY: Company = {
   updated_at: new Date().toISOString(),
 }
 
+export const NSC_COMPANY: Company = {
+  id: 'nsc-company-id',
+  user_id: null,
+  name: 'Neighbourhood Shine Co.',
+  prefix: 'NSC',
+  currency: 'AUD',
+  logo_url: '/Neighbourhood-Shine.png',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
+
+export const ISQUARE_COMPANY: Company = {
+  id: 'isquare-bpo-company-id',
+  user_id: null,
+  name: 'ISquare BPO',
+  prefix: 'ISQ',
+  currency: 'USD',
+  logo_url: '/isquarebpo.png',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
+
 export async function getCompanies(includeAnonymous = false): Promise<Company[]> {
   try {
     const supabase = createClient()
@@ -34,7 +56,7 @@ export async function getCompanies(includeAnonymous = false): Promise<Company[]>
     let result: Company[] = []
 
     if (error || !data || data.length === 0) {
-      result = [FALLBACK_COMPANY]
+      result = [FALLBACK_COMPANY, NSC_COMPANY, ISQUARE_COMPANY]
     } else {
       const valid = data
         .filter((c) => (c.name || '').toLowerCase() !== 'anonymous')
@@ -50,6 +72,10 @@ export async function getCompanies(includeAnonymous = false): Promise<Company[]>
         })
 
       result = valid.length > 0 ? valid : [FALLBACK_COMPANY]
+      const hasNsc = result.some((c) => c.prefix === 'NSC')
+      if (!hasNsc) result.push(NSC_COMPANY)
+      const hasIsq = result.some((c) => c.prefix === 'ISQ')
+      if (!hasIsq) result.push(ISQUARE_COMPANY)
     }
 
     if (includeAnonymous) {
@@ -61,7 +87,9 @@ export async function getCompanies(includeAnonymous = false): Promise<Company[]>
 
     return result
   } catch (err) {
-    return includeAnonymous ? [FALLBACK_COMPANY, ANONYMOUS_COMPANY] : [FALLBACK_COMPANY]
+    return includeAnonymous
+      ? [FALLBACK_COMPANY, NSC_COMPANY, ISQUARE_COMPANY, ANONYMOUS_COMPANY]
+      : [FALLBACK_COMPANY, NSC_COMPANY, ISQUARE_COMPANY]
   }
 }
 
@@ -72,18 +100,69 @@ function isValidUUID(str?: string | null): boolean {
 
 export async function getCompanyById(id: string): Promise<Company | null> {
   const clean = (id || '').toLowerCase().trim()
-  if (clean === 'anonymous-company-id' || clean === 'anonymous' || clean === 'ano' || clean === 'custom') {
+  if (clean === 'anonymous-company-id' || clean === 'anonymous' || clean === 'ano' || clean === 'custom' || clean === 'edlink-pk') {
     return ANONYMOUS_COMPANY
   }
 
-  if (clean === 'edlink' || clean === 'edlink-australia' || clean === 'edl' || clean === 'edlink-pk-id') {
+  if (clean === 'nsc' || clean === 'nsc-company-id' || clean === 'neighbourhood-shine' || clean === 'neighbourhood shine' || clean === 'neighbourhood shine co.') {
     try {
       const supabase = createClient()
-      const { data } = await supabase.from('companies').select('*').limit(1).single()
+      const { data } = await supabase
+        .from('companies')
+        .select('*')
+        .or('prefix.eq.NSC,name.ilike.%Neighbourhood%')
+        .limit(1)
+        .maybeSingle()
       if (data) {
         return {
           ...data,
-          name: data.name === 'EdLink Pakistan' ? 'EdLink Australia' : data.name,
+          name: 'Neighbourhood Shine Co.',
+          logo_url: data.logo_url || '/Neighbourhood-Shine.png',
+          prefix: 'NSC',
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    return NSC_COMPANY
+  }
+
+  if (clean === 'isq' || clean === 'isquare' || clean === 'isquare-bpo' || clean === 'isquare-bpo-company-id') {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('companies')
+        .select('*')
+        .or('prefix.eq.ISQ,name.ilike.%ISquare%')
+        .limit(1)
+        .maybeSingle()
+      if (data) {
+        return {
+          ...data,
+          name: 'ISquare BPO',
+          logo_url: data.logo_url || '/isquarebpo.png',
+          prefix: 'ISQ',
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    return ISQUARE_COMPANY
+  }
+
+  if (clean === 'edlink' || clean === 'edlink-australia' || clean === 'edlink-au' || clean === 'eda' || clean === 'edl' || clean === 'edlink-pk-id') {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('companies')
+        .select('*')
+        .or('prefix.eq.EDA,name.ilike.%Australia%')
+        .limit(1)
+        .maybeSingle()
+      if (data) {
+        return {
+          ...data,
+          name: 'EdLink Australia',
           logo_url: data.logo_url || '/edlink-logo.png',
         }
       }

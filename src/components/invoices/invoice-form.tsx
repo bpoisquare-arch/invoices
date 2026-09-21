@@ -94,20 +94,24 @@ export default function InvoiceForm({
   const [customerName, setCustomerName] = useState(
     existingInvoice?.customer_name || ''
   )
+  const [referenceAddress, setReferenceAddress] = useState<string>(
+    existingInvoice?.reference_name || (company.prefix === 'NSC' ? '22 Cheviot Avenue Berwick' : '')
+  )
   const [invoiceDate, setInvoiceDate] = useState(existingInvoice?.invoice_date || todayStr)
   const [dueDate, setDueDate] = useState(existingInvoice?.due_date || (isAnonymous ? '' : dueStr))
 
   const [invoiceNumberDisplay, setInvoiceNumberDisplay] = useState<string>(
     existingInvoice?.invoice_number || 'Loading...'
   )
+  const [activeTab, setActiveTab] = useState<'form' | 'preview'>('form')
 
   useEffect(() => {
     if (mode === 'create' && !existingInvoice) {
-      generateNextInvoiceNumber(company.id).then((num) => {
+      generateNextInvoiceNumber(company.id, isAnonymous).then((num) => {
         setInvoiceNumberDisplay(num)
       })
     }
-  }, [mode, company.id, existingInvoice])
+  }, [mode, company.id, isAnonymous, existingInvoice])
 
   const initialItems: InvoiceItemInput[] = existingInvoice?.invoice_items?.length
     ? existingInvoice.invoice_items.map((i) => ({
@@ -190,9 +194,9 @@ export default function InvoiceForm({
         payment_details: template?.payment_details || '',
         currency: selectedCurrency,
         footer_terms: template?.footer_terms || 'Thank you for getting services from us',
-        primary_color: '#2563eb',
-        logo_url: '/edlink-logo.png',
-        layout_type: 'edlink_v1',
+        primary_color: template?.primary_color || (company.prefix === 'NSC' ? '#8CB34E' : '#2563eb'),
+        logo_url: company.logo_url || (company.prefix === 'NSC' ? '/Neighbourhood-Shine.png' : company.prefix === 'ISQ' ? '/isquarebpo.png' : '/edlink-logo.png'),
+        layout_type: template?.layout_type || (company.prefix === 'NSC' ? 'nsc_v1' : 'edlink_v1'),
         header_mode: 'logo' as const,
         bill_to_label: 'BILL TO',
         is_anonymous: false,
@@ -203,7 +207,7 @@ export default function InvoiceForm({
   const livePreviewInvoice: Partial<InvoiceWithDetails> = {
     invoice_number: existingInvoice?.invoice_number || invoiceNumberDisplay,
     customer_name: customerName,
-    reference_name: null,
+    reference_name: referenceAddress || null,
     invoice_date: invoiceDate,
     due_date: dueDate || '',
     total_amount: grandTotal,
@@ -251,7 +255,7 @@ export default function InvoiceForm({
           template_id: template?.id,
           invoice_number: invoiceNumberDisplay !== 'Loading...' ? invoiceNumberDisplay : undefined,
           customer_name: customerName,
-          reference_name: null,
+          reference_name: referenceAddress || null,
           invoice_date: invoiceDate,
           due_date: dueDate || null,
           items,
@@ -264,7 +268,7 @@ export default function InvoiceForm({
           currency: selectedCurrency,
           header_mode: headerMode,
           bill_to_label: isAnonymous ? 'Issued to:' : 'BILL TO',
-          footer_terms: 'Thank you for getting services from us',
+          footer_terms: template?.footer_terms || 'Thank you for getting services from us',
           is_anonymous: isAnonymous,
           logo_size: isAnonymous && headerMode === 'logo' ? logoSize : undefined,
         })
@@ -272,7 +276,7 @@ export default function InvoiceForm({
       } else if (mode === 'edit' && existingInvoice) {
         await updateInvoice(existingInvoice.id, {
           customer_name: customerName,
-          reference_name: null,
+          reference_name: referenceAddress || null,
           invoice_date: invoiceDate,
           due_date: dueDate || null,
           items,
@@ -285,7 +289,7 @@ export default function InvoiceForm({
           currency: selectedCurrency,
           header_mode: headerMode,
           bill_to_label: isAnonymous ? 'Issued to:' : 'BILL TO',
-          footer_terms: 'Thank you for getting services from us',
+          footer_terms: template?.footer_terms || 'Thank you for getting services from us',
           is_anonymous: isAnonymous,
           logo_size: isAnonymous && headerMode === 'logo' ? logoSize : undefined,
         })
@@ -303,7 +307,7 @@ export default function InvoiceForm({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-['Montserrat'] text-xl sm:text-2xl font-bold text-[#003D5C] tracking-tight">
+            <h1 className="font-['Geist'] text-xl sm:text-2xl font-bold text-[#003D5C] tracking-tight">
               {mode === 'edit' ? 'Edit Invoice' : 'Generate Invoice'}
             </h1>
             {isAnonymous && (
@@ -347,10 +351,37 @@ export default function InvoiceForm({
         </div>
       )}
 
+      {/* Mobile/Tablet View Switcher (<xl) */}
+      <div className="flex xl:hidden items-center justify-center p-1 bg-slate-100 border border-slate-200 rounded-lg max-w-sm mx-auto mb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('form')}
+          className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeTab === 'form'
+              ? 'bg-[#003D5C] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span>Invoice Form</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('preview')}
+          className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeTab === 'preview'
+              ? 'bg-[#003D5C] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Eye className="w-3.5 h-3.5" />
+          <span>Live Preview Sheet</span>
+        </button>
+      </div>
+
       {/* 2-Column Split Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
         {/* Left Column: Invoice Form Controls (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className={`space-y-6 ${activeTab === 'preview' ? 'hidden xl:block' : 'block'} xl:col-span-5`}>
           {/* Card 0: Custom Header & Sender Details (Only shown in Anonymous mode) */}
           {isAnonymous && (
             <Card className="bg-white border border-[#E2E8F0] shadow-2xs rounded-lg">
@@ -564,7 +595,7 @@ export default function InvoiceForm({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
                     INVOICE # (AUTO UNIQUE)
@@ -588,6 +619,19 @@ export default function InvoiceForm({
                     required
                   />
                 </div>
+              </div>
+
+              {/* Dynamic Address / Reference Field */}
+              <div>
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                  {company.prefix === 'NSC' ? 'PROPERTY / CUSTOMER ADDRESS' : 'ADDRESS / REFERENCE'}
+                </Label>
+                <Input
+                  placeholder={company.prefix === 'NSC' ? 'e.g. 22 Cheviot Avenue Berwick' : 'Client / Property Address or Reference'}
+                  value={referenceAddress}
+                  onChange={(e) => setReferenceAddress(e.target.value)}
+                  className="mt-1.5 h-9 text-xs"
+                />
               </div>
 
               {/* Dates & Currency Row */}
@@ -677,45 +721,46 @@ export default function InvoiceForm({
               </Button>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto w-full">
-                <table className="w-full text-left text-xs border-collapse min-w-[500px]">
+              <div className="w-full">
+                <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-[#F8FAFC] text-slate-600 font-bold uppercase text-[10px] tracking-wider border-b border-[#E2E8F0]">
-                      <th className="py-2.5 px-3 w-[55%]">DESCRIPTION</th>
-                      <th className="py-2.5 px-2 w-[18%] text-center">QTY</th>
-                      <th className="py-2.5 px-2 w-[22%] text-right">AMOUNT ({selectedCurrency})</th>
-                      <th className="py-2.5 px-1 w-[5%] text-center"></th>
+                      <th className="py-2.5 px-2.5 w-[50%]">DESCRIPTION</th>
+                      <th className="py-2.5 px-1.5 w-[16%] text-center">QTY</th>
+                      <th className="py-2.5 px-1.5 w-[24%] text-right">AMOUNT ({selectedCurrency})</th>
+                      <th className="py-2.5 px-1 w-[10%] text-center"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {calculatedItems.map((item, idx) => (
                       <tr key={idx}>
-                        <td className="py-2 px-3">
+                        <td className="py-2 px-2.5">
                           <Input
                             placeholder="Service / Item Description"
                             value={item.description}
                             onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
-                            className="h-8 text-xs"
+                            className="h-8 text-xs w-full"
                           />
                         </td>
-                        <td className="py-2 px-2 text-center">
+                        <td className="py-2 px-1.5 text-center">
                           <Input
                             type="number"
                             step="1"
                             min="1"
                             value={item.quantity}
                             onChange={(e) => handleItemChange(idx, 'quantity', parseFloat(e.target.value) || 0)}
-                            className="h-8 text-xs text-center font-mono"
+                            className="h-8 text-xs text-center font-mono w-full min-w-0 px-1"
                           />
                         </td>
-                        <td className="py-2 px-2 text-right">
+                        <td className="py-2 px-1.5 text-right">
                           <Input
                             type="number"
                             step="0.01"
                             min="0"
-                            value={item.amount}
+                            value={item.amount || ''}
                             onChange={(e) => handleItemChange(idx, 'amount', parseFloat(e.target.value) || 0)}
-                            className="h-8 text-xs text-right font-mono"
+                            className="h-8 text-xs text-right font-mono w-full min-w-0 px-1"
+                            placeholder="0.00"
                           />
                         </td>
                         <td className="py-2 px-1 text-center">
@@ -723,7 +768,7 @@ export default function InvoiceForm({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600"
+                            className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 mx-auto"
                             onClick={() => handleRemoveItem(idx)}
                             disabled={items.length <= 1}
                             title="Delete Row"
@@ -764,7 +809,7 @@ export default function InvoiceForm({
         </div>
 
         {/* Right Column: Permanent Live Sheet Preview (7 cols) */}
-        <div className="lg:col-span-7 sticky top-4">
+        <div className={`sticky top-4 ${activeTab === 'form' ? 'hidden xl:block' : 'block'} xl:col-span-7`}>
           <div className="flex items-center justify-between mb-3 px-1">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
               <Eye className="w-4 h-4 text-[#009D9E]" />
