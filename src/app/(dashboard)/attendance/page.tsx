@@ -127,11 +127,11 @@ export default function EmployeeOverviewPage() {
   const [newWfhQuota, setNewWfhQuota] = useState<number>(4)
   const [newProbationLeaves, setNewProbationLeaves] = useState<number>(3)
 
-  const [editAnnualLeaves, setEditAnnualLeaves] = useState<number>(6)
-  const [editSickLeaves, setEditSickLeaves] = useState<number>(7)
-  const [editCasualLeaves, setEditCasualLeaves] = useState<number>(7)
-  const [editWfhQuota, setEditWfhQuota] = useState<number>(4)
-  const [editProbationLeaves, setEditProbationLeaves] = useState<number>(3)
+  const [editAnnualLeaves, setEditAnnualLeaves] = useState<number | string>(6)
+  const [editSickLeaves, setEditSickLeaves] = useState<number | string>(7)
+  const [editCasualLeaves, setEditCasualLeaves] = useState<number | string>(7)
+  const [editWfhQuota, setEditWfhQuota] = useState<number | string>(4)
+  const [editProbationLeaves, setEditProbationLeaves] = useState<number | string>(3)
 
   // Delete Employee Modal
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null)
@@ -254,13 +254,19 @@ export default function EmployeeOverviewPage() {
     setEditError(null)
     setIsSaving(true)
 
+    const parseQuota = (v: number | string, fallback: number = 0) => {
+      if (v === '' || v === undefined || v === null || v === '-') return fallback
+      const num = Number(v)
+      return isNaN(num) ? fallback : num
+    }
+
     const targetSalary = editSalary ? Number(editSalary) : null
     const leave_quotas = {
-      annual_leaves: Number(editAnnualLeaves) || 0,
-      sick_leaves: Number(editSickLeaves) || 0,
-      casual_leaves: Number(editCasualLeaves) || 0,
-      wfh_quota: Number(editWfhQuota) || 0,
-      probation_leaves: showEditProbation ? (Number(editProbationLeaves) || 0) : 0,
+      annual_leaves: parseQuota(editAnnualLeaves, 6),
+      sick_leaves: parseQuota(editSickLeaves, 7),
+      casual_leaves: parseQuota(editCasualLeaves, 7),
+      wfh_quota: parseQuota(editWfhQuota, 4),
+      probation_leaves: showEditProbation ? parseQuota(editProbationLeaves, 3) : 0,
     }
 
     try {
@@ -1480,7 +1486,7 @@ export default function EmployeeOverviewPage() {
                     step="0.5"
                     min="0"
                     value={editAnnualLeaves}
-                    onChange={(e) => setEditAnnualLeaves(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setEditAnnualLeaves(e.target.value)}
                     className="h-7 text-xs font-mono font-bold text-slate-800 bg-white border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                   />
                 </div>
@@ -1492,7 +1498,7 @@ export default function EmployeeOverviewPage() {
                     step="0.5"
                     min="0"
                     value={editSickLeaves}
-                    onChange={(e) => setEditSickLeaves(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setEditSickLeaves(e.target.value)}
                     className="h-7 text-xs font-mono font-bold text-slate-800 bg-white border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                   />
                 </div>
@@ -1504,7 +1510,7 @@ export default function EmployeeOverviewPage() {
                     step="0.5"
                     min="0"
                     value={editCasualLeaves}
-                    onChange={(e) => setEditCasualLeaves(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setEditCasualLeaves(e.target.value)}
                     className="h-7 text-xs font-mono font-bold text-slate-800 bg-white border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                   />
                 </div>
@@ -1514,9 +1520,8 @@ export default function EmployeeOverviewPage() {
                   <Input
                     type="number"
                     step="0.5"
-                    min="0"
                     value={editWfhQuota}
-                    onChange={(e) => setEditWfhQuota(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setEditWfhQuota(e.target.value)}
                     className="h-7 text-xs font-mono font-bold text-slate-800 bg-white border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                   />
                 </div>
@@ -1529,7 +1534,7 @@ export default function EmployeeOverviewPage() {
                       step="0.5"
                       min="0"
                       value={editProbationLeaves}
-                      onChange={(e) => setEditProbationLeaves(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => setEditProbationLeaves(e.target.value)}
                       className="h-7 text-xs font-mono font-bold text-slate-800 bg-white border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                     />
                   </div>
