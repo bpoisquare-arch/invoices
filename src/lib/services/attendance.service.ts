@@ -235,7 +235,8 @@ async function calculateAllEmployeeUsedLeaves(supabase: any): Promise<Map<string
   try {
     const { data: recs } = await supabase
       .from('attendance_records')
-      .select('employee_id, arrival_status, departure_status, raw_punches')
+      .select('employee_id, attendance_date, arrival_status, departure_status, raw_punches')
+      .gte('attendance_date', '2026-09-01')
 
     if (recs && recs.length > 0) {
       for (const r of recs) {
@@ -1321,6 +1322,7 @@ export async function getEmployeeLeaveBalanceSummary(
       .from('attendance_records')
       .select('id, attendance_date, arrival_status, departure_status, raw_punches')
       .eq('employee_id', empDbId)
+      .gte('attendance_date', '2026-09-01')
     allRecords = data || []
   }
 

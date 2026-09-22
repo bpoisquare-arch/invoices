@@ -21,6 +21,7 @@ import {
   Coins,
   MoreHorizontal,
   Lock,
+  Unlock,
   Sparkles,
   FileMinus,
   SlidersHorizontal,
@@ -329,7 +330,7 @@ export default function EmployeeOverviewPage() {
     setEditJoiningDate(rawDate ? rawDate.split('T')[0] : todayStr)
     setEditSalary(emp.salary !== undefined && emp.salary !== null ? String(emp.salary) : '')
     setEditActive(emp.is_active)
-    const q = emp.base_leave_quotas || emp.leave_quotas || {}
+    const q = emp.leave_quotas || emp.base_leave_quotas || {}
     setEditAnnualLeaves(q.annual_leaves !== undefined ? Number(q.annual_leaves) : 6)
     setEditSickLeaves(q.sick_leaves !== undefined ? Number(q.sick_leaves) : 7)
     setEditCasualLeaves(q.casual_leaves !== undefined ? Number(q.casual_leaves) : 7)
@@ -1458,79 +1459,84 @@ export default function EmployeeOverviewPage() {
               </div>
             </div>
 
-            {/* Locked Remaining Leave Balances Section */}
-            <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3 space-y-2">
+            {/* Unlocked Remaining Leave Balances Section */}
+            <div className="bg-emerald-50/40 border border-emerald-200/90 rounded-xl p-3 space-y-2.5">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-[#003D5C] uppercase tracking-wider">
-                  <Lock className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Remaining Leave Balances (Locked)</span>
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                  <Unlock className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Remaining Leave Balances (Unlocked / Editable)</span>
                 </div>
-                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold flex items-center gap-1">
-                  <Lock className="w-3 h-3" />
-                  Non-Editable
+                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1 border border-emerald-200">
+                  <Unlock className="w-3 h-3 text-emerald-600" />
+                  Editable
                 </span>
               </div>
 
               <div className={`grid grid-cols-2 ${!showEditProbation ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-2`}>
-                <div className="space-y-1 bg-slate-100/80 p-2 rounded-lg border border-slate-200">
-                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Annual (6/yr)</Label>
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-emerald-200/80 shadow-2xs">
+                  <Label className="text-[10px] font-bold text-emerald-800 uppercase">Annual (Leaves)</Label>
                   <Input
                     type="number"
-                    disabled
-                    readOnly
+                    step="0.5"
+                    min="0"
                     value={editAnnualLeaves}
-                    className="h-7 text-xs font-mono font-bold text-slate-700 bg-white/70 border-slate-200 cursor-not-allowed"
+                    onChange={(e) => setEditAnnualLeaves(parseFloat(e.target.value) || 0)}
+                    className="h-7 text-xs font-mono font-bold text-slate-800 bg-white border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                   />
                 </div>
 
-                <div className="space-y-1 bg-slate-100/80 p-2 rounded-lg border border-slate-200">
-                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Sick (7/yr)</Label>
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-emerald-200/80 shadow-2xs">
+                  <Label className="text-[10px] font-bold text-emerald-800 uppercase">Sick (Leaves)</Label>
                   <Input
                     type="number"
-                    disabled
-                    readOnly
+                    step="0.5"
+                    min="0"
                     value={editSickLeaves}
-                    className="h-7 text-xs font-mono font-bold text-slate-700 bg-white/70 border-slate-200 cursor-not-allowed"
+                    onChange={(e) => setEditSickLeaves(parseFloat(e.target.value) || 0)}
+                    className="h-7 text-xs font-mono font-bold text-slate-800 bg-white border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                   />
                 </div>
 
-                <div className="space-y-1 bg-slate-100/80 p-2 rounded-lg border border-slate-200">
-                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Casual (7/yr)</Label>
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-emerald-200/80 shadow-2xs">
+                  <Label className="text-[10px] font-bold text-emerald-800 uppercase">Casual (Leaves)</Label>
                   <Input
                     type="number"
-                    disabled
-                    readOnly
+                    step="0.5"
+                    min="0"
                     value={editCasualLeaves}
-                    className="h-7 text-xs font-mono font-bold text-slate-700 bg-white/70 border-slate-200 cursor-not-allowed"
+                    onChange={(e) => setEditCasualLeaves(parseFloat(e.target.value) || 0)}
+                    className="h-7 text-xs font-mono font-bold text-slate-800 bg-white border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                   />
                 </div>
 
-                <div className="space-y-1 bg-slate-100/80 p-2 rounded-lg border border-slate-200">
-                  <Label className="text-[10px] font-bold text-slate-500 uppercase">WFH (4/yr)</Label>
+                <div className="space-y-1 bg-white p-2 rounded-lg border border-emerald-200/80 shadow-2xs">
+                  <Label className="text-[10px] font-bold text-emerald-800 uppercase">WFH (Quota)</Label>
                   <Input
                     type="number"
-                    disabled
-                    readOnly
+                    step="0.5"
+                    min="0"
                     value={editWfhQuota}
-                    className="h-7 text-xs font-mono font-bold text-slate-700 bg-white/70 border-slate-200 cursor-not-allowed"
+                    onChange={(e) => setEditWfhQuota(parseFloat(e.target.value) || 0)}
+                    className="h-7 text-xs font-mono font-bold text-slate-800 bg-white border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                   />
                 </div>
 
                 {showEditProbation && (
-                  <div className="space-y-1 bg-slate-100/80 p-2 rounded-lg border border-slate-200">
-                    <Label className="text-[10px] font-bold text-slate-500 uppercase">Probation (3 max)</Label>
+                  <div className="space-y-1 bg-white p-2 rounded-lg border border-emerald-200/80 shadow-2xs">
+                    <Label className="text-[10px] font-bold text-emerald-800 uppercase">Probation (Leaves)</Label>
                     <Input
                       type="number"
-                      disabled
-                      readOnly
+                      step="0.5"
+                      min="0"
                       value={editProbationLeaves}
-                      className="h-7 text-xs font-mono font-bold text-slate-700 bg-white/70 border-slate-200 cursor-not-allowed"
+                      onChange={(e) => setEditProbationLeaves(parseFloat(e.target.value) || 0)}
+                      className="h-7 text-xs font-mono font-bold text-slate-800 bg-white border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                     />
                   </div>
                 )}
               </div>
-              <p className="text-[10px] text-slate-500 leading-tight">
-                🔒 Remaining leaves are locked and will be automatically deducted when leaves (or WFH) are applied in Attendance Records.
+              <p className="text-[10px] text-slate-600 leading-tight">
+                💡 Enter the exact remaining leaves as of end of August. These will serve as the baseline, and any leaves taken in September onwards will be automatically deducted.
               </p>
             </div>
 
