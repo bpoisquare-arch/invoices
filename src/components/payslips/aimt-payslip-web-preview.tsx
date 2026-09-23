@@ -158,6 +158,32 @@ export default function AIMTPayslipWebPreview({ payslip }: AIMTPayslipWebPreview
           </div>
         </div>
 
+        {/* 5b. SUPERANNUATION Section (Optional, Placed after TAX and before PAYMENT DETAILS) */}
+        {(payslip.include_superannuation || Number(payslip.superannuation_amount || 0) > 0) && (
+          <div className="mb-7">
+            <div className="border-t-2 border-b-2 border-slate-300 py-2 px-3 text-xs font-bold uppercase tracking-wider grid grid-cols-12 text-slate-900">
+              <div className="col-span-8">SUPERANNUATION</div>
+              <div className="col-span-4 text-right"></div>
+            </div>
+
+            <div className="py-3 px-3 text-[13px] grid grid-cols-12 text-slate-800 items-center">
+              <div className="col-span-8 font-medium">
+                {payslip.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122'}
+              </div>
+              <div className="col-span-4 text-right font-bold text-slate-900">
+                {formatCurrency(payslip.superannuation_amount || 0)}
+              </div>
+            </div>
+
+            <div className="bg-slate-100 border-t border-b border-slate-300 py-2 px-3 text-[13px] font-bold text-slate-900 grid grid-cols-12">
+              <div className="col-span-8">TOTAL</div>
+              <div className="col-span-4 text-right font-bold">
+                {formatCurrency(payslip.superannuation_total ?? payslip.superannuation_amount ?? 0)}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 6. PAYMENT DETAILS Section */}
         <div className="mb-6">
           <div className="border-t-2 border-b-2 border-slate-300 py-2 px-3 text-xs font-bold uppercase tracking-wider grid grid-cols-12 text-slate-900">

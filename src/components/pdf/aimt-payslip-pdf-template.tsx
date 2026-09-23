@@ -291,6 +291,32 @@ export default function AIMTPayslipPDFTemplate({ payslip }: AIMTPayslipPDFTempla
           </View>
         </View>
 
+        {/* 5b. SUPERANNUATION Section (Optional) */}
+        {(payslip.include_superannuation || Number(payslip.superannuation_amount || 0) > 0) && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.tableHeaderRow}>
+              <Text style={styles.colTaxDesc}>SUPERANNUATION</Text>
+              <Text style={styles.colTaxAmount} />
+            </View>
+
+            <View style={styles.tableDataRow}>
+              <Text style={styles.colTaxDesc}>
+                {payslip.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122'}
+              </Text>
+              <Text style={styles.colTaxAmount}>
+                {formatCurrency(payslip.superannuation_amount || 0)}
+              </Text>
+            </View>
+
+            <View style={styles.tableTotalRow}>
+              <Text style={{ flex: 1 }}>TOTAL</Text>
+              <Text style={styles.colTaxAmount}>
+                {formatCurrency(payslip.superannuation_total ?? payslip.superannuation_amount ?? 0)}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* 6. PAYMENT DETAILS Section */}
         <View style={styles.sectionContainer}>
           <View style={styles.tableHeaderRow}>

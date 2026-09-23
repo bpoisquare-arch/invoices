@@ -192,6 +192,31 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
     }))
   }
 
+  const handleSuperannuationToggle = (enabled: boolean) => {
+    const defaultDesc = formData.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122'
+
+    setFormData((prev) => ({
+      ...prev,
+      include_superannuation: enabled,
+      superannuation_description: defaultDesc,
+    }))
+  }
+
+  const handleSuperannuationAmountChange = (amount: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      superannuation_amount: amount,
+      superannuation_total: amount,
+    }))
+  }
+
+  const handleSuperannuationDescriptionChange = (desc: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      superannuation_description: desc,
+    }))
+  }
+
   const handleEmployeeNameChange = (name: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -702,14 +727,15 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
                   onChange={(e) => {
                     const val = parseFloat(e.target.value) || 0
                     const calcAnnual = calculateAnnualSalary(val, formData.pay_frequency || 'Fortnightly')
+                    const calcNet = Math.max(0, Math.round((val - formData.tax_amount) * 100) / 100)
                     setFormData({
                       ...formData,
                       total_earnings: val,
                       wages_amount: val,
                       wages_total: val,
                       annual_salary: formData.show_annual_salary !== false ? calcAnnual : formData.annual_salary,
-                      net_pay: Math.max(0, val - formData.tax_amount),
-                      payment_amount: Math.max(0, val - formData.tax_amount),
+                      net_pay: calcNet,
+                      payment_amount: calcNet,
                     })
                   }}
                   className="w-full bg-[#001724] border border-white/20 rounded-xl px-3 py-2 text-sm text-white font-bold text-emerald-400 focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50"
@@ -728,6 +754,56 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
                   className="w-full bg-[#001724] border border-white/20 rounded-xl px-3 py-2 text-sm text-white font-bold text-amber-400 focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50"
                 />
               </div>
+            </div>
+
+            {/* Superannuation Section (Optional Toggle + Description + Amount) */}
+            <div className="pt-2 border-t border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-300 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.include_superannuation)}
+                    onChange={(e) => handleSuperannuationToggle(e.target.checked)}
+                    className="size-4 rounded border-white/20 bg-[#001724] text-[#81F5F5] focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                  />
+                  <span>Include Superannuation</span>
+                </label>
+                <span className="text-[10px] text-slate-400">Optional</span>
+              </div>
+
+              {formData.include_superannuation && (
+                <div className="space-y-3 pl-6 animate-in fade-in">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Superannuation Fund / Description
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.superannuation_description ?? 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122'}
+                      onChange={(e) => handleSuperannuationDescriptionChange(e.target.value)}
+                      placeholder="e.g. SGC - HOSTPLUS Superannuation Fund - Industry - 102860122"
+                      className="w-full bg-[#001724] border border-white/20 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Superannuation Amount ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.superannuation_amount || ''}
+                      onChange={(e) => handleSuperannuationAmountChange(parseFloat(e.target.value) || 0)}
+                      placeholder="e.g. 369.23"
+                      className="w-full bg-[#001724] border border-white/20 rounded-xl px-3 py-2 text-sm text-white font-bold text-sky-400 focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50"
+                    />
+                    <div className="text-[10px] text-slate-400 mt-1">
+                      Superannuation is an employer contribution and only appears on the payslip without deducting from Net Pay.
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Live Calculated Net Pay & Annual Salary Banner */}

@@ -41,6 +41,12 @@ export interface AIMTPayslip {
   tax_amount: number
   tax_total: number
 
+  // Superannuation Table (Optional)
+  include_superannuation?: boolean
+  superannuation_description?: string
+  superannuation_amount?: number
+  superannuation_total?: number
+
   // Payment Details Table
   bank_account_masked: string
   account_name: string
@@ -77,6 +83,10 @@ export const DEFAULT_AIMT_PAYSLIP: Omit<AIMTPayslip, 'id' | 'created_at'> = {
   tax_description: 'PAYG',
   tax_amount: 928.0,
   tax_total: 928.0,
+  include_superannuation: false,
+  superannuation_description: 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122',
+  superannuation_amount: 0.0,
+  superannuation_total: 0.0,
   bank_account_masked: '(013-481)*****6474',
   account_name: 'Ubaid Raza',
   payment_reference: 'AIMT Pay',
@@ -98,8 +108,8 @@ export function formatCurrency(amount: number): string {
 /**
  * Sanitize frontend payload to match exact database columns
  */
-function toDbPayload(payslip: AIMTPayslip) {
-  return {
+function toDbPayload(payslip: AIMTPayslip, includeSuperCols = true) {
+  const payload: Record<string, any> = {
     id: payslip.id,
     paid_by_name: payslip.paid_by_name,
     paid_by_address_1: payslip.paid_by_address_1,
@@ -131,12 +141,31 @@ function toDbPayload(payslip: AIMTPayslip) {
     created_at: payslip.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
+
+  if (includeSuperCols) {
+    payload.superannuation_description = payslip.superannuation_description || ''
+    payload.superannuation_amount = Number(payslip.superannuation_amount || 0)
+    payload.superannuation_total = Number(payslip.superannuation_total || payslip.superannuation_amount || 0)
+  }
+
+  return payload
 }
 
 function fromDbRow(row: any): AIMTPayslip {
+  const hasSuper = Boolean(
+    row.include_superannuation ||
+    Number(row.superannuation_amount || 0) > 0 ||
+    (row.superannuation_description && row.superannuation_description.trim() !== '')
+  )
+
   return {
     ...row,
     show_annual_salary: Number(row.annual_salary || 0) > 0,
+    include_superannuation: hasSuper,
+    superannuation_description:
+      row.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122',
+    superannuation_amount: Number(row.superannuation_amount || 0),
+    superannuation_total: Number(row.superannuation_total || row.superannuation_amount || 0),
   }
 }
 
@@ -234,19 +263,40 @@ export const aimtPayslipService = {
     }
     saveLocalPayslips(locals)
 
-    const dbPayload = toDbPayload(payslip)
+    const dbPayload = toDbPayload(payslip, true)
 
     // Attempt Supabase insert/upsert
     try {
       const supabase = createClient()
-      const { data, error } = await (supabase as any)
+      let { data, error } = await (supabase as any)
         .from('aimt_payslips')
         .upsert(dbPayload)
         .select()
         .single()
 
+      if (error && error.message?.includes('superannuation')) {
+        // If live Supabase table does not yet have superannuation columns, fallback without them
+        const fallbackRes = await (supabase as any)
+          .from('aimt_payslips')
+          .upsert(toDbPayload(payslip, false))
+          .select()
+          .single()
+        data = fallbackRes.data
+        error = fallbackRes.error
+      }
+
       if (!error && data) {
-        return { success: true, data: fromDbRow(data) }
+        return {
+          success: true,
+          data: {
+            ...payslip,
+            ...fromDbRow(data),
+            include_superannuation: payslip.include_superannuation,
+            superannuation_description: payslip.superannuation_description,
+            superannuation_amount: payslip.superannuation_amount,
+            superannuation_total: payslip.superannuation_total,
+          },
+        }
       }
     } catch (e) {
       console.warn('Supabase upsert failed, stored in local storage:', e)
