@@ -5,6 +5,7 @@ import {
   calculateDepartureStatus,
   calculateWorkingDuration,
   parseExcelAttendanceWorkbook,
+  parseDateString,
   DEFAULT_ATTENDANCE_SETTINGS,
 } from './src/lib/services/attendance-calculator'
 import * as XLSX from 'xlsx'
@@ -73,16 +74,16 @@ assert(matchEmployeeByName(' ayesha ', mockEmployees).status === 'MATCHED', 'Mat
 assert(matchEmployeeByName('Ayesha Khan', mockEmployees).status === 'UNMATCHED', 'Do not match "Ayesha Khan" to "Ayesha"')
 assert(matchEmployeeByName('John Smith', mockEmployees).status === 'UNMATCHED', 'Unmatched employee detected')
 
-// 7. Full Excel Parsing & Sunday Skipping Test
+// 7. Full Excel Parsing & Sunday Skipping Test (DD/MM/YYYY format)
 const testRows = [
   ['Name', 'Time', 'State', 'New State', 'Exception', 'Operation'],
-  ['Ayesha', '8/1/2026 10:43 AM', 'C/In', '', 'OK', ''],
-  ['Ayesha', '8/1/2026 3:30 PM', 'C/Out', '', 'OK', ''],
-  ['Ayesha', '8/2/2026 10:44 AM', 'C/In', '', 'OK', ''], // 8/2/2026 is Sunday!
-  ['Ayesha', '8/2/2026 6:59 PM', 'C/Out', '', 'OK', ''], // 8/2/2026 is Sunday!
-  ['Ayesha', '8/3/2026 10:42 AM', 'C/In', '', 'OK', ''], // 8/3/2026 is Monday
-  ['Ayesha', '8/3/2026 6:37 PM', 'C/Out', '', 'OK', ''],
-  ['Unknown Person', '8/3/2026 10:30 AM', 'C/In', '', 'OK', ''],
+  ['Ayesha', '01/08/2026 10:43 AM', 'C/In', '', 'OK', ''],
+  ['Ayesha', '01/08/2026 3:30 PM', 'C/Out', '', 'OK', ''],
+  ['Ayesha', '02/08/2026 10:44 AM', 'C/In', '', 'OK', ''], // 02/08/2026 is Sunday!
+  ['Ayesha', '02/08/2026 6:59 PM', 'C/Out', '', 'OK', ''], // 02/08/2026 is Sunday!
+  ['Ayesha', '03/08/2026 10:42 AM', 'C/In', '', 'OK', ''], // 03/08/2026 is Monday
+  ['Ayesha', '03/08/2026 6:37 PM', 'C/Out', '', 'OK', ''],
+  ['Unknown Person', '03/08/2026 10:30 AM', 'C/In', '', 'OK', ''],
 ]
 
 const ws = XLSX.utils.aoa_to_sheet(testRows)
@@ -100,20 +101,35 @@ const parseResult = parseExcelAttendanceWorkbook(
 
 assert(parseResult.stats.sundaySkippedCount === 2, 'Sunday records skipped counter == 2')
 assert(parseResult.stats.unmatchedCount === 1, 'Unmatched counter == 1 (Unknown Person)')
-assert(parseResult.stats.matchedCount === 2, 'Matched days == 2 (8/1 and 8/3)')
+assert(parseResult.stats.matchedCount === 2, 'Matched days == 2 (01/08 and 03/08)')
 
 // 8. Verify Out Time and Duration from the user's exact spreadsheet format (State=C/In, New State=C/Out)
 const day1 = parseResult.previewItems.find((p) => p.date === '2026-08-01')
-assert(day1 !== undefined, '8/1 record found in preview')
-assert(day1?.inTime === '10:43 AM', `8/1 In Time is 10:43 AM (got: ${day1?.inTime})`)
-assert(day1?.outTime === '03:30 PM', `8/1 Out Time is 03:30 PM (got: ${day1?.outTime})`)
-assert(day1?.totalWorkingHoursFormatted === '4h 47m', `8/1 Working Duration is 4h 47m (got: ${day1?.totalWorkingHoursFormatted})`)
+assert(day1 !== undefined, '01/08 record found in preview as 2026-08-01')
+assert(day1?.inTime === '10:43 AM', `01/08 In Time is 10:43 AM (got: ${day1?.inTime})`)
+assert(day1?.outTime === '03:30 PM', `01/08 Out Time is 03:30 PM (got: ${day1?.outTime})`)
+assert(day1?.totalWorkingHoursFormatted === '4h 47m', `01/08 Working Duration is 4h 47m (got: ${day1?.totalWorkingHoursFormatted})`)
 
 const day3 = parseResult.previewItems.find((p) => p.date === '2026-08-03')
-assert(day3 !== undefined, '8/3 record found in preview')
-assert(day3?.inTime === '10:42 AM', `8/3 In Time is 10:42 AM (got: ${day3?.inTime})`)
-assert(day3?.outTime === '06:37 PM', `8/3 Out Time is 06:37 PM (got: ${day3?.outTime})`)
-assert(day3?.totalWorkingHoursFormatted === '7h 55m', `8/3 Working Duration is 7h 55m (got: ${day3?.totalWorkingHoursFormatted})`)
+assert(day3 !== undefined, '03/08 record found in preview as 2026-08-03')
+assert(day3?.inTime === '10:42 AM', `03/08 In Time is 10:42 AM (got: ${day3?.inTime})`)
+assert(day3?.outTime === '06:37 PM', `03/08 Out Time is 06:37 PM (got: ${day3?.outTime})`)
+assert(day3?.totalWorkingHoursFormatted === '7h 55m', `03/08 Working Duration is 7h 55m (got: ${day3?.totalWorkingHoursFormatted})`)
+
+// 9. DD/MM/YY and DD/MM/YYYY explicit parsing test
+const d1 = parseDateString('18/09/2026 10:19 AM')
+assert(d1?.dateString === '2026-09-18', '18/09/2026 parsed as 2026-09-18')
+assert(d1?.dayName === 'Friday', '18/09/2026 is Friday')
+
+const d2 = parseDateString('18/09/26 10:19 AM')
+assert(d2?.dateString === '2026-09-18', '18/09/26 (2-digit year) parsed as 2026-09-18')
+
+const d3 = parseDateString('01/09/2026 11:23 AM')
+assert(d3?.dateString === '2026-09-01', '01/09/2026 (DD/MM) parsed as 2026-09-01')
+assert(d3?.dayName === 'Tuesday', '01/09/2026 is Tuesday')
+
+const d4 = parseDateString('01/09/26 11:23 AM')
+assert(d4?.dateString === '2026-09-01', '01/09/26 (DD/MM/YY) parsed as 2026-09-01')
 
 console.log(`\n=== SUMMARY: ${passCount} PASSED, ${failCount} FAILED ===`)
 

@@ -146,6 +146,23 @@ export async function POST(request: NextRequest) {
         }
       })
 
+      if (batchResult.savedCount === 0 && batchResult.errors.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Database save failed: ${batchResult.errors[0]}`,
+            summary: {
+              totalSubmitted: items.length,
+              savedCount: 0,
+              skippedDuplicates: batchResult.skippedDuplicates,
+              skippedInvalidOrSunday: skippedInvalidCount,
+              errors: batchResult.errors,
+            },
+          },
+          { status: 500 }
+        )
+      }
+
       return NextResponse.json({
         success: true,
         summary: {

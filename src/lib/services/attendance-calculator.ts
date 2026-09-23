@@ -227,12 +227,24 @@ export function calculateWorkingDuration(
 export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 /**
- * Parses date string or Excel serial number into YYYY-MM-DD and Day info
+ * Parses date string or Excel serial number into YYYY-MM-DD and Day info.
+ * Strictly adheres to DD/MM/YY and DD/MM/YYYY formats for file uploads
+ * (e.g. 18/09/2026 or 18/09/26 -> Day: 18, Month: 09, Year: 2026 -> 2026-09-18).
  */
 export function parseDateString(rawDate: any): { dateString: string; dayOfWeek: number; dayName: string } | null {
   if (rawDate === null || rawDate === undefined || rawDate === '') return null
 
-  // Handle Excel Serial Number (e.g. 45505)
+  // 1. Handle JS Date object (e.g. from cellDates: true)
+  if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+    const year = rawDate.getFullYear()
+    const month = String(rawDate.getMonth() + 1).padStart(2, '0')
+    const day = String(rawDate.getDate()).padStart(2, '0')
+    const dateString = `${year}-${month}-${day}`
+    const dayOfWeek = rawDate.getDay()
+    return { dateString, dayOfWeek, dayName: DAY_NAMES[dayOfWeek] }
+  }
+
+  // 2. Handle Excel Serial Number (e.g. 45505)
   if (typeof rawDate === 'number') {
     const jsDate = new Date((rawDate - 25569) * 86400 * 1000)
     if (isNaN(jsDate.getTime())) return null
@@ -250,36 +262,47 @@ export function parseDateString(rawDate: any): { dateString: string; dayOfWeek: 
 
   const str = String(rawDate).trim()
 
-  // Match M/D/YYYY or MM/DD/YYYY or YYYY-MM-DD or DD/MM/YYYY
-  // First check ISO YYYY-MM-DD
+  // 3. Match ISO YYYY-MM-DD (e.g. 2026-09-18 or 2026/09/18)
   const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
   if (isoMatch) {
     const year = parseInt(isoMatch[1], 10)
     const month = parseInt(isoMatch[2], 10)
     const day = parseInt(isoMatch[3], 10)
-    const d = new Date(Date.UTC(year, month - 1, day))
-    if (!isNaN(d.getTime())) {
-      const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      const dayOfWeek = d.getUTCDay()
-      return { dateString, dayOfWeek, dayName: DAY_NAMES[dayOfWeek] }
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const d = new Date(Date.UTC(year, month - 1, day))
+      if (!isNaN(d.getTime())) {
+        const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        const dayOfWeek = d.getUTCDay()
+        return { dateString, dayOfWeek, dayName: DAY_NAMES[dayOfWeek] }
+      }
     }
   }
 
-  // Check M/D/YYYY (e.g. 8/1/2026 or 08/01/2026)
-  const usMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/)
-  if (usMatch) {
-    const month = parseInt(usMatch[1], 10)
-    const day = parseInt(usMatch[2], 10)
-    const year = parseInt(usMatch[3], 10)
-    const d = new Date(Date.UTC(year, month - 1, day))
-    if (!isNaN(d.getTime())) {
-      const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      const dayOfWeek = d.getUTCDay()
-      return { dateString, dayOfWeek, dayName: DAY_NAMES[dayOfWeek] }
+  // 4. Primary DD/MM/YY and DD/MM/YYYY parser (DD/MM/YYYY or DD/MM/YY, with '/' or '-')
+  // e.g. "18/09/2026", "18/09/26", "01/09/2026", "01/09/26", "18-09-2026"
+  const dmyMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/)
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10)
+    const month = parseInt(dmyMatch[2], 10)
+    const yearPart = dmyMatch[3]
+    let year = parseInt(yearPart, 10)
+
+    // Expand 2-digit year (e.g. 26 -> 2026)
+    if (yearPart.length <= 2) {
+      year = year < 50 ? 2000 + year : 1900 + year
+    }
+
+    if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 2000 && year <= 2099) {
+      const d = new Date(Date.UTC(year, month - 1, day))
+      if (!isNaN(d.getTime())) {
+        const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        const dayOfWeek = d.getUTCDay()
+        return { dateString, dayOfWeek, dayName: DAY_NAMES[dayOfWeek] }
+      }
     }
   }
 
-  // Generic date fallback
+  // 5. Generic date fallback
   const d = new Date(str)
   if (!isNaN(d.getTime())) {
     const year = d.getFullYear()
