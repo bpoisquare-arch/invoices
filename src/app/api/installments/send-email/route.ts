@@ -26,9 +26,12 @@ export async function POST(request: NextRequest) {
     // Session Verification
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    const devSession = request.cookies.get('dev-auth-session')?.value === 'true'
+    const devSessionVal = request.cookies.get('dev-auth-session')?.value
+    const userRoleVal = request.cookies.get('user-role')?.value
+    const devSession = !!devSessionVal && devSessionVal !== 'false'
+    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer' || user?.user_metadata?.role === 'viewer'
     
-    if (!user && !devSession) {
+    if ((!user && !devSession) || isViewer) {
       return NextResponse.json({ success: false, error: 'Unauthorized: Valid session required.' }, { status: 401 })
     }
 
