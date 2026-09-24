@@ -245,8 +245,8 @@ export default function StudentReportsPage() {
             <span>Refresh Data</span>
           </Button>
 
-          {/* Import Excel */}
-          {!isViewer && (
+          {/* Import Excel - Temporarily Hidden */}
+          {/* {!isViewer && (
             <Button
               size="sm"
               onClick={() => setIsUploadModalOpen(true)}
@@ -256,7 +256,7 @@ export default function StudentReportsPage() {
               <UploadCloud className="size-4 text-cyan-300" />
               <span>Import Excel</span>
             </Button>
-          )}
+          )} */}
         </div>
       </div>
 
@@ -276,7 +276,7 @@ export default function StudentReportsPage() {
         selectedIds={selectedIds}
         onSelectChange={setSelectedIds}
         onViewRecord={(record) => setDetailModalRecord(record)}
-        onImportExcel={isViewer ? undefined : () => setIsUploadModalOpen(true)}
+        onImportExcel={undefined}
         onAddEntry={
           isViewer
             ? undefined

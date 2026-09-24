@@ -386,8 +386,8 @@ export default function StcReportDataTable({
             <span className="hidden sm:inline">Export Excel ({filteredRecords.length})</span>
           </Button>
 
-          {/* Import Excel */}
-          {onImportExcel && (
+          {/* Import Excel - Temporarily Hidden */}
+          {/* {onImportExcel && (
             <Button
               variant="outline"
               size="sm"
@@ -398,7 +398,7 @@ export default function StcReportDataTable({
               <UploadCloud className="size-4 text-[#00BF8F]" />
               <span className="hidden sm:inline">Import Excel</span>
             </Button>
-          )}
+          )} */}
 
           {/* Add Entry */}
           {onAddEntry && (
@@ -631,7 +631,7 @@ export default function StcReportDataTable({
                       <span className="text-xs text-slate-500 max-w-sm">
                         {searchTerm || selectedStatus !== 'all' || selectedDocument !== 'all'
                           ? 'Try adjusting your search query or filters.'
-                          : 'Use "+ Add Entry" or "Import Excel" to add student records.'}
+                          : 'Use "+ Add Entry" to add student records.'}
                       </span>
                     </div>
                   </td>

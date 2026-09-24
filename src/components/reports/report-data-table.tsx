@@ -415,8 +415,8 @@ export default function ReportDataTable({
             <span className="hidden sm:inline">Export Excel ({filteredRecords.length})</span>
           </Button>
 
-          {/* Import Excel Button in Table Controls */}
-          {onImportExcel && (
+          {/* Import Excel Button in Table Controls - Temporarily Hidden */}
+          {/* {onImportExcel && (
             <Button
               variant="outline"
               size="sm"
@@ -427,7 +427,7 @@ export default function ReportDataTable({
               <UploadCloud className="size-4 text-[#009D9E]" />
               <span className="hidden sm:inline">Import Excel</span>
             </Button>
-          )}
+          )} */}
 
           {/* Add Entry Button */}
           {onAddEntry && (
