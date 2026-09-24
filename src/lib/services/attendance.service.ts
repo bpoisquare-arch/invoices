@@ -233,10 +233,12 @@ async function calculateAllEmployeeUsedLeaves(supabase: any): Promise<Map<string
   }>()
 
   try {
+    const currentYear = new Date().getFullYear()
     const { data: recs } = await supabase
       .from('attendance_records')
       .select('employee_id, attendance_date, arrival_status, departure_status, raw_punches')
-      .gte('attendance_date', '2026-09-01')
+      .gte('attendance_date', `${currentYear}-01-01`)
+      .lte('attendance_date', `${currentYear}-12-31`)
 
     if (recs && recs.length > 0) {
       for (const r of recs) {
@@ -1289,40 +1291,71 @@ export async function getEmployeeLeaveBalanceSummary(
   probationDates: string[]
   hasProbationInTargetMonth: boolean
 }> {
-  const [emp, metaMap] = await Promise.all([
-    getEmployeeById(employeeIdOrUuid),
-    getEmployeeMetadataMap(),
-  ])
+  const supabase = await getSupabase()
+  const isUuid = Boolean(employeeIdOrUuid && employeeIdOrUuid.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
 
+  let emp = await getEmployeeById(employeeIdOrUuid)
+  if (!emp && supabase) {
+    try {
+      let q = supabase.from('employees').select('*')
+      if (isUuid) {
+        q = q.eq('id', employeeIdOrUuid)
+      } else {
+        q = q.eq('employee_id', employeeIdOrUuid)
+      }
+      const { data: dbEmp } = await q.limit(1).maybeSingle()
+      if (dbEmp) emp = dbEmp as any
+    } catch {}
+  }
+
+  const metaMap = await getEmployeeMetadataMap()
   const meta = (emp?.id && metaMap[emp.id]) || (emp?.employee_id && metaMap[emp.employee_id]) || metaMap[employeeIdOrUuid] || {}
   const isOldStaff = meta.is_old_staff !== undefined ? Boolean(meta.is_old_staff) : Boolean(emp?.is_old_staff)
   const joiningDate = isOldStaff ? null : (meta.joining_date || emp?.joining_date || emp?.created_at || null)
 
-  const initialQuotas: EmployeeLeaveQuotas = meta.leave_quotas || {
-    annual_leaves: DEFAULT_EMPLOYEE_LEAVE_QUOTAS.annual_leaves ?? 6,
-    sick_leaves: DEFAULT_EMPLOYEE_LEAVE_QUOTAS.sick_leaves ?? 7,
-    casual_leaves: DEFAULT_EMPLOYEE_LEAVE_QUOTAS.casual_leaves ?? 7,
-    wfh_quota: DEFAULT_EMPLOYEE_LEAVE_QUOTAS.wfh_quota ?? 4,
-    probation_leaves: isOldStaff ? 0 : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.probation_leaves ?? 3),
+  const targetDateStr = targetDate ? targetDate.split('T')[0] : ''
+  const targetMonthStr = targetDateStr ? targetDateStr.substring(0, 7) : ''
+  const year = targetDateStr ? targetDateStr.substring(0, 4) : String(new Date().getFullYear())
+
+  // Calculate probation status
+  let isProbation = false
+  if (!isOldStaff && joiningDate && targetDateStr) {
+    const j = new Date(joiningDate.split('T')[0])
+    const t = new Date(targetDateStr)
+    if (!isNaN(j.getTime()) && !isNaN(t.getTime())) {
+      const monthsDiff = (t.getFullYear() - j.getFullYear()) * 12 + (t.getMonth() - j.getMonth())
+      const daysDiff = Math.floor((t.getTime() - j.getTime()) / (1000 * 60 * 60 * 24))
+      isProbation = daysDiff >= 0 && monthsDiff < 3
+    }
   }
 
-  const initial_prob = isOldStaff ? 0 : (initialQuotas.probation_leaves !== undefined ? Number(initialQuotas.probation_leaves) : 3)
+  const initialQuotas: EmployeeLeaveQuotas = {
+    annual_leaves: emp?.base_leave_quotas?.annual_leaves ?? meta.base_leave_quotas?.annual_leaves ?? (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.annual_leaves ?? 6),
+    sick_leaves: emp?.base_leave_quotas?.sick_leaves ?? meta.base_leave_quotas?.sick_leaves ?? (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.sick_leaves ?? 7),
+    casual_leaves: emp?.base_leave_quotas?.casual_leaves ?? meta.base_leave_quotas?.casual_leaves ?? (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.casual_leaves ?? 7),
+    wfh_quota: emp?.base_leave_quotas?.wfh_quota ?? meta.base_leave_quotas?.wfh_quota ?? (emp?.leave_quotas?.wfh_quota === -1 ? -1 : (DEFAULT_EMPLOYEE_LEAVE_QUOTAS.wfh_quota ?? 4)),
+    probation_leaves: isOldStaff ? 0 : (emp?.base_leave_quotas?.probation_leaves ?? meta.base_leave_quotas?.probation_leaves ?? (isProbation ? 3 : 0)),
+  }
+
+  const initial_prob = isOldStaff ? 0 : (initialQuotas.probation_leaves !== undefined ? Number(initialQuotas.probation_leaves) : (isProbation ? 3 : 0))
   const initial_ann = initialQuotas.annual_leaves !== undefined ? Number(initialQuotas.annual_leaves) : 6
   const initial_sick = initialQuotas.sick_leaves !== undefined ? Number(initialQuotas.sick_leaves) : 7
   const initial_cas = initialQuotas.casual_leaves !== undefined ? Number(initialQuotas.casual_leaves) : 7
   const initial_wfh = initialQuotas.wfh_quota !== undefined ? Number(initialQuotas.wfh_quota) : 4
 
-  const supabase = await getSupabase()
-  const isUuid = Boolean(employeeIdOrUuid && employeeIdOrUuid.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
-  const empDbId = emp?.id || (isUuid ? employeeIdOrUuid : null)
+  const uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+  const empDbId = (emp?.id && uuidPattern.test(emp.id))
+    ? emp.id
+    : (uuidPattern.test(employeeIdOrUuid) ? employeeIdOrUuid : null)
 
   let allRecords: any[] = []
   if (empDbId) {
     const { data } = await supabase
       .from('attendance_records')
-      .select('id, attendance_date, arrival_status, departure_status, raw_punches')
+      .select('id, employee_id, attendance_date, arrival_status, departure_status, raw_punches')
       .eq('employee_id', empDbId)
-      .gte('attendance_date', '2026-09-01')
+      .gte('attendance_date', `${year}-01-01`)
+      .lte('attendance_date', `${year}-12-31`)
     allRecords = data || []
   }
 
@@ -1332,9 +1365,6 @@ export async function getEmployeeLeaveBalanceSummary(
   let used_casual = 0
   let used_probation = 0
   let used_wfh = 0
-
-  const targetDateStr = targetDate ? targetDate.split('T')[0] : ''
-  const targetMonthStr = targetDateStr ? targetDateStr.substring(0, 7) : ''
 
   if (allRecords && allRecords.length > 0) {
     for (const r of allRecords) {
@@ -1373,18 +1403,6 @@ export async function getEmployeeLeaveBalanceSummary(
     }
   }
 
-  // Calculate probation status
-  let isProbation = false
-  if (!isOldStaff && joiningDate && targetDateStr) {
-    const j = new Date(joiningDate.split('T')[0])
-    const t = new Date(targetDateStr)
-    if (!isNaN(j.getTime()) && !isNaN(t.getTime())) {
-      const monthsDiff = (t.getFullYear() - j.getFullYear()) * 12 + (t.getMonth() - j.getMonth())
-      const daysDiff = Math.floor((t.getTime() - j.getTime()) / (1000 * 60 * 60 * 24))
-      isProbation = daysDiff >= 0 && monthsDiff < 3
-    }
-  }
-
   const hasProbationInTargetMonth = targetMonthStr
     ? probationDates.some((d) => d.startsWith(targetMonthStr))
     : false
@@ -1407,11 +1425,11 @@ export async function getEmployeeLeaveBalanceSummary(
       wfh_quota: Number(used_wfh.toFixed(2)),
     },
     remaining: {
-      probation_leaves: Math.max(0, Number((initial_prob - used_probation).toFixed(2))),
+      probation_leaves: isOldStaff ? 0 : Math.max(0, Number((initial_prob - used_probation).toFixed(2))),
       annual_leaves: Math.max(0, Number((initial_ann - used_annual).toFixed(2))),
       sick_leaves: Math.max(0, Number((initial_sick - used_sick).toFixed(2))),
       casual_leaves: Math.max(0, Number((initial_cas - used_casual).toFixed(2))),
-      wfh_quota: Number((initial_wfh - used_wfh).toFixed(2)),
+      wfh_quota: initial_wfh < 0 ? -1 : Number((initial_wfh - used_wfh).toFixed(2)),
     },
     probationDates,
     hasProbationInTargetMonth,

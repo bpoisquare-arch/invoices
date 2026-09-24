@@ -11,6 +11,7 @@ export interface EmployeeMetadata {
   email?: string | null
   is_active?: boolean
   leave_quotas?: EmployeeLeaveQuotas
+  base_leave_quotas?: EmployeeLeaveQuotas
 }
 
 function getFsAndPath() {
