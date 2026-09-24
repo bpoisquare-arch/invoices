@@ -1,5 +1,26 @@
 [
   {
+    "id": "80f40fab-c039-4f51-bf65-c778fa8df1f0",
+    "employee_id": "3823d7df-5be6-4932-ab0c-0bdbf252338e",
+    "employee_name": "Ushfa Noor",
+    "batch_id": "EMP-0004",
+    "branch": "Multan",
+    "attendance_date": "2026-09-01",
+    "request_type": "LEAVE",
+    "leave_type": "Sick Leave",
+    "leave_duration": 1,
+    "requested_in_time": null,
+    "requested_out_time": null,
+    "reason": "khizar raza",
+    "status": "REJECTED",
+    "submitted_by": "Admin (Multan)",
+    "reviewed_by": "Admin",
+    "reviewed_at": "2026-09-24T11:40:39.931Z",
+    "review_notes": "22 Cheviot A",
+    "created_at": "2026-09-24T11:40:18.821Z",
+    "updated_at": "2026-09-24T11:40:39.931Z"
+  },
+  {
     "id": "7e050320-c1c9-4e7c-8dfe-7cfa1c19394b",
     "employee_id": "72cb861d-a184-4c3a-ac2c-a5e79a9282f0",
     "employee_name": "Ayesha Anwar",
