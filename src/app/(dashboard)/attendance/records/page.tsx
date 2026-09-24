@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
+  Building2,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -52,6 +53,7 @@ import {
 } from '@/lib/supabase/database.types'
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
+import { BranchRequestsModal } from '@/components/attendance/branch-requests-modal'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
 import { cn } from '@/lib/utils'
 import { DataTableViewOptions } from '@/components/ui/data-table-view-options'
@@ -620,6 +622,20 @@ export default function AttendanceRecordsPage() {
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
+  // Branch Attendance Requests Modal State & Pending Counter
+  const [isBranchRequestsModalOpen, setIsBranchRequestsModalOpen] = useState(false)
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
+
+  const fetchPendingRequestsCount = async () => {
+    try {
+      const res = await fetch('/api/attendance/requests?status=PENDING')
+      const data = await res.json()
+      if (data.success && typeof data.pendingCount === 'number') {
+        setPendingRequestsCount(data.pendingCount)
+      }
+    } catch {}
+  }
+
   // Sync deleteStartDate/deleteEndDate when modal opens
   useEffect(() => {
     if (isDeleteModalOpen) {
@@ -700,11 +716,16 @@ export default function AttendanceRecordsPage() {
         if (empData.success && empData.employees) setEmployees(empData.employees)
         if (settData.success && settData.settings) setSettings(settData.settings)
         if (holData.success && holData.holidays) setHolidays(holData.holidays)
+        await fetchPendingRequestsCount()
       } catch (err) {
         console.error('Error loading meta:', err)
       }
     }
     loadMeta()
+    const timer = setInterval(() => {
+      fetchPendingRequestsCount()
+    }, 20000)
+    return () => clearInterval(timer)
   }, [])
 
   const getPresentEmployeesCountOnDate = (date: string): number => {
@@ -1725,6 +1746,24 @@ export default function AttendanceRecordsPage() {
         <div className="flex items-center gap-2.5 flex-wrap">
           <Button
             variant="outline"
+            onClick={() => setIsBranchRequestsModalOpen(true)}
+            className="text-xs font-bold uppercase tracking-wider text-indigo-750 hover:text-indigo-900 hover:bg-indigo-100/70 border-indigo-300 bg-indigo-50/70 gap-2 shadow-2xs h-9"
+          >
+            <Building2 className="w-4 h-4 text-indigo-600" />
+            Branch Requests
+            {pendingRequestsCount > 0 ? (
+              <Badge className="bg-amber-500 hover:bg-amber-600 text-white font-mono text-[10px] px-1.5 py-0 rounded-full animate-pulse">
+                {pendingRequestsCount} Pending
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-slate-500 text-[10px] px-1.5 py-0 rounded-full font-mono">
+                0
+              </Badge>
+            )}
+          </Button>
+
+          <Button
+            variant="outline"
             onClick={() => setIsDeleteModalOpen(true)}
             className="text-xs font-bold uppercase tracking-wider text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 gap-1.5 shadow-2xs h-9"
           >
@@ -2523,6 +2562,19 @@ export default function AttendanceRecordsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Branch Attendance Requests Review Modal */}
+      <BranchRequestsModal
+        isOpen={isBranchRequestsModalOpen}
+        onClose={() => {
+          setIsBranchRequestsModalOpen(false)
+          fetchPendingRequestsCount()
+        }}
+        onRecordUpdated={() => {
+          fetchRecords()
+          fetchPendingRequestsCount()
+        }}
+      />
     </div>
   )
 }

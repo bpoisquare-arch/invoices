@@ -1,0 +1,23 @@
+[
+  {
+    "id": "7e050320-c1c9-4e7c-8dfe-7cfa1c19394b",
+    "employee_id": "72cb861d-a184-4c3a-ac2c-a5e79a9282f0",
+    "employee_name": "Ayesha Anwar",
+    "batch_id": "EMP-0001",
+    "branch": "Multan",
+    "attendance_date": "2026-09-01",
+    "request_type": "LEAVE",
+    "leave_type": "Casual Leave",
+    "leave_duration": 1,
+    "requested_in_time": null,
+    "requested_out_time": null,
+    "reason": null,
+    "status": "APPROVED",
+    "submitted_by": "Admin (Multan)",
+    "reviewed_by": "Admin",
+    "reviewed_at": "2026-09-24T10:42:45.686Z",
+    "review_notes": "Approved by Admin",
+    "created_at": "2026-09-24T10:42:22.696Z",
+    "updated_at": "2026-09-24T10:42:45.686Z"
+  }
+]

@@ -555,6 +555,71 @@ export interface Database {
           }
         ]
       }
+      attendance_requests: {
+        Row: {
+          id: string
+          employee_id: string
+          attendance_date: string
+          branch: string
+          request_type: string
+          leave_type: string | null
+          requested_in_time: string | null
+          requested_out_time: string | null
+          reason: string | null
+          status: string
+          submitted_by: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          review_notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          employee_id: string
+          attendance_date: string
+          branch: string
+          request_type: string
+          leave_type?: string | null
+          requested_in_time?: string | null
+          requested_out_time?: string | null
+          reason?: string | null
+          status?: string
+          submitted_by?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          review_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          employee_id?: string
+          attendance_date?: string
+          branch?: string
+          request_type?: string
+          leave_type?: string | null
+          requested_in_time?: string | null
+          requested_out_time?: string | null
+          reason?: string | null
+          status?: string
+          submitted_by?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          review_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       attendance_audit_logs: {
         Row: {
           id: string
