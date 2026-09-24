@@ -10,8 +10,8 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "CMS - Client Management System",
-  description: "Client Management System & Payroll Operations",
+  title: "MIS - Management Information System",
+  description: "Management Information System & Payroll Operations",
   icons: {
     icon: "/isquarebpo.png",
     shortcut: "/isquarebpo.png",

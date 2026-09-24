@@ -1,7 +1,7 @@
 import AIMTPayslipList from '@/components/payslips/aimt-payslip-list'
 
 export const metadata = {
-  title: 'AIMT Payslips | Client Management System',
+  title: 'AIMT Payslips | MIS - Management Information System',
   description: 'Manage and export AIMT College employee payslips',
 }
 

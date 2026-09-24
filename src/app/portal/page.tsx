@@ -260,7 +260,7 @@ export default function EntityPortalPage() {
       {/* Footer */}
       <footer className="py-5 text-center text-xs font-medium text-[#5C7B73] border-t border-[#002D27]/10 bg-white/70 backdrop-blur-xs">
         <div className="flex items-center justify-center gap-2">
-          <span>Client Management System by <strong className="text-[#002D27] font-bold">ISquareBPO</strong></span>
+          <span>MIS - Management Information System by <strong className="text-[#002D27] font-bold">ISquareBPO</strong></span>
           <span>•</span>
           <span>All Rights Reserved</span>
         </div>
