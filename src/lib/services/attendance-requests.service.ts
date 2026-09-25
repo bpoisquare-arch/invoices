@@ -150,8 +150,9 @@ export async function getAttendanceRequests(filter?: {
 
     if (recs && recs.length > 0) {
       for (const r of recs) {
-        if (!Array.isArray(r.raw_punches)) continue
-        const reqObj = r.raw_punches.find((p: any) => p && p.type === 'BRANCH_REQUEST')
+        const reqObj: any = Array.isArray(r.raw_punches)
+          ? (r.raw_punches as any[]).find((p: any) => p && p.type === 'BRANCH_REQUEST')
+          : null
         if (reqObj) {
           const item: AttendanceRequestItem = {
             id: reqObj.id || reqObj.request_id || `req-${r.id}`,
@@ -287,14 +288,17 @@ export async function createAttendanceRequest(params: {
         })
         .eq('id', rec.id)
     } else {
+      const parsedDate = parseDateString(newItem.attendance_date)
+      const dayName = parsedDate ? parsedDate.dayName : 'Monday'
       await supabase
         .from('attendance_records')
         .insert({
           employee_id: newItem.employee_id,
           attendance_date: newItem.attendance_date,
+          day_of_week: dayName,
           arrival_status: 'Absent',
           departure_status: 'Absent',
-          raw_punches: [branchReqPayload],
+          raw_punches: [branchReqPayload] as any,
           updated_at: new Date().toISOString(),
         })
     }
