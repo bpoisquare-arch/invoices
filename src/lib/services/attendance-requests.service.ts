@@ -135,6 +135,7 @@ export async function getAttendanceRequests(filter?: {
       .from('attendance_records')
       .select('id, employee_id, attendance_date, arrival_status, departure_status, raw_punches')
       .not('raw_punches', 'is', null)
+      .order('attendance_date', { ascending: false })
 
     if (filter?.startDate) {
       recQuery = recQuery.gte('attendance_date', filter.startDate)
@@ -343,6 +344,52 @@ export async function reviewAttendanceRequest(params: {
     targetRequest = all.find((r) => r.id === params.requestId) || null
   }
 
+  // If not in local fallback, search directly in Supabase attendance_records for live cloud requests!
+  if (!targetRequest) {
+    try {
+      const { data: recs } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .not('raw_punches', 'is', null)
+        .order('attendance_date', { ascending: false })
+
+      if (recs && recs.length > 0) {
+        for (const r of recs) {
+          if (!Array.isArray(r.raw_punches)) continue
+          const reqObj: any = (r.raw_punches as any[]).find(
+            (p: any) => p && p.type === 'BRANCH_REQUEST' && (p.id === params.requestId || p.request_id === params.requestId || `req-${r.id}` === params.requestId)
+          )
+          if (reqObj) {
+            targetRequest = {
+              id: reqObj.id || reqObj.request_id || `req-${r.id}`,
+              employee_id: reqObj.employee_id || r.employee_id,
+              employee_name: reqObj.employee_name || '',
+              batch_id: reqObj.batch_id || '',
+              branch: reqObj.branch || 'Multan',
+              attendance_date: reqObj.attendance_date || r.attendance_date,
+              request_type: reqObj.request_type || 'LEAVE',
+              leave_type: reqObj.leave_type || null,
+              leave_duration: reqObj.leave_duration !== undefined ? reqObj.leave_duration : 1,
+              requested_in_time: reqObj.requested_in_time || null,
+              requested_out_time: reqObj.requested_out_time || null,
+              reason: reqObj.reason || null,
+              status: reqObj.status || 'PENDING',
+              submitted_by: reqObj.submitted_by || 'Branch User',
+              reviewed_by: reqObj.reviewed_by || null,
+              reviewed_at: reqObj.reviewed_at || null,
+              review_notes: reqObj.review_notes || null,
+              created_at: reqObj.created_at || r.attendance_date,
+              updated_at: reqObj.updated_at || r.attendance_date,
+            }
+            break
+          }
+        }
+      }
+    } catch (findErr) {
+      console.error('Error finding request in attendance_records:', findErr)
+    }
+  }
+
   if (!targetRequest) {
     throw new Error('Attendance request not found.')
   }
@@ -466,6 +513,14 @@ export async function reviewAttendanceRequest(params: {
         total_working_minutes: wfhMinutes,
         total_working_hours_formatted: wfhFormatted,
         raw_punches: [
+          {
+            type: 'BRANCH_REQUEST',
+            ...targetRequest,
+            status: 'APPROVED',
+            reviewed_by: reviewedBy,
+            reviewed_at: reviewedAt,
+            review_notes: targetRequest.review_notes,
+          },
           { punch_time: wfhIn, type: 'IN', source: 'WFH', notes: targetRequest.reason || 'Work From Home (1 day)' },
           { punch_time: wfhOut, type: 'OUT', source: 'WFH', notes: targetRequest.reason || 'Work From Home (1 day)' },
         ],
@@ -488,6 +543,14 @@ export async function reviewAttendanceRequest(params: {
         total_working_minutes: 0,
         total_working_hours_formatted: '00:00',
         raw_punches: [
+          {
+            type: 'BRANCH_REQUEST',
+            ...targetRequest,
+            status: 'APPROVED',
+            reviewed_by: reviewedBy,
+            reviewed_at: reviewedAt,
+            review_notes: targetRequest.review_notes,
+          },
           {
             punch_time: null,
             type: 'LEAVE',
@@ -540,6 +603,19 @@ export async function reviewAttendanceRequest(params: {
       departure_status: departureStatus,
       total_working_minutes: duration.totalMinutes,
       total_working_hours_formatted: duration.formatted,
+      raw_punches: [
+        {
+          type: 'BRANCH_REQUEST',
+          ...targetRequest,
+          status: 'APPROVED',
+          reviewed_by: reviewedBy,
+          reviewed_at: reviewedAt,
+          review_notes: targetRequest.review_notes,
+        },
+        ...(Array.isArray(currentRecord?.raw_punches)
+          ? (currentRecord.raw_punches as any[]).filter((p: any) => p && p.type !== 'BRANCH_REQUEST')
+          : []),
+      ],
       updated_at: new Date().toISOString(),
     }
 
@@ -585,6 +661,19 @@ export async function reviewAttendanceRequest(params: {
       departure_status: departureStatus,
       total_working_minutes: duration.totalMinutes,
       total_working_hours_formatted: duration.formatted,
+      raw_punches: [
+        {
+          type: 'BRANCH_REQUEST',
+          ...targetRequest,
+          status: 'APPROVED',
+          reviewed_by: reviewedBy,
+          reviewed_at: reviewedAt,
+          review_notes: targetRequest.review_notes,
+        },
+        ...(Array.isArray(currentRecord?.raw_punches)
+          ? (currentRecord.raw_punches as any[]).filter((p: any) => p && p.type !== 'BRANCH_REQUEST')
+          : []),
+      ],
       updated_at: new Date().toISOString(),
     }
 
@@ -656,9 +745,13 @@ export async function cancelAttendanceRequest(requestId: string): Promise<boolea
     if (recs && recs.length > 0) {
       for (const rec of recs) {
         if (!Array.isArray(rec.raw_punches)) continue
-        const hasReq = rec.raw_punches.some((p: any) => p && (p.id === requestId || p.request_id === requestId))
+        const hasReq = (rec.raw_punches as any[]).some(
+          (p: any) => p && (p.id === requestId || p.request_id === requestId || `req-${rec.id}` === requestId)
+        )
         if (hasReq) {
-          const cleaned = rec.raw_punches.filter((p: any) => !(p && (p.id === requestId || p.request_id === requestId)))
+          const cleaned = (rec.raw_punches as any[]).filter(
+            (p: any) => !(p && (p.id === requestId || p.request_id === requestId || `req-${rec.id}` === requestId))
+          )
           await supabase.from('attendance_records').update({ raw_punches: cleaned }).eq('id', rec.id)
         }
       }
