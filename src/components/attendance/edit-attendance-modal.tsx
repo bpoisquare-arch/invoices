@@ -253,7 +253,13 @@ export default function EditAttendanceModal({
 
   const isMissingOut =
     attendanceStatus === 'present' &&
-    (!outTime || outTime === '---' || record.departure_status === 'Missing Out Time')
+    (!outTime || outTime === '---' || record.departure_status === 'Missing Out Time') &&
+    Boolean(inTime && inTime !== '---')
+
+  const isMissingIn =
+    attendanceStatus === 'present' &&
+    (!inTime || inTime === '---' || record.arrival_status === 'Missing In Time') &&
+    Boolean(outTime && outTime !== '---')
 
   // Live recalculations for preview
   const parsedDate = parseDateString(date)
@@ -509,6 +515,18 @@ export default function EditAttendanceModal({
               <p className="font-bold">Missing Punch-Out Detected</p>
               <p className="text-[11px] text-amber-700 mt-0.5">
                 The employee checked in at <span className="font-bold font-mono">{record.in_time || 'N/A'}</span> but missed checking out. Pick their departure time or mark status.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {isMissingIn && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs p-3 rounded-lg flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Missing Punch-In Detected</p>
+              <p className="text-[11px] text-amber-700 mt-0.5">
+                The employee checked out at <span className="font-bold font-mono">{record.out_time || 'N/A'}</span> but missed checking in. Pick their arrival time below.
               </p>
             </div>
           </div>
@@ -837,16 +855,42 @@ export default function EditAttendanceModal({
             <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
               {/* Office In Time */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  Office In Time
+                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    Office In Time
+                  </span>
+                  {isMissingIn && (
+                    <span className="text-[10px] font-bold text-amber-600 uppercase">Required</span>
+                  )}
                 </Label>
                 <Input
                   type="time"
                   value={toTimeInputValue(inTime)}
                   onChange={(e) => setInTime(fromTimeInputValue(e.target.value))}
-                  className="text-sm border-slate-200 font-mono h-10"
+                  className={`text-sm font-mono h-10 ${
+                    isMissingIn && !inTime
+                      ? 'border-amber-400 bg-amber-50/40 focus:border-[#009D9E]'
+                      : 'border-slate-200'
+                  }`}
+                  autoFocus={isMissingIn}
                 />
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {['10:00 AM', '10:15 AM', '10:30 AM', '10:45 AM', '11:00 AM'].map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setInTime(t)}
+                      className={`px-1.5 py-0.5 text-[10px] font-mono rounded border transition-colors ${
+                        inTime.toUpperCase() === t.toUpperCase()
+                          ? 'bg-[#003D5C] text-white border-[#003D5C]'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
                 <p className="text-[11px] text-slate-500 font-mono">
                   {inTime ? `Selected: ${inTime}` : 'Pick in time'}
                 </p>
@@ -874,6 +918,22 @@ export default function EditAttendanceModal({
                   }`}
                   autoFocus={isMissingOut}
                 />
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {['06:00 PM', '06:15 PM', '06:30 PM', '06:45 PM', '07:00 PM'].map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setOutTime(t)}
+                      className={`px-1.5 py-0.5 text-[10px] font-mono rounded border transition-colors ${
+                        outTime.toUpperCase() === t.toUpperCase()
+                          ? 'bg-[#003D5C] text-white border-[#003D5C]'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
                 <p className="text-[11px] text-slate-500 font-mono">
                   {outTime ? `Selected: ${outTime}` : 'Pick out time'}
                 </p>

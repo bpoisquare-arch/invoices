@@ -696,8 +696,35 @@ export function parseExcelAttendanceWorkbook(
       }
     }
 
-    const firstIn = inPunches.length > 0 ? inPunches[0].time : (sortedPunches[0]?.time || null)
-    const lastOut = outPunches.length > 0 ? outPunches[outPunches.length - 1].time : null
+    let firstIn: string | null = null
+    let lastOut: string | null = null
+
+    if (sortedPunches.length === 1) {
+      const singlePunch = sortedPunches[0]
+      const punchMin = parseTimeToMinutes(singlePunch.time)?.minutes || 0
+      const isSat = group.dayOfWeek === 6
+      const inScheduleMin = parseScheduleTimeToMinutes(
+        isSat ? (settings?.saturday_in_time || '11:00') : (settings?.weekday_in_time || '10:30')
+      )
+      const outScheduleMin = parseScheduleTimeToMinutes(
+        isSat ? (settings?.saturday_out_time || '15:00') : (settings?.weekday_out_time || '18:30')
+      )
+      const shiftMidpoint = Math.round((inScheduleMin + outScheduleMin) / 2)
+
+      // If the single punch is at or after shift midpoint (e.g. 2:30 PM on weekdays, 1:00 PM on Sat),
+      // it is a departure punch (employee missed In punch)
+      if (punchMin >= shiftMidpoint) {
+        lastOut = singlePunch.time
+        firstIn = null
+      } else {
+        // Morning punch: it is an arrival punch (employee missed Out punch)
+        firstIn = singlePunch.time
+        lastOut = null
+      }
+    } else {
+      firstIn = inPunches.length > 0 ? inPunches[0].time : (sortedPunches[0]?.time || null)
+      lastOut = outPunches.length > 0 ? outPunches[outPunches.length - 1].time : null
+    }
 
     // Calculate arrival & departure statuses
     const arrivalStatus = calculateArrivalStatus(firstIn, group.dayOfWeek, settings)

@@ -1730,13 +1730,13 @@ export default function AttendanceRecordsPage() {
     }
 
     // 3. If NO record exists:
-    // A. Future Date -> Show neutral placeholder "--"
-    if (isFuture) {
+    // A. Future Date OR Date after the last uploaded attendance date -> Show neutral placeholder "--"
+    if (isFuture || (maxUploadedDate && date > maxUploadedDate)) {
       return (
         <div
           onClick={() => handleBlankCellClick(emp, date)}
           className="flex items-center justify-center py-2 text-slate-300 font-mono text-xs cursor-pointer hover:bg-blue-50/40 rounded transition-colors"
-          title="Future date. Click to pre-record leave or timings"
+          title="Unuploaded or future date. Click to pre-record leave or timings"
         >
           --
         </div>
@@ -1770,20 +1770,7 @@ export default function AttendanceRecordsPage() {
       }
     }
 
-    // D. Unuploaded dates beyond maxUploadedDate -> Show neutral placeholder "--"
-    if (maxUploadedDate && date > maxUploadedDate) {
-      return (
-        <div
-          onClick={() => handleBlankCellClick(emp, date)}
-          className="flex items-center justify-center py-2 text-slate-300 font-mono text-xs cursor-pointer hover:bg-blue-50/40 rounded transition-colors"
-          title="Unuploaded date. Click to pre-record leave or timings"
-        >
-          --
-        </div>
-      )
-    }
-
-    // C. Past Date -> Show ABSENT (No punches recorded)
+    // C. Past Date up to maxUploadedDate -> Show ABSENT (No punches recorded)
     return (
       <div
         onClick={() => handleBlankCellClick(emp, date)}
