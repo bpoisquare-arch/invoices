@@ -205,7 +205,8 @@ function getRecordStatusFlags(
   date: string,
   recordMatrixMap: Map<string, AttendanceRecordWithEmployee>,
   holidays: Record<string, string>,
-  settings?: AttendanceSettings
+  settings?: AttendanceSettings,
+  maxUploadedDate?: string
 ) {
   const dayName = getDayName(date)
   const isSunday = dayName === 'Sunday'
@@ -390,6 +391,23 @@ function getRecordStatusFlags(
       isWfh: false,
       isPresent: false,
       isBeforeJoining: true,
+      statusLabel: '--',
+    }
+  }
+
+  if (maxUploadedDate && date > maxUploadedDate) {
+    return {
+      isSunday: false,
+      isGazettedHoliday: false,
+      isLeave: false,
+      isAbsent: false,
+      isLate: false,
+      isEarlyLeave: false,
+      isMissingIn: false,
+      isMissingOut: false,
+      isWfh: false,
+      isPresent: false,
+      isBeforeJoining: false,
       statusLabel: '--',
     }
   }
@@ -890,49 +908,34 @@ export default function AttendanceRecordsPage() {
     return map
   }, [records])
 
-  // Calculate status counts across entire active range for filter badges & employee map
-  const statusFilterCounts = useMemo(() => {
-    let totalAbsent = 0
-    let totalMissingIn = 0
-    let totalMissingOut = 0
-
-    const empHasMap = new Map<string, { hasAbsent: boolean; hasMissingIn: boolean; hasMissingOut: boolean }>()
-
-    employees.forEach((emp) => {
-      let hasAbsent = false
-      let hasMissingIn = false
-      let hasMissingOut = false
-
-      dateColumns.forEach((date) => {
-        const flags = getRecordStatusFlags(emp, date, recordMatrixMap, holidays, settings)
-        if (flags.isAbsent) {
-          hasAbsent = true
-          totalAbsent++
+  // Determine the MAXIMUM date up to which attendance has been uploaded
+  const maxUploadedDate = useMemo(() => {
+    let maxD = ''
+    records.forEach((r) => {
+      const hasActualPunchOrLeave = Boolean(
+        (r.in_time && r.in_time !== '---' && r.in_time !== '--') ||
+        (r.out_time && r.out_time !== '---' && r.out_time !== '--') ||
+        (r.total_working_minutes && r.total_working_minutes > 0) ||
+        r.arrival_status === 'Leave' ||
+        r.departure_status?.includes('Leave') ||
+        r.arrival_status === 'On Time Arrival' ||
+        r.arrival_status === 'Late Arrival' ||
+        r.departure_status === 'On Time Departure' ||
+        r.departure_status === 'Early Departure' ||
+        r.departure_status === 'Work From Home' ||
+        r.arrival_status === 'Work From Home'
+      )
+      if (hasActualPunchOrLeave && r.attendance_date) {
+        if (!maxD || r.attendance_date > maxD) {
+          maxD = r.attendance_date
         }
-        if (flags.isMissingIn) {
-          hasMissingIn = true
-          totalMissingIn++
-        }
-        if (flags.isMissingOut) {
-          hasMissingOut = true
-          totalMissingOut++
-        }
-      })
-
-      empHasMap.set(emp.id, { hasAbsent, hasMissingIn, hasMissingOut })
-      empHasMap.set(emp.employee_id, { hasAbsent, hasMissingIn, hasMissingOut })
+      }
     })
+    return maxD
+  }, [records])
 
-    return {
-      totalAbsent,
-      totalMissingIn,
-      totalMissingOut,
-      empHasMap,
-    }
-  }, [employees, dateColumns, recordMatrixMap, holidays, settings])
-
-  // Filter Employees based on Search, Designation, Branch, Status Checkboxes, and presence of records in range
-  const filteredEmployees = useMemo(() => {
+  // Filter Employees matching base filters (Search, Designation, Branch, presence of records in range)
+  const baseFilteredEmployees = useMemo(() => {
     const recordedEmployeeIds = new Set<string>()
     records.forEach((rec) => {
       if (rec.employee_id) recordedEmployeeIds.add(rec.employee_id)
@@ -940,10 +943,11 @@ export default function AttendanceRecordsPage() {
       if (rec.employee?.employee_id) recordedEmployeeIds.add(rec.employee.employee_id)
     })
 
-    const isAnyStatusFilterActive = statusFilters.absent || statusFilters.missingIn || statusFilters.missingOut
+    if (records.length === 0 || recordedEmployeeIds.size === 0) {
+      return []
+    }
 
     let list = employees.filter((emp) => {
-      // Must have at least 1 attendance / leave / WFH record in the active date range
       const hasRecordInRange =
         recordedEmployeeIds.has(emp.id) ||
         recordedEmployeeIds.has(emp.employee_id)
@@ -973,8 +977,64 @@ export default function AttendanceRecordsPage() {
         if (!nameMatch && !idMatch && !desigMatch && !branchMatch) return false
       }
 
-      // Status Checkbox filters (Absent, Missing In, Missing Out)
-      if (isAnyStatusFilterActive) {
+      return true
+    })
+
+    return list
+  }, [employees, records, selectedDesignation, selectedBranch, selectedEmployeeId, search])
+
+  // Calculate status counts across currently filtered base employees (matches KPI Card perfectly!)
+  const statusFilterCounts = useMemo(() => {
+    let totalAbsent = 0
+    let totalMissingIn = 0
+    let totalMissingOut = 0
+
+    const empHasMap = new Map<string, { hasAbsent: boolean; hasMissingIn: boolean; hasMissingOut: boolean }>()
+
+    baseFilteredEmployees.forEach((emp) => {
+      let hasAbsent = false
+      let hasMissingIn = false
+      let hasMissingOut = false
+
+      dateColumns.forEach((date) => {
+        const flags = getRecordStatusFlags(emp, date, recordMatrixMap, holidays, settings, maxUploadedDate)
+        if (flags.isAbsent) {
+          hasAbsent = true
+          totalAbsent++
+        }
+        if (flags.isMissingIn) {
+          hasMissingIn = true
+          totalMissingIn++
+        }
+        if (flags.isMissingOut) {
+          hasMissingOut = true
+          totalMissingOut++
+        }
+      })
+
+      empHasMap.set(emp.id, { hasAbsent, hasMissingIn, hasMissingOut })
+      empHasMap.set(emp.employee_id, { hasAbsent, hasMissingIn, hasMissingOut })
+    })
+
+    return {
+      totalAbsent,
+      totalMissingIn,
+      totalMissingOut,
+      empHasMap,
+    }
+  }, [baseFilteredEmployees, dateColumns, recordMatrixMap, holidays, settings, maxUploadedDate])
+
+  // Is any status filter active?
+  const isAnyStatusFilterActive = Boolean(
+    statusFilters.absent || statusFilters.missingIn || statusFilters.missingOut
+  )
+
+  // Filter Employees based on Status Checkboxes
+  const filteredEmployees = useMemo(() => {
+    let list = baseFilteredEmployees
+
+    if (isAnyStatusFilterActive) {
+      list = list.filter((emp) => {
         const empStatus = statusFilterCounts.empHasMap.get(emp.id) || statusFilterCounts.empHasMap.get(emp.employee_id)
         if (!empStatus) return false
 
@@ -982,25 +1042,16 @@ export default function AttendanceRecordsPage() {
         const matchMissingIn = statusFilters.missingIn && empStatus.hasMissingIn
         const matchMissingOut = statusFilters.missingOut && empStatus.hasMissingOut
 
-        if (!matchAbsent && !matchMissingIn && !matchMissingOut) {
-          return false
-        }
-      }
-
-      return true
-    })
+        return matchAbsent || matchMissingIn || matchMissingOut
+      })
+    }
 
     if (pageSize !== 'all') {
       list = list.slice(0, pageSize)
     }
 
     return list
-  }, [employees, records, selectedDesignation, selectedBranch, selectedEmployeeId, search, pageSize, statusFilters, statusFilterCounts])
-
-  // Is any status filter active?
-  const isAnyStatusFilterActive = Boolean(
-    statusFilters.absent || statusFilters.missingIn || statusFilters.missingOut
-  )
+  }, [baseFilteredEmployees, isAnyStatusFilterActive, statusFilters, statusFilterCounts, pageSize])
 
   // Smart Date Columns for Grid View & Export:
   // If status filter (Absent, Missing In, Missing Out) is active, ONLY show dates where at least one employee had that status!
@@ -1016,7 +1067,7 @@ export default function AttendanceRecordsPage() {
     if (isAnyStatusFilterActive && filteredEmployees.length > 0) {
       dates = dates.filter((date) => {
         return filteredEmployees.some((emp) => {
-          const flags = getRecordStatusFlags(emp, date, recordMatrixMap, holidays, settings)
+          const flags = getRecordStatusFlags(emp, date, recordMatrixMap, holidays, settings, maxUploadedDate)
           const matchAbsent = statusFilters.absent && flags.isAbsent
           const matchMissingIn = statusFilters.missingIn && flags.isMissingIn
           const matchMissingOut = statusFilters.missingOut && flags.isMissingOut
@@ -1035,6 +1086,7 @@ export default function AttendanceRecordsPage() {
     holidays,
     settings,
     statusFilters,
+    maxUploadedDate,
   ])
 
   // Dynamically calculate KPI summary stats across grid matrix
@@ -1060,6 +1112,8 @@ export default function AttendanceRecordsPage() {
         const dayName = getDayName(date)
         const isGazettedHoliday = Boolean(holidays[date]) && getPresentEmployeesCountOnDate(date) === 0
         if (dayName === 'Sunday' || isGazettedHoliday) return // Sundays and Gazetted Holidays
+
+        if (maxUploadedDate && date > maxUploadedDate) return // Dates after maxUploadedDate are not un-uploaded absent days
 
         const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
         const isFuture = date > todayStr
@@ -1110,7 +1164,7 @@ export default function AttendanceRecordsPage() {
       totalAbsent,
       totalLeaves,
     }
-  }, [filteredEmployees, dateColumns, recordMatrixMap, settings, holidays])
+  }, [filteredEmployees, dateColumns, recordMatrixMap, settings, holidays, maxUploadedDate])
 
   // Export to Excel (Styled exactly as 2nd Attachment with Designation & Branch columns, Peach Headers, and Color Rules)
   const handleExportExcel = async () => {
@@ -1714,6 +1768,19 @@ export default function AttendanceRecordsPage() {
           </div>
         )
       }
+    }
+
+    // D. Unuploaded dates beyond maxUploadedDate -> Show neutral placeholder "--"
+    if (maxUploadedDate && date > maxUploadedDate) {
+      return (
+        <div
+          onClick={() => handleBlankCellClick(emp, date)}
+          className="flex items-center justify-center py-2 text-slate-300 font-mono text-xs cursor-pointer hover:bg-blue-50/40 rounded transition-colors"
+          title="Unuploaded date. Click to pre-record leave or timings"
+        >
+          --
+        </div>
+      )
     }
 
     // C. Past Date -> Show ABSENT (No punches recorded)
