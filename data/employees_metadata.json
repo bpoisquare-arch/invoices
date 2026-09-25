@@ -4,10 +4,10 @@
     "salary": 60000,
     "joining_date": null,
     "leave_quotas": {
-      "annual_leaves": 6,
-      "sick_leaves": 5.5,
+      "annual_leaves": 5,
       "casual_leaves": 7,
-      "wfh_quota": 1,
+      "sick_leaves": 5.5,
+      "wfh_quota": -1,
       "probation_leaves": 0
     },
     "is_old_staff": true,
@@ -18,10 +18,10 @@
     "salary": 60000,
     "joining_date": null,
     "leave_quotas": {
-      "annual_leaves": 6,
-      "sick_leaves": 5.5,
+      "annual_leaves": 5,
       "casual_leaves": 7,
-      "wfh_quota": 1,
+      "sick_leaves": 5.5,
+      "wfh_quota": -1,
       "probation_leaves": 0
     },
     "is_old_staff": true,
@@ -33,10 +33,10 @@
     "joining_date": null,
     "is_old_staff": true,
     "leave_quotas": {
-      "annual_leaves": 7,
-      "sick_leaves": 7,
-      "casual_leaves": 6,
-      "wfh_quota": 2,
+      "annual_leaves": 4,
+      "casual_leaves": 7,
+      "sick_leaves": 6,
+      "wfh_quota": 0,
       "probation_leaves": 0
     }
   },
@@ -46,10 +46,10 @@
     "joining_date": null,
     "is_old_staff": true,
     "leave_quotas": {
-      "annual_leaves": 7,
-      "sick_leaves": 7,
-      "casual_leaves": 6,
-      "wfh_quota": 2,
+      "annual_leaves": 4,
+      "casual_leaves": 7,
+      "sick_leaves": 6,
+      "wfh_quota": 0,
       "probation_leaves": 0
     }
   },
@@ -59,10 +59,10 @@
     "joining_date": "2025-09-01",
     "leave_quotas": {
       "annual_leaves": 6,
-      "sick_leaves": 7,
       "casual_leaves": 7,
-      "wfh_quota": 1,
-      "probation_leaves": 0
+      "sick_leaves": 7,
+      "wfh_quota": -10,
+      "probation_leaves": 3
     },
     "is_old_staff": false
   },
@@ -72,10 +72,10 @@
     "joining_date": "2025-09-01",
     "leave_quotas": {
       "annual_leaves": 6,
-      "sick_leaves": 7,
       "casual_leaves": 7,
-      "wfh_quota": 1,
-      "probation_leaves": 0
+      "sick_leaves": 7,
+      "wfh_quota": -10,
+      "probation_leaves": 3
     },
     "is_old_staff": false
   },
@@ -85,11 +85,11 @@
     "joining_date": "2025-06-15",
     "is_old_staff": false,
     "leave_quotas": {
-      "annual_leaves": 6,
-      "sick_leaves": 7,
-      "casual_leaves": 5.5,
-      "wfh_quota": 2,
-      "probation_leaves": 0
+      "annual_leaves": 4.5,
+      "casual_leaves": 6,
+      "sick_leaves": 6,
+      "wfh_quota": 0,
+      "probation_leaves": 3
     }
   },
   "EMP-0003": {
@@ -98,11 +98,11 @@
     "joining_date": "2025-06-15",
     "is_old_staff": false,
     "leave_quotas": {
-      "annual_leaves": 6,
-      "sick_leaves": 7,
-      "casual_leaves": 5.5,
-      "wfh_quota": 2,
-      "probation_leaves": 0
+      "annual_leaves": 4.5,
+      "casual_leaves": 6,
+      "sick_leaves": 6,
+      "wfh_quota": 0,
+      "probation_leaves": 3
     }
   },
   "7fa77f7b-5dc4-4d7c-a079-9c5e9414c052": {
@@ -111,11 +111,11 @@
     "joining_date": "2025-06-14",
     "is_old_staff": false,
     "leave_quotas": {
-      "annual_leaves": 6,
+      "annual_leaves": 4,
+      "casual_leaves": 7,
       "sick_leaves": 7,
-      "casual_leaves": 5,
-      "wfh_quota": 0,
-      "probation_leaves": 0
+      "wfh_quota": -1,
+      "probation_leaves": 3
     }
   },
   "EMP-0012": {
@@ -124,11 +124,11 @@
     "joining_date": "2025-06-14",
     "is_old_staff": false,
     "leave_quotas": {
-      "annual_leaves": 6,
+      "annual_leaves": 4,
+      "casual_leaves": 7,
       "sick_leaves": 7,
-      "casual_leaves": 5,
-      "wfh_quota": 0,
-      "probation_leaves": 0
+      "wfh_quota": -1,
+      "probation_leaves": 3
     }
   },
   "b18d48d1-0aa2-4218-b076-83d1903f1e2d": {
@@ -137,10 +137,10 @@
     "joining_date": null,
     "is_old_staff": true,
     "leave_quotas": {
-      "annual_leaves": 6,
+      "annual_leaves": 2,
+      "casual_leaves": 6,
       "sick_leaves": 7,
-      "casual_leaves": 3,
-      "wfh_quota": 2,
+      "wfh_quota": -10,
       "probation_leaves": 0
     }
   },
@@ -150,10 +150,10 @@
     "joining_date": null,
     "is_old_staff": true,
     "leave_quotas": {
-      "annual_leaves": 6,
+      "annual_leaves": 2,
+      "casual_leaves": 6,
       "sick_leaves": 7,
-      "casual_leaves": 3,
-      "wfh_quota": 2,
+      "wfh_quota": -10,
       "probation_leaves": 0
     }
   },
@@ -163,11 +163,11 @@
     "joining_date": "2024-12-10",
     "is_old_staff": false,
     "leave_quotas": {
-      "annual_leaves": 6,
-      "sick_leaves": 6,
+      "annual_leaves": 5,
       "casual_leaves": 7,
-      "wfh_quota": 1,
-      "probation_leaves": 0
+      "sick_leaves": 5,
+      "wfh_quota": -3,
+      "probation_leaves": 3
     }
   },
   "EMP-0008": {
@@ -176,11 +176,11 @@
     "joining_date": "2024-12-10",
     "is_old_staff": false,
     "leave_quotas": {
-      "annual_leaves": 6,
-      "sick_leaves": 6,
+      "annual_leaves": 5,
       "casual_leaves": 7,
-      "wfh_quota": 1,
-      "probation_leaves": 0
+      "sick_leaves": 5,
+      "wfh_quota": -3,
+      "probation_leaves": 3
     }
   },
   "065b96de-d728-4e12-8a2e-e5dfea65a209": {
@@ -189,11 +189,11 @@
     "joining_date": "2025-08-05",
     "is_old_staff": false,
     "leave_quotas": {
-      "annual_leaves": 6,
+      "annual_leaves": 4.5,
+      "casual_leaves": 6,
       "sick_leaves": 7,
-      "casual_leaves": 5.5,
-      "wfh_quota": 2,
-      "probation_leaves": 0
+      "wfh_quota": -4,
+      "probation_leaves": 3
     }
   },
   "EMP-0013": {
@@ -202,11 +202,11 @@
     "joining_date": "2025-08-05",
     "is_old_staff": false,
     "leave_quotas": {
-      "annual_leaves": 6,
+      "annual_leaves": 4.5,
+      "casual_leaves": 6,
       "sick_leaves": 7,
-      "casual_leaves": 5.5,
-      "wfh_quota": 2,
-      "probation_leaves": 0
+      "wfh_quota": -4,
+      "probation_leaves": 3
     }
   },
   "99467505-916d-41f5-967a-5a40bc47b2b9": {
@@ -258,10 +258,10 @@
     "is_old_staff": false,
     "leave_quotas": {
       "annual_leaves": 6,
-      "sick_leaves": 7,
       "casual_leaves": 7,
-      "wfh_quota": 4,
-      "probation_leaves": 3
+      "sick_leaves": 7,
+      "wfh_quota": 1,
+      "probation_leaves": 0
     }
   },
   "EMP-0007": {
@@ -271,10 +271,10 @@
     "is_old_staff": false,
     "leave_quotas": {
       "annual_leaves": 6,
-      "sick_leaves": 7,
       "casual_leaves": 7,
-      "wfh_quota": 4,
-      "probation_leaves": 3
+      "sick_leaves": 7,
+      "wfh_quota": 1,
+      "probation_leaves": 0
     }
   },
   "61f4c5e2-895d-4d9c-b3fe-4a94238972f6": {
@@ -570,10 +570,10 @@
     "is_old_staff": false,
     "leave_quotas": {
       "annual_leaves": 6,
+      "casual_leaves": 6,
       "sick_leaves": 7,
-      "casual_leaves": 7,
       "wfh_quota": 3,
-      "probation_leaves": 3
+      "probation_leaves": 0
     }
   },
   "EMP-0005": {
@@ -583,10 +583,10 @@
     "is_old_staff": false,
     "leave_quotas": {
       "annual_leaves": 6,
+      "casual_leaves": 6,
       "sick_leaves": 7,
-      "casual_leaves": 7,
       "wfh_quota": 3,
-      "probation_leaves": 3
+      "probation_leaves": 0
     }
   },
   "8bf6c81d-b462-40f0-804f-4bbb1c942c7b": {
@@ -622,8 +622,8 @@
     "is_old_staff": false,
     "leave_quotas": {
       "annual_leaves": 6,
-      "sick_leaves": 7,
       "casual_leaves": 7,
+      "sick_leaves": 7,
       "wfh_quota": 4,
       "probation_leaves": 3
     }
@@ -635,8 +635,8 @@
     "is_old_staff": false,
     "leave_quotas": {
       "annual_leaves": 6,
-      "sick_leaves": 7,
       "casual_leaves": 7,
+      "sick_leaves": 7,
       "wfh_quota": 4,
       "probation_leaves": 3
     }

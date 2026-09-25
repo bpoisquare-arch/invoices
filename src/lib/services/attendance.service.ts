@@ -237,7 +237,7 @@ async function calculateAllEmployeeUsedLeaves(supabase: any): Promise<Map<string
     const { data: recs } = await supabase
       .from('attendance_records')
       .select('employee_id, attendance_date, arrival_status, departure_status, raw_punches')
-      .gte('attendance_date', `${currentYear}-01-01`)
+      .gte('attendance_date', '2026-09-01')
       .lte('attendance_date', `${currentYear}-12-31`)
 
     if (recs && recs.length > 0) {
@@ -350,11 +350,11 @@ export async function getEmployees(params?: {
           probation_leaves: Math.max(0, Number((initialProb - used.probation_leaves).toFixed(2))),
         },
         base_leave_quotas: {
-          annual_leaves: initialAnn,
-          sick_leaves: initialSick,
-          casual_leaves: initialCas,
-          wfh_quota: initialWfh,
-          probation_leaves: initialProb,
+          annual_leaves: 6,
+          sick_leaves: 7,
+          casual_leaves: 7,
+          wfh_quota: 4,
+          probation_leaves: isOldStaff ? 0 : 3,
         },
       }
     })
@@ -1354,7 +1354,7 @@ export async function getEmployeeLeaveBalanceSummary(
       .from('attendance_records')
       .select('id, employee_id, attendance_date, arrival_status, departure_status, raw_punches')
       .eq('employee_id', empDbId)
-      .gte('attendance_date', `${year}-01-01`)
+      .gte('attendance_date', '2026-09-01')
       .lte('attendance_date', `${year}-12-31`)
     allRecords = data || []
   }
@@ -1411,11 +1411,11 @@ export async function getEmployeeLeaveBalanceSummary(
     isProbation,
     joiningDate,
     quotas: {
-      probation_leaves: initial_prob,
-      annual_leaves: initial_ann,
-      sick_leaves: initial_sick,
-      casual_leaves: initial_cas,
-      wfh_quota: initial_wfh,
+      probation_leaves: isOldStaff ? 0 : 3,
+      annual_leaves: 6,
+      sick_leaves: 7,
+      casual_leaves: 7,
+      wfh_quota: 4,
     },
     used: {
       probation_leaves: Number(used_probation.toFixed(2)),
@@ -1429,7 +1429,7 @@ export async function getEmployeeLeaveBalanceSummary(
       annual_leaves: Math.max(0, Number((initial_ann - used_annual).toFixed(2))),
       sick_leaves: Math.max(0, Number((initial_sick - used_sick).toFixed(2))),
       casual_leaves: Math.max(0, Number((initial_cas - used_casual).toFixed(2))),
-      wfh_quota: initial_wfh < 0 ? -1 : Number((initial_wfh - used_wfh).toFixed(2)),
+      wfh_quota: Number((initial_wfh - used_wfh).toFixed(2)),
     },
     probationDates,
     hasProbationInTargetMonth,
