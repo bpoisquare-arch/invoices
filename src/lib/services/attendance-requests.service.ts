@@ -99,8 +99,11 @@ export async function getAttendanceRequests(filter?: {
   startDate?: string
   endDate?: string
 }): Promise<AttendanceRequestItem[]> {
+  const supabase = await createServerClient()
+  let requestsList: AttendanceRequestItem[] = []
+
+  // 1. Try dedicated attendance_requests table first
   try {
-    const supabase = await createServerClient()
     let query = supabase.from('attendance_requests').select('*').order('created_at', { ascending: false })
 
     if (filter?.branch && filter.branch !== 'all') {
@@ -121,31 +124,92 @@ export async function getAttendanceRequests(filter?: {
 
     const { data, error } = await query
 
-    if (!error && Array.isArray(data)) {
+    if (!error && Array.isArray(data) && data.length > 0) {
       return data as AttendanceRequestItem[]
     }
-  } catch {
-    // If Supabase table doesn't exist yet, fall back to file store
+  } catch {}
+
+  // 2. Query attendance_records table from Supabase for live branch requests!
+  try {
+    let recQuery = supabase
+      .from('attendance_records')
+      .select('id, employee_id, attendance_date, arrival_status, departure_status, raw_punches')
+      .not('raw_punches', 'is', null)
+
+    if (filter?.startDate) {
+      recQuery = recQuery.gte('attendance_date', filter.startDate)
+    }
+    if (filter?.endDate) {
+      recQuery = recQuery.lte('attendance_date', filter.endDate)
+    }
+    if (filter?.employeeId && filter.employeeId !== 'all') {
+      recQuery = recQuery.eq('employee_id', filter.employeeId)
+    }
+
+    const { data: recs } = await recQuery
+
+    if (recs && recs.length > 0) {
+      for (const r of recs) {
+        if (!Array.isArray(r.raw_punches)) continue
+        const reqObj = r.raw_punches.find((p: any) => p && p.type === 'BRANCH_REQUEST')
+        if (reqObj) {
+          const item: AttendanceRequestItem = {
+            id: reqObj.id || reqObj.request_id || `req-${r.id}`,
+            employee_id: reqObj.employee_id || r.employee_id,
+            employee_name: reqObj.employee_name || '',
+            batch_id: reqObj.batch_id || '',
+            branch: reqObj.branch || 'Multan',
+            attendance_date: reqObj.attendance_date || r.attendance_date,
+            request_type: reqObj.request_type || 'LEAVE',
+            leave_type: reqObj.leave_type || null,
+            leave_duration: reqObj.leave_duration !== undefined ? reqObj.leave_duration : 1,
+            requested_in_time: reqObj.requested_in_time || null,
+            requested_out_time: reqObj.requested_out_time || null,
+            reason: reqObj.reason || null,
+            status: reqObj.status || 'PENDING',
+            submitted_by: reqObj.submitted_by || 'Branch User',
+            reviewed_by: reqObj.reviewed_by || null,
+            reviewed_at: reqObj.reviewed_at || null,
+            review_notes: reqObj.review_notes || null,
+            created_at: reqObj.created_at || r.attendance_date,
+            updated_at: reqObj.updated_at || r.attendance_date,
+          }
+          requestsList.push(item)
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching live requests from attendance_records:', err)
   }
 
-  // Fallback to local store
-  let items = readFallbackRequests()
+  // 3. Fallback to local store as extra layer
+  try {
+    const local = readFallbackRequests()
+    for (const loc of local) {
+      if (!requestsList.some((r) => r.id === loc.id || (r.employee_id === loc.employee_id && r.attendance_date === loc.attendance_date))) {
+        requestsList.push(loc)
+      }
+    }
+  } catch {}
+
+  // Filter in-memory
   if (filter?.branch && filter.branch !== 'all') {
-    items = items.filter((r) => r.branch.toLowerCase() === filter.branch!.toLowerCase())
+    requestsList = requestsList.filter((r) => (r.branch || '').toLowerCase().includes(filter.branch!.toLowerCase()))
   }
   if (filter?.status && filter.status !== 'all') {
-    items = items.filter((r) => r.status === filter.status)
+    requestsList = requestsList.filter((r) => r.status === filter.status)
   }
   if (filter?.employeeId && filter.employeeId !== 'all') {
-    items = items.filter((r) => r.employee_id === filter.employeeId)
+    requestsList = requestsList.filter((r) => r.employee_id === filter.employeeId)
   }
   if (filter?.startDate) {
-    items = items.filter((r) => r.attendance_date >= filter.startDate!)
+    requestsList = requestsList.filter((r) => r.attendance_date >= filter.startDate!)
   }
   if (filter?.endDate) {
-    items = items.filter((r) => r.attendance_date <= filter.endDate!)
+    requestsList = requestsList.filter((r) => r.attendance_date <= filter.endDate!)
   }
-  return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+  return requestsList.sort((a, b) => new Date(b.created_at || b.attendance_date).getTime() - new Date(a.created_at || a.attendance_date).getTime())
 }
 
 /**
@@ -187,25 +251,65 @@ export async function createAttendanceRequest(params: {
     updated_at: new Date().toISOString(),
   }
 
-  // Try Supabase table first
+  const supabase = await createServerClient()
+
+  // 1. Try Supabase dedicated table first
   try {
-    const supabase = await createServerClient()
-    const { data, error } = await supabase.from('attendance_requests').insert(newItem as any).select().single()
-    if (!error && data) {
-      // Also cache in local file
-      const current = readFallbackRequests().filter((r) => r.id !== newItem.id)
-      writeFallbackRequests([data as any, ...current])
-      return data as AttendanceRequestItem
+    await supabase.from('attendance_requests').insert(newItem as any)
+  } catch {}
+
+  // 2. ALWAYS also sync to attendance_records table in Supabase (100% live cloud persistence)
+  try {
+    const { data: existingRecs } = await supabase
+      .from('attendance_records')
+      .select('id, employee_id, attendance_date, raw_punches')
+      .eq('employee_id', newItem.employee_id)
+      .eq('attendance_date', newItem.attendance_date)
+      .limit(1)
+
+    const branchReqPayload = {
+      type: 'BRANCH_REQUEST',
+      ...newItem,
     }
-  } catch {
-    // Supabase table not created yet
+
+    if (existingRecs && existingRecs.length > 0) {
+      const rec = existingRecs[0]
+      const punches = Array.isArray(rec.raw_punches) ? [...rec.raw_punches] : []
+      const updatedPunches = [
+        ...punches.filter((p: any) => p && p.type !== 'BRANCH_REQUEST'),
+        branchReqPayload,
+      ]
+      await supabase
+        .from('attendance_records')
+        .update({
+          raw_punches: updatedPunches,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', rec.id)
+    } else {
+      await supabase
+        .from('attendance_records')
+        .insert({
+          employee_id: newItem.employee_id,
+          attendance_date: newItem.attendance_date,
+          arrival_status: 'Absent',
+          departure_status: 'Absent',
+          raw_punches: [branchReqPayload],
+          updated_at: new Date().toISOString(),
+        })
+    }
+  } catch (recErr) {
+    console.error('Error syncing request to attendance_records:', recErr)
   }
 
-  // Fallback save
-  const current = readFallbackRequests().filter(
-    (r) => !(r.employee_id === newItem.employee_id && r.attendance_date === newItem.attendance_date && r.status === 'PENDING')
-  )
-  writeFallbackRequests([newItem, ...current])
+  // 3. Fallback save to local store
+  try {
+    const current = readFallbackRequests().filter(
+      (r) => !(r.employee_id === newItem.employee_id && r.attendance_date === newItem.attendance_date && r.status === 'PENDING')
+    )
+    writeFallbackRequests([newItem, ...current])
+  } catch {}
+
   return newItem
 }
 
@@ -254,7 +358,7 @@ export async function reviewAttendanceRequest(params: {
     targetRequest.review_notes = params.reviewNotes || 'Rejected by Admin'
     targetRequest.updated_at = reviewedAt
 
-    // Update in Supabase
+    // Update in Supabase dedicated table
     try {
       await supabase
         .from('attendance_requests')
@@ -267,6 +371,38 @@ export async function reviewAttendanceRequest(params: {
         } as any)
         .eq('id', params.requestId)
     } catch {}
+
+    // ALWAYS also update raw_punches in attendance_records in Supabase
+    try {
+      const { data: recs } = await supabase
+        .from('attendance_records')
+        .select('id, raw_punches')
+        .eq('employee_id', targetRequest.employee_id)
+        .eq('attendance_date', targetRequest.attendance_date)
+        .limit(1)
+
+      if (recs && recs.length > 0) {
+        const rec = recs[0]
+        const punches = Array.isArray(rec.raw_punches) ? [...rec.raw_punches] : []
+        const updatedPunches = [
+          ...punches.filter((p: any) => p && p.type !== 'BRANCH_REQUEST'),
+          {
+            type: 'BRANCH_REQUEST',
+            ...targetRequest,
+            status: 'REJECTED',
+            reviewed_by: reviewedBy,
+            reviewed_at: reviewedAt,
+            review_notes: targetRequest.review_notes,
+          },
+        ]
+        await supabase
+          .from('attendance_records')
+          .update({ raw_punches: updatedPunches, updated_at: reviewedAt })
+          .eq('id', rec.id)
+      }
+    } catch (err) {
+      console.error('Error updating raw_punches on reject:', err)
+    }
 
     // Update fallback store
     const all = readFallbackRequests().map((r) => (r.id === params.requestId ? targetRequest! : r))
@@ -495,4 +631,39 @@ export async function reviewAttendanceRequest(params: {
     updatedRecord,
     message: 'Request approved and live attendance record updated successfully in database.',
   }
+}
+
+/**
+ * 4. Cancel Pending Request (by branch user or admin)
+ */
+export async function cancelAttendanceRequest(requestId: string): Promise<boolean> {
+  const supabase = await createServerClient()
+  try {
+    await supabase.from('attendance_requests').delete().eq('id', requestId).eq('status', 'PENDING')
+  } catch {}
+
+  // Also remove from attendance_records raw_punches
+  try {
+    const { data: recs } = await supabase
+      .from('attendance_records')
+      .select('id, raw_punches')
+      .not('raw_punches', 'is', null)
+
+    if (recs && recs.length > 0) {
+      for (const rec of recs) {
+        if (!Array.isArray(rec.raw_punches)) continue
+        const hasReq = rec.raw_punches.some((p: any) => p && (p.id === requestId || p.request_id === requestId))
+        if (hasReq) {
+          const cleaned = rec.raw_punches.filter((p: any) => !(p && (p.id === requestId || p.request_id === requestId)))
+          await supabase.from('attendance_records').update({ raw_punches: cleaned }).eq('id', rec.id)
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error cleaning raw_punches on cancel:', err)
+  }
+
+  const current = readFallbackRequests().filter((r) => !(r.id === requestId && r.status === 'PENDING'))
+  writeFallbackRequests(current)
+  return true
 }
