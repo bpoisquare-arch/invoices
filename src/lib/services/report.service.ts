@@ -1181,17 +1181,18 @@ export async function getOrCreateManualImportBatch(entity: string = 'aimt'): Pro
       return {
         id: mysqlBatch.id,
         file_name: mysqlBatch.fileName,
-        file_size: mysqlBatch.fileSize,
+        file_size: Number(mysqlBatch.fileSize ?? 0),
         uploaded_at: mysqlBatch.uploadedAt.toISOString(),
         uploaded_by: mysqlBatch.uploadedBy,
         total_records: mysqlBatch.totalRecords,
         total_pending_amount: Number(mysqlBatch.totalPendingAmount),
         total_yet_to_raised: Number(mysqlBatch.totalYetToRaised),
         entity: mysqlBatch.entity ?? entity,
-        raw_headers: (mysqlBatch.rawHeaders as string[]) ?? [],
+        original_file_data: null,
+        raw_headers: (mysqlBatch.rawHeaders as any) ?? [],
         created_at: mysqlBatch.createdAt?.toISOString() ?? nowStr,
         updated_at: mysqlBatch.updatedAt?.toISOString() ?? nowStr,
-      } as AimtReportImport
+      } as unknown as AimtReportImport
     }
   } catch (err) {
     console.warn('MySQL getOrCreateManualImportBatch query failed:', err)
