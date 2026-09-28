@@ -18,7 +18,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { createClient } from "@/lib/supabase/client"
 import { logAuditEvent } from "@/lib/services/audit.service"
 import { Info, Loader2, X, Mail, ShieldAlert } from "lucide-react"
 
@@ -31,12 +30,6 @@ export function LoginForm({
   const [isLoading, setIsLoading] = useState(false)
   const [adminNotice, setAdminNotice] = useState<{ title: string; message: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  // MFA Flow States
-  const [step, setStep] = useState<'login' | 'mfa'>('login')
-  const [mfaCode, setMfaCode] = useState("")
-  const [mfaFactorId, setMfaFactorId] = useState("")
-  const [mfaChallengeId, setMfaChallengeId] = useState("")
 
   const router = useRouter()
 
@@ -73,134 +66,50 @@ export function LoginForm({
     }
 
     try {
-      const supabase = createClient()
-
-      // 1. Perform Supabase Sign In
-      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password }),
       })
 
-      if (signInErr) {
-        // Fallback automatic sign up for local development environment
-        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-          email,
-          password,
-        })
+      const result = await res.json()
 
-        if (!signUpErr && signUpData?.user) {
-          // Retry signing in after auto signup fallback
-          const { data: retryData, error: retryErr } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          })
-
-          if (!retryErr && retryData?.user) {
-            await handlePostAuth(retryData.user, supabase)
-            return
-          }
-        }
-
-        // Standard Generic Error (do not expose email existence details)
+      if (!res.ok) {
         await logAuditEvent({
           action: 'Failed Login',
           module: 'auth',
-          metadata: { email, reason: 'Invalid credentials' }
+          metadata: { email: cleanEmail, reason: result?.error || 'Invalid credentials' }
         })
-        setError("Invalid email or password.")
+        setError(result?.error || "Invalid email or password.")
         setIsLoading(false)
         return
       }
 
-      if (signInData?.user) {
-        await handlePostAuth(signInData.user, supabase)
-      }
+      const role = result?.user?.role || 'admin'
+      document.cookie = `dev-auth-session=${role}; path=/; max-age=86400; SameSite=Lax`
+      document.cookie = `user-role=${role}; path=/; max-age=86400; SameSite=Lax`
+      document.cookie = `user-email=${encodeURIComponent(result?.user?.email || cleanEmail)}; path=/; max-age=86400; SameSite=Lax`
+
+      await logAuditEvent({
+        action: 'Successful Login',
+        module: 'auth',
+        metadata: { email: cleanEmail, role }
+      })
+
+      router.push('/portal')
+      router.refresh()
     } catch (err: any) {
       await logAuditEvent({
         action: 'Login Error',
         module: 'auth',
-        metadata: { email, error: err?.message || 'Unknown error' }
+        metadata: { email: cleanEmail, error: err?.message || 'Unknown error' }
       })
       setError("An unexpected authentication error occurred.")
       setIsLoading(false)
     }
   }
 
-  // Handle post-password authentication checks (MFA / 2FA redirection)
-  async function handlePostAuth(user: any, supabase: any) {
-    try {
-      // Check if user has Multi-Factor Authentication factors enrolled
-      const { data: factorData, error: factorErr } = await supabase.auth.mfa.listFactors()
 
-      if (factorErr) {
-        throw factorErr
-      }
-
-      const activeFactors = factorData?.totp || []
-      const enrolledFactor = activeFactors.find((f: any) => f.status === 'verified')
-
-      if (enrolledFactor) {
-        // User has verified TOTP factors, initiate verification challenge
-        const { data: challenge, error: challengeErr } = await supabase.auth.mfa.challenge({
-          factorId: enrolledFactor.id,
-        })
-
-        if (challengeErr) {
-          throw challengeErr
-        }
-
-        if (challenge) {
-          setMfaFactorId(enrolledFactor.id)
-          setMfaChallengeId(challenge.id)
-          setStep('mfa')
-          setIsLoading(false)
-          return
-        }
-      }
-
-      // No MFA enrolled, proceed to standard login completion
-      await completeLoginSession()
-    } catch (err: any) {
-      setError(err?.message || "Error setting up security validation.")
-      setIsLoading(false)
-    }
-  }
-
-  // Verification helper for Multi-Factor Authentication TOTP code
-  async function handleMfaSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const supabase = createClient()
-      const { error: verifyErr } = await supabase.auth.mfa.verify({
-        factorId: mfaFactorId,
-        challengeId: mfaChallengeId,
-        code: mfaCode.trim(),
-      })
-
-      if (verifyErr) {
-        await logAuditEvent({
-          action: 'Failed MFA Verification',
-          module: 'auth',
-          metadata: { email, factorId: mfaFactorId }
-        })
-        setError("Invalid authenticator verification code. Please try again.")
-        setIsLoading(false)
-        return
-      }
-
-      await logAuditEvent({
-        action: 'MFA Verified Login',
-        module: 'auth',
-      })
-      await completeLoginSession()
-    } catch (err: any) {
-      setError(err?.message || "MFA validation failure.")
-      setIsLoading(false)
-    }
-  }
 
   async function completeLoginSession(authenticatedUser?: any) {
     const isViewerUser =
@@ -241,12 +150,10 @@ export function LoginForm({
       <Card className="relative overflow-hidden border border-[#001E2F]/15 shadow-md rounded-2xl bg-white">
         <CardHeader className="p-6 sm:p-8 pb-4">
           <CardTitle className="text-xl sm:text-2xl font-bold text-[#001E2F] tracking-tight">
-            {step === 'mfa' ? "Security Verification" : "Login to your account"}
+            Login to your account
           </CardTitle>
           <CardDescription className="text-xs sm:text-sm text-slate-500">
-            {step === 'mfa' 
-              ? "Enter the 6-digit verification code from your authenticator app."
-              : "Enter your email below to login to your account"}
+            Enter your email below to login to your account
           </CardDescription>
         </CardHeader>
 
@@ -286,7 +193,6 @@ export function LoginForm({
             </div>
           )}
 
-          {step === 'login' ? (
             <form onSubmit={handleLogin}>
               <FieldGroup className="gap-4">
                 <Field>
@@ -359,58 +265,6 @@ export function LoginForm({
                 </Field>
               </FieldGroup>
             </form>
-          ) : (
-            <form onSubmit={handleMfaSubmit}>
-              <FieldGroup className="gap-4">
-                <Field>
-                  <FieldLabel htmlFor="mfaCode" className="text-xs font-semibold text-[#001E2F]">
-                    Authenticator Code
-                  </FieldLabel>
-                  <Input
-                    id="mfaCode"
-                    type="text"
-                    pattern="[0-9]*"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    placeholder="000000"
-                    maxLength={6}
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
-                    disabled={isLoading}
-                    required
-                    className="rounded-xl border-slate-200 text-center tracking-widest text-lg font-bold focus-visible:ring-[#001E2F] focus-visible:border-[#001E2F]"
-                  />
-                </Field>
-
-                <Field className="pt-2 gap-2.5">
-                  <Button
-                    type="submit"
-                    disabled={isLoading || mfaCode.length < 6}
-                    className="w-full bg-[#001E2F] hover:bg-[#0E3E5B] text-white font-medium py-2.5 rounded-xl text-sm transition-all shadow-sm cursor-pointer"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Verifying Code...
-                      </>
-                    ) : (
-                      "Verify & Authorize"
-                    )}
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setStep('login')}
-                    disabled={isLoading}
-                    className="w-full border-slate-300 text-slate-600 hover:bg-slate-50 rounded-xl"
-                  >
-                    Back to Login
-                  </Button>
-                </Field>
-              </FieldGroup>
-            </form>
-          )}
         </CardContent>
       </Card>
     </div>

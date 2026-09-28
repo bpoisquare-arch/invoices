@@ -1,4 +1,5 @@
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import {
   calculateArrivalStatus,
   calculateDepartureStatus,
@@ -102,7 +103,57 @@ export async function getAttendanceRequests(filter?: {
   const supabase = await createServerClient()
   let requestsList: AttendanceRequestItem[] = []
 
-  // 1. Try dedicated attendance_requests table first
+  // 1. Query dedicated attendance_requests from Hostinger MySQL via Prisma
+  try {
+    const where: any = {}
+    if (filter?.branch && filter.branch !== 'all') {
+      where.branch = { contains: filter.branch }
+    }
+    if (filter?.status && filter.status !== 'all') {
+      where.status = filter.status
+    }
+    if (filter?.employeeId && filter.employeeId !== 'all') {
+      where.employeeId = filter.employeeId
+    }
+    if (filter?.startDate || filter?.endDate) {
+      where.attendanceDate = {}
+      if (filter?.startDate) where.attendanceDate.gte = new Date(filter.startDate)
+      if (filter?.endDate) where.attendanceDate.lte = new Date(filter.endDate)
+    }
+
+    const dbRows = await prisma.attendanceRequest.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    })
+
+    if (dbRows && dbRows.length > 0) {
+      return dbRows.map((r) => ({
+        id: r.id,
+        employee_id: r.employeeId,
+        employee_name: r.employeeName,
+        batch_id: r.batchId,
+        branch: r.branch,
+        attendance_date: r.attendanceDate instanceof Date ? r.attendanceDate.toISOString().slice(0, 10) : String(r.attendanceDate).slice(0, 10),
+        request_type: r.requestType as AttendanceRequestType,
+        leave_type: r.leaveType,
+        leave_duration: r.leaveDuration ? Number(r.leaveDuration) : null,
+        requested_in_time: r.requestedInTime,
+        requested_out_time: r.requestedOutTime,
+        reason: r.reason,
+        status: r.status as AttendanceRequestStatus,
+        submitted_by: r.submittedBy,
+        reviewed_by: r.reviewedBy,
+        reviewed_at: r.reviewedAt ? r.reviewedAt.toISOString() : null,
+        review_notes: r.reviewNotes,
+        created_at: r.createdAt.toISOString(),
+        updated_at: r.updatedAt.toISOString(),
+      }))
+    }
+  } catch (err) {
+    console.warn('MySQL attendance requests fetch failed, falling back:', err)
+  }
+
+  // Fallback: Try Supabase table if MySQL returns no rows
   try {
     let query = supabase.from('attendance_requests').select('*').order('created_at', { ascending: false })
 
@@ -231,11 +282,34 @@ export async function createAttendanceRequest(params: {
   reason?: string | null
   submitted_by?: string | null
 }): Promise<AttendanceRequestItem> {
+  const reqId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+
+  // 1. Resolve employee UUID for relational integrity
+  let empUuid = params.employee_id
+  let empName = params.employee_name || ''
+  let empBatch = params.batch_id || ''
+
+  try {
+    const isUuid = Boolean(empUuid && empUuid.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
+    const emp = await prisma.employee.findFirst({
+      where: isUuid
+        ? { OR: [{ id: empUuid }, { employeeId: empUuid }] }
+        : { employeeId: empUuid },
+    })
+    if (emp) {
+      empUuid = emp.id
+      if (!empName) empName = emp.name
+      if (!empBatch) empBatch = emp.employeeId
+    }
+  } catch (err) {
+    console.warn('Could not resolve employee in Prisma for attendance request:', err)
+  }
+
   const newItem: AttendanceRequestItem = {
-    id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    employee_id: params.employee_id,
-    employee_name: params.employee_name || '',
-    batch_id: params.batch_id || '',
+    id: reqId,
+    employee_id: empUuid,
+    employee_name: empName,
+    batch_id: empBatch,
     branch: params.branch,
     attendance_date: params.attendance_date,
     request_type: params.request_type,
@@ -253,26 +327,49 @@ export async function createAttendanceRequest(params: {
     updated_at: new Date().toISOString(),
   }
 
-  const supabase = await createServerClient()
+  // 2. Primary Save: Hostinger MySQL via Prisma
+  try {
+    await prisma.attendanceRequest.create({
+      data: {
+        id: newItem.id,
+        employeeId: newItem.employee_id,
+        employeeName: newItem.employee_name || 'Staff',
+        batchId: newItem.batch_id || 'EMP',
+        branch: newItem.branch,
+        attendanceDate: new Date(newItem.attendance_date),
+        requestType: newItem.request_type,
+        leaveType: newItem.leave_type,
+        leaveDuration: newItem.leave_duration !== null && newItem.leave_duration !== undefined ? newItem.leave_duration : 1,
+        requestedInTime: newItem.requested_in_time,
+        requestedOutTime: newItem.requested_out_time,
+        reason: newItem.reason,
+        status: 'PENDING',
+        submittedBy: newItem.submitted_by || `${newItem.branch} Branch User`,
+      },
+    })
+  } catch (err) {
+    console.warn('MySQL attendance request insert warning (proceeding with fallback):', err)
+  }
 
-  // 1. Try Supabase dedicated table first
+  // 3. Fallback: Supabase dedicated table
+  const supabase = await createServerClient()
   try {
     await supabase.from('attendance_requests').insert(newItem as any)
   } catch {}
 
-  // 2. ALWAYS also sync to attendance_records table in Supabase (100% live cloud persistence)
+  // 4. ALWAYS also sync to attendance_records table in Supabase & MySQL
   try {
+    const branchReqPayload = {
+      type: 'BRANCH_REQUEST',
+      ...newItem,
+    }
+
     const { data: existingRecs } = await supabase
       .from('attendance_records')
       .select('id, employee_id, attendance_date, raw_punches')
       .eq('employee_id', newItem.employee_id)
       .eq('attendance_date', newItem.attendance_date)
       .limit(1)
-
-    const branchReqPayload = {
-      type: 'BRANCH_REQUEST',
-      ...newItem,
-    }
 
     if (existingRecs && existingRecs.length > 0) {
       const rec = existingRecs[0]
@@ -307,7 +404,7 @@ export async function createAttendanceRequest(params: {
     console.error('Error syncing request to attendance_records:', recErr)
   }
 
-  // 3. Fallback save to local store
+  // 5. Fallback save to local store
   try {
     const current = readFallbackRequests().filter(
       (r) => !(r.employee_id === newItem.employee_id && r.attendance_date === newItem.attendance_date && r.status === 'PENDING')
@@ -330,14 +427,47 @@ export async function reviewAttendanceRequest(params: {
   const supabase = await createServerClient()
   const settings = await getAttendanceSettings()
 
-  // 1. Find the request
+  // 1. Find the request: Check Hostinger MySQL via Prisma first
   let targetRequest: AttendanceRequestItem | null = null
   try {
-    const { data } = await supabase.from('attendance_requests').select('*').eq('id', params.requestId).single()
-    if (data) {
-      targetRequest = data as AttendanceRequestItem
+    const dbReq = await prisma.attendanceRequest.findUnique({
+      where: { id: params.requestId },
+    })
+    if (dbReq) {
+      targetRequest = {
+        id: dbReq.id,
+        employee_id: dbReq.employeeId,
+        employee_name: dbReq.employeeName,
+        batch_id: dbReq.batchId,
+        branch: dbReq.branch,
+        attendance_date: dbReq.attendanceDate instanceof Date ? dbReq.attendanceDate.toISOString().slice(0, 10) : String(dbReq.attendanceDate).slice(0, 10),
+        request_type: dbReq.requestType as AttendanceRequestType,
+        leave_type: dbReq.leaveType,
+        leave_duration: dbReq.leaveDuration ? Number(dbReq.leaveDuration) : null,
+        requested_in_time: dbReq.requestedInTime,
+        requested_out_time: dbReq.requestedOutTime,
+        reason: dbReq.reason,
+        status: dbReq.status as AttendanceRequestStatus,
+        submitted_by: dbReq.submittedBy,
+        reviewed_by: dbReq.reviewedBy,
+        reviewed_at: dbReq.reviewedAt ? dbReq.reviewedAt.toISOString() : null,
+        review_notes: dbReq.reviewNotes,
+        created_at: dbReq.createdAt.toISOString(),
+        updated_at: dbReq.updatedAt.toISOString(),
+      }
     }
-  } catch {}
+  } catch (err) {
+    console.warn('Prisma attendance request lookup warning:', err)
+  }
+
+  if (!targetRequest) {
+    try {
+      const { data } = await supabase.from('attendance_requests').select('*').eq('id', params.requestId).single()
+      if (data) {
+        targetRequest = data as AttendanceRequestItem
+      }
+    } catch {}
+  }
 
   if (!targetRequest) {
     const all = readFallbackRequests()
@@ -408,6 +538,21 @@ export async function reviewAttendanceRequest(params: {
     targetRequest.reviewed_at = reviewedAt
     targetRequest.review_notes = params.reviewNotes || 'Rejected by Admin'
     targetRequest.updated_at = reviewedAt
+
+    // Update in MySQL via Prisma
+    try {
+      await prisma.attendanceRequest.updateMany({
+        where: { id: params.requestId },
+        data: {
+          status: 'REJECTED',
+          reviewedBy,
+          reviewedAt: new Date(reviewedAt),
+          reviewNotes: targetRequest.review_notes,
+        },
+      })
+    } catch (err) {
+      console.warn('MySQL request reject update warning:', err)
+    }
 
     // Update in Supabase dedicated table
     try {
@@ -700,6 +845,58 @@ export async function reviewAttendanceRequest(params: {
     }
   }
 
+  // Update request status to APPROVED in MySQL via Prisma
+  try {
+    await prisma.attendanceRequest.updateMany({
+      where: { id: params.requestId },
+      data: {
+        status: 'APPROVED',
+        reviewedBy,
+        reviewedAt: new Date(reviewedAt),
+        reviewNotes: targetRequest.review_notes,
+      },
+    })
+  } catch (err) {
+    console.warn('MySQL request approve update warning:', err)
+  }
+
+  // Update or insert attendance_record in MySQL via Prisma
+  try {
+    const parsedDateObj = new Date(targetRequest.attendance_date)
+    await prisma.attendanceRecord.upsert({
+      where: {
+        employeeId_attendanceDate: {
+          employeeId: targetRequest.employee_id,
+          attendanceDate: parsedDateObj,
+        },
+      },
+      update: {
+        dayOfWeek: dayName,
+        inTime: updatedRecord?.in_time || null,
+        outTime: updatedRecord?.out_time || null,
+        arrivalStatus: updatedRecord?.arrival_status || 'On Time Arrival',
+        departureStatus: updatedRecord?.departure_status || 'On Time Departure',
+        totalWorkingMinutes: updatedRecord?.total_working_minutes || 0,
+        totalWorkingHoursFormatted: updatedRecord?.total_working_hours_formatted || '0h 0m',
+        rawPunches: updatedRecord?.raw_punches || [],
+      },
+      create: {
+        employeeId: targetRequest.employee_id,
+        attendanceDate: parsedDateObj,
+        dayOfWeek: dayName,
+        inTime: updatedRecord?.in_time || null,
+        outTime: updatedRecord?.out_time || null,
+        arrivalStatus: updatedRecord?.arrival_status || 'On Time Arrival',
+        departureStatus: updatedRecord?.departure_status || 'On Time Departure',
+        totalWorkingMinutes: updatedRecord?.total_working_minutes || 0,
+        totalWorkingHoursFormatted: updatedRecord?.total_working_hours_formatted || '0h 0m',
+        rawPunches: updatedRecord?.raw_punches || [],
+      },
+    })
+  } catch (err) {
+    console.warn('MySQL attendance record upsert on approval warning:', err)
+  }
+
   // Update request status to APPROVED in Supabase
   try {
     await supabase
@@ -730,6 +927,15 @@ export async function reviewAttendanceRequest(params: {
  * 4. Cancel Pending Request (by branch user or admin)
  */
 export async function cancelAttendanceRequest(requestId: string): Promise<boolean> {
+  // 1. Delete from MySQL via Prisma
+  try {
+    await prisma.attendanceRequest.deleteMany({
+      where: { id: requestId, status: 'PENDING' },
+    })
+  } catch (err) {
+    console.warn('MySQL cancel attendance request error:', err)
+  }
+
   const supabase = await createServerClient()
   try {
     await supabase.from('attendance_requests').delete().eq('id', requestId).eq('status', 'PENDING')

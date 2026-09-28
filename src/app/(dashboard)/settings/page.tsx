@@ -40,34 +40,11 @@ export default function SettingsPage() {
 
   async function loadUserData() {
     try {
-      const supabase = createClient()
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
-      setUser(currentUser)
-
-      if (currentUser) {
-        // 1. Load User Profile / Role
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', currentUser.id)
-          .single()
-        
-        if (profileData) {
-          setRole(profileData.role)
-        }
-
-        // 2. Load 2FA status from Supabase
-        const { data: factorsData, error: factorsErr } = await supabase.auth.mfa.listFactors()
-        if (!factorsErr && factorsData) {
-          const activeFactor = (factorsData.totp || []).find((f: any) => f.status === 'verified')
-          if (activeFactor) {
-            setMfaEnabled(true)
-            setMfaFactorId(activeFactor.id)
-          } else {
-            setMfaEnabled(false)
-            setMfaFactorId(null)
-          }
-        }
+      const res = await fetch('/api/auth/session')
+      const data = await res.json()
+      if (data?.authenticated && data?.user) {
+        setUser({ email: data.user.email, id: 'mysql-user' } as any)
+        setRole(data.user.role || 'admin')
       }
     } catch (err) {
       console.error('Error loading settings metadata:', err)
@@ -98,26 +75,33 @@ export default function SettingsPage() {
     setIsSaving(true)
     setMessage(null)
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-
-    if (error) {
-      await logAuditEvent({
-        action: 'Failed Password Change Attempt',
-        module: 'settings',
-        metadata: { error: error.message }
+    try {
+      const res = await fetch('/api/auth/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword }),
       })
-      setMessage({ type: 'error', text: error.message })
-    } else {
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to update password')
+      }
       await logAuditEvent({
         action: 'Successful Password Change',
         module: 'settings',
       })
-      setMessage({ type: 'success', text: 'Password updated successfully!' })
+      setMessage({ type: 'success', text: 'Password updated successfully in MySQL!' })
       setNewPassword('')
       setConfirmPassword('')
+    } catch (err: any) {
+      await logAuditEvent({
+        action: 'Failed Password Change Attempt',
+        module: 'settings',
+        metadata: { error: err.message }
+      })
+      setMessage({ type: 'error', text: err.message })
+    } finally {
+      setIsSaving(false)
     }
-    setIsSaving(false)
   }
 
   // Multi-Factor Authentication TOTP Enrollment Flow

@@ -1,43 +1,14 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+  const response = NextResponse.next({
     request,
   })
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
-
-  const supabase = createServerClient(
-    url,
-    anonKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  // Check dev session cookie fallback for instant login without email verification delays
+  // Check auth session cookie
   const devSessionVal = request.cookies.get('dev-auth-session')?.value
   const devSession = !!devSessionVal && devSessionVal !== 'false'
-  const isAuthenticated = !!user || devSession
+  const isAuthenticated = devSession
 
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
   const isPublicRoute =
@@ -66,11 +37,7 @@ export async function updateSession(request: NextRequest) {
 
   // Role-Based Access Control for Viewer Role
   const userRoleCookie = request.cookies.get('user-role')?.value
-  const isViewer =
-    userRoleCookie === 'viewer' ||
-    devSessionVal === 'viewer' ||
-    user?.email?.toLowerCase() === 'team@mis.isquarebpo.com' ||
-    user?.user_metadata?.role === 'viewer'
+  const isViewer = userRoleCookie === 'viewer' || devSessionVal === 'viewer'
 
   if (isAuthenticated && isViewer) {
     const pathname = request.nextUrl.pathname
@@ -82,11 +49,11 @@ export async function updateSession(request: NextRequest) {
       pathname.startsWith('/edlink') ||
       pathname.startsWith('/settings') ||
       pathname.startsWith('/installments/new') ||
-      pathname.includes('/installments/') && pathname.endsWith('/edit') ||
+      (pathname.includes('/installments/') && pathname.endsWith('/edit')) ||
       pathname.startsWith('/stc/installments/new') ||
-      pathname.includes('/stc/installments/') && pathname.endsWith('/edit') ||
+      (pathname.includes('/stc/installments/') && pathname.endsWith('/edit')) ||
       pathname.startsWith('/payslips/new') ||
-      pathname.includes('/payslips/') && pathname.endsWith('/edit')
+      (pathname.includes('/payslips/') && pathname.endsWith('/edit'))
 
     if (isRestrictedForViewer) {
       const redirectUrl = request.nextUrl.clone()
@@ -96,7 +63,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Inject Production-Grade Security Headers
-  const headers = supabaseResponse.headers
+  const headers = response.headers
   headers.set('X-Frame-Options', 'DENY') // Prevent clickjacking
   headers.set('X-Content-Type-Options', 'nosniff') // Prevent mime sniffing
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
@@ -110,11 +77,11 @@ export async function updateSession(request: NextRequest) {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://lh5.googleusercontent.com",
     "font-src 'self' data: https://fonts.gstatic.com",
-    `connect-src 'self' ${url} wss://*.supabase.co https://api.resend.com`,
+    "connect-src 'self' https://api.resend.com",
     "frame-ancestors 'none'", // Clickjacking protection (CSP Level 2)
   ].join('; ')
 
   headers.set('Content-Security-Policy', csp)
 
-  return supabaseResponse
+  return response
 }

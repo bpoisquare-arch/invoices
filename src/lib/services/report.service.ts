@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { prisma } from '@/lib/prisma'
 import { createClient as createSupabaseClient } from '@/lib/supabase/server'
 import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { AimtReportImport, AimtReportRecord } from '@/lib/supabase/database.types'
@@ -771,6 +772,33 @@ export async function saveReportImportToDatabase(params: {
 
 // Fetch all import history batches
 export async function getReportImports(entity: string = 'aimt'): Promise<AimtReportImport[]> {
+  // 1. Primary: Hostinger MySQL via Prisma
+  try {
+    const dbImports = await prisma.aimtReportImport.findMany({
+      where: { entity },
+      orderBy: { uploadedAt: 'desc' },
+    })
+    if (dbImports && dbImports.length > 0) {
+      return dbImports.map((imp: any) => ({
+        id: imp.id,
+        file_name: imp.fileName,
+        file_size: Number(imp.fileSize || 0),
+        uploaded_at: imp.uploadedAt.toISOString(),
+        uploaded_by: imp.uploadedBy,
+        total_records: imp.totalRecords,
+        total_pending_amount: Number(imp.totalPendingAmount || 0),
+        total_yet_to_raised: Number(imp.totalYetToRaised || 0),
+        entity: imp.entity,
+        raw_headers: imp.rawHeaders,
+        created_at: imp.createdAt.toISOString(),
+        updated_at: imp.updatedAt.toISOString(),
+      })) as unknown as AimtReportImport[]
+    }
+  } catch (err) {
+    console.warn('MySQL getReportImports failed, falling back to Supabase:', err)
+  }
+
+  // 2. Supabase fallback
   const supabase = await getSupabase()
   try {
     const { data, error } = await supabase

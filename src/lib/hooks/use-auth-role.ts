@@ -1,53 +1,57 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
 import { getRoleFromCookie, setRoleCookie, UserRole, VIEWER_ALLOWED_ENTITIES, ALL_ENTITIES } from '@/lib/auth/role'
+
+export interface AuthUser {
+  id?: string
+  email?: string
+  user_metadata?: Record<string, any>
+}
 
 export function useAuthRole() {
   const [role, setRole] = useState<UserRole>('admin')
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [email, setEmail] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const supabase = createClient()
-    
-    // Initial role from cookie
+    // 1. Initial role from cookie
     const currentCookieRole = getRoleFromCookie()
     setRole(currentCookieRole)
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user) {
-        setUser(data.user)
-        const userEmail = data.user.email || ''
-        setEmail(userEmail)
-
-        // Check if user is viewer based on metadata or specific viewer email
-        if (
-          data.user.user_metadata?.role === 'viewer' ||
-          userEmail.toLowerCase() === 'team@mis.isquarebpo.com' ||
-          userEmail.toLowerCase().startsWith('viewer@')
-        ) {
-          setRole('viewer')
-          setRoleCookie('viewer')
-        } else if (currentCookieRole !== 'viewer') {
-          setRole('admin')
-          setRoleCookie('admin')
+    // 2. Fetch session from internal auth API
+    fetch('/api/auth/session')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.authenticated && data?.user) {
+          const userRole = (data.user.role === 'viewer' ? 'viewer' : 'admin') as UserRole
+          setRole(userRole)
+          setRoleCookie(userRole)
+          setEmail(data.user.email || (userRole === 'viewer' ? 'team@mis.isquarebpo.com' : 'admin@mis.isquarebpo.com'))
+          setUser({ email: data.user.email, user_metadata: { role: userRole } })
+        } else {
+          // Fallback based on cookies
+          if (currentCookieRole === 'viewer') {
+            setEmail('team@mis.isquarebpo.com')
+            setUser({ email: 'team@mis.isquarebpo.com', user_metadata: { role: 'viewer' } })
+          } else {
+            setEmail('admin@mis.isquarebpo.com')
+            setUser({ email: 'admin@mis.isquarebpo.com', user_metadata: { role: 'admin' } })
+          }
         }
-      } else {
-        // Fallback for dev-session login
+        setIsLoading(false)
+      })
+      .catch(() => {
         if (currentCookieRole === 'viewer') {
           setEmail('team@mis.isquarebpo.com')
+          setUser({ email: 'team@mis.isquarebpo.com', user_metadata: { role: 'viewer' } })
         } else {
           setEmail('admin@mis.isquarebpo.com')
+          setUser({ email: 'admin@mis.isquarebpo.com', user_metadata: { role: 'admin' } })
         }
-      }
-      setIsLoading(false)
-    }).catch(() => {
-      setIsLoading(false)
-    })
+        setIsLoading(false)
+      })
   }, [])
 
   const isViewer = role === 'viewer'

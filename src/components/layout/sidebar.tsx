@@ -3,8 +3,6 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
 import {
   PlusCircle,
   FileText,
@@ -135,7 +133,6 @@ const ENTITIES: EntityItem[] = [
 export default function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
   const { role, isViewer, email } = useAuthRole()
   const { setOpenMobile, isMobile } = useSidebar()
 
@@ -226,9 +223,12 @@ export default function AppSidebar() {
   })
 
   async function handleLogout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {}
     document.cookie = 'dev-auth-session=; path=/; max-age=0'
+    document.cookie = 'user-role=; path=/; max-age=0'
     clearRoleCookie()
-    await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
   }

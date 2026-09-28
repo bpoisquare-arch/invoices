@@ -3,8 +3,6 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
 import {
   Building2,
@@ -92,16 +90,18 @@ const ENTITIES: EntityPortal[] = [
 
 export default function EntityPortalPage() {
   const router = useRouter()
-  const supabase = createClient()
   const { role, isViewer, email } = useAuthRole()
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null)
 
   const initials = email.substring(0, 2).toUpperCase()
 
   async function handleLogout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {}
     document.cookie = 'dev-auth-session=; path=/; max-age=0'
+    document.cookie = 'user-role=; path=/; max-age=0'
     clearRoleCookie()
-    await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
   }

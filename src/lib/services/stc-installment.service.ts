@@ -573,6 +573,48 @@ function saveLocalSchedules(items: STCStudentInstallmentSchedule[]) {
 }
 
 export async function getSTCInstallments(): Promise<STCStudentInstallmentSchedule[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/stc/installments')
+      if (res.ok) {
+        const rows = await res.json()
+        if (Array.isArray(rows) && rows.length > 0) {
+          const schedules = rows.map((r: any) => mapDbRowToSchedule({
+            ...r,
+            student_name: r.studentName ?? r.student_name,
+            student_id: r.studentId ?? r.student_id,
+            course_name: r.courseName ?? r.course_name,
+            start_date: r.startDate instanceof Date ? r.startDate.toISOString().slice(0, 10) : String(r.startDate || r.start_date || '').slice(0, 10),
+            end_date: r.endDate instanceof Date ? r.endDate.toISOString().slice(0, 10) : String(r.endDate || r.end_date || '').slice(0, 10),
+            start_month_year: r.startMonthYear ?? r.start_month_year,
+            end_month_offset: r.endMonthOffset ?? r.end_month_offset,
+            admin_fee: Number(r.adminFee ?? r.admin_fee ?? 0),
+            resources_fee: Number(r.resourcesFee ?? r.resources_fee ?? 0),
+            material_fee: r.materialFee !== null && r.materialFee !== undefined ? Number(r.materialFee) : (r.material_fee !== undefined ? Number(r.material_fee) : undefined),
+            tuition_fee: Number(r.tuitionFee ?? r.tuition_fee ?? 0),
+            scholarship: Number(r.scholarship ?? 0),
+            total_amount: Number(r.totalAmount ?? r.total_amount ?? 0),
+            first_installment_amount: Number(r.firstInstallmentAmount ?? r.first_installment_amount ?? 0),
+            schedule_items: r.scheduleItems ?? r.schedule_items,
+            agency: r.agency,
+            recipient_email: r.recipientEmail ?? r.recipient_email,
+            from_email: r.fromEmail ?? r.from_email,
+            email_subject: r.emailSubject ?? r.email_subject,
+            email_message: r.emailMessage ?? r.email_message,
+            last_email_sent_at: r.lastEmailSentAt ?? r.last_email_sent_at,
+            last_email_status: r.lastEmailStatus ?? r.last_email_status,
+            created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : (r.created_at || new Date().toISOString()),
+            updated_at: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : (r.updated_at || new Date().toISOString()),
+          }))
+          saveLocalSchedules(schedules)
+          return schedules
+        }
+      }
+    } catch (err) {
+      console.warn('API getSTCInstallments failed, falling back:', err)
+    }
+  }
+
   try {
     const supabase = createClient()
     const { data, error } = await (supabase as any)
@@ -595,6 +637,46 @@ export async function getSTCInstallments(): Promise<STCStudentInstallmentSchedul
 }
 
 export async function getSTCInstallmentById(id: string): Promise<STCStudentInstallmentSchedule | null> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/stc/installments?id=${encodeURIComponent(id)}`)
+      if (res.ok) {
+        const r = await res.json()
+        if (r && r.id) {
+          return mapDbRowToSchedule({
+            ...r,
+            student_name: r.studentName ?? r.student_name,
+            student_id: r.studentId ?? r.student_id,
+            course_name: r.courseName ?? r.course_name,
+            start_date: r.startDate instanceof Date ? r.startDate.toISOString().slice(0, 10) : String(r.startDate || r.start_date || '').slice(0, 10),
+            end_date: r.endDate instanceof Date ? r.endDate.toISOString().slice(0, 10) : String(r.endDate || r.end_date || '').slice(0, 10),
+            start_month_year: r.startMonthYear ?? r.start_month_year,
+            end_month_offset: r.endMonthOffset ?? r.end_month_offset,
+            admin_fee: Number(r.adminFee ?? r.admin_fee ?? 0),
+            resources_fee: Number(r.resourcesFee ?? r.resources_fee ?? 0),
+            material_fee: r.materialFee !== null && r.materialFee !== undefined ? Number(r.materialFee) : (r.material_fee !== undefined ? Number(r.material_fee) : undefined),
+            tuition_fee: Number(r.tuitionFee ?? r.tuition_fee ?? 0),
+            scholarship: Number(r.scholarship ?? 0),
+            total_amount: Number(r.totalAmount ?? r.total_amount ?? 0),
+            first_installment_amount: Number(r.firstInstallmentAmount ?? r.first_installment_amount ?? 0),
+            schedule_items: r.scheduleItems ?? r.schedule_items,
+            agency: r.agency,
+            recipient_email: r.recipientEmail ?? r.recipient_email,
+            from_email: r.fromEmail ?? r.from_email,
+            email_subject: r.emailSubject ?? r.email_subject,
+            email_message: r.emailMessage ?? r.email_message,
+            last_email_sent_at: r.lastEmailSentAt ?? r.last_email_sent_at,
+            last_email_status: r.lastEmailStatus ?? r.last_email_status,
+            created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : (r.created_at || new Date().toISOString()),
+            updated_at: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : (r.updated_at || new Date().toISOString()),
+          })
+        }
+      }
+    } catch (err) {
+      console.warn('API getSTCInstallmentById failed, falling back:', err)
+    }
+  }
+
   try {
     const supabase = createClient()
     const { data, error } = await (supabase as any)
@@ -638,9 +720,25 @@ export async function saveSTCInstallment(
   }
   saveLocalSchedules(locals)
 
+  const dbRow = mapScheduleToDbRow(finalSchedule)
+
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/stc/installments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dbRow),
+      })
+      if (res.ok) {
+        return finalSchedule
+      }
+    } catch (err) {
+      console.warn('API saveSTCInstallment failed, falling back:', err)
+    }
+  }
+
   try {
     const supabase = createClient()
-    const dbRow = mapScheduleToDbRow(finalSchedule)
     let { error } = await (supabase as any)
       .from('stc_installment_schedules')
       .upsert(dbRow, { onConflict: 'id' })
@@ -667,6 +765,17 @@ export async function deleteSTCInstallment(id: string): Promise<void> {
   // Update local cache
   const locals = getLocalSchedules().filter((s) => s.id !== id)
   saveLocalSchedules(locals)
+
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/stc/installments?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) return
+    } catch (err) {
+      console.warn('API deleteSTCInstallment failed, falling back:', err)
+    }
+  }
 
   try {
     const supabase = createClient()

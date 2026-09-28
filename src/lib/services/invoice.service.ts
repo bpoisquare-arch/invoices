@@ -123,6 +123,23 @@ export function getInvoicePdfFilename(invoice: Partial<InvoiceWithDetails>): str
 }
 
 export async function generateNextInvoiceNumber(companyId: string, isAnonymous?: boolean): Promise<string> {
+  // 1. Primary: If running in browser, query the Next.js API route backed by Hostinger MySQL
+  if (typeof window !== 'undefined') {
+    try {
+      const q = new URLSearchParams({
+        companyId: companyId || '',
+        isAnonymous: isAnonymous ? 'true' : 'false',
+      })
+      const res = await fetch(`/api/invoices/next-number?${q.toString()}`)
+      if (res.ok) {
+        const json = await res.json()
+        if (json.nextNumber) return json.nextNumber
+      }
+    } catch (err) {
+      console.warn('API generateNextInvoiceNumber failed, falling back:', err)
+    }
+  }
+
   let maxSeq = 1000 // Each entity starts at 1001 (1000 + 1)
 
   try {
@@ -192,6 +209,23 @@ export async function generateNextInvoiceNumber(companyId: string, isAnonymous?:
 }
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceWithDetails> {
+  // 1. Primary: If running in browser, post to Next.js API route backed by Hostinger MySQL via Prisma
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        return json
+      }
+    } catch (err) {
+      console.warn('API createInvoice failed, falling back to client Supabase:', err)
+    }
+  }
+
   const supabase = createClient()
 
   let companyName = 'EdLink Australia'
@@ -387,6 +421,23 @@ export async function updateInvoice(
   invoiceId: string,
   input: UpdateInvoiceInput
 ): Promise<InvoiceWithDetails> {
+  // 1. Primary: If running in browser, call Next.js API route backed by Hostinger MySQL via Prisma
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/invoices/${encodeURIComponent(invoiceId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        return json
+      }
+    } catch (err) {
+      console.warn('API updateInvoice failed, falling back to client Supabase:', err)
+    }
+  }
+
   const supabase = createClient()
 
   const preparedItems = input.items && input.items.length > 0 ? input.items.map((item) => {
@@ -452,6 +503,20 @@ export async function updateInvoice(
 }
 
 export async function renameInvoiceReference(invoiceId: string, referenceName: string): Promise<void> {
+  // 1. Primary: If running in browser, call Next.js API route backed by Hostinger MySQL via Prisma
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/invoices/${encodeURIComponent(invoiceId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referenceName }),
+      })
+      if (res.ok) return
+    } catch (err) {
+      console.warn('API renameInvoiceReference failed, falling back to client Supabase:', err)
+    }
+  }
+
   const supabase = createClient()
   const { error } = await supabase
     .from('invoices')
@@ -485,6 +550,18 @@ export async function duplicateInvoice(invoiceId: string): Promise<InvoiceWithDe
 }
 
 export async function deleteInvoice(invoiceId: string): Promise<void> {
+  // 1. Primary: If running in browser, call Next.js API route backed by Hostinger MySQL via Prisma
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/invoices/${encodeURIComponent(invoiceId)}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) return
+    } catch (err) {
+      console.warn('API deleteInvoice failed, falling back to client Supabase:', err)
+    }
+  }
+
   const supabase = createClient()
   await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
   const { error } = await supabase.from('invoices').delete().eq('id', invoiceId)
@@ -522,6 +599,19 @@ function normalizeInvoice(inv: InvoiceWithDetails): InvoiceWithDetails {
 export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithDetails | null> {
   if (!isValidUUID(invoiceId)) return null
 
+  // 1. Primary: If running in browser, query Next.js API route backed by Hostinger MySQL via Prisma
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/invoices/${encodeURIComponent(invoiceId)}`)
+      if (res.ok) {
+        const json = await res.json()
+        if (json && json.id) return json
+      }
+    } catch (err) {
+      console.warn('API getInvoiceById failed, falling back to client Supabase:', err)
+    }
+  }
+
   try {
     const supabase = createClient()
     const { data: invoice, error } = await supabase
@@ -543,6 +633,31 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
   page: number
   pageSize: number
 }> {
+  // 1. Primary: If running in browser, query Next.js API route backed by Hostinger MySQL via Prisma
+  if (typeof window !== 'undefined') {
+    try {
+      const q = new URLSearchParams()
+      if (params.companyId) q.set('companyId', params.companyId)
+      if (params.entityType) q.set('entityType', params.entityType)
+      if (params.dateFilter) q.set('dateFilter', params.dateFilter)
+      if (params.startDate) q.set('startDate', params.startDate)
+      if (params.endDate) q.set('endDate', params.endDate)
+      if (params.sortBy) q.set('sortBy', params.sortBy)
+      if (params.search) q.set('search', params.search)
+      if (params.page) q.set('page', String(params.page))
+      if (params.pageSize) q.set('pageSize', String(params.pageSize))
+
+      const res = await fetch(`/api/invoices?${q.toString()}`)
+      if (res.ok) {
+        const json = await res.json()
+        if (json && Array.isArray(json.invoices)) {
+          return json
+        }
+      }
+    } catch (err) {
+      console.warn('API getInvoices failed, falling back to client Supabase:', err)
+    }
+  }
   const page = params.page && params.page > 0 ? params.page : 1
   const pageSize = params.pageSize && params.pageSize > 0 ? params.pageSize : 20
   const from = (page - 1) * pageSize

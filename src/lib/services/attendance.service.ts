@@ -1,8 +1,57 @@
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 
 async function getSupabase() {
   return await createServerClient()
 }
+
+export function toEmployeeModel(emp: any): Employee {
+  const joiningStr = emp.joiningDate
+    ? (emp.joiningDate instanceof Date ? emp.joiningDate.toISOString().slice(0, 10) : String(emp.joiningDate).slice(0, 10))
+    : (emp.joining_date || null)
+
+  return {
+    id: emp.id,
+    user_id: emp.userId ?? emp.user_id ?? null,
+    employee_id: emp.employeeId ?? emp.employee_id,
+    name: emp.name,
+    normalized_name: emp.normalizedName ?? emp.normalized_name ?? emp.name?.toLowerCase().trim() ?? '',
+    designation: emp.designation,
+    email: emp.email ?? null,
+    branch: emp.branch || 'Multan',
+    salary: emp.salary !== undefined && emp.salary !== null ? Number(emp.salary) : null,
+    joining_date: joiningStr,
+    is_old_staff: Boolean(emp.isOldStaff ?? emp.is_old_staff),
+    is_attendance_exempt: Boolean(emp.isAttendanceExempt ?? emp.is_attendance_exempt),
+    leave_quotas: emp.leaveQuotas ?? emp.leave_quotas ?? DEFAULT_ATTENDANCE_SETTINGS,
+    is_active: Boolean(emp.isActive ?? emp.is_active ?? true),
+    created_at: emp.createdAt instanceof Date ? emp.createdAt.toISOString() : (emp.created_at || new Date().toISOString()),
+    updated_at: emp.updatedAt instanceof Date ? emp.updatedAt.toISOString() : (emp.updated_at || new Date().toISOString()),
+  }
+}
+
+export function toAttendanceRecordModel(rec: any): AttendanceRecord {
+  const dateStr = rec.attendanceDate
+    ? (rec.attendanceDate instanceof Date ? rec.attendanceDate.toISOString().slice(0, 10) : String(rec.attendanceDate).slice(0, 10))
+    : (rec.attendance_date || '')
+
+  return {
+    id: rec.id,
+    employee_id: rec.employeeId ?? rec.employee_id,
+    attendance_date: dateStr,
+    day_of_week: rec.dayOfWeek ?? rec.day_of_week ?? '',
+    in_time: rec.inTime ?? rec.in_time ?? null,
+    out_time: rec.outTime ?? rec.out_time ?? null,
+    arrival_status: rec.arrivalStatus ?? rec.arrival_status ?? 'Missing In',
+    departure_status: rec.departureStatus ?? rec.departure_status ?? 'Missing Out',
+    total_working_minutes: rec.totalWorkingMinutes ?? rec.total_working_minutes ?? 0,
+    total_working_hours_formatted: rec.totalWorkingHoursFormatted ?? rec.total_working_hours_formatted ?? '0h 0m',
+    raw_punches: rec.rawPunches ?? rec.raw_punches ?? [],
+    created_at: rec.createdAt instanceof Date ? rec.createdAt.toISOString() : (rec.created_at || new Date().toISOString()),
+    updated_at: rec.updatedAt instanceof Date ? rec.updatedAt.toISOString() : (rec.updated_at || new Date().toISOString()),
+  }
+}
+
 import {
   Employee,
   AttendanceRecord,
@@ -81,6 +130,26 @@ export const INITIAL_EMPLOYEES: Employee[] = [
 
 export async function getAttendanceSettings(): Promise<AttendanceSettings> {
   try {
+    const s = await prisma.attendanceSetting.findUnique({ where: { id: 'default' } })
+    if (s) {
+      return {
+        id: s.id,
+        weekday_in_time: s.weekdayInTime,
+        weekday_grace_minutes: s.weekdayGraceMinutes,
+        weekday_out_time: s.weekdayOutTime,
+        saturday_in_time: s.saturdayInTime,
+        saturday_grace_minutes: s.saturdayGraceMinutes,
+        saturday_out_time: s.saturdayOutTime,
+        timezone: s.timezone,
+        created_at: s.createdAt.toISOString(),
+        updated_at: s.updatedAt.toISOString(),
+      }
+    }
+  } catch (err) {
+    console.warn('MySQL attendance settings fetch failed, falling back to Supabase:', err)
+  }
+
+  try {
     const supabase = await getSupabase()
     const { data, error } = await supabase
       .from('attendance_settings')
@@ -110,21 +179,38 @@ export async function updateAttendanceSettings(
   }
 
   try {
-    const supabase = await getSupabase()
-    const { data, error } = await supabase
-      .from('attendance_settings')
-      .upsert(updated)
-      .select()
-      .single()
-
-    if (error || !data) {
-      return updated
-    }
-
-    return data
+    await prisma.attendanceSetting.upsert({
+      where: { id: 'default' },
+      update: {
+        weekdayInTime: updated.weekday_in_time,
+        weekdayGraceMinutes: updated.weekday_grace_minutes,
+        weekdayOutTime: updated.weekday_out_time,
+        saturdayInTime: updated.saturday_in_time,
+        saturdayGraceMinutes: updated.saturday_grace_minutes,
+        saturdayOutTime: updated.saturday_out_time,
+        timezone: updated.timezone,
+      },
+      create: {
+        id: 'default',
+        weekdayInTime: updated.weekday_in_time,
+        weekdayGraceMinutes: updated.weekday_grace_minutes,
+        weekdayOutTime: updated.weekday_out_time,
+        saturdayInTime: updated.saturday_in_time,
+        saturdayGraceMinutes: updated.saturday_grace_minutes,
+        saturdayOutTime: updated.saturday_out_time,
+        timezone: updated.timezone,
+      },
+    })
   } catch (err) {
-    return updated
+    console.warn('MySQL attendance settings update error:', err)
   }
+
+  try {
+    const supabase = await getSupabase()
+    await supabase.from('attendance_settings').upsert(updated)
+  } catch {}
+
+  return updated
 }
 
 // ----------------------------------------------------
@@ -234,11 +320,45 @@ async function calculateAllEmployeeUsedLeaves(supabase: any): Promise<Map<string
 
   try {
     const currentYear = new Date().getFullYear()
-    const { data: recs } = await supabase
-      .from('attendance_records')
-      .select('employee_id, attendance_date, arrival_status, departure_status, raw_punches')
-      .gte('attendance_date', '2026-09-01')
-      .lte('attendance_date', `${currentYear}-12-31`)
+    let recs: any[] = []
+
+    try {
+      const mysqlRecs = await prisma.attendanceRecord.findMany({
+        where: {
+          attendanceDate: {
+            gte: new Date('2026-09-01'),
+            lte: new Date(`${currentYear}-12-31`),
+          },
+        },
+        select: {
+          employeeId: true,
+          attendanceDate: true,
+          arrivalStatus: true,
+          departureStatus: true,
+          rawPunches: true,
+        },
+      })
+      if (mysqlRecs && mysqlRecs.length > 0) {
+        recs = mysqlRecs.map((r) => ({
+          employee_id: r.employeeId,
+          attendance_date: r.attendanceDate.toISOString().slice(0, 10),
+          arrival_status: r.arrivalStatus,
+          departure_status: r.departureStatus,
+          raw_punches: r.rawPunches,
+        }))
+      }
+    } catch (err) {
+      console.warn('MySQL used leaves query failed, falling back:', err)
+    }
+
+    if (recs.length === 0 && supabase) {
+      const { data } = await supabase
+        .from('attendance_records')
+        .select('employee_id, attendance_date, arrival_status, departure_status, raw_punches')
+        .gte('attendance_date', '2026-09-01')
+        .lte('attendance_date', `${currentYear}-12-31`)
+      if (data) recs = data
+    }
 
     if (recs && recs.length > 0) {
       for (const r of recs) {
@@ -291,20 +411,39 @@ export async function getEmployees(params?: {
   isActiveOnly?: boolean
 }): Promise<Employee[]> {
   try {
-    const supabase = await getSupabase()
-    let query = supabase.from('employees').select('*').order('employee_id', { ascending: true })
+    let data: any[] = []
 
-    if (params?.isActiveOnly !== false) {
-      query = query.eq('is_active', true)
+    try {
+      const where: any = {}
+      if (params?.isActiveOnly !== false) {
+        where.isActive = true
+      }
+      const mysqlEmps = await prisma.employee.findMany({
+        where,
+        orderBy: { employeeId: 'asc' },
+      })
+      if (mysqlEmps && mysqlEmps.length > 0) {
+        data = mysqlEmps.map(toEmployeeModel)
+      }
+    } catch (err) {
+      console.warn('MySQL employee fetch failed, falling back to Supabase:', err)
     }
 
-    const { data, error } = await query
+    if (data.length === 0) {
+      const supabase = await getSupabase()
+      let query = supabase.from('employees').select('*').order('employee_id', { ascending: true })
+      if (params?.isActiveOnly !== false) {
+        query = query.eq('is_active', true)
+      }
+      const { data: supaData } = await query
+      if (supaData) data = supaData
+    }
 
-    if (error || !data) {
-      console.error('Error fetching employees from Supabase:', error?.message)
+    if (!data || data.length === 0) {
       return []
     }
 
+    const supabase = await getSupabase()
     const [metaMap, usedMap] = await Promise.all([
       getEmployeeMetadataMap(),
       calculateAllEmployeeUsedLeaves(supabase),
@@ -382,22 +521,39 @@ export async function getEmployees(params?: {
  */
 export async function getEmployeeById(idOrEmpId: string): Promise<Employee | null> {
   try {
-    const supabase = await getSupabase()
+    let data: any = null
     const isUuid = Boolean(idOrEmpId && idOrEmpId.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
 
-    let query = supabase.from('employees').select('*')
-    if (isUuid) {
-      query = query.or(`id.eq.${idOrEmpId},employee_id.eq.${idOrEmpId}`)
-    } else {
-      query = query.eq('employee_id', idOrEmpId)
+    try {
+      const mysqlEmp = await prisma.employee.findFirst({
+        where: isUuid
+          ? { OR: [{ id: idOrEmpId }, { employeeId: idOrEmpId }] }
+          : { employeeId: idOrEmpId },
+      })
+      if (mysqlEmp) {
+        data = toEmployeeModel(mysqlEmp)
+      }
+    } catch (err) {
+      console.warn('MySQL employee getById failed, falling back:', err)
     }
 
-    const { data, error } = await query.maybeSingle()
+    if (!data) {
+      const supabase = await getSupabase()
+      let query = supabase.from('employees').select('*')
+      if (isUuid) {
+        query = query.or(`id.eq.${idOrEmpId},employee_id.eq.${idOrEmpId}`)
+      } else {
+        query = query.eq('employee_id', idOrEmpId)
+      }
+      const { data: supaData } = await query.maybeSingle()
+      if (supaData) data = supaData
+    }
 
-    if (error || !data) {
+    if (!data) {
       return null
     }
 
+    const supabase = await getSupabase()
     const [metaMap, usedMap] = await Promise.all([
       getEmployeeMetadataMap(),
       calculateAllEmployeeUsedLeaves(supabase),
@@ -478,11 +634,10 @@ export async function generateNextEmployeeId(): Promise<string> {
   let maxSeq = 0
 
   try {
-    const supabase = await getSupabase()
-    const { data } = await supabase.from('employees').select('employee_id')
-    if (data && data.length > 0) {
-      for (const emp of data) {
-        const match = emp.employee_id.match(/EMP-(\d+)/i)
+    const mysqlEmps = await prisma.employee.findMany({ select: { employeeId: true } })
+    if (mysqlEmps && mysqlEmps.length > 0) {
+      for (const emp of mysqlEmps) {
+        const match = emp.employeeId.match(/EMP-(\d+)/i)
         if (match) {
           const num = parseInt(match[1], 10)
           if (num > maxSeq) maxSeq = num
@@ -490,7 +645,25 @@ export async function generateNextEmployeeId(): Promise<string> {
       }
     }
   } catch (err) {
-    // Ignore DB error
+    console.warn('MySQL generateNextEmployeeId failed, falling back to Supabase:', err)
+  }
+
+  if (maxSeq === 0) {
+    try {
+      const supabase = await getSupabase()
+      const { data } = await supabase.from('employees').select('employee_id')
+      if (data && data.length > 0) {
+        for (const emp of data) {
+          const match = emp.employee_id.match(/EMP-(\d+)/i)
+          if (match) {
+            const num = parseInt(match[1], 10)
+            if (num > maxSeq) maxSeq = num
+          }
+        }
+      }
+    } catch (err) {
+      // Ignore DB error
+    }
   }
 
   const nextSeq = maxSeq + 1
@@ -548,39 +721,63 @@ export async function createEmployee(params: {
   }
 
   const employeeId = await generateNextEmployeeId()
-  const supabase = await getSupabase()
-  
-  const insertPayload: any = {
-    employee_id: employeeId,
-    name,
-    normalized_name: normalizedName,
-    designation,
-    email,
-    branch,
-    salary,
-    joining_date: joiningDate,
-    is_old_staff: isOldStaff,
-    is_attendance_exempt: isAttendanceExempt,
-    leave_quotas: leaveQuotas,
-    is_active: true,
+  let data: any = null
+
+  // 1. Create in MySQL via Prisma
+  try {
+    const created = await prisma.employee.create({
+      data: {
+        employeeId,
+        name,
+        normalizedName,
+        designation,
+        email,
+        branch,
+        salary: salary !== null ? salary : undefined,
+        joiningDate: joiningDate ? new Date(joiningDate) : null,
+        isOldStaff,
+        isAttendanceExempt,
+        leaveQuotas: leaveQuotas as any,
+        isActive: true,
+      },
+    })
+    if (created) {
+      data = toEmployeeModel(created)
+    }
+  } catch (err) {
+    console.warn('MySQL createEmployee failed, falling back to Supabase:', err)
   }
 
-  let { data, error } = await supabase
-    .from('employees')
-    .insert(insertPayload)
-    .select()
-    .single()
-
-  if (error) {
-    const fallbackPayload = {
+  // 2. Supabase fallback / sync
+  try {
+    const supabase = await getSupabase()
+    const insertPayload: any = {
+      id: data?.id,
       employee_id: employeeId,
       name,
       normalized_name: normalizedName,
       designation,
+      email,
+      branch,
+      salary,
+      joining_date: joiningDate,
+      is_old_staff: isOldStaff,
+      is_attendance_exempt: isAttendanceExempt,
+      leave_quotas: leaveQuotas,
       is_active: true,
     }
-    const res = await supabase.from('employees').insert(fallbackPayload).select().single()
-    data = res.data
+
+    const { data: supaData } = await supabase
+      .from('employees')
+      .insert(insertPayload)
+      .select()
+      .maybeSingle()
+
+    if (!data && supaData) {
+      data = supaData
+    }
+  } catch (supaErr) {
+    console.warn('Supabase sync createEmployee warning:', supaErr)
   }
 
   if (data) {
@@ -660,12 +857,42 @@ export async function updateEmployee(
     updateData.leave_quotas = finalQuotas
   }
 
-  let { data, error } = await supabase
+  // 1. Primary Update: Hostinger MySQL via Prisma
+  try {
+    const prismaData: any = {
+      ...(params.name !== undefined ? { name: params.name.trim(), normalizedName: normalizeEmployeeName(params.name) } : {}),
+      ...(params.designation !== undefined ? { designation: cleanDesignation(params.designation) } : {}),
+      ...(params.email !== undefined ? { email: params.email && params.email.trim() ? params.email.trim() : null } : {}),
+      ...(params.branch !== undefined ? { branch: params.branch } : {}),
+      ...(params.salary !== undefined ? { salary: params.salary !== null && params.salary !== '' ? Number(params.salary) : null } : {}),
+      ...(params.joining_date !== undefined || isOldStaff !== undefined ? { joiningDate: isOldStaff ? null : (params.joining_date ? new Date(params.joining_date) : null) } : {}),
+      ...(isOldStaff !== undefined ? { isOldStaff } : {}),
+      ...(isAttendanceExempt !== undefined ? { isAttendanceExempt } : {}),
+      ...(params.is_active !== undefined ? { isActive: params.is_active } : {}),
+      ...(finalQuotas !== undefined ? { leaveQuotas: finalQuotas as any } : {}),
+    }
+
+    const isUuid = Boolean(id && id.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
+    await prisma.employee.updateMany({
+      where: isUuid ? { OR: [{ id }, { employeeId: id }] } : { employeeId: id },
+      data: prismaData,
+    })
+  } catch (mysqlErr) {
+    console.warn('MySQL updateEmployee warning:', mysqlErr)
+  }
+
+  // 2. Fallback / Sync: Supabase
+  let data: any = null
+  let { data: supaData, error } = await supabase
     .from('employees')
     .update(updateData)
     .eq('id', id)
     .select()
     .single()
+
+  if (supaData) {
+    data = supaData
+  }
 
   if (error) {
     const safeData: any = {
@@ -705,6 +932,14 @@ export async function updateEmployee(
   }
 
   if (!data) {
+    // If Supabase update didn't return, fetch from Prisma
+    const updatedPrisma = await getEmployeeById(id)
+    if (updatedPrisma) {
+      data = updatedPrisma
+    }
+  }
+
+  if (!data) {
     throw new Error('Failed to update employee in database')
   }
 
@@ -738,18 +973,30 @@ export async function updateEmployee(
 }
 
 export async function deleteEmployee(id: string): Promise<void> {
+  const isUuid = Boolean(id && id.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
+
+  // 1. Delete from MySQL via Prisma
+  try {
+    const emp = await prisma.employee.findFirst({
+      where: isUuid ? { OR: [{ id }, { employeeId: id }] } : { employeeId: id },
+    })
+    if (emp) {
+      await prisma.attendanceRecord.deleteMany({ where: { employeeId: emp.id } })
+      await prisma.attendanceRequest.deleteMany({ where: { employeeId: emp.id } })
+      await prisma.employee.delete({ where: { id: emp.id } })
+    }
+  } catch (err) {
+    console.warn('MySQL deleteEmployee warning:', err)
+  }
+
+  // 2. Supabase fallback
   const supabase = await getSupabase()
-  // 1. Delete associated attendance records
   await supabase
     .from('attendance_records')
     .delete()
     .or(`employee_id.eq.${id}`)
 
-  // 2. Delete employee
-  const { error } = await supabase.from('employees').delete().or(`id.eq.${id},employee_id.eq.${id}`)
-  if (error) {
-    throw new Error(error.message || 'Failed to delete employee from database')
-  }
+  await supabase.from('employees').delete().or(`id.eq.${id},employee_id.eq.${id}`)
 }
 
 // ----------------------------------------------------
@@ -791,38 +1038,71 @@ export async function getAttendanceRecords(
   let allRecords: AttendanceRecord[] = []
 
   try {
-    const supabase = await getSupabase()
-    let query = supabase.from('attendance_records').select('*')
-
+    const where: any = {}
     if (params.employeeId && params.employeeId !== 'all') {
       const targetEmp = empMap.get(params.employeeId)
       const empUuid = targetEmp?.id || (params.employeeId.includes('-') && params.employeeId.length > 20 ? params.employeeId : null)
-      if (empUuid) {
-        query = query.eq('employee_id', empUuid)
-      } else {
-        query = query.eq('employee_id', params.employeeId)
-      }
+      where.employeeId = empUuid || params.employeeId
     }
-    if (params.startDate) {
-      query = query.gte('attendance_date', params.startDate)
-    }
-    if (params.endDate) {
-      query = query.lte('attendance_date', params.endDate)
+    if (params.startDate || params.endDate) {
+      where.attendanceDate = {}
+      if (params.startDate) where.attendanceDate.gte = new Date(params.startDate)
+      if (params.endDate) where.attendanceDate.lte = new Date(params.endDate)
     }
     if (params.arrivalStatus && params.arrivalStatus !== 'all') {
-      query = query.eq('arrival_status', params.arrivalStatus)
+      where.arrivalStatus = params.arrivalStatus
     }
     if (params.departureStatus && params.departureStatus !== 'all') {
-      query = query.eq('departure_status', params.departureStatus)
+      where.departureStatus = params.departureStatus
     }
 
-    const { data, error } = await query
+    const mysqlRecs = await prisma.attendanceRecord.findMany({
+      where,
+      orderBy: { attendanceDate: 'desc' },
+    })
 
-    if (!error && data) {
-      allRecords = data
+    if (mysqlRecs && mysqlRecs.length > 0) {
+      allRecords = mysqlRecs.map(toAttendanceRecordModel)
     }
   } catch (err) {
-    console.error('Error querying attendance records from Supabase:', err)
+    console.warn('MySQL attendance records query failed, falling back to Supabase:', err)
+  }
+
+  if (allRecords.length === 0) {
+    try {
+      const supabase = await getSupabase()
+      let query = supabase.from('attendance_records').select('*')
+
+      if (params.employeeId && params.employeeId !== 'all') {
+        const targetEmp = empMap.get(params.employeeId)
+        const empUuid = targetEmp?.id || (params.employeeId.includes('-') && params.employeeId.length > 20 ? params.employeeId : null)
+        if (empUuid) {
+          query = query.eq('employee_id', empUuid)
+        } else {
+          query = query.eq('employee_id', params.employeeId)
+        }
+      }
+      if (params.startDate) {
+        query = query.gte('attendance_date', params.startDate)
+      }
+      if (params.endDate) {
+        query = query.lte('attendance_date', params.endDate)
+      }
+      if (params.arrivalStatus && params.arrivalStatus !== 'all') {
+        query = query.eq('arrival_status', params.arrivalStatus)
+      }
+      if (params.departureStatus && params.departureStatus !== 'all') {
+        query = query.eq('departure_status', params.departureStatus)
+      }
+
+      const { data, error } = await query
+
+      if (!error && data) {
+        allRecords = data
+      }
+    } catch (err) {
+      console.error('Error querying attendance records from Supabase:', err)
+    }
   }
 
   // Filter in-memory for rich relations and search
@@ -1225,27 +1505,69 @@ export async function saveImportedAttendanceBatch(
   }
 
   if (payload.length > 0) {
+    // 1. Primary Save: Hostinger MySQL via Prisma
+    try {
+      for (const item of payload) {
+        const dObj = new Date(item.attendance_date)
+        await prisma.attendanceRecord.upsert({
+          where: {
+            employeeId_attendanceDate: {
+              employeeId: item.employee_id,
+              attendanceDate: dObj,
+            },
+          },
+          update: {
+            dayOfWeek: item.day_of_week,
+            inTime: item.in_time,
+            outTime: item.out_time,
+            arrivalStatus: item.arrival_status,
+            departureStatus: item.departure_status,
+            totalWorkingMinutes: item.total_working_minutes,
+            totalWorkingHoursFormatted: item.total_working_hours_formatted,
+            rawPunches: item.raw_punches,
+          },
+          create: {
+            employeeId: item.employee_id,
+            attendanceDate: dObj,
+            dayOfWeek: item.day_of_week,
+            inTime: item.in_time,
+            outTime: item.out_time,
+            arrivalStatus: item.arrival_status,
+            departureStatus: item.departure_status,
+            totalWorkingMinutes: item.total_working_minutes,
+            totalWorkingHoursFormatted: item.total_working_hours_formatted,
+            rawPunches: item.raw_punches,
+          },
+        })
+      }
+      savedCount = payload.length
+    } catch (mysqlErr: any) {
+      console.warn('MySQL saveImportedAttendanceBatch warning:', mysqlErr?.message)
+    }
+
+    // 2. Fallback / Sync: Supabase
     try {
       if (duplicateStrategy === 'overwrite') {
         const { error } = await supabase.from('attendance_records').upsert(payload, {
           onConflict: 'employee_id,attendance_date',
         })
-        if (error) {
+        if (error && savedCount === 0) {
           errors.push(error.message)
-        } else {
+        } else if (savedCount === 0) {
           savedCount = payload.length
         }
       } else {
         const { error } = await supabase.from('attendance_records').insert(payload)
-        if (error) {
-          // If error is unique constraint violation, try inserting row by row or report
+        if (error && savedCount === 0) {
           errors.push(error.message)
-        } else {
+        } else if (savedCount === 0) {
           savedCount = payload.length
         }
       }
     } catch (err: any) {
-      errors.push(err?.message || 'Database error during batch save')
+      if (savedCount === 0) {
+        errors.push(err?.message || 'Database error during batch save')
+      }
     }
   }
 
@@ -1634,15 +1956,70 @@ export async function updateAttendanceRecord(
     updated_at: new Date().toISOString(),
   }
 
-  const { data: updated, error: updateErr } = await supabase
-    .from('attendance_records')
-    .update(updatedData as any)
-    .eq('id', id)
-    .select()
-    .single()
+  let updated: AttendanceRecord | null = null
 
-  if (updateErr || !updated) {
-    throw new Error(updateErr?.message || 'Failed to update attendance record in database.')
+  // 1. Primary Update: Hostinger MySQL via Prisma
+  try {
+    const isRecUuid = Boolean(id && id.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
+    const parsedDateObj = new Date(dateToUse)
+    const mysqlRec = await prisma.attendanceRecord.upsert({
+      where: isRecUuid
+        ? { id }
+        : {
+            employeeId_attendanceDate: {
+              employeeId: effectiveEmpId,
+              attendanceDate: parsedDateObj,
+            },
+          },
+      update: {
+        attendanceDate: parsedDateObj,
+        dayOfWeek: dayName,
+        inTime: updatedData.in_time,
+        outTime: updatedData.out_time,
+        arrivalStatus: updatedData.arrival_status,
+        departureStatus: updatedData.departure_status,
+        totalWorkingMinutes: updatedData.total_working_minutes,
+        totalWorkingHoursFormatted: updatedData.total_working_hours_formatted,
+        rawPunches: updatedData.raw_punches,
+      },
+      create: {
+        employeeId: effectiveEmpId,
+        attendanceDate: parsedDateObj,
+        dayOfWeek: dayName,
+        inTime: updatedData.in_time,
+        outTime: updatedData.out_time,
+        arrivalStatus: updatedData.arrival_status,
+        departureStatus: updatedData.departure_status,
+        totalWorkingMinutes: updatedData.total_working_minutes,
+        totalWorkingHoursFormatted: updatedData.total_working_hours_formatted,
+        rawPunches: updatedData.raw_punches,
+      },
+    })
+    if (mysqlRec) {
+      updated = toAttendanceRecordModel(mysqlRec)
+    }
+  } catch (mysqlErr) {
+    console.warn('MySQL updateAttendanceRecord warning:', mysqlErr)
+  }
+
+  // 2. Fallback / Sync: Supabase
+  try {
+    const { data: supaData } = await supabase
+      .from('attendance_records')
+      .update(updatedData as any)
+      .eq('id', id)
+      .select()
+      .maybeSingle()
+
+    if (!updated && supaData) {
+      updated = supaData
+    }
+  } catch (err) {
+    console.warn('Supabase updateAttendanceRecord sync error:', err)
+  }
+
+  if (!updated) {
+    throw new Error('Failed to update attendance record in database.')
   }
 
   return updated
@@ -1742,25 +2119,83 @@ export async function createManualAttendanceRecord(params: {
     raw_punches: rawPunches as any,
   }
 
-  const { data, error } = await supabase
-    .from('attendance_records')
-    .upsert(newRecord, { onConflict: 'employee_id,attendance_date' })
-    .select()
-    .single()
+  let data: AttendanceRecord | null = null
 
-  if (error || !data) {
-    throw new Error(error?.message || 'Failed to save attendance record.')
+  // 1. Primary Save: Hostinger MySQL via Prisma
+  try {
+    const parsedDateObj = new Date(params.attendance_date)
+    const mysqlRec = await prisma.attendanceRecord.upsert({
+      where: {
+        employeeId_attendanceDate: {
+          employeeId: resolvedEmployeeId,
+          attendanceDate: parsedDateObj,
+        },
+      },
+      update: {
+        dayOfWeek: dayName,
+        inTime: newRecord.in_time,
+        outTime: newRecord.out_time,
+        arrivalStatus: newRecord.arrival_status,
+        departureStatus: newRecord.departure_status,
+        totalWorkingMinutes: newRecord.total_working_minutes,
+        totalWorkingHoursFormatted: newRecord.total_working_hours_formatted,
+        rawPunches: newRecord.raw_punches,
+      },
+      create: {
+        employeeId: resolvedEmployeeId,
+        attendanceDate: parsedDateObj,
+        dayOfWeek: dayName,
+        inTime: newRecord.in_time,
+        outTime: newRecord.out_time,
+        arrivalStatus: newRecord.arrival_status,
+        departureStatus: newRecord.departure_status,
+        totalWorkingMinutes: newRecord.total_working_minutes,
+        totalWorkingHoursFormatted: newRecord.total_working_hours_formatted,
+        rawPunches: newRecord.raw_punches,
+      },
+    })
+    if (mysqlRec) {
+      data = toAttendanceRecordModel(mysqlRec)
+    }
+  } catch (err) {
+    console.warn('MySQL createManualAttendanceRecord warning:', err)
+  }
+
+  // 2. Fallback / Sync: Supabase
+  try {
+    const { data: supaData } = await supabase
+      .from('attendance_records')
+      .upsert(newRecord, { onConflict: 'employee_id,attendance_date' })
+      .select()
+      .maybeSingle()
+
+    if (!data && supaData) {
+      data = supaData
+    }
+  } catch (err) {
+    console.warn('Supabase createManualAttendanceRecord sync warning:', err)
+  }
+
+  if (!data) {
+    throw new Error('Failed to save attendance record.')
   }
 
   return data
 }
 
 export async function deleteAttendanceRecord(id: string): Promise<void> {
-  const supabase = await getSupabase()
-  const { error } = await supabase.from('attendance_records').delete().eq('id', id)
-  if (error) {
-    throw new Error(error.message || 'Failed to delete attendance record from database')
+  // 1. MySQL via Prisma
+  try {
+    await prisma.attendanceRecord.deleteMany({ where: { id } })
+  } catch (err) {
+    console.warn('MySQL deleteAttendanceRecord warning:', err)
   }
+
+  // 2. Supabase fallback
+  const supabase = await getSupabase()
+  try {
+    await supabase.from('attendance_records').delete().eq('id', id)
+  } catch {}
 }
 
 export async function bulkDeleteAttendanceRecords(params: {
@@ -1768,24 +2203,44 @@ export async function bulkDeleteAttendanceRecords(params: {
   endDate: string
   employeeId?: string
 }): Promise<{ deletedCount: number }> {
-  const supabase = await getSupabase()
-  let query = supabase
-    .from('attendance_records')
-    .delete({ count: 'exact' })
-    .gte('attendance_date', params.startDate)
-    .lte('attendance_date', params.endDate)
+  let deletedCount = 0
 
-  if (params.employeeId && params.employeeId !== 'all') {
-    query = query.eq('employee_id', params.employeeId)
+  // 1. MySQL via Prisma
+  try {
+    const where: any = {
+      attendanceDate: {
+        gte: new Date(params.startDate),
+        lte: new Date(params.endDate),
+      },
+    }
+    if (params.employeeId && params.employeeId !== 'all') {
+      where.employeeId = params.employeeId
+    }
+    const res = await prisma.attendanceRecord.deleteMany({ where })
+    deletedCount = res.count
+  } catch (err) {
+    console.warn('MySQL bulkDeleteAttendanceRecords warning:', err)
   }
 
-  const { data, error, count } = await query.select('id')
+  // 2. Supabase fallback
+  try {
+    const supabase = await getSupabase()
+    let query = supabase
+      .from('attendance_records')
+      .delete({ count: 'exact' })
+      .gte('attendance_date', params.startDate)
+      .lte('attendance_date', params.endDate)
 
-  if (error) {
-    throw new Error(error.message || 'Failed to delete attendance records.')
-  }
+    if (params.employeeId && params.employeeId !== 'all') {
+      query = query.eq('employee_id', params.employeeId)
+    }
 
-  const deletedCount = count !== null && count !== undefined ? count : (data?.length || 0)
+    const { count } = await query
+    if (deletedCount === 0 && count !== null && count !== undefined) {
+      deletedCount = count
+    }
+  } catch {}
+
   return { deletedCount }
 }
 
