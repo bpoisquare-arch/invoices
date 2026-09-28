@@ -1169,26 +1169,51 @@ export async function deleteReportImport(id: string): Promise<void> {
 
 // Get or create a manual entries import batch to link manually added records
 export async function getOrCreateManualImportBatch(entity: string = 'aimt'): Promise<AimtReportImport> {
-  const supabase = await getSupabase()
   const nowStr = new Date().toISOString()
-  
-  // 1. Try to find latest active batch for this entity in Supabase
+
+  // 1. PRIMARY: Try MySQL first
   try {
+    const mysqlBatch = await prisma.aimtReportImport.findFirst({
+      where: { entity },
+      orderBy: { uploadedAt: 'desc' },
+    })
+    if (mysqlBatch) {
+      return {
+        id: mysqlBatch.id,
+        file_name: mysqlBatch.fileName,
+        file_size: mysqlBatch.fileSize,
+        uploaded_at: mysqlBatch.uploadedAt.toISOString(),
+        uploaded_by: mysqlBatch.uploadedBy,
+        total_records: mysqlBatch.totalRecords,
+        total_pending_amount: Number(mysqlBatch.totalPendingAmount),
+        total_yet_to_raised: Number(mysqlBatch.totalYetToRaised),
+        entity: mysqlBatch.entity ?? entity,
+        raw_headers: (mysqlBatch.rawHeaders as string[]) ?? [],
+        created_at: mysqlBatch.createdAt?.toISOString() ?? nowStr,
+        updated_at: mysqlBatch.updatedAt?.toISOString() ?? nowStr,
+      } as AimtReportImport
+    }
+  } catch (err) {
+    console.warn('MySQL getOrCreateManualImportBatch query failed:', err)
+  }
+
+  // 2. Fallback: Try Supabase
+  try {
+    const supabase = await getSupabase()
     const { data, error } = await supabase
       .from('aimt_report_imports')
       .select('*')
       .eq('entity', entity)
       .order('uploaded_at', { ascending: false })
       .limit(1)
-
     if (!error && data && data.length > 0) {
       return data[0] as AimtReportImport
     }
   } catch (err) {
-    console.warn('Supabase getOrCreateManualImportBatch query failed:', err)
+    console.warn('Supabase getOrCreateManualImportBatch query failed (non-fatal):', err)
   }
 
-  // 2. Create a default "Manual Student Records" batch in Supabase
+  // 3. Create a new batch in MySQL
   const manualBatchId = generateId()
   const newBatchPayload: any = {
     id: manualBatchId,
@@ -1200,43 +1225,40 @@ export async function getOrCreateManualImportBatch(entity: string = 'aimt'): Pro
     total_pending_amount: 0,
     total_yet_to_raised: 0,
     entity: entity,
-    raw_headers: [
-      'Sr No',
-      'Student Name',
-      'Agent',
-      'Pending Invoice',
-      'Pending Amount',
-      'Yet to Raised',
-      'Intake',
-      'Course',
-    ],
+    raw_headers: ['Sr No', 'Student Name', 'Agent', 'Pending Invoice', 'Pending Amount', 'Yet to Raised', 'Intake', 'Course'],
   }
 
   try {
-    const { data, error } = await supabase
-      .from('aimt_report_imports')
-      .insert(newBatchPayload)
-      .select()
-      .single()
-
-    if (!error && data) {
-      return data as AimtReportImport
-    }
-  } catch (err) {
-    console.warn('Failed to insert default batch into Supabase:', err)
+    await prisma.aimtReportImport.create({
+      data: {
+        id: manualBatchId,
+        fileName: 'Manual Student Records',
+        fileSize: 0,
+        uploadedAt: new Date(),
+        uploadedBy: 'admin@isquarebpo.com',
+        totalRecords: 0,
+        totalPendingAmount: 0,
+        totalYetToRaised: 0,
+        entity: entity,
+        rawHeaders: newBatchPayload.raw_headers,
+      },
+    })
+  } catch (mysqlErr) {
+    console.warn('MySQL createManualImportBatch failed (non-fatal):', mysqlErr)
   }
 
-  const createdBatch = {
-    ...newBatchPayload,
-    created_at: nowStr,
-    updated_at: nowStr,
-  } as AimtReportImport
+  // Mirror to Supabase non-fatally
+  try {
+    const supabase = await getSupabase()
+    await supabase.from('aimt_report_imports').insert(newBatchPayload)
+  } catch (err) {
+    console.warn('Supabase mirror createManualImportBatch failed (non-fatal):', err)
+  }
 
+  const createdBatch = { ...newBatchPayload, created_at: nowStr, updated_at: nowStr } as AimtReportImport
   const store = readLocalReportStorage()
   store.imports[manualBatchId] = createdBatch
-  if (!store.records[manualBatchId]) {
-    store.records[manualBatchId] = []
-  }
+  if (!store.records[manualBatchId]) store.records[manualBatchId] = []
   saveLocalReportStorage(store)
 
   return createdBatch
@@ -1273,33 +1295,28 @@ export async function createReportRecord(params: {
   payment_status?: string | null
   extra_data?: Record<string, any>
 }): Promise<AimtReportRecord> {
-  const supabase = await getSupabase()
   let targetImportId = params.importId
+  const nowStr = new Date().toISOString()
 
-  // Ensure an import batch exists in Supabase
+  // Ensure an import batch exists — MySQL first
   if (!targetImportId) {
     const defaultBatch = await getOrCreateManualImportBatch('aimt')
     targetImportId = defaultBatch.id
   } else {
-    // Verify targetImportId exists in Supabase
+    // Verify targetImportId exists in MySQL, fallback to create
     try {
-      const { data: existingBatch } = await supabase
-        .from('aimt_report_imports')
-        .select('id')
-        .eq('id', targetImportId)
-        .maybeSingle()
-
+      const existingBatch = await prisma.aimtReportImport.findUnique({ where: { id: targetImportId } })
       if (!existingBatch) {
         const defaultBatch = await getOrCreateManualImportBatch('aimt')
         targetImportId = defaultBatch.id
       }
     } catch {
-      // fallback
+      const defaultBatch = await getOrCreateManualImportBatch('aimt')
+      targetImportId = defaultBatch.id
     }
   }
 
   const newId = generateId()
-  const nowStr = new Date().toISOString()
 
   // Clean numeric values
   const pendingAmountNum = cleanNumber(params.pending_amount)
@@ -1307,8 +1324,7 @@ export async function createReportRecord(params: {
   const adminFeeNum = cleanNumber(params.admin_fee)
   const resourceFeeNum = cleanNumber(params.resource_fee)
   const tuitionFeeNum = cleanNumber(params.tuition_fee)
-  
-  // Auto-calculated total fee fallback if not supplied
+
   const totalFeeNum = params.total_fee !== undefined && params.total_fee !== null && params.total_fee !== ''
     ? cleanNumber(params.total_fee)
     : Math.max(0, adminFeeNum + resourceFeeNum + tuitionFeeNum - (cleanNumber(params.scholarship)))
@@ -1317,18 +1333,15 @@ export async function createReportRecord(params: {
   const totalPaidNum = cleanNumber(params.total_paid)
   const followUpVal = cleanString(params.follow_up) || null
 
-  // Find highest Sr No in Supabase
+  // Find highest Sr No in MySQL
   let nextSrNo = 1
   try {
-    const { data: maxRecord } = await supabase
-      .from('aimt_report_records')
-      .select('sr_no')
-      .order('sr_no', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (maxRecord && typeof maxRecord.sr_no === 'number') {
-      nextSrNo = maxRecord.sr_no + 1
+    const maxRecord = await prisma.aimtReportRecord.findFirst({
+      orderBy: { srNo: 'desc' },
+      select: { srNo: true },
+    })
+    if (maxRecord && maxRecord.srNo != null) {
+      nextSrNo = maxRecord.srNo + 1
     }
   } catch {
     // fallback
@@ -1375,120 +1388,78 @@ export async function createReportRecord(params: {
     created_at: nowStr,
   }
 
-  // 1. Insert into Supabase (Live Database Server)
   let savedRecord = recordPayload
+
+  // 1. PRIMARY: Insert into MySQL (Prisma)
   try {
-    const { initial_payment, total_paid, follow_up, ...dbPayload } = recordPayload as any
-    const { data, error } = await supabase
-      .from('aimt_report_records')
-      .insert(dbPayload)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Supabase record insert error:', error)
-      throw new Error(`Database insert error: ${error.message}`)
-    }
-
-    if (data) {
-      savedRecord = {
-        ...data,
-        total_paid: totalPaidNum,
-        follow_up: followUpVal,
-      } as AimtReportRecord
-      // Update batch totals in Supabase
-      try {
-        const { data: allRows } = await supabase
-          .from('aimt_report_records')
-          .select('pending_amount, yet_to_raised')
-          .eq('import_id', targetImportId)
-
-        if (allRows) {
-          const totalPending = allRows.reduce((acc, r) => acc + (Number(r.pending_amount) || 0), 0)
-          const totalYet = allRows.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
-          await supabase
-            .from('aimt_report_imports')
-            .update({
-              total_records: allRows.length,
-              total_pending_amount: totalPending,
-              total_yet_to_raised: totalYet,
-              updated_at: nowStr,
-            })
-            .eq('id', targetImportId)
-        }
-      } catch {
-        // ignore
-      }
-    }
-  } catch (err: any) {
-    console.error('CRITICAL: Supabase insert failed:', err)
-    throw err
-  }
-
-  // 2. MySQL (Prisma) insert — mirror to Hostinger
-  try {
-    const existingMySQL = await prisma.aimtReportRecord.findUnique({ where: { id: savedRecord.id } })
-    if (!existingMySQL) {
-      // Also ensure the import batch exists in MySQL
-      const importExists = await prisma.aimtReportImport.findUnique({ where: { id: targetImportId! } })
-      if (!importExists) {
-        await prisma.aimtReportImport.create({
-          data: {
-            id: targetImportId!,
-            fileName: 'Manual Student Records',
-            fileSize: 0,
-            uploadedAt: new Date(),
-            uploadedBy: 'admin@isquarebpo.com',
-            totalRecords: 0,
-            totalPendingAmount: 0,
-            totalYetToRaised: 0,
-            entity: 'aimt',
-          },
-        })
-      }
-      await prisma.aimtReportRecord.create({
+    // Ensure the import batch exists in MySQL
+    const importExists = await prisma.aimtReportImport.findUnique({ where: { id: targetImportId! } })
+    if (!importExists) {
+      await prisma.aimtReportImport.create({
         data: {
-          id: savedRecord.id,
-          importId: targetImportId!,
-          srNo: savedRecord.sr_no ?? undefined,
-          studentName: savedRecord.student_name,
-          studentId: savedRecord.student_id ?? null,
-          agent: savedRecord.agent ?? null,
-          scholarship: savedRecord.scholarship ?? null,
-          pendingInvoice: savedRecord.pending_invoice ?? null,
-          pendingAmount: savedRecord.pending_amount ?? 0,
-          yetToRaised: savedRecord.yet_to_raised ?? null,
-          remarks: savedRecord.remarks ?? null,
-          followUp: followUpVal ?? null,
-          dob: savedRecord.dob ?? null,
-          document: savedRecord.document ?? null,
-          status: savedRecord.status ?? null,
-          intake: savedRecord.intake ?? null,
-          endDate: savedRecord.end_date ?? null,
-          course: savedRecord.course ?? null,
-          adminFee: savedRecord.admin_fee ?? 0,
-          resourceFee: savedRecord.resource_fee ?? 0,
-          tuitionFee: savedRecord.tuition_fee ?? 0,
-          totalFee: savedRecord.total_fee ?? 0,
-          paidAmount: savedRecord.paid_amount ?? 0,
-          totalPaid: totalPaidNum ?? 0,
-          coeIssuedDate: savedRecord.coe_issued_date ?? null,
-          emailId: savedRecord.email_id ?? null,
-          phoneNo: savedRecord.phone_no ?? null,
-          paymentStatus: savedRecord.payment_status ?? null,
-          extraData: (savedRecord.extra_data as any) ?? undefined,
+          id: targetImportId!,
+          fileName: 'Manual Student Records',
+          fileSize: 0,
+          uploadedAt: new Date(),
+          uploadedBy: 'admin@isquarebpo.com',
+          totalRecords: 0,
+          totalPendingAmount: 0,
+          totalYetToRaised: 0,
+          entity: 'aimt',
         },
       })
     }
-  } catch (mysqlErr) {
-    console.warn('MySQL createReportRecord failed (non-fatal):', mysqlErr)
+    const mysqlRow = await prisma.aimtReportRecord.create({
+      data: {
+        id: newId,
+        importId: targetImportId!,
+        srNo: nextSrNo,
+        studentName: recordPayload.student_name,
+        studentId: recordPayload.student_id ?? null,
+        agent: recordPayload.agent ?? null,
+        scholarship: recordPayload.scholarship ?? null,
+        pendingInvoice: recordPayload.pending_invoice ?? null,
+        pendingAmount: pendingAmountNum,
+        yetToRaised: recordPayload.yet_to_raised ?? null,
+        remarks: recordPayload.remarks ?? null,
+        followUp: followUpVal ?? null,
+        dob: recordPayload.dob ?? null,
+        document: recordPayload.document ?? null,
+        status: recordPayload.status ?? null,
+        intake: recordPayload.intake ?? null,
+        endDate: recordPayload.end_date ?? null,
+        course: recordPayload.course ?? null,
+        adminFee: adminFeeNum,
+        resourceFee: resourceFeeNum,
+        tuitionFee: tuitionFeeNum,
+        totalFee: totalFeeNum,
+        paidAmount: paidAmountNum,
+        totalPaid: totalPaidNum,
+        coeIssuedDate: recordPayload.coe_issued_date ?? null,
+        emailId: recordPayload.email_id ?? null,
+        phoneNo: recordPayload.phone_no ?? null,
+        paymentStatus: recordPayload.payment_status ?? null,
+        extraData: extraData as any,
+      },
+    })
+    savedRecord = prismaRecordToSnake(mysqlRow)
+  } catch (mysqlErr: any) {
+    console.error('MySQL createReportRecord FAILED:', mysqlErr)
+    throw mysqlErr
   }
 
-  // 3. Backup update in local server storage
-  const store = readLocalReportStorage()
-  if (!store.records[targetImportId!]) {
-    store.records[targetImportId!] = []
+  // 2. NON-FATAL: Mirror to Supabase
+  try {
+    const supabase = await getSupabase()
+    const { initial_payment, total_paid, follow_up, ...dbPayload } = recordPayload as any
+    await supabase.from('aimt_report_records').insert({ ...dbPayload, id: newId })
+  } catch (err) {
+    console.warn('Supabase mirror createReportRecord failed (non-fatal):', err)
   }
+
+  // 3. Backup in local server storage
+  const store = readLocalReportStorage()
+  if (!store.records[targetImportId!]) store.records[targetImportId!] = []
   store.records[targetImportId!].push(savedRecord)
   saveLocalReportStorage(store)
 
@@ -1500,7 +1471,6 @@ export async function updateReportRecord(
   id: string,
   updates: Partial<AimtReportRecord>
 ): Promise<AimtReportRecord | null> {
-  const supabase = await getSupabase()
   const nowStr = new Date().toISOString()
 
   // Clean numeric values if provided
@@ -1519,74 +1489,7 @@ export async function updateReportRecord(
 
   let updatedRecord: AimtReportRecord | null = null
 
-  // 1. Supabase Update (Live Database Server)
-  try {
-    // Fetch existing extra_data to merge safely
-    const { data: existingRec } = await supabase
-      .from('aimt_report_records')
-      .select('extra_data, import_id')
-      .eq('id', id)
-      .maybeSingle()
-
-    const mergedExtraData = {
-      ...((existingRec?.extra_data as Record<string, any>) || {}),
-      ...((cleanedUpdates.extra_data as Record<string, any>) || {}),
-      ...(updates.total_paid !== undefined ? { total_paid: cleanNumber(updates.total_paid) } : {}),
-      ...(updates.initial_payment !== undefined || updates.paid_amount !== undefined ? { initial_payment: cleanNumber(updates.paid_amount ?? updates.initial_payment) } : {}),
-      ...(updates.follow_up !== undefined ? { follow_up: cleanString(updates.follow_up) || null } : {}),
-    }
-
-    cleanedUpdates.extra_data = mergedExtraData
-    delete cleanedUpdates.initial_payment
-    delete cleanedUpdates.total_paid
-    delete cleanedUpdates.follow_up
-
-    const { data, error } = await supabase
-      .from('aimt_report_records')
-      .update(cleanedUpdates)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Supabase update error:', error)
-      throw new Error(`Database update error: ${error.message}`)
-    }
-
-    if (data) {
-      updatedRecord = {
-        ...data,
-        total_paid: data.total_paid !== undefined && data.total_paid !== null ? Number(data.total_paid) : (mergedExtraData.total_paid || 0),
-        follow_up: data.follow_up !== undefined && data.follow_up !== null ? data.follow_up : (mergedExtraData.follow_up || null),
-      } as AimtReportRecord
-      const importId = updatedRecord.import_id
-      if (importId) {
-        // Recalculate batch totals in Supabase
-        const { data: allRows } = await supabase
-          .from('aimt_report_records')
-          .select('pending_amount, yet_to_raised')
-          .eq('import_id', importId)
-
-        if (allRows) {
-          const totalPending = allRows.reduce((acc, r) => acc + (Number(r.pending_amount) || 0), 0)
-          const totalYet = allRows.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
-          await supabase
-            .from('aimt_report_imports')
-            .update({
-              total_pending_amount: totalPending,
-              total_yet_to_raised: totalYet,
-              updated_at: nowStr,
-            })
-            .eq('id', importId)
-        }
-      }
-    }
-  } catch (err: any) {
-    console.error('CRITICAL: Supabase update failed:', err)
-    throw err
-  }
-
-  // 2. MySQL (Prisma) — write the same update so Hostinger stays in sync
+  // 1. PRIMARY: MySQL (Prisma) update — Hostinger live database
   try {
     const mysqlUpdate: any = {}
     if (updates.student_name !== undefined) mysqlUpdate.studentName = cleanString(updates.student_name) || undefined
@@ -1618,12 +1521,63 @@ export async function updateReportRecord(
 
     if (Object.keys(mysqlUpdate).length > 0) {
       const mysqlRow = await prisma.aimtReportRecord.update({ where: { id }, data: mysqlUpdate })
-      if (!updatedRecord) {
-        updatedRecord = prismaRecordToSnake(mysqlRow)
+      updatedRecord = prismaRecordToSnake(mysqlRow)
+    } else {
+      // Nothing to update — fetch current row for return value
+      const mysqlRow = await prisma.aimtReportRecord.findUnique({ where: { id } })
+      if (mysqlRow) updatedRecord = prismaRecordToSnake(mysqlRow)
+    }
+  } catch (mysqlErr: any) {
+    console.error('MySQL updateReportRecord FAILED:', mysqlErr)
+    throw mysqlErr
+  }
+
+  // 2. NON-FATAL: Supabase mirror update
+  try {
+    const supabase = await getSupabase()
+    // Fetch existing extra_data to merge safely for Supabase
+    const { data: existingRec } = await supabase
+      .from('aimt_report_records')
+      .select('extra_data, import_id')
+      .eq('id', id)
+      .maybeSingle()
+
+    const mergedExtraData = {
+      ...((existingRec?.extra_data as Record<string, any>) || {}),
+      ...((cleanedUpdates.extra_data as Record<string, any>) || {}),
+      ...(updates.total_paid !== undefined ? { total_paid: cleanNumber(updates.total_paid) } : {}),
+      ...(updates.initial_payment !== undefined || updates.paid_amount !== undefined ? { initial_payment: cleanNumber(updates.paid_amount ?? updates.initial_payment) } : {}),
+      ...(updates.follow_up !== undefined ? { follow_up: cleanString(updates.follow_up) || null } : {}),
+    }
+
+    const supabaseUpdates = { ...cleanedUpdates, extra_data: mergedExtraData }
+    delete supabaseUpdates.initial_payment
+    delete supabaseUpdates.total_paid
+    delete supabaseUpdates.follow_up
+
+    await supabase.from('aimt_report_records').update(supabaseUpdates).eq('id', id)
+
+    // Recalculate batch totals in Supabase non-fatally
+    if (updatedRecord?.import_id) {
+      try {
+        const { data: allRows } = await supabase
+          .from('aimt_report_records')
+          .select('pending_amount, yet_to_raised')
+          .eq('import_id', updatedRecord.import_id)
+        if (allRows) {
+          const totalPending = allRows.reduce((acc, r) => acc + (Number(r.pending_amount) || 0), 0)
+          const totalYet = allRows.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
+          await supabase
+            .from('aimt_report_imports')
+            .update({ total_pending_amount: totalPending, total_yet_to_raised: totalYet, updated_at: nowStr })
+            .eq('id', updatedRecord.import_id)
+        }
+      } catch {
+        // ignore batch recalculation error
       }
     }
-  } catch (mysqlErr) {
-    console.warn('MySQL updateReportRecord failed (non-fatal):', mysqlErr)
+  } catch (err: any) {
+    console.warn('Supabase mirror update failed (non-fatal):', err)
   }
 
   // 3. Server storage backup update
@@ -1648,58 +1602,55 @@ export async function updateReportRecord(
 
 // 3. Delete a student record directly from the database
 export async function deleteReportRecord(id: string): Promise<boolean> {
-  const supabase = await getSupabase()
   let importId: string | null = null
 
-  // 1. Delete from Supabase (Live Database Server)
+  // 1. PRIMARY: Delete from MySQL (Prisma)
   try {
-    const { data: target } = await supabase
-      .from('aimt_report_records')
-      .select('import_id')
-      .eq('id', id)
-      .maybeSingle()
-
-    if (target) {
-      importId = target.import_id
+    const target = await prisma.aimtReportRecord.findUnique({ where: { id }, select: { importId: true } })
+    if (target) importId = target.importId
+    await prisma.aimtReportRecord.delete({ where: { id } })
+  } catch (mysqlErr: any) {
+    // If not found in MySQL, still try to delete from Supabase
+    if (mysqlErr?.code !== 'P2025') {
+      console.error('MySQL deleteReportRecord FAILED:', mysqlErr)
+      throw mysqlErr
     }
-
-    const { error } = await supabase.from('aimt_report_records').delete().eq('id', id)
-    if (error) {
-      console.error('Supabase delete error:', error)
-      throw new Error(`Database delete error: ${error.message}`)
-    }
-
-    if (importId) {
-      // Recalculate batch totals in Supabase
-      const { data: allRows } = await supabase
-        .from('aimt_report_records')
-        .select('pending_amount, yet_to_raised')
-        .eq('import_id', importId)
-
-      if (allRows) {
-        const totalPending = allRows.reduce((acc, r) => acc + (Number(r.pending_amount) || 0), 0)
-        const totalYet = allRows.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
-        await supabase
-          .from('aimt_report_imports')
-          .update({
-            total_records: allRows.length,
-            total_pending_amount: totalPending,
-            total_yet_to_raised: totalYet,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', importId)
-      }
-    }
-  } catch (err: any) {
-    console.error('CRITICAL: Supabase delete failed:', err)
-    throw err
   }
 
-  // 2. MySQL (Prisma) delete
+  // 2. NON-FATAL: Delete from Supabase mirror
   try {
-    await prisma.aimtReportRecord.delete({ where: { id } })
-  } catch (mysqlErr) {
-    console.warn('MySQL deleteReportRecord failed (non-fatal):', mysqlErr)
+    const supabase = await getSupabase()
+    if (!importId) {
+      const { data: target } = await supabase
+        .from('aimt_report_records')
+        .select('import_id')
+        .eq('id', id)
+        .maybeSingle()
+      if (target) importId = target.import_id
+    }
+    await supabase.from('aimt_report_records').delete().eq('id', id)
+
+    // Recalculate batch totals in Supabase non-fatally
+    if (importId) {
+      try {
+        const { data: allRows } = await supabase
+          .from('aimt_report_records')
+          .select('pending_amount, yet_to_raised')
+          .eq('import_id', importId)
+        if (allRows) {
+          const totalPending = allRows.reduce((acc, r) => acc + (Number(r.pending_amount) || 0), 0)
+          const totalYet = allRows.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
+          await supabase
+            .from('aimt_report_imports')
+            .update({ total_records: allRows.length, total_pending_amount: totalPending, total_yet_to_raised: totalYet, updated_at: new Date().toISOString() })
+            .eq('id', importId)
+        }
+      } catch {
+        // ignore
+      }
+    }
+  } catch (err) {
+    console.warn('Supabase mirror deleteReportRecord failed (non-fatal):', err)
   }
 
   // 3. Delete from server storage backup
@@ -1715,65 +1666,48 @@ export async function deleteReportRecord(id: string): Promise<boolean> {
 // 4. Bulk delete student records directly from the database
 export async function deleteReportRecords(ids: string[]): Promise<number> {
   if (!ids || ids.length === 0) return 0
-  const supabase = await getSupabase()
 
-  // 1. Delete from Supabase (Live Database Server)
+  // 1. PRIMARY: Bulk delete from MySQL (Prisma)
   try {
-    // Find unique import_ids for these records
+    await prisma.aimtReportRecord.deleteMany({ where: { id: { in: ids } } })
+  } catch (mysqlErr: any) {
+    console.error('MySQL deleteReportRecords FAILED:', mysqlErr)
+    throw mysqlErr
+  }
+
+  // 2. NON-FATAL: Mirror bulk delete to Supabase
+  try {
+    const supabase = await getSupabase()
+    // Find unique import_ids for batch totals recalculation
     const { data: targets } = await supabase
       .from('aimt_report_records')
       .select('import_id')
       .in('id', ids)
-
     const importIds = Array.from(
-      new Set(
-        (targets || [])
-          .map((t: any) => t.import_id)
-          .filter(Boolean)
-      )
+      new Set((targets || []).map((t: any) => t.import_id).filter(Boolean))
     )
-
-    const { error } = await supabase.from('aimt_report_records').delete().in('id', ids)
-    if (error) {
-      console.error('Supabase bulk delete error:', error)
-      throw new Error(`Database bulk delete error: ${error.message}`)
-    }
-
-    // Recalculate batch totals in Supabase for each affected batch
+    await supabase.from('aimt_report_records').delete().in('id', ids)
+    // Recalculate batch totals non-fatally
     for (const impId of importIds) {
       try {
         const { data: allRows } = await supabase
           .from('aimt_report_records')
           .select('pending_amount, yet_to_raised')
           .eq('import_id', impId)
-
         if (allRows) {
           const totalPending = allRows.reduce((acc, r) => acc + (Number(r.pending_amount) || 0), 0)
           const totalYet = allRows.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
           await supabase
             .from('aimt_report_imports')
-            .update({
-              total_records: allRows.length,
-              total_pending_amount: totalPending,
-              total_yet_to_raised: totalYet,
-              updated_at: new Date().toISOString(),
-            })
+            .update({ total_records: allRows.length, total_pending_amount: totalPending, total_yet_to_raised: totalYet, updated_at: new Date().toISOString() })
             .eq('id', impId)
         }
       } catch {
         // ignore
       }
     }
-  } catch (err: any) {
-    console.error('CRITICAL: Supabase bulk delete failed:', err)
-    throw err
-  }
-
-  // 2. MySQL (Prisma) bulk delete
-  try {
-    await prisma.aimtReportRecord.deleteMany({ where: { id: { in: ids } } })
-  } catch (mysqlErr) {
-    console.warn('MySQL deleteReportRecords failed (non-fatal):', mysqlErr)
+  } catch (err) {
+    console.warn('Supabase mirror deleteReportRecords failed (non-fatal):', err)
   }
 
   // 3. Delete from server storage backup
