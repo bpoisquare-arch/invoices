@@ -3,6 +3,7 @@ import {
   getAttendanceRequests,
   createAttendanceRequest,
   reviewAttendanceRequest,
+  cancelAttendanceRequest,
 } from '@/lib/services/attendance-requests.service'
 
 export const dynamic = 'force-dynamic'
@@ -95,6 +96,21 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ success: true, request: newReq })
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const requestId = searchParams.get('id')
+    if (!requestId) {
+      return NextResponse.json({ success: false, error: 'Request ID is required.' }, { status: 400 })
+    }
+
+    await cancelAttendanceRequest(requestId)
+    return NextResponse.json({ success: true, message: 'Request cancelled successfully.' })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }

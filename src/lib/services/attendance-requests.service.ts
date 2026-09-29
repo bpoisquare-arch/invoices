@@ -127,7 +127,7 @@ export async function getAttendanceRequests(filter?: {
     })
 
     if (dbRows && dbRows.length > 0) {
-      return dbRows.map((r) => ({
+      requestsList = dbRows.map((r) => ({
         id: r.id,
         employee_id: r.employeeId,
         employee_name: r.employeeName,
@@ -153,30 +153,48 @@ export async function getAttendanceRequests(filter?: {
     console.warn('MySQL attendance requests fetch failed, falling back:', err)
   }
 
-  // Fallback: Try Supabase table if MySQL returns no rows
+  // 1b. Check MySQL attendanceRecord rawPunches for live branch requests
   try {
-    let query = supabase.from('attendance_requests').select('*').order('created_at', { ascending: false })
+    const mysqlRecsWithReqs = await prisma.attendanceRecord.findMany({
+      where: {
+        rawPunches: { not: '[]' },
+      },
+      select: { id: true, employeeId: true, attendanceDate: true, rawPunches: true },
+    })
 
-    if (filter?.branch && filter.branch !== 'all') {
-      query = query.ilike('branch', `%${filter.branch}%`)
-    }
-    if (filter?.status && filter.status !== 'all') {
-      query = query.eq('status', filter.status)
-    }
-    if (filter?.employeeId && filter.employeeId !== 'all') {
-      query = query.eq('employee_id', filter.employeeId)
-    }
-    if (filter?.startDate) {
-      query = query.gte('attendance_date', filter.startDate)
-    }
-    if (filter?.endDate) {
-      query = query.lte('attendance_date', filter.endDate)
-    }
-
-    const { data, error } = await query
-
-    if (!error && Array.isArray(data) && data.length > 0) {
-      return data as AttendanceRequestItem[]
+    if (mysqlRecsWithReqs && mysqlRecsWithReqs.length > 0) {
+      for (const r of mysqlRecsWithReqs) {
+        if (!Array.isArray(r.rawPunches)) continue
+        const reqObj: any = (r.rawPunches as any[]).find((p: any) => p && p.type === 'BRANCH_REQUEST')
+        if (reqObj) {
+          const reqId = reqObj.id || reqObj.request_id || `req-${r.id}`
+          const dateStr = r.attendanceDate instanceof Date ? r.attendanceDate.toISOString().slice(0, 10) : String(r.attendanceDate).slice(0, 10)
+          const exists = requestsList.some((item) => item.id === reqId || (item.employee_id === r.employeeId && item.attendance_date === dateStr))
+          if (!exists) {
+            requestsList.push({
+              id: reqId,
+              employee_id: reqObj.employee_id || r.employeeId,
+              employee_name: reqObj.employee_name || '',
+              batch_id: reqObj.batch_id || '',
+              branch: reqObj.branch || 'Multan',
+              attendance_date: reqObj.attendance_date || dateStr,
+              request_type: reqObj.request_type || 'LEAVE',
+              leave_type: reqObj.leave_type || null,
+              leave_duration: reqObj.leave_duration !== undefined ? reqObj.leave_duration : 1,
+              requested_in_time: reqObj.requested_in_time || null,
+              requested_out_time: reqObj.requested_out_time || null,
+              reason: reqObj.reason || null,
+              status: reqObj.status || 'PENDING',
+              submitted_by: reqObj.submitted_by || 'Branch User',
+              reviewed_by: reqObj.reviewed_by || null,
+              reviewed_at: reqObj.reviewed_at || null,
+              review_notes: reqObj.review_notes || null,
+              created_at: reqObj.created_at || dateStr,
+              updated_at: reqObj.updated_at || dateStr,
+            })
+          }
+        }
+      }
     }
   } catch {}
 
