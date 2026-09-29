@@ -114,9 +114,11 @@ export async function generateNextInvoiceNumberServer(companyId: string, isAnony
     } catch {}
   }
 
-  // 2. Query invoices from MySQL via Prisma
+  // 2. Query invoices from MySQL via Prisma (take top 150 recent invoices for sequence calculation)
   try {
     const existingInvoices = await prisma.invoice.findMany({
+      take: 150,
+      orderBy: { createdAt: 'desc' },
       select: {
         invoiceNumber: true,
         templateSnapshot: true,
@@ -281,14 +283,12 @@ export async function getInvoicesServer(params: InvoiceFilterParams = {}): Promi
       prisma.invoice.count({ where }),
     ])
 
-    if (rows && rows.length > 0) {
-      let invoices = rows.map(toInvoiceWithDetails).map(normalizeInvoice)
-      return {
-        invoices,
-        totalCount: count,
-        page,
-        pageSize,
-      }
+    const invoices = (rows || []).map(toInvoiceWithDetails).map(normalizeInvoice)
+    return {
+      invoices,
+      totalCount: count ?? invoices.length,
+      page,
+      pageSize,
     }
   } catch (err) {
     console.warn('MySQL getInvoicesServer failed, falling back to Supabase:', err)
