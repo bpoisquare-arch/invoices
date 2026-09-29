@@ -1621,13 +1621,49 @@ export async function getEmployeeLeaveBalanceSummary(
 
   let allRecords: any[] = []
   if (empDbId) {
-    const { data } = await supabase
-      .from('attendance_records')
-      .select('id, employee_id, attendance_date, arrival_status, departure_status, raw_punches')
-      .eq('employee_id', empDbId)
-      .gte('attendance_date', '2026-09-01')
-      .lte('attendance_date', `${year}-12-31`)
-    allRecords = data || []
+    try {
+      const mysqlRecs = await prisma.attendanceRecord.findMany({
+        where: {
+          employeeId: empDbId,
+          attendanceDate: {
+            gte: new Date('2026-09-01T00:00:00'),
+            lte: new Date(`${year}-12-31T23:59:59`),
+          },
+        },
+        select: {
+          id: true,
+          employeeId: true,
+          attendanceDate: true,
+          arrivalStatus: true,
+          departureStatus: true,
+          rawPunches: true,
+        },
+      })
+      if (mysqlRecs && mysqlRecs.length > 0) {
+        allRecords = mysqlRecs.map((r) => ({
+          id: r.id,
+          employee_id: r.employeeId,
+          attendance_date: r.attendanceDate.toISOString().slice(0, 10),
+          arrival_status: r.arrivalStatus,
+          departure_status: r.departureStatus,
+          raw_punches: r.rawPunches,
+        }))
+      }
+    } catch (err) {
+      console.warn('MySQL getEmployeeLeaveBalanceSummary records error:', err)
+    }
+
+    if (allRecords.length === 0 && supabase) {
+      try {
+        const { data } = await supabase
+          .from('attendance_records')
+          .select('id, employee_id, attendance_date, arrival_status, departure_status, raw_punches')
+          .eq('employee_id', empDbId)
+          .gte('attendance_date', '2026-09-01')
+          .lte('attendance_date', `${year}-12-31`)
+        if (data) allRecords = data
+      } catch {}
+    }
   }
 
   const probationDates: string[] = []
@@ -1789,14 +1825,31 @@ export async function updateAttendanceRecord(
 
   let current: AttendanceRecord | null = null
   if (!isSynthetic) {
-    const { data, error: fetchErr } = await supabase
-      .from('attendance_records')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle()
-    
-    if (!fetchErr && data) {
-      current = data
+    try {
+      const mysqlRec = await prisma.attendanceRecord.findUnique({
+        where: { id },
+      })
+      if (mysqlRec) {
+        current = toAttendanceRecordModel(mysqlRec)
+      }
+    } catch (err) {
+      console.warn('MySQL find record error:', err)
+    }
+
+    if (!current) {
+      try {
+        const { data, error: fetchErr } = await supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle()
+        
+        if (!fetchErr && data) {
+          current = data
+        }
+      } catch (err) {
+        console.warn('Supabase find record error:', err)
+      }
     }
   }
 

@@ -639,6 +639,7 @@ export default function AttendanceRecordsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   // Branch Attendance Requests Modal State & Pending Counter
   const [isBranchRequestsModalOpen, setIsBranchRequestsModalOpen] = useState(false)
@@ -724,7 +725,7 @@ export default function AttendanceRecordsPage() {
     async function loadMeta() {
       try {
         const [empRes, settRes, holRes] = await Promise.all([
-          fetch('/api/attendance/employees'),
+          fetch('/api/attendance/employees?skipLeaves=true'),
           fetch('/api/attendance/settings'),
           fetch('/api/attendance/holidays'),
         ])
@@ -828,6 +829,7 @@ export default function AttendanceRecordsPage() {
       if (data.success) {
         const recs: AttendanceRecordWithEmployee[] = data.records || []
         setRecords(recs)
+        setFetchError(null)
 
         // Calculate summary
         let onTimeArr = 0
@@ -855,9 +857,12 @@ export default function AttendanceRecordsPage() {
           earlyDepartures: earlyDep,
           totalHours: `${hrs}h ${mins}m`,
         })
+      } else {
+        setFetchError(data.error || 'Failed to fetch attendance records.')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching records:', err)
+      setFetchError(err.message || 'Error connecting to database. Please click Refresh to try again.')
     } finally {
       setIsLoading(false)
     }
@@ -2225,21 +2230,38 @@ export default function AttendanceRecordsPage() {
                 <tr>
                   <td
                     colSpan={stickyColumnLayout.visibleCount + displayDateColumns.length}
-                    className="py-20 text-center text-slate-400 bg-white"
+                    className="py-16 text-slate-400 bg-white"
                   >
-                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-[#009D9E]" />
-                    <p className="font-semibold text-slate-600 text-sm">Loading attendance timesheet grid...</p>
+                    <div className="sticky left-0 w-full flex flex-col items-center justify-center text-center">
+                      <Loader2 className="w-8 h-8 animate-spin mb-2 text-[#009D9E]" />
+                      <p className="font-semibold text-slate-600 text-sm">Loading attendance timesheet grid...</p>
+                      <p className="text-xs text-slate-400 mt-1">Fetching biometric records and calculations...</p>
+                    </div>
                   </td>
                 </tr>
               ) : filteredEmployees.length === 0 || displayDateColumns.length === 0 ? (
                 <tr>
                   <td
                     colSpan={Math.max(1, stickyColumnLayout.visibleCount + displayDateColumns.length)}
-                    className="py-20 text-center text-slate-400 bg-white"
+                    className="py-16 text-slate-400 bg-white"
                   >
-                    <Calendar className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                    <p className="font-semibold text-slate-600 text-sm">No matching records found for active filters</p>
-                    <p className="text-xs text-slate-400 mt-1">Try adjusting your designation, search query, or status filters.</p>
+                    <div className="sticky left-0 w-full flex flex-col items-center justify-center text-center">
+                      <Calendar className="w-10 h-10 mb-2 text-slate-300" />
+                      <p className="font-semibold text-slate-600 text-sm">
+                        {fetchError ? 'Unable to load attendance records' : 'No matching records found for active filters'}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {fetchError || 'Try adjusting your date range, designation, search query, or status filters.'}
+                      </p>
+                      {fetchError && (
+                        <button
+                          onClick={() => fetchRecords()}
+                          className="mt-3 px-3 py-1.5 bg-[#009D9E] text-white text-xs font-semibold rounded-lg hover:bg-[#008283] transition-colors"
+                        >
+                          Retry Loading Records
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (

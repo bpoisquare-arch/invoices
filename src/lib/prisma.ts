@@ -10,8 +10,7 @@ export const prisma =
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   })
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+// Persist singleton across all environments (including production) to prevent connection leaks
+globalForPrisma.prisma = prisma
 
 export default prisma

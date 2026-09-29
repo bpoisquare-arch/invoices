@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(dup)
     }
 
-    const employees = await getEmployees({ search, isActiveOnly: false })
+    const skipLeaves = searchParams.get('skipLeaves') === 'true'
+    const employees = await getEmployees({ search, isActiveOnly: false, skipLeaveCalculation: skipLeaves })
     return NextResponse.json({ success: true, employees })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
