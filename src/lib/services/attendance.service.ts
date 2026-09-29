@@ -293,7 +293,7 @@ export const DEFAULT_EMPLOYEE_LEAVE_QUOTAS: EmployeeLeaveQuotas = {
   probation_leaves: 3,
 }
 
-async function calculateAllEmployeeUsedLeaves(supabase: any): Promise<Map<string, {
+async function calculateAllEmployeeUsedLeaves(supabase?: any): Promise<Map<string, {
   annual_leaves: number
   sick_leaves: number
   casual_leaves: number

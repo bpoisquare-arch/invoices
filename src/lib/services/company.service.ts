@@ -1,3 +1,4 @@
+import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/client'
 import { Company } from '@/lib/supabase/database.types'
 
@@ -47,50 +48,43 @@ export const ISQUARE_COMPANY: Company = {
 
 export async function getCompanies(includeAnonymous = false): Promise<Company[]> {
   try {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('companies')
-      .select('*')
-      .order('created_at', { ascending: true })
+    if (typeof window === 'undefined') {
+      const dbCompanies = await prisma.company.findMany({
+        orderBy: { createdAt: 'asc' },
+      })
 
-    let result: Company[] = []
+      if (dbCompanies && dbCompanies.length > 0) {
+        let result: Company[] = dbCompanies
+          .filter((c) => (c.name || '').toLowerCase() !== 'anonymous')
+          .map((c) => ({
+            id: c.id,
+            user_id: c.userId ?? null,
+            name: c.name === 'EdLink Pakistan' ? 'EdLink Australia' : c.name,
+            logo_url: c.logoUrl || (c.name === 'EdLink Pakistan' || c.name === 'EdLink Australia' ? '/edlink-logo.png' : null),
+            prefix: c.prefix,
+            currency: c.currency,
+            created_at: c.createdAt.toISOString(),
+            updated_at: c.updatedAt.toISOString(),
+          }))
 
-    if (error || !data || data.length === 0) {
-      result = [FALLBACK_COMPANY, NSC_COMPANY, ISQUARE_COMPANY]
-    } else {
-      const valid = data
-        .filter((c) => (c.name || '').toLowerCase() !== 'anonymous')
-        .map((c) => {
-          if (c.name === 'EdLink Pakistan') {
-            return {
-              ...c,
-              name: 'EdLink Australia',
-              logo_url: c.logo_url || '/edlink-logo.png',
-            }
-          }
-          return c
-        })
-
-      result = valid.length > 0 ? valid : [FALLBACK_COMPANY]
-      const hasNsc = result.some((c) => c.prefix === 'NSC')
-      if (!hasNsc) result.push(NSC_COMPANY)
-      const hasIsq = result.some((c) => c.prefix === 'ISQ')
-      if (!hasIsq) result.push(ISQUARE_COMPANY)
-    }
-
-    if (includeAnonymous) {
-      const hasAnon = result.some((c) => c.id === ANONYMOUS_COMPANY.id || c.prefix === 'ANO')
-      if (!hasAnon) {
-        result.push(ANONYMOUS_COMPANY)
+        const hasNsc = result.some((c) => c.prefix === 'NSC')
+        if (!hasNsc) result.push(NSC_COMPANY)
+        const hasIsq = result.some((c) => c.prefix === 'ISQ')
+        if (!hasIsq) result.push(ISQUARE_COMPANY)
+        if (includeAnonymous) {
+          const hasAnon = result.some((c) => c.id === ANONYMOUS_COMPANY.id || c.prefix === 'ANO')
+          if (!hasAnon) result.push(ANONYMOUS_COMPANY)
+        }
+        return result
       }
     }
-
-    return result
   } catch (err) {
-    return includeAnonymous
-      ? [FALLBACK_COMPANY, NSC_COMPANY, ISQUARE_COMPANY, ANONYMOUS_COMPANY]
-      : [FALLBACK_COMPANY, NSC_COMPANY, ISQUARE_COMPANY]
+    console.warn('MySQL getCompanies warning:', err)
   }
+
+  const base = [FALLBACK_COMPANY, NSC_COMPANY, ISQUARE_COMPANY]
+  if (includeAnonymous) base.push(ANONYMOUS_COMPANY)
+  return base
 }
 
 function isValidUUID(str?: string | null): boolean {
