@@ -541,7 +541,7 @@ export async function getInstallments(): Promise<StudentInstallmentSchedule[]> {
       const res = await fetch('/api/installments')
       if (res.ok) {
         const rows = await res.json()
-        if (Array.isArray(rows) && rows.length > 0) {
+        if (Array.isArray(rows)) {
           return rows.map((r: any) => mapDbRowToSchedule({
             ...r,
             student_name: r.studentName ?? r.student_name,

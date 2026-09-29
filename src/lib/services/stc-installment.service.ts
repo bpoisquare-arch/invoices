@@ -578,7 +578,7 @@ export async function getSTCInstallments(): Promise<STCStudentInstallmentSchedul
       const res = await fetch('/api/stc/installments')
       if (res.ok) {
         const rows = await res.json()
-        if (Array.isArray(rows) && rows.length > 0) {
+        if (Array.isArray(rows)) {
           const schedules = rows.map((r: any) => mapDbRowToSchedule({
             ...r,
             student_name: r.studentName ?? r.student_name,
