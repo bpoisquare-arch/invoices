@@ -399,6 +399,7 @@ async function calculateAllEmployeeUsedLeaves(supabase: any): Promise<Map<string
 export async function getEmployees(params?: {
   search?: string
   isActiveOnly?: boolean
+  skipLeaveCalculation?: boolean
 }): Promise<Employee[]> {
   try {
     let data: any[] = []
@@ -412,32 +413,21 @@ export async function getEmployees(params?: {
         where,
         orderBy: { employeeId: 'asc' },
       })
-      if (mysqlEmps && mysqlEmps.length > 0) {
+      if (mysqlEmps) {
         data = mysqlEmps.map(toEmployeeModel)
       }
     } catch (err) {
-      console.warn('MySQL employee fetch failed, falling back to Supabase:', err)
-    }
-
-    if (data.length === 0) {
-      const supabase = await getSupabase()
-      let query = supabase.from('employees').select('*').order('employee_id', { ascending: true })
-      if (params?.isActiveOnly !== false) {
-        query = query.eq('is_active', true)
-      }
-      const { data: supaData } = await query
-      if (supaData) data = supaData
+      console.warn('MySQL employee fetch failed:', err)
     }
 
     if (!data || data.length === 0) {
       return []
     }
 
-    const supabase = await getSupabase()
-    const [metaMap, usedMap] = await Promise.all([
-      getEmployeeMetadataMap(),
-      calculateAllEmployeeUsedLeaves(supabase),
-    ])
+    const metaMap = await getEmployeeMetadataMap()
+    const usedMap = params?.skipLeaveCalculation
+      ? new Map()
+      : await calculateAllEmployeeUsedLeaves()
 
     let result: Employee[] = data.map((emp) => {
       const meta = metaMap[emp.id] || metaMap[emp.employee_id] || {}
@@ -1018,7 +1008,7 @@ export interface AttendanceListResponse {
 export async function getAttendanceRecords(
   params: AttendanceFilterParams = {}
 ): Promise<AttendanceListResponse> {
-  const employees = await getEmployees({ isActiveOnly: false })
+  const employees = await getEmployees({ isActiveOnly: false, skipLeaveCalculation: true })
   const empMap = new Map<string, Employee>()
   employees.forEach((e) => {
     empMap.set(e.id, e)
@@ -1034,11 +1024,17 @@ export async function getAttendanceRecords(
       const empUuid = targetEmp?.id || (params.employeeId.includes('-') && params.employeeId.length > 20 ? params.employeeId : null)
       where.employeeId = empUuid || params.employeeId
     }
-    if (params.startDate || params.endDate) {
+    
+    // Strict date range / month filtering
+    const sDate = params.startDate || (params.month ? `${params.month}-01` : null)
+    const eDate = params.endDate || (params.month ? `${params.month}-31` : null)
+
+    if (sDate || eDate) {
       where.attendanceDate = {}
-      if (params.startDate) where.attendanceDate.gte = new Date(params.startDate)
-      if (params.endDate) where.attendanceDate.lte = new Date(params.endDate)
+      if (sDate) where.attendanceDate.gte = new Date(`${sDate}T00:00:00`)
+      if (eDate) where.attendanceDate.lte = new Date(`${eDate}T23:59:59`)
     }
+
     if (params.arrivalStatus && params.arrivalStatus !== 'all') {
       where.arrivalStatus = params.arrivalStatus
     }
@@ -1051,48 +1047,11 @@ export async function getAttendanceRecords(
       orderBy: { attendanceDate: 'desc' },
     })
 
-    if (mysqlRecs && mysqlRecs.length > 0) {
+    if (mysqlRecs) {
       allRecords = mysqlRecs.map(toAttendanceRecordModel)
     }
   } catch (err) {
-    console.warn('MySQL attendance records query failed, falling back to Supabase:', err)
-  }
-
-  if (allRecords.length === 0) {
-    try {
-      const supabase = await getSupabase()
-      let query = supabase.from('attendance_records').select('*')
-
-      if (params.employeeId && params.employeeId !== 'all') {
-        const targetEmp = empMap.get(params.employeeId)
-        const empUuid = targetEmp?.id || (params.employeeId.includes('-') && params.employeeId.length > 20 ? params.employeeId : null)
-        if (empUuid) {
-          query = query.eq('employee_id', empUuid)
-        } else {
-          query = query.eq('employee_id', params.employeeId)
-        }
-      }
-      if (params.startDate) {
-        query = query.gte('attendance_date', params.startDate)
-      }
-      if (params.endDate) {
-        query = query.lte('attendance_date', params.endDate)
-      }
-      if (params.arrivalStatus && params.arrivalStatus !== 'all') {
-        query = query.eq('arrival_status', params.arrivalStatus)
-      }
-      if (params.departureStatus && params.departureStatus !== 'all') {
-        query = query.eq('departure_status', params.departureStatus)
-      }
-
-      const { data, error } = await query
-
-      if (!error && data) {
-        allRecords = data
-      }
-    } catch (err) {
-      console.error('Error querying attendance records from Supabase:', err)
-    }
+    console.warn('MySQL attendance records query warning:', err)
   }
 
   // Filter in-memory for rich relations and search
