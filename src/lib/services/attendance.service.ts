@@ -150,21 +150,25 @@ export async function getAttendanceSettings(): Promise<AttendanceSettings> {
   }
 
   try {
-    const supabase = await getSupabase()
-    const { data, error } = await supabase
-      .from('attendance_settings')
-      .select('*')
-      .eq('id', 'default')
-      .single()
-
-    if (error || !data) {
-      return DEFAULT_ATTENDANCE_SETTINGS
+    const s = await prisma.attendanceSetting.findUnique({ where: { id: 'default' } })
+    if (s) {
+      return {
+        id: s.id,
+        weekday_in_time: s.weekdayInTime,
+        weekday_grace_minutes: s.weekdayGraceMinutes,
+        weekday_out_time: s.weekdayOutTime,
+        saturday_in_time: s.saturdayInTime,
+        saturday_grace_minutes: s.saturdayGraceMinutes,
+        saturday_out_time: s.saturdayOutTime,
+        timezone: s.timezone,
+        created_at: s.createdAt.toISOString(),
+        updated_at: s.updatedAt.toISOString(),
+      }
     }
-
-    return data
   } catch (err) {
-    return DEFAULT_ATTENDANCE_SETTINGS
+    console.warn('MySQL getAttendanceSettings error:', err)
   }
+  return DEFAULT_ATTENDANCE_SETTINGS
 }
 
 export async function updateAttendanceSettings(
@@ -205,11 +209,6 @@ export async function updateAttendanceSettings(
     console.warn('MySQL attendance settings update error:', err)
   }
 
-  try {
-    const supabase = await getSupabase()
-    await supabase.from('attendance_settings').upsert(updated)
-  } catch {}
-
   return updated
 }
 
@@ -222,28 +221,21 @@ export async function getEmployeeMetadataMap(): Promise<Record<string, EmployeeM
   const fileMeta = readAllEmployeeMetadata()
 
   try {
-    const supabase = await getSupabase()
-    const { data, error } = await supabase
-      .from('attendance_audit_logs')
-      .select('details')
-      .eq('action', 'EMPLOYEE_METADATA_STORE')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
+    const log = await prisma.attendanceAuditLog.findFirst({
+      where: { action: 'EMPLOYEE_METADATA_STORE' },
+      orderBy: { createdAt: 'desc' },
+      select: { details: true },
+    })
 
-    if (error) {
-      console.warn('Database metadata fetch warning:', error.message)
-    }
-
-    if (data && data.details && typeof data.details === 'object') {
-      const dbMeta = data.details as Record<string, any>
+    if (log && log.details && typeof log.details === 'object') {
+      const dbMeta = log.details as Record<string, any>
       return {
         ...fileMeta,
-        ...dbMeta, // DB metadata MUST override initial static file metadata
+        ...dbMeta,
       }
     }
   } catch (err) {
-    console.error('Error fetching employee metadata from database:', err)
+    console.warn('Database metadata fetch warning:', err)
   }
   return fileMeta as any
 }
@@ -255,7 +247,7 @@ export async function saveEmployeeMetadata(
   // 1. Write immediately to server-side in-memory & file store
   writeEmployeeMetadata(idOrEmpId, meta)
 
-  // 2. Also persist to Supabase attendance_audit_logs store
+  // 2. Also persist to MySQL attendance_audit_logs store
   try {
     const currentMap = await getEmployeeMetadataMap()
     const existing = currentMap[idOrEmpId] || {}
@@ -274,14 +266,12 @@ export async function saveEmployeeMetadata(
       ...(meta.leave_quotas !== undefined ? { leave_quotas: meta.leave_quotas } : {}),
     }
 
-    const supabase = await getSupabase()
-    const { error } = await supabase.from('attendance_audit_logs').insert({
-      action: 'EMPLOYEE_METADATA_STORE',
-      details: currentMap as any,
+    await prisma.attendanceAuditLog.create({
+      data: {
+        action: 'EMPLOYEE_METADATA_STORE',
+        details: currentMap as any,
+      },
     })
-    if (error) {
-      console.error('Failed to insert employee metadata to attendance_audit_logs:', error.message)
-    }
   } catch (err) {
     console.error('Error in saveEmployeeMetadata db write:', err)
   }
