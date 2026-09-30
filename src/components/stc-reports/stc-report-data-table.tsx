@@ -754,7 +754,7 @@ export default function StcReportDataTable({
                       {/* Actions */}
                       <td className="p-3.5 text-center" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
-                          <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="size-7 p-0 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer" />}>
+                          <DropdownMenuTrigger className="size-8 rounded-lg hover:bg-slate-200/70 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors focus:outline-none cursor-pointer border border-transparent hover:border-slate-200">
                             <MoreHorizontal className="size-4" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-44 text-xs font-medium rounded-xl p-1 shadow-lg">

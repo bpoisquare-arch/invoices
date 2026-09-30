@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { prisma } from '@/lib/prisma'
 import { createClient as createSupabaseClient } from '@/lib/supabase/server'
 import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { StcReportImport, StcReportRecord } from '@/lib/supabase/database.types'
@@ -348,16 +349,35 @@ export async function previewStcReportImport(
   const parseResult = parseStcReportExcel(buffer, fileName)
   const supabase = await getSupabase()
 
-  let existingRecords: StcReportRecord[] = []
+  let existingRecords: { id: string; student_name: string; student_id?: string | null; course?: string | null }[] = []
   try {
-    const { data } = await supabase.from('stc_report_records').select('id, student_name, student_id, course')
-    if (data) existingRecords = data as StcReportRecord[]
+    const dbRecs = await prisma.stcReportRecord.findMany({
+      select: { id: true, studentName: true, studentId: true, course: true },
+    })
+    if (dbRecs && dbRecs.length > 0) {
+      existingRecords = dbRecs.map((r) => ({
+        id: r.id,
+        student_name: r.studentName,
+        student_id: r.studentId,
+        course: r.course,
+      }))
+    }
   } catch {
     // fallback
   }
 
-  const existingById = new Map<string, StcReportRecord>()
-  const existingByName = new Map<string, StcReportRecord>()
+  if (existingRecords.length === 0) {
+    try {
+      const { data } = await supabase.from('stc_report_records').select('id, student_name, student_id, course')
+      if (data) existingRecords = data as any[]
+    } catch {
+      // fallback
+    }
+  }
+
+  type ExistingPreviewRecord = { id: string; student_name: string; student_id?: string | null; course?: string | null }
+  const existingById = new Map<string, ExistingPreviewRecord>()
+  const existingByName = new Map<string, ExistingPreviewRecord>()
 
   existingRecords.forEach((r) => {
     if (r.student_id && r.student_id.trim()) {
@@ -411,7 +431,73 @@ export async function previewStcReportImport(
   }
 }
 
-// 3. Save STC imported Excel data to Supabase Live Database
+// ─── Helper: map Prisma StcReportRecord row → StcReportRecord (snake_case) ────
+function prismaStcRecordToSnake(r: any): StcReportRecord {
+  const extraData = r.extraData
+    ? (typeof r.extraData === 'string' ? JSON.parse(r.extraData) : r.extraData)
+    : {}
+
+  const rawFollowUp = r.followUp !== null && r.followUp !== undefined
+    ? r.followUp
+    : extraData?.follow_up
+  const safeFollowUp =
+    rawFollowUp && String(rawFollowUp).trim() !== 'null' && String(rawFollowUp).trim() !== 'undefined'
+      ? String(rawFollowUp).trim()
+      : null
+
+  const totalPaidVal = r.totalPaid !== null && r.totalPaid !== undefined
+    ? Number(r.totalPaid)
+    : (extraData?.total_paid !== undefined ? Number(extraData.total_paid) : 0)
+
+  const paidAmountVal = Number(r.paidAmount ?? 0)
+  const totalFeeVal = Number(r.totalFee ?? 0)
+
+  let pendingAmountVal = Number(r.pendingAmount ?? 0)
+  if (pendingAmountVal === 0 && totalFeeVal > paidAmountVal) {
+    pendingAmountVal = Math.max(0, totalFeeVal - paidAmountVal)
+  }
+
+  let pendingInvoiceVal = r.pendingInvoice ?? null
+  if (!pendingInvoiceVal && pendingAmountVal > 0) {
+    pendingInvoiceVal = '1'
+  }
+
+  return {
+    id: r.id,
+    import_id: r.importId,
+    sr_no: r.srNo ?? null,
+    student_name: r.studentName,
+    student_id: r.studentId ?? null,
+    agent: r.agent ?? null,
+    scholarship: r.scholarship ?? null,
+    pending_invoice: pendingInvoiceVal,
+    pending_amount: pendingAmountVal,
+    yet_to_raised: r.yetToRaised ?? null,
+    remarks: r.remarks ?? null,
+    follow_up: safeFollowUp,
+    dob: r.dob ?? null,
+    document: r.document ?? null,
+    status: r.status ?? null,
+    intake: r.intake ?? null,
+    end_date: r.endDate ?? null,
+    course: r.course ?? null,
+    admin_fee: Number(r.adminFee ?? 0),
+    resource_fee: Number(r.resourceFee ?? 0),
+    tuition_fee: Number(r.tuitionFee ?? 0),
+    total_fee: totalFeeVal,
+    paid_amount: paidAmountVal,
+    total_paid: totalPaidVal,
+    initial_payment: paidAmountVal,
+    coe_issued_date: r.coeIssuedDate ?? null,
+    email_id: r.emailId ?? null,
+    phone_no: r.phoneNo ?? null,
+    payment_status: r.paymentStatus ?? null,
+    extra_data: extraData,
+    created_at: r.createdAt ? (r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt) : new Date().toISOString(),
+  } as StcReportRecord
+}
+
+// 3. Save STC imported Excel data to MySQL (Prisma) and Supabase
 export async function saveStcReportImportToDatabase(params: {
   fileName: string
   fileSize: number
@@ -427,19 +513,30 @@ export async function saveStcReportImportToDatabase(params: {
   skippedCount: number
   newCount: number
 }> {
-  const supabase = await getSupabase()
   const duplicateStrategy = params.duplicateStrategy || 'override'
   const nowStr = new Date().toISOString()
   const importBatchId = generateId()
 
   let existingRecords: StcReportRecord[] = []
   try {
-    const { data: dbRecords } = await supabase.from('stc_report_records').select('*')
-    if (dbRecords) {
-      existingRecords = dbRecords as StcReportRecord[]
+    const dbRecords = await prisma.stcReportRecord.findMany()
+    if (dbRecords && dbRecords.length > 0) {
+      existingRecords = dbRecords.map(prismaStcRecordToSnake)
     }
   } catch (err) {
-    console.warn('Could not fetch existing STC records from Supabase:', err)
+    console.warn('Could not fetch existing STC records from MySQL:', err)
+  }
+
+  if (existingRecords.length === 0) {
+    try {
+      const supabase = await getSupabase()
+      const { data: dbRecords } = await supabase.from('stc_report_records').select('*')
+      if (dbRecords) {
+        existingRecords = dbRecords as StcReportRecord[]
+      }
+    } catch (err) {
+      console.warn('Could not fetch existing STC records from Supabase:', err)
+    }
   }
 
   const existingById = new Map<string, StcReportRecord>()
@@ -457,20 +554,27 @@ export async function saveStcReportImportToDatabase(params: {
   // Handle replace strategy
   if (duplicateStrategy === 'replace') {
     try {
-      await supabase.from('stc_report_records').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      existingRecords = []
-      existingById.clear()
-      existingByName.clear()
+      await prisma.stcReportRecord.deleteMany({})
     } catch (err) {
-      console.error('Error clearing existing STC records for replace strategy:', err)
+      console.warn('Error clearing MySQL STC records for replace strategy:', err)
     }
+    try {
+      const supabase = await getSupabase()
+      await supabase.from('stc_report_records').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    } catch (err) {
+      console.error('Error clearing Supabase STC records for replace strategy:', err)
+    }
+    existingRecords = []
+    existingById.clear()
+    existingByName.clear()
   }
 
   let overriddenCount = 0
   let skippedCount = 0
   let newCount = 0
 
-  const recordsToInsert: any[] = []
+  const recordsToInsertPrisma: any[] = []
+  const recordsToInsertSupabase: any[] = []
 
   const importPayload = {
     id: importBatchId,
@@ -488,12 +592,31 @@ export async function saveStcReportImportToDatabase(params: {
     updated_at: nowStr,
   }
 
-  let finalImportBatchId = importBatchId
+  // 1. Create import batch in MySQL (Prisma)
   try {
-    const { data, error } = await supabase.from('stc_report_imports').insert(importPayload).select().single()
-    if (!error && data) {
-      finalImportBatchId = data.id
-    }
+    await prisma.stcReportImport.create({
+      data: {
+        id: importBatchId,
+        fileName: params.fileName,
+        fileSize: BigInt(params.fileSize || 0),
+        uploadedAt: new Date(),
+        uploadedBy: params.uploadedBy || 'admin@isquarebpo.com',
+        totalRecords: 0,
+        totalPendingAmount: 0,
+        totalYetToRaised: 0,
+        entity: 'stc',
+        originalFileData: params.originalBase64 || null,
+        rawHeaders: (params.rawHeaders || []) as any,
+      },
+    })
+  } catch (mysqlErr) {
+    console.warn('Error creating STC import batch in MySQL:', mysqlErr)
+  }
+
+  // Mirror to Supabase non-fatally
+  try {
+    const supabase = await getSupabase()
+    await supabase.from('stc_report_imports').insert(importPayload)
   } catch (err) {
     console.warn('Error creating STC import batch in Supabase:', err)
   }
@@ -515,31 +638,31 @@ export async function saveStcReportImportToDatabase(params: {
         skippedCount++
         continue
       } else if (duplicateStrategy === 'override') {
-        const updatedPayload: any = {
-          student_name: incoming.student_name,
-          student_id: incoming.student_id || existing.student_id,
+        const updatedPayloadPrisma: any = {
+          studentName: incoming.student_name,
+          studentId: incoming.student_id || existing.student_id,
           agent: incoming.agent || existing.agent,
           scholarship: incoming.scholarship || existing.scholarship,
-          pending_invoice: incoming.pending_invoice,
-          pending_amount: incoming.pending_amount,
-          yet_to_raised: incoming.yet_to_raised,
+          pendingInvoice: incoming.pending_invoice,
+          pendingAmount: incoming.pending_amount,
+          yetToRaised: incoming.yet_to_raised,
           remarks: incoming.remarks || existing.remarks,
           dob: incoming.dob || existing.dob,
           document: normalizeDocumentType(incoming.document || existing.document) || null,
           status: incoming.status || existing.status,
           intake: incoming.intake || existing.intake,
-          end_date: incoming.end_date || existing.end_date,
+          endDate: incoming.end_date || existing.end_date,
           course: incoming.course || existing.course,
-          admin_fee: incoming.admin_fee,
-          resource_fee: incoming.resource_fee,
-          tuition_fee: incoming.tuition_fee,
-          total_fee: incoming.total_fee,
-          paid_amount: incoming.paid_amount,
-          coe_issued_date: incoming.coe_issued_date || existing.coe_issued_date,
-          email_id: incoming.email_id || existing.email_id,
-          phone_no: incoming.phone_no || existing.phone_no,
-          payment_status: incoming.payment_status || existing.payment_status,
-          extra_data: {
+          adminFee: incoming.admin_fee,
+          resourceFee: incoming.resource_fee,
+          tuitionFee: incoming.tuition_fee,
+          totalFee: incoming.total_fee,
+          paidAmount: incoming.paid_amount,
+          coeIssuedDate: incoming.coe_issued_date || existing.coe_issued_date,
+          emailId: incoming.email_id || existing.email_id,
+          phoneNo: incoming.phone_no || existing.phone_no,
+          paymentStatus: incoming.payment_status || existing.payment_status,
+          extraData: {
             ...((existing.extra_data as Record<string, any>) || {}),
             ...(incoming.extra_data || {}),
             total_paid: incoming.total_paid || incoming.paid_amount,
@@ -548,12 +671,46 @@ export async function saveStcReportImportToDatabase(params: {
         }
 
         try {
-          const { error: updErr } = await supabase.from('stc_report_records').update(updatedPayload).eq('id', existing.id)
-          if (!updErr) {
-            overriddenCount++
-          }
+          await prisma.stcReportRecord.update({
+            where: { id: existing.id },
+            data: updatedPayloadPrisma,
+          })
+          overriddenCount++
         } catch (err) {
-          console.error(`Error overriding student ${incoming.student_name}:`, err)
+          console.error(`Error overriding student ${incoming.student_name} in MySQL:`, err)
+        }
+
+        try {
+          const supabase = await getSupabase()
+          const updatedPayloadSupabase: any = {
+            student_name: incoming.student_name,
+            student_id: incoming.student_id || existing.student_id,
+            agent: incoming.agent || existing.agent,
+            scholarship: incoming.scholarship || existing.scholarship,
+            pending_invoice: incoming.pending_invoice,
+            pending_amount: incoming.pending_amount,
+            yet_to_raised: incoming.yet_to_raised,
+            remarks: incoming.remarks || existing.remarks,
+            dob: incoming.dob || existing.dob,
+            document: normalizeDocumentType(incoming.document || existing.document) || null,
+            status: incoming.status || existing.status,
+            intake: incoming.intake || existing.intake,
+            end_date: incoming.end_date || existing.end_date,
+            course: incoming.course || existing.course,
+            admin_fee: incoming.admin_fee,
+            resource_fee: incoming.resource_fee,
+            tuition_fee: incoming.tuition_fee,
+            total_fee: incoming.total_fee,
+            paid_amount: incoming.paid_amount,
+            coe_issued_date: incoming.coe_issued_date || existing.coe_issued_date,
+            email_id: incoming.email_id || existing.email_id,
+            phone_no: incoming.phone_no || existing.phone_no,
+            payment_status: incoming.payment_status || existing.payment_status,
+            extra_data: updatedPayloadPrisma.extraData,
+          }
+          await supabase.from('stc_report_records').update(updatedPayloadSupabase).eq('id', existing.id)
+        } catch {
+          // ignore
         }
         continue
       }
@@ -564,10 +721,47 @@ export async function saveStcReportImportToDatabase(params: {
     if (newSrNo <= 0 || newSrNo > 100000) {
       newSrNo = nextSrNo++
     }
+    const newRecordId = generateId()
+    const extraDataObj = {
+      ...(incoming.extra_data || {}),
+      total_paid: incoming.total_paid || incoming.paid_amount,
+      initial_payment: incoming.paid_amount,
+    }
 
-    recordsToInsert.push({
-      id: generateId(),
-      import_id: finalImportBatchId,
+    recordsToInsertPrisma.push({
+      id: newRecordId,
+      importId: importBatchId,
+      srNo: newSrNo,
+      studentName: incoming.student_name,
+      studentId: incoming.student_id,
+      agent: incoming.agent,
+      scholarship: incoming.scholarship,
+      pendingInvoice: incoming.pending_invoice,
+      pendingAmount: incoming.pending_amount,
+      yetToRaised: incoming.yet_to_raised,
+      remarks: incoming.remarks,
+      dob: incoming.dob,
+      document: incoming.document,
+      status: incoming.status || 'Current',
+      intake: incoming.intake,
+      endDate: incoming.end_date,
+      course: incoming.course,
+      adminFee: incoming.admin_fee,
+      resourceFee: incoming.resource_fee,
+      tuitionFee: incoming.tuition_fee,
+      totalFee: incoming.total_fee,
+      paidAmount: incoming.paid_amount,
+      coeIssuedDate: incoming.coe_issued_date,
+      emailId: incoming.email_id,
+      phoneNo: incoming.phone_no,
+      paymentStatus: incoming.payment_status,
+      extraData: extraDataObj,
+      createdAt: new Date(),
+    })
+
+    recordsToInsertSupabase.push({
+      id: newRecordId,
+      import_id: importBatchId,
       sr_no: newSrNo,
       student_name: incoming.student_name,
       student_id: incoming.student_id,
@@ -592,21 +786,31 @@ export async function saveStcReportImportToDatabase(params: {
       email_id: incoming.email_id,
       phone_no: incoming.phone_no,
       payment_status: incoming.payment_status,
-      extra_data: {
-        ...(incoming.extra_data || {}),
-        total_paid: incoming.total_paid || incoming.paid_amount,
-        initial_payment: incoming.paid_amount,
-      },
+      extra_data: extraDataObj,
       created_at: nowStr,
     })
   }
 
-  // Batch insert new records in chunks of 100
-  if (recordsToInsert.length > 0) {
+  // Insert into MySQL (Prisma)
+  if (recordsToInsertPrisma.length > 0) {
     const CHUNK_SIZE = 100
-    for (let i = 0; i < recordsToInsert.length; i += CHUNK_SIZE) {
-      const chunk = recordsToInsert.slice(i, i + CHUNK_SIZE)
+    for (let i = 0; i < recordsToInsertPrisma.length; i += CHUNK_SIZE) {
+      const chunk = recordsToInsertPrisma.slice(i, i + CHUNK_SIZE)
       try {
+        await prisma.stcReportRecord.createMany({ data: chunk })
+      } catch (err) {
+        console.error('Error inserting STC records chunk into MySQL:', err)
+      }
+    }
+  }
+
+  // Insert into Supabase
+  if (recordsToInsertSupabase.length > 0) {
+    const CHUNK_SIZE = 100
+    for (let i = 0; i < recordsToInsertSupabase.length; i += CHUNK_SIZE) {
+      const chunk = recordsToInsertSupabase.slice(i, i + CHUNK_SIZE)
+      try {
+        const supabase = await getSupabase()
         await supabase.from('stc_report_records').insert(chunk)
       } catch (err) {
         console.error('Error inserting STC record chunk into Supabase:', err)
@@ -614,30 +818,46 @@ export async function saveStcReportImportToDatabase(params: {
     }
   }
 
-  // Update batch totals
+  // Update MySQL batch totals
   try {
-    const { data: allFinalRows } = await supabase.from('stc_report_records').select('pending_amount, yet_to_raised')
+    const allFinalRows = await prisma.stcReportRecord.findMany({
+      where: { importId: importBatchId },
+      select: { pendingAmount: true, totalFee: true, paidAmount: true, yetToRaised: true },
+    })
     if (allFinalRows) {
-      const finalTotalPending = allFinalRows.reduce((sum, r) => sum + (Number(r.pending_amount) || 0), 0)
-      const finalTotalYet = allFinalRows.reduce((sum, r) => sum + cleanNumber(r.yet_to_raised), 0)
+      let finalTotalPending = 0
+      let finalTotalYet = 0
+      for (const r of allFinalRows) {
+        let pAmt = Number(r.pendingAmount || 0)
+        const fee = Number(r.totalFee || 0)
+        const paid = Number(r.paidAmount || 0)
+        if (pAmt === 0 && fee > paid) {
+          pAmt = Math.max(0, fee - paid)
+        }
+        finalTotalPending += pAmt
+        finalTotalYet += cleanNumber(r.yetToRaised)
+      }
 
-      await supabase.from('stc_report_imports').update({
-        total_records: allFinalRows.length,
-        total_pending_amount: Number(finalTotalPending.toFixed(2)),
-        total_yet_to_raised: Number(finalTotalYet.toFixed(2)),
-        updated_at: nowStr,
-      }).eq('id', finalImportBatchId)
+      await prisma.stcReportImport.update({
+        where: { id: importBatchId },
+        data: {
+          totalRecords: allFinalRows.length,
+          totalPendingAmount: Number(finalTotalPending.toFixed(2)),
+          totalYetToRaised: Number(finalTotalYet.toFixed(2)),
+          updatedAt: new Date(),
+        },
+      })
     }
   } catch (err) {
-    console.warn('Could not update STC import batch totals:', err)
+    console.warn('Could not update STC import batch totals in MySQL:', err)
   }
 
   return {
     importBatch: {
       ...importPayload,
-      id: finalImportBatchId,
+      id: importBatchId,
     } as StcReportImport,
-    recordCount: recordsToInsert.length + overriddenCount,
+    recordCount: recordsToInsertPrisma.length + overriddenCount,
     overriddenCount,
     skippedCount,
     newCount,
@@ -646,6 +866,48 @@ export async function saveStcReportImportToDatabase(params: {
 
 // 4. Fetch all STC import history batches
 export async function getStcReportImports(): Promise<StcReportImport[]> {
+  // 1. Primary: Hostinger MySQL via Prisma
+  try {
+    const dbImports = await prisma.stcReportImport.findMany({
+      orderBy: { uploadedAt: 'desc' },
+      select: {
+        id: true,
+        fileName: true,
+        fileSize: true,
+        uploadedAt: true,
+        uploadedBy: true,
+        totalRecords: true,
+        totalPendingAmount: true,
+        totalYetToRaised: true,
+        entity: true,
+        rawHeaders: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+
+    if (dbImports && dbImports.length > 0) {
+      return dbImports.map((imp) => ({
+        id: imp.id,
+        file_name: imp.fileName,
+        file_size: Number(imp.fileSize ?? 0),
+        uploaded_at: imp.uploadedAt.toISOString(),
+        uploaded_by: imp.uploadedBy,
+        total_records: imp.totalRecords,
+        total_pending_amount: Number(imp.totalPendingAmount ?? 0),
+        total_yet_to_raised: Number(imp.totalYetToRaised ?? 0),
+        entity: imp.entity ?? 'stc',
+        original_file_data: null,
+        raw_headers: (imp.rawHeaders as any) ?? [],
+        created_at: imp.createdAt?.toISOString() ?? imp.uploadedAt.toISOString(),
+        updated_at: imp.updatedAt?.toISOString() ?? imp.uploadedAt.toISOString(),
+      })) as unknown as StcReportImport[]
+    }
+  } catch (err) {
+    console.warn('MySQL getStcReportImports failed, falling back to Supabase:', err)
+  }
+
+  // 2. Fallback: Supabase
   const supabase = await getSupabase()
   try {
     const { data, error } = await supabase
@@ -662,8 +924,33 @@ export async function getStcReportImports(): Promise<StcReportImport[]> {
   return []
 }
 
-// 5. Fetch a single import batch by ID (including original base64 file data)
+// 5. Fetch a single import batch by ID
 export async function getStcReportImportById(id: string, includeFileData: boolean = false): Promise<StcReportImport | null> {
+  // 1. Primary: MySQL via Prisma
+  try {
+    const imp = await prisma.stcReportImport.findUnique({ where: { id } })
+    if (imp) {
+      return {
+        id: imp.id,
+        file_name: imp.fileName,
+        file_size: Number(imp.fileSize ?? 0),
+        uploaded_at: imp.uploadedAt.toISOString(),
+        uploaded_by: imp.uploadedBy,
+        total_records: imp.totalRecords,
+        total_pending_amount: Number(imp.totalPendingAmount ?? 0),
+        total_yet_to_raised: Number(imp.totalYetToRaised ?? 0),
+        entity: imp.entity ?? 'stc',
+        original_file_data: includeFileData ? (imp.originalFileData ?? null) : null,
+        raw_headers: (imp.rawHeaders as any) ?? [],
+        created_at: imp.createdAt?.toISOString() ?? imp.uploadedAt.toISOString(),
+        updated_at: imp.updatedAt?.toISOString() ?? imp.uploadedAt.toISOString(),
+      } as unknown as StcReportImport
+    }
+  } catch (err) {
+    console.warn('MySQL getStcReportImportById failed, falling back to Supabase:', err)
+  }
+
+  // 2. Fallback: Supabase
   const supabase = await getSupabase()
   try {
     const query = includeFileData
@@ -700,6 +987,94 @@ export async function getStcReportRecords(params: {
   availableIntakes: string[]
   availableCourses: string[]
 }> {
+  // 1. Primary: Hostinger MySQL via Prisma
+  try {
+    const page = params.page || 1
+    const pageSize = params.pageSize || 50
+    const sortBy = params.sortBy || 'sr_no'
+    const sortOrder = params.sortOrder || 'asc'
+
+    const where: any = {}
+    if (params.importId) where.importId = params.importId
+    if (params.agent && params.agent !== 'all') where.agent = params.agent
+    if (params.intake && params.intake !== 'all') where.intake = params.intake
+    if (params.course && params.course !== 'all') where.course = params.course
+    if (params.search && params.search.trim()) {
+      const q = params.search.trim()
+      where.OR = [
+        { studentName: { contains: q } },
+        { agent: { contains: q } },
+        { course: { contains: q } },
+        { studentId: { contains: q } },
+        { intake: { contains: q } },
+      ]
+    }
+
+    const sortFieldMap: Record<string, string> = {
+      sr_no: 'srNo',
+      student_name: 'studentName',
+      agent: 'agent',
+      pending_amount: 'pendingAmount',
+      intake: 'intake',
+      course: 'course',
+      created_at: 'createdAt',
+    }
+    const prismaSort = sortFieldMap[sortBy] || 'srNo'
+
+    const totalCount = await prisma.stcReportRecord.count({ where })
+    const rows = await prisma.stcReportRecord.findMany({
+      where,
+      orderBy: { [prismaSort]: sortOrder },
+      ...(pageSize === -1 ? {} : { skip: (page - 1) * pageSize, take: pageSize }),
+    })
+
+    const allForTotals = await prisma.stcReportRecord.findMany({
+      where: params.importId ? { importId: params.importId } : {},
+      select: {
+        pendingAmount: true,
+        totalFee: true,
+        paidAmount: true,
+        yetToRaised: true,
+        agent: true,
+        intake: true,
+        course: true,
+      },
+    })
+
+    let totalPending = 0
+    let totalYetRaised = 0
+    const agentSet = new Set<string>()
+    const intakeSet = new Set<string>()
+    const courseSet = new Set<string>()
+
+    for (const r of allForTotals) {
+      let pAmt = Number(r.pendingAmount ?? 0)
+      const fee = Number(r.totalFee ?? 0)
+      const paid = Number(r.paidAmount ?? 0)
+      if (pAmt === 0 && fee > paid) {
+        pAmt = Math.max(0, fee - paid)
+      }
+      totalPending += pAmt
+      totalYetRaised += cleanNumber(r.yetToRaised)
+      if (r.agent) agentSet.add(r.agent)
+      if (r.intake) intakeSet.add(r.intake)
+      if (r.course) courseSet.add(r.course)
+    }
+
+    return {
+      records: rows.map(prismaStcRecordToSnake),
+      totalCount,
+      totalPendingAmount: Number(totalPending.toFixed(2)),
+      totalYetToRaised: Number(totalYetRaised.toFixed(2)),
+      availableAgents: Array.from(agentSet).sort(),
+      availableIntakes: Array.from(intakeSet).sort(),
+      availableCourses: Array.from(courseSet).sort(),
+    }
+  } catch (err) {
+    console.warn('MySQL getStcReportRecords failed, falling back to Supabase:', err)
+  }
+
+  // 2. Fallback: Supabase
   const supabase = await getSupabase()
   const page = params.page || 1
   const pageSize = params.pageSize || 50
@@ -742,7 +1117,6 @@ export async function getStcReportRecords(params: {
     const data = res.data || []
     const count = res.count ?? data.length
 
-    // Calculate totals across whole dataset
     let totalsQuery = supabase.from('stc_report_records').select('pending_amount, yet_to_raised, agent, intake, course')
     if (params.importId) {
       totalsQuery = totalsQuery.eq('import_id', params.importId)
@@ -791,7 +1165,7 @@ export async function getStcReportRecords(params: {
       availableCourses: Array.from(courseSet).sort(),
     }
   } catch (err) {
-    console.error('Error in getStcReportRecords:', err)
+    console.error('Error in getStcReportRecords fallback:', err)
     return {
       records: [],
       totalCount: 0,
@@ -806,21 +1180,59 @@ export async function getStcReportRecords(params: {
 
 // 7. Delete an STC import batch and cascade delete its records
 export async function deleteStcReportImport(id: string): Promise<void> {
-  const supabase = await getSupabase()
+  // 1. PRIMARY: MySQL delete (Prisma cascade delete)
   try {
+    await prisma.stcReportImport.delete({ where: { id } })
+  } catch (mysqlErr: any) {
+    if (mysqlErr?.code !== 'P2025') {
+      console.error('MySQL deleteStcReportImport FAILED:', mysqlErr)
+      throw mysqlErr
+    }
+  }
+
+  // 2. NON-FATAL: Supabase delete
+  try {
+    const supabase = await getSupabase()
     await supabase.from('stc_report_imports').delete().eq('id', id)
   } catch (err) {
-    console.error('Error deleting STC import batch:', err)
-    throw err
+    console.error('Supabase error deleting STC import batch:', err)
   }
 }
 
 // 8. Get or create a manual entries import batch for STC
 export async function getOrCreateStcManualImportBatch(): Promise<StcReportImport> {
-  const supabase = await getSupabase()
   const nowStr = new Date().toISOString()
 
+  // 1. Primary: MySQL via Prisma
   try {
+    const mysqlBatch = await prisma.stcReportImport.findFirst({
+      where: { entity: 'stc' },
+      orderBy: { uploadedAt: 'desc' },
+    })
+    if (mysqlBatch) {
+      return {
+        id: mysqlBatch.id,
+        file_name: mysqlBatch.fileName,
+        file_size: Number(mysqlBatch.fileSize ?? 0),
+        uploaded_at: mysqlBatch.uploadedAt.toISOString(),
+        uploaded_by: mysqlBatch.uploadedBy,
+        total_records: mysqlBatch.totalRecords,
+        total_pending_amount: Number(mysqlBatch.totalPendingAmount ?? 0),
+        total_yet_to_raised: Number(mysqlBatch.totalYetToRaised ?? 0),
+        entity: mysqlBatch.entity ?? 'stc',
+        original_file_data: null,
+        raw_headers: (mysqlBatch.rawHeaders as any) ?? [],
+        created_at: mysqlBatch.createdAt?.toISOString() ?? nowStr,
+        updated_at: mysqlBatch.updatedAt?.toISOString() ?? nowStr,
+      } as unknown as StcReportImport
+    }
+  } catch (err) {
+    console.warn('MySQL getOrCreateStcManualImportBatch query failed:', err)
+  }
+
+  // 2. Fallback: Supabase
+  try {
+    const supabase = await getSupabase()
     const { data } = await supabase
       .from('stc_report_imports')
       .select('*')
@@ -831,7 +1243,7 @@ export async function getOrCreateStcManualImportBatch(): Promise<StcReportImport
       return data[0] as StcReportImport
     }
   } catch (err) {
-    console.warn('STC getOrCreateManualImportBatch query error:', err)
+    console.warn('STC getOrCreateManualImportBatch Supabase query error:', err)
   }
 
   const manualBatchId = generateId()
@@ -858,12 +1270,29 @@ export async function getOrCreateStcManualImportBatch(): Promise<StcReportImport
   }
 
   try {
-    const { data, error } = await supabase.from('stc_report_imports').insert(newBatchPayload).select().single()
-    if (!error && data) {
-      return data as StcReportImport
-    }
+    await prisma.stcReportImport.create({
+      data: {
+        id: manualBatchId,
+        fileName: 'Manual STC Student Records',
+        fileSize: 0,
+        uploadedAt: new Date(),
+        uploadedBy: 'admin@isquarebpo.com',
+        totalRecords: 0,
+        totalPendingAmount: 0,
+        totalYetToRaised: 0,
+        entity: 'stc',
+        rawHeaders: newBatchPayload.raw_headers,
+      },
+    })
+  } catch (mysqlErr) {
+    console.warn('MySQL createManualImportBatch failed (non-fatal):', mysqlErr)
+  }
+
+  try {
+    const supabase = await getSupabase()
+    await supabase.from('stc_report_imports').insert(newBatchPayload)
   } catch (err) {
-    console.warn('Failed to insert default STC batch:', err)
+    console.warn('Failed to insert default STC batch to Supabase (non-fatal):', err)
   }
 
   return {
@@ -904,7 +1333,6 @@ export async function createStcReportRecord(params: {
   payment_status?: string | null
   extra_data?: Record<string, any>
 }): Promise<StcReportRecord> {
-  const supabase = await getSupabase()
   let targetImportId = params.importId
 
   if (!targetImportId) {
@@ -931,15 +1359,12 @@ export async function createStcReportRecord(params: {
 
   let nextSrNo = 1
   try {
-    const { data: maxRecord } = await supabase
-      .from('stc_report_records')
-      .select('sr_no')
-      .order('sr_no', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (maxRecord && typeof maxRecord.sr_no === 'number') {
-      nextSrNo = maxRecord.sr_no + 1
+    const maxRecord = await prisma.stcReportRecord.findFirst({
+      orderBy: { srNo: 'desc' },
+      select: { srNo: true },
+    })
+    if (maxRecord && typeof maxRecord.srNo === 'number') {
+      nextSrNo = maxRecord.srNo + 1
     }
   } catch {
     // fallback
@@ -952,46 +1377,76 @@ export async function createStcReportRecord(params: {
     follow_up: followUpVal,
   }
 
-  const recordPayload = {
-    id: newId,
-    import_id: targetImportId!,
-    sr_no: nextSrNo,
-    student_name: cleanString(params.student_name) || 'Unnamed Student',
-    student_id: cleanString(params.student_id) || null,
-    agent: cleanString(params.agent) || null,
-    scholarship: cleanString(params.scholarship) || null,
-    pending_invoice: cleanString(params.pending_invoice) || null,
-    pending_amount: pendingAmountNum,
-    yet_to_raised: yetToRaisedVal || null,
-    remarks: cleanString(params.remarks) || null,
-    follow_up: followUpVal,
-    dob: cleanString(params.dob) || null,
-    document: normalizeDocumentType(params.document) || null,
-    status: cleanString(params.status) || 'Current',
-    intake: cleanString(params.intake) || null,
-    end_date: cleanString(params.end_date) || null,
-    course: cleanString(params.course) || null,
-    admin_fee: adminFeeNum,
-    resource_fee: resourceFeeNum,
-    tuition_fee: tuitionFeeNum,
-    total_fee: totalFeeNum,
-    paid_amount: paidAmountNum,
-    total_paid: totalPaidNum,
-    coe_issued_date: cleanString(params.coe_issued_date) || null,
-    email_id: cleanString(params.email_id) || null,
-    phone_no: cleanString(params.phone_no) || null,
-    payment_status: cleanString(params.payment_status) || 'Pending',
-    extra_data: extraData,
-    created_at: nowStr,
+  let savedRecord: StcReportRecord
+
+  // 1. PRIMARY: Insert into MySQL (Prisma)
+  try {
+    const importExists = await prisma.stcReportImport.findUnique({ where: { id: targetImportId! } })
+    if (!importExists) {
+      await prisma.stcReportImport.create({
+        data: {
+          id: targetImportId!,
+          fileName: 'Manual STC Student Records',
+          fileSize: 0,
+          uploadedAt: new Date(),
+          uploadedBy: 'admin@isquarebpo.com',
+          totalRecords: 0,
+          totalPendingAmount: 0,
+          totalYetToRaised: 0,
+          entity: 'stc',
+        },
+      })
+    }
+
+    const mysqlRow = await prisma.stcReportRecord.create({
+      data: {
+        id: newId,
+        importId: targetImportId!,
+        srNo: nextSrNo,
+        studentName: cleanString(params.student_name) || 'Unnamed Student',
+        studentId: cleanString(params.student_id) || null,
+        agent: cleanString(params.agent) || null,
+        scholarship: cleanString(params.scholarship) || null,
+        pendingInvoice: cleanString(params.pending_invoice) || null,
+        pendingAmount: pendingAmountNum,
+        yetToRaised: yetToRaisedVal || null,
+        remarks: cleanString(params.remarks) || null,
+        followUp: followUpVal,
+        dob: cleanString(params.dob) || null,
+        document: normalizeDocumentType(params.document) || null,
+        status: cleanString(params.status) || 'Current',
+        intake: cleanString(params.intake) || null,
+        endDate: cleanString(params.end_date) || null,
+        course: cleanString(params.course) || null,
+        adminFee: adminFeeNum,
+        resourceFee: resourceFeeNum,
+        tuitionFee: tuitionFeeNum,
+        totalFee: totalFeeNum,
+        paidAmount: paidAmountNum,
+        totalPaid: totalPaidNum,
+        coeIssuedDate: cleanString(params.coe_issued_date) || null,
+        emailId: cleanString(params.email_id) || null,
+        phoneNo: cleanString(params.phone_no) || null,
+        paymentStatus: cleanString(params.payment_status) || 'Pending',
+        extraData: extraData as any,
+      },
+    })
+    savedRecord = prismaStcRecordToSnake(mysqlRow)
+  } catch (mysqlErr: any) {
+    console.error('MySQL createStcReportRecord FAILED:', mysqlErr)
+    throw mysqlErr
   }
 
-  const { data, error } = await supabase.from('stc_report_records').insert(recordPayload).select().single()
-  if (error) {
-    console.error('Supabase STC record insert error:', error)
-    throw new Error(`Database insert error: ${error.message}`)
+  // 2. NON-FATAL: Mirror to Supabase
+  try {
+    const supabase = await getSupabase()
+    const { initial_payment, total_paid, follow_up, ...dbPayload } = savedRecord as any
+    await supabase.from('stc_report_records').insert({ ...dbPayload, id: newId })
+  } catch (err) {
+    console.warn('Supabase mirror createStcReportRecord failed (non-fatal):', err)
   }
 
-  return data as StcReportRecord
+  return savedRecord
 }
 
 // 10. Update a single STC student record
@@ -999,8 +1454,6 @@ export async function updateStcReportRecord(
   id: string,
   updates: Partial<StcReportRecord>
 ): Promise<StcReportRecord | null> {
-  const supabase = await getSupabase()
-
   const cleanedUpdates: any = { ...updates }
   if (updates.pending_amount !== undefined) cleanedUpdates.pending_amount = cleanNumber(updates.pending_amount)
   if (updates.admin_fee !== undefined) cleanedUpdates.admin_fee = cleanNumber(updates.admin_fee)
@@ -1013,56 +1466,124 @@ export async function updateStcReportRecord(
   if (updates.yet_to_raised !== undefined) cleanedUpdates.yet_to_raised = cleanString(updates.yet_to_raised) || null
   if (updates.document !== undefined) cleanedUpdates.document = normalizeDocumentType(updates.document) || null
 
-  const { data: existingRec } = await supabase
-    .from('stc_report_records')
-    .select('extra_data, import_id')
-    .eq('id', id)
-    .maybeSingle()
+  let updatedRecord: StcReportRecord | null = null
 
-  const mergedExtraData = {
-    ...((existingRec?.extra_data as Record<string, any>) || {}),
-    ...((cleanedUpdates.extra_data as Record<string, any>) || {}),
-    ...(updates.total_paid !== undefined ? { total_paid: cleanNumber(updates.total_paid) } : {}),
-    ...(updates.paid_amount !== undefined ? { initial_payment: cleanNumber(updates.paid_amount) } : {}),
-    ...(updates.follow_up !== undefined ? { follow_up: cleanString(updates.follow_up) || null } : {}),
+  // 1. PRIMARY: MySQL (Prisma) update — Hostinger live database
+  try {
+    const mysqlUpdate: any = {}
+    if (updates.student_name !== undefined) mysqlUpdate.studentName = cleanString(updates.student_name) || undefined
+    if (updates.student_id !== undefined) mysqlUpdate.studentId = cleanString(updates.student_id) || null
+    if (updates.agent !== undefined) mysqlUpdate.agent = cleanString(updates.agent) || null
+    if (updates.scholarship !== undefined) mysqlUpdate.scholarship = cleanString(updates.scholarship) || null
+    if (updates.pending_invoice !== undefined) mysqlUpdate.pendingInvoice = cleanString(updates.pending_invoice) || null
+    if (updates.pending_amount !== undefined) mysqlUpdate.pendingAmount = cleanNumber(updates.pending_amount)
+    if (updates.yet_to_raised !== undefined) mysqlUpdate.yetToRaised = cleanString(updates.yet_to_raised) || null
+    if (updates.remarks !== undefined) mysqlUpdate.remarks = cleanString(updates.remarks) || null
+    if (updates.follow_up !== undefined) mysqlUpdate.followUp = cleanString(updates.follow_up) || null
+    if (updates.dob !== undefined) mysqlUpdate.dob = cleanString(updates.dob) || null
+    if (updates.document !== undefined) mysqlUpdate.document = normalizeDocumentType(updates.document) || null
+    if (updates.status !== undefined) mysqlUpdate.status = cleanString(updates.status) || null
+    if (updates.intake !== undefined) mysqlUpdate.intake = cleanString(updates.intake) || null
+    if (updates.end_date !== undefined) mysqlUpdate.endDate = cleanString(updates.end_date) || null
+    if (updates.course !== undefined) mysqlUpdate.course = cleanString(updates.course) || null
+    if (updates.admin_fee !== undefined) mysqlUpdate.adminFee = cleanNumber(updates.admin_fee)
+    if (updates.resource_fee !== undefined) mysqlUpdate.resourceFee = cleanNumber(updates.resource_fee)
+    if (updates.tuition_fee !== undefined) mysqlUpdate.tuitionFee = cleanNumber(updates.tuition_fee)
+    if (updates.total_fee !== undefined) mysqlUpdate.totalFee = cleanNumber(updates.total_fee)
+    if (updates.paid_amount !== undefined || (updates as any).initial_payment !== undefined) {
+      mysqlUpdate.paidAmount = cleanNumber(updates.paid_amount ?? (updates as any).initial_payment)
+    }
+    if (updates.total_paid !== undefined) mysqlUpdate.totalPaid = cleanNumber(updates.total_paid)
+    if (updates.coe_issued_date !== undefined) mysqlUpdate.coeIssuedDate = cleanString(updates.coe_issued_date) || null
+    if (updates.email_id !== undefined) mysqlUpdate.emailId = cleanString(updates.email_id) || null
+    if (updates.phone_no !== undefined) mysqlUpdate.phoneNo = cleanString(updates.phone_no) || null
+    if (updates.payment_status !== undefined) mysqlUpdate.paymentStatus = cleanString(updates.payment_status) || null
+    if (updates.extra_data !== undefined) mysqlUpdate.extraData = updates.extra_data as any
+
+    if (Object.keys(mysqlUpdate).length > 0) {
+      const mysqlRow = await prisma.stcReportRecord.update({ where: { id }, data: mysqlUpdate })
+      updatedRecord = prismaStcRecordToSnake(mysqlRow)
+    } else {
+      const mysqlRow = await prisma.stcReportRecord.findUnique({ where: { id } })
+      if (mysqlRow) updatedRecord = prismaStcRecordToSnake(mysqlRow)
+    }
+  } catch (mysqlErr: any) {
+    console.error('MySQL updateStcReportRecord FAILED:', mysqlErr)
+    throw mysqlErr
   }
 
-  cleanedUpdates.extra_data = mergedExtraData
+  // 2. NON-FATAL: Supabase mirror update
+  try {
+    const supabase = await getSupabase()
+    const { data: existingRec } = await supabase
+      .from('stc_report_records')
+      .select('extra_data, import_id')
+      .eq('id', id)
+      .maybeSingle()
 
-  const { data, error } = await supabase
-    .from('stc_report_records')
-    .update(cleanedUpdates)
-    .eq('id', id)
-    .select()
-    .single()
+    const mergedExtraData = {
+      ...((existingRec?.extra_data as Record<string, any>) || {}),
+      ...((cleanedUpdates.extra_data as Record<string, any>) || {}),
+      ...(updates.total_paid !== undefined ? { total_paid: cleanNumber(updates.total_paid) } : {}),
+      ...(updates.paid_amount !== undefined ? { initial_payment: cleanNumber(updates.paid_amount) } : {}),
+      ...(updates.follow_up !== undefined ? { follow_up: cleanString(updates.follow_up) || null } : {}),
+    }
 
-  if (error) {
-    console.error('Supabase STC update error:', error)
-    throw new Error(`Database update error: ${error.message}`)
+    const supabaseUpdates = { ...cleanedUpdates, extra_data: mergedExtraData }
+    delete supabaseUpdates.initial_payment
+    delete supabaseUpdates.total_paid
+    delete supabaseUpdates.follow_up
+
+    await supabase.from('stc_report_records').update(supabaseUpdates).eq('id', id)
+  } catch (err: any) {
+    console.warn('Supabase mirror STC update failed (non-fatal):', err)
   }
 
-  return data as StcReportRecord
+  return updatedRecord
 }
 
 // 11. Delete a single STC student record
 export async function deleteStcReportRecord(id: string): Promise<boolean> {
-  const supabase = await getSupabase()
-  const { error } = await supabase.from('stc_report_records').delete().eq('id', id)
-  if (error) {
-    console.error('Supabase delete error:', error)
-    throw new Error(`Database delete error: ${error.message}`)
+  // 1. PRIMARY: Delete from MySQL (Prisma)
+  try {
+    await prisma.stcReportRecord.delete({ where: { id } })
+  } catch (mysqlErr: any) {
+    if (mysqlErr?.code !== 'P2025') {
+      console.error('MySQL deleteStcReportRecord FAILED:', mysqlErr)
+      throw mysqlErr
+    }
   }
+
+  // 2. NON-FATAL: Delete from Supabase
+  try {
+    const supabase = await getSupabase()
+    await supabase.from('stc_report_records').delete().eq('id', id)
+  } catch (err) {
+    console.warn('Supabase mirror deleteStcReportRecord failed (non-fatal):', err)
+  }
+
   return true
 }
 
 // 12. Bulk delete STC student records
 export async function deleteStcReportRecords(ids: string[]): Promise<number> {
   if (!ids || ids.length === 0) return 0
-  const supabase = await getSupabase()
-  const { error } = await supabase.from('stc_report_records').delete().in('id', ids)
-  if (error) {
-    console.error('Supabase bulk delete error:', error)
-    throw new Error(`Database bulk delete error: ${error.message}`)
+
+  // 1. PRIMARY: Bulk delete from MySQL (Prisma)
+  try {
+    await prisma.stcReportRecord.deleteMany({ where: { id: { in: ids } } })
+  } catch (mysqlErr: any) {
+    console.error('MySQL deleteStcReportRecords FAILED:', mysqlErr)
+    throw mysqlErr
   }
+
+  // 2. NON-FATAL: Mirror bulk delete to Supabase
+  try {
+    const supabase = await getSupabase()
+    await supabase.from('stc_report_records').delete().in('id', ids)
+  } catch (err) {
+    console.warn('Supabase mirror deleteStcReportRecords failed (non-fatal):', err)
+  }
+
   return ids.length
 }
