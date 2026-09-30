@@ -89,19 +89,26 @@ export default function ReportRecordDetailModal({
                     ID: {record.student_id}
                   </span>
                 )}
-                {record.status && (
-                  <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
-                    record.status.toLowerCase() === 'current'
+                <span className="flex items-center gap-1">
+                  <span className="text-slate-300">Status:</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                    record.status === 'Invoice Raised'
+                      ? 'bg-emerald-500 text-white shadow-2xs'
+                      : record.status === 'Need Advise'
+                      ? 'bg-sky-500 text-white shadow-2xs'
+                      : record.status === 'Course End'
+                      ? 'bg-rose-500 text-white shadow-2xs'
+                      : record.status?.toLowerCase() === 'current'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
-                      : record.status.toLowerCase() === 'future'
+                      : record.status?.toLowerCase() === 'future'
                       ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30'
-                      : record.status.toLowerCase() === 'cancelled'
+                      : record.status?.toLowerCase() === 'cancelled'
                       ? 'bg-rose-500/20 text-rose-300 border border-rose-400/30'
                       : 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
                   }`}>
-                    {record.status}
+                    {record.status || 'Current'}
                   </span>
-                )}
+                </span>
                 {record.payment_status && (
                   <span className="bg-sky-500/20 text-sky-200 border border-sky-400/30 text-[10px] font-bold px-2 py-0.5 rounded-md">
                     Plan: {record.payment_status}

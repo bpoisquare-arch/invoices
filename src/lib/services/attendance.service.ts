@@ -1516,9 +1516,13 @@ export async function validateEmployeeLeaveQuotas(
   const isAnnualLeave = leaveOrWfhType.includes('Annual')
   const isSickLeave = leaveOrWfhType.includes('Sick')
   const isCasualLeave = leaveOrWfhType.includes('Casual')
+  const isMaternityLeave = leaveOrWfhType.includes('Maternity')
   const isWfh = leaveOrWfhType === 'Work From Home'
 
-  if (isProbationLeave) {
+  if (isMaternityLeave) {
+    // Maternity Leave has no quota limits or probation restrictions
+    return
+  } else if (isProbationLeave) {
     if (!summary.isProbation) {
       throw new Error('Probation period has completed (> 3 months from joining). Only Annual, Sick, or Casual Leaves can be applied.')
     }

@@ -82,12 +82,25 @@ export default function StcReportRecordDetailModal({
                   <Copy className="size-3.5" />
                 </button>
               </div>
-              <DialogDescription className="text-xs text-slate-300 font-medium flex items-center gap-2 mt-0.5">
+              <DialogDescription className="text-xs text-slate-300 font-medium flex items-center gap-2 mt-0.5 flex-wrap">
                 <span>States College Australia</span>
                 <span>•</span>
                 <span>ID: {record.student_id || 'Not Assigned'}</span>
                 <span>•</span>
-                <span>Status: {record.status || 'Current'}</span>
+                <span className="flex items-center gap-1">
+                  <span>Status:</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                    record.status === 'Invoice Raised'
+                      ? 'bg-emerald-500 text-white shadow-2xs'
+                      : record.status === 'Need Advise'
+                      ? 'bg-sky-500 text-white shadow-2xs'
+                      : record.status === 'Course End'
+                      ? 'bg-rose-500 text-white shadow-2xs'
+                      : 'bg-white/20 text-emerald-200'
+                  }`}>
+                    {record.status || 'Current'}
+                  </span>
+                </span>
               </DialogDescription>
             </div>
           </div>

@@ -352,7 +352,7 @@ export default function EditAttendanceModal({
     }
 
     // Validation 1: Probation Rule Enforcement
-    if (attendanceStatus === 'leave') {
+    if (attendanceStatus === 'leave' && selectedLeaveType !== 'Maternity Leave') {
       if (isProbation) {
         if (selectedLeaveType !== 'Probation Leaves' && selectedLeaveType !== 'Probation Leave') {
           setError('Employee is in probation period (within 3 months of joining). Only Probation Leaves can be applied.')
@@ -678,7 +678,11 @@ export default function EditAttendanceModal({
                   <FileText className="w-3.5 h-3.5 text-indigo-600" />
                   Select Leave Type
                 </Label>
-                {isProbation ? (
+                {selectedLeaveType === 'Maternity Leave' ? (
+                  <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold">
+                    Maternity Leave (Unlimited / No Quota Limit)
+                  </span>
+                ) : isProbation ? (
                   <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
                     Probation Active (Max 1/mo, {effectiveQuotas.probation_leaves ?? 3} total)
                   </span>
@@ -714,6 +718,9 @@ export default function EditAttendanceModal({
                       <SelectItem value="Probation Leaves" disabled={isProbationExhausted} className={`text-xs font-bold text-indigo-950 py-2 ${isProbationExhausted ? 'text-slate-400 opacity-50 cursor-not-allowed' : ''}`}>
                         Probation Leaves ({effectiveRemaining.probation_leaves ?? 3} remaining / {effectiveQuotas.probation_leaves ?? 3}{isProbationExhausted ? ' • Exhausted (0)' : ' • Max 1/month'})
                       </SelectItem>
+                      <SelectItem value="Maternity Leave" className="text-xs font-semibold text-purple-700 py-2">
+                        Maternity Leave (No Quota Limit)
+                      </SelectItem>
                       <SelectItem value="Annual Leaves" disabled className="text-xs text-slate-400 opacity-60 py-2">
                         Annual Leaves (Locked — Available after 3 months)
                       </SelectItem>
@@ -726,7 +733,7 @@ export default function EditAttendanceModal({
                     </SelectContent>
                   </Select>
                   <p className="text-[10px] text-amber-700 font-medium">
-                    Employee joined on <strong>{employeeJoiningDate ? employeeJoiningDate.split('T')[0] : 'N/A'}</strong> (within 3-month probation). Only Probation Leaves can be selected.
+                    Employee joined on <strong>{employeeJoiningDate ? employeeJoiningDate.split('T')[0] : 'N/A'}</strong> (within 3-month probation).
                   </p>
                 </div>
               ) : (
@@ -747,6 +754,9 @@ export default function EditAttendanceModal({
                       </SelectItem>
                       <SelectItem value="Annual Leave" disabled={isAnnualExhausted} className={`text-xs font-medium py-2 ${isAnnualExhausted ? 'text-slate-400 opacity-50 cursor-not-allowed' : ''}`}>
                         Annual Leaves ({effectiveRemaining.annual_leaves ?? 6} remaining / {effectiveQuotas.annual_leaves ?? 6}{isAnnualExhausted ? ' • Exhausted (0)' : ''})
+                      </SelectItem>
+                      <SelectItem value="Maternity Leave" className="text-xs font-semibold text-purple-700 py-2">
+                        Maternity Leave (No Quota Limit)
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -804,24 +814,31 @@ export default function EditAttendanceModal({
                 </div>
 
                 {/* Real-time Dynamic Balance Deduction Display */}
-                {(() => {
-                  const val = parseFloat(leaveDays) || 0
-                  let currentRem = 0
-                  if (selectedLeaveType.includes('Annual')) currentRem = effectiveRemaining.annual_leaves ?? 0
-                  else if (selectedLeaveType.includes('Sick')) currentRem = effectiveRemaining.sick_leaves ?? 0
-                  else if (selectedLeaveType.includes('Probation')) currentRem = effectiveRemaining.probation_leaves ?? 0
-                  else currentRem = effectiveRemaining.casual_leaves ?? 0
+                {selectedLeaveType === 'Maternity Leave' ? (
+                  <div className="text-[11px] p-2.5 rounded-md border bg-purple-50 border-purple-200 text-purple-900 flex items-center justify-between font-medium">
+                    <span className="font-semibold text-purple-800">Maternity Leave (Unlimited / No Quota Limit)</span>
+                    <span className="text-purple-700 font-bold">Approved Leave</span>
+                  </div>
+                ) : (
+                  (() => {
+                    const val = parseFloat(leaveDays) || 0
+                    let currentRem = 0
+                    if (selectedLeaveType.includes('Annual')) currentRem = effectiveRemaining.annual_leaves ?? 0
+                    else if (selectedLeaveType.includes('Sick')) currentRem = effectiveRemaining.sick_leaves ?? 0
+                    else if (selectedLeaveType.includes('Probation')) currentRem = effectiveRemaining.probation_leaves ?? 0
+                    else currentRem = effectiveRemaining.casual_leaves ?? 0
 
-                  const projected = Math.max(0, Number((currentRem - val).toFixed(2)))
-                  const isOver = val > currentRem
-                  return (
-                    <div className={`text-[11px] p-2 rounded-md border flex items-center justify-between font-medium ${isOver ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-indigo-100 text-indigo-900'}`}>
-                      <span>Available Balance: <strong>{currentRem}</strong></span>
-                      <span className="text-slate-400">→</span>
-                      <span>After Deduction: <strong className={isOver ? 'text-rose-600 font-bold' : 'text-emerald-700 font-bold'}>{projected}</strong></span>
-                    </div>
-                  )
-                })()}
+                    const projected = Math.max(0, Number((currentRem - val).toFixed(2)))
+                    const isOver = val > currentRem
+                    return (
+                      <div className={`text-[11px] p-2 rounded-md border flex items-center justify-between font-medium ${isOver ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-indigo-100 text-indigo-900'}`}>
+                        <span>Available Balance: <strong>{currentRem}</strong></span>
+                        <span className="text-slate-400">→</span>
+                        <span>After Deduction: <strong className={isOver ? 'text-rose-600 font-bold' : 'text-emerald-700 font-bold'}>{projected}</strong></span>
+                      </div>
+                    )
+                  })()
+                )}
               </div>
             </div>
           )}

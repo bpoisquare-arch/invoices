@@ -129,6 +129,28 @@ export default function StudentReportsPage() {
     await fetchRecords()
   }
 
+  // Live Update Status Mark in Database
+  const handleStatusUpdate = async (record: AimtReportRecord, newStatus: string) => {
+    try {
+      const res = await fetch('/api/reports/records', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: record.id, status: newStatus }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to update record status.')
+      }
+      // Optimistically update local state
+      setRecords((prev) =>
+        prev.map((r) => (r.id === record.id ? { ...r, status: newStatus } : r))
+      )
+    } catch (err: any) {
+      console.error('Failed to update status mark:', err)
+      alert(err.message || 'Failed to update status.')
+    }
+  }
+
   // Handle Delete Single Record
   const handleDeleteRecord = async (record: AimtReportRecord) => {
     const res = await fetch(`/api/reports/records?id=${record.id}`, {
@@ -299,6 +321,7 @@ export default function StudentReportsPage() {
         availableIntakes={availableIntakes}
         onExportFiltered={handleExportToExcel}
         onFilteredRecordsChange={setFilteredRecords}
+        onStatusUpdate={handleStatusUpdate}
       />
 
       {/* 4. Modals */}

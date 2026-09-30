@@ -63,6 +63,7 @@ interface StcReportDataTableProps {
   availableIntakes?: string[]
   onExportFiltered?: (exportRows: StcReportRecord[]) => void
   onFilteredRecordsChange?: (filtered: StcReportRecord[]) => void
+  onStatusUpdate?: (record: StcReportRecord, status: string) => Promise<void>
 }
 
 type SortField = 'student_name' | 'pending_invoice' | 'pending_amount' | 'yet_to_raised' | 'course' | 'intake' | 'end_date'
@@ -106,9 +107,11 @@ export default function StcReportDataTable({
   onDeleteSelected,
   onExportFiltered,
   onFilteredRecordsChange,
+  onStatusUpdate,
 }: StcReportDataTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
+  const [selectedMarkStatus, setSelectedMarkStatus] = useState<string>('all')
   const [selectedDocument, setSelectedDocument] = useState<string>('all')
 
   const [sortField, setSortField] = useState<SortField>('student_name')
@@ -157,6 +160,10 @@ export default function StcReportDataTable({
       list = list.filter((r) => r.status?.toLowerCase().trim() === selectedStatus.toLowerCase().trim())
     }
 
+    if (selectedMarkStatus !== 'all') {
+      list = list.filter((r) => r.status?.toLowerCase().trim() === selectedMarkStatus.toLowerCase().trim())
+    }
+
     if (selectedDocument !== 'all') {
       list = list.filter((r) => {
         const doc = (r.document || '').toLowerCase().trim()
@@ -199,7 +206,7 @@ export default function StcReportDataTable({
     })
 
     return list
-  }, [records, searchTerm, selectedStatus, selectedDocument, sortField, sortOrder])
+  }, [records, searchTerm, selectedStatus, selectedMarkStatus, selectedDocument, sortField, sortOrder])
 
   React.useEffect(() => {
     onFilteredRecordsChange?.(filteredRecords)
@@ -273,7 +280,7 @@ export default function StcReportDataTable({
     }
   }
 
-  const hasActiveFilters = Boolean(searchTerm.trim() || selectedStatus !== 'all' || selectedDocument !== 'all')
+  const hasActiveFilters = Boolean(searchTerm.trim() || selectedStatus !== 'all' || selectedMarkStatus !== 'all' || selectedDocument !== 'all')
 
   return (
     <div className="w-full space-y-4">
@@ -295,8 +302,30 @@ export default function StcReportDataTable({
 
         {/* Filter Dropdowns + Actions */}
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-          {/* Status Filter */}
-          <div className="relative flex items-center min-w-[145px]">
+          {/* 1. Dedicated Mark Status Filter */}
+          <div className="relative flex items-center min-w-[155px]">
+            <select
+              value={selectedMarkStatus}
+              onChange={(e) => {
+                setSelectedMarkStatus(e.target.value)
+                setCurrentPage(1)
+              }}
+              className={`w-full h-10 pl-3.5 pr-8 text-xs font-semibold rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#00BF8F]/30 shadow-2xs transition-all appearance-none border ${
+                selectedMarkStatus !== 'all'
+                  ? 'border-emerald-500 bg-emerald-100/80 text-emerald-950 font-extrabold shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <option value="all">Mark Status: All</option>
+              <option value="Invoice Raised">Invoice Raised</option>
+              <option value="Need Advise">Need Advise</option>
+              <option value="Course End">Course End</option>
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+          </div>
+
+          {/* 2. Standard Student Status Filter */}
+          <div className="relative flex items-center min-w-[135px]">
             <select
               value={selectedStatus}
               onChange={(e) => {
@@ -320,7 +349,7 @@ export default function StcReportDataTable({
           </div>
 
           {/* Document Type Filter */}
-          <div className="relative flex items-center min-w-[155px]">
+          <div className="relative flex items-center min-w-[145px]">
             <select
               value={selectedDocument}
               onChange={(e) => {
@@ -349,6 +378,7 @@ export default function StcReportDataTable({
               onClick={() => {
                 setSearchTerm('')
                 setSelectedStatus('all')
+                setSelectedMarkStatus('all')
                 setSelectedDocument('all')
                 setCurrentPage(1)
               }}
@@ -640,16 +670,22 @@ export default function StcReportDataTable({
                 paginatedRecords.map((record, index) => {
                   const isSelected = selectedIds.includes(record.id)
 
+                  const normStatus = record.status?.trim() || ''
+                  let rowColorClass = index % 2 === 1 ? 'bg-slate-50/60 hover:bg-emerald-50/40' : 'bg-white hover:bg-emerald-50/40'
+                  if (isSelected) {
+                    rowColorClass = 'bg-emerald-100/80 hover:bg-emerald-100 text-slate-900'
+                  } else if (normStatus === 'Invoice Raised') {
+                    rowColorClass = 'bg-emerald-100/70 text-emerald-950 hover:bg-emerald-100 border-l-4 border-l-emerald-500'
+                  } else if (normStatus === 'Need Advise') {
+                    rowColorClass = 'bg-sky-100/70 text-sky-950 hover:bg-sky-100 border-l-4 border-l-sky-500'
+                  } else if (normStatus === 'Course End') {
+                    rowColorClass = 'bg-rose-100/70 text-rose-950 hover:bg-rose-100 border-l-4 border-l-rose-500'
+                  }
+
                   return (
                     <tr
                       key={record.id}
-                      className={`transition-colors cursor-pointer border-b border-slate-200/70 ${
-                        isSelected
-                          ? 'bg-emerald-100/80 hover:bg-emerald-100 text-slate-900'
-                          : index % 2 === 1
-                          ? 'bg-slate-50/60 hover:bg-emerald-50/40'
-                          : 'bg-white hover:bg-emerald-50/40'
-                      }`}
+                      className={`transition-colors cursor-pointer border-b border-slate-200/70 ${rowColorClass}`}
                       onClick={() => onViewRecord(record)}
                     >
                       {/* Checkbox */}
@@ -672,15 +708,21 @@ export default function StcReportDataTable({
                             <div className="font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
                               <span>{record.student_name}</span>
                             </div>
-                            <div className="flex items-center gap-1.5 mt-0.5">
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                               {record.student_id && (
                                 <span className="text-[10px] font-mono text-[#001E2F] font-extrabold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
                                   {record.student_id}
                                 </span>
                               )}
                               {record.status && (
-                                <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded ${
-                                  record.status.toLowerCase() === 'current'
+                                <span className={`text-[9.5px] font-extrabold uppercase px-1.5 py-0.2 rounded ${
+                                  record.status === 'Invoice Raised'
+                                    ? 'bg-emerald-600 text-white shadow-2xs'
+                                    : record.status === 'Need Advise'
+                                    ? 'bg-sky-600 text-white shadow-2xs'
+                                    : record.status === 'Course End'
+                                    ? 'bg-rose-600 text-white shadow-2xs'
+                                    : record.status.toLowerCase() === 'current'
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                     : record.status.toLowerCase() === 'future'
                                     ? 'bg-blue-50 text-blue-700 border border-blue-200'
@@ -757,10 +799,10 @@ export default function StcReportDataTable({
                           <DropdownMenuTrigger className="size-8 rounded-lg hover:bg-slate-200/70 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors focus:outline-none cursor-pointer border border-transparent hover:border-slate-200">
                             <MoreHorizontal className="size-4" />
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-44 text-xs font-medium rounded-xl p-1 shadow-lg">
+                          <DropdownMenuContent align="end" className="w-52 text-xs font-medium rounded-xl p-1 shadow-lg">
                             <DropdownMenuItem
                               onClick={() => onViewRecord(record)}
-                              className="gap-2 cursor-pointer py-1.5"
+                              className="gap-2 cursor-pointer py-1.5 font-semibold"
                             >
                               <Eye className="size-3.5 text-[#00BF8F]" />
                               <span>View Details</span>
@@ -783,6 +825,40 @@ export default function StcReportDataTable({
                               <Copy className="size-3.5 text-slate-400" />
                               <span>Copy Name</span>
                             </DropdownMenuItem>
+
+                            {/* Status Mark Options */}
+                            {onStatusUpdate && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel className="text-[10px] uppercase font-bold text-slate-400 px-2 py-1">
+                                  Mark Status
+                                </DropdownMenuLabel>
+                                <DropdownMenuCheckboxItem
+                                  checked={normStatus === 'Invoice Raised'}
+                                  onCheckedChange={() => onStatusUpdate(record, normStatus === 'Invoice Raised' ? 'Current' : 'Invoice Raised')}
+                                  className="gap-2 cursor-pointer text-emerald-800 focus:bg-emerald-50 focus:text-emerald-900 font-semibold"
+                                >
+                                  <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
+                                  <span>1 Invoice Raised</span>
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
+                                  checked={normStatus === 'Need Advise'}
+                                  onCheckedChange={() => onStatusUpdate(record, normStatus === 'Need Advise' ? 'Current' : 'Need Advise')}
+                                  className="gap-2 cursor-pointer text-sky-800 focus:bg-sky-50 focus:text-sky-900 font-semibold"
+                                >
+                                  <span className="size-2 rounded-full bg-sky-500 shrink-0" />
+                                  <span>2 Need Advise</span>
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
+                                  checked={normStatus === 'Course End'}
+                                  onCheckedChange={() => onStatusUpdate(record, normStatus === 'Course End' ? 'Current' : 'Course End')}
+                                  className="gap-2 cursor-pointer text-rose-800 focus:bg-rose-50 focus:text-rose-900 font-semibold"
+                                >
+                                  <span className="size-2 rounded-full bg-rose-500 shrink-0" />
+                                  <span>3 Course End</span>
+                                </DropdownMenuCheckboxItem>
+                              </>
+                            )}
 
                             {onDeleteRecord && (
                               <>

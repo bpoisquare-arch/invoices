@@ -19,6 +19,7 @@ export const LEAVE_TYPES = [
   'Annual Leaves',
   'Sick Leaves',
   'Casual Leaves',
+  'Maternity Leave',
   'Probation Leave',
   'Annual Leave',
   'Sick Leave',
