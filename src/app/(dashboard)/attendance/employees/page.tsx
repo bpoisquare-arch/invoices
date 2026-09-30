@@ -61,7 +61,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
-import { Employee } from '@/lib/supabase/database.types'
+import { Employee } from '@/types/database.types'
 
 const BRANCHES = ['Lahore', 'Multan', 'Onshore', 'AIMT']
 

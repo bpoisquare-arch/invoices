@@ -1,19 +1,6 @@
 import * as XLSX from 'xlsx'
 import { prisma } from '@/lib/prisma'
-import { createClient as createSupabaseClient } from '@/lib/supabase/server'
-import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { AimtReportImport, AimtReportRecord } from '@/lib/supabase/database.types'
-
-async function getSupabase() {
-  if (typeof window === 'undefined') {
-    try {
-      return await createSupabaseClient()
-    } catch {
-      return createBrowserSupabaseClient()
-    }
-  }
-  return createBrowserSupabaseClient()
-}
+import type { AimtReportImport, AimtReportRecord } from '@/types/database.types'
 
 // Clean and normalize strings
 function cleanString(val: any): string {
@@ -36,7 +23,6 @@ function cleanNumber(val: any): number {
 function formatExcelDate(val: any): string {
   if (!val && val !== 0) return ''
   if (typeof val === 'number') {
-    // Excel date serial number
     try {
       const dateObj = XLSX.SSF.parse_date_code(val)
       if (dateObj) {
@@ -49,454 +35,266 @@ function formatExcelDate(val: any): string {
       return String(val)
     }
   }
-  if (val instanceof Date) {
-    const d = String(val.getDate()).padStart(2, '0')
-    const m = String(val.getMonth() + 1).padStart(2, '0')
-    const y = val.getFullYear()
-    return `${d}/${m}/${y}`
-  }
-  return String(val).trim()
-}
 
-// Normalize column header key for fuzzy matching
-function normalizeHeader(header: string): string {
-  return header
-    .toLowerCase()
-    .replace(/[\r\n\t_.-]+/g, ' ')
-    .replace(/[^a-z0-9 ]/g, '')
-    .trim()
-}
-
-// Normalize document type: e.g. "CoE + Offer Letter" / "COE+OFFER LETTER" / "CoE Received" -> "CoE", "VoE Received" -> "VoE", "Offer Letter" -> "Offer Letter"
-export function normalizeDocumentType(val: any): string {
-  if (!val && val !== 0) return ''
   const str = String(val).trim()
-  const lower = str.toLowerCase()
-  if (lower.includes('coe')) {
-    return 'CoE'
+  if (!str) return ''
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const parts = str.split('T')[0].split('-')
+    return `${parts[2]}/${parts[1]}/${parts[0]}`
   }
-  if (lower.includes('voe')) {
-    return 'VoE'
-  }
-  if (lower.includes('offer')) {
-    return 'Offer Letter'
-  }
+
   return str
 }
 
+function normalizeDocumentType(doc?: string | null): string {
+  if (!doc) return 'Passport'
+  const d = doc.trim().toLowerCase()
+  if (d.includes('cnic') || d.includes('nic') || d.includes('national id')) return 'CNIC'
+  return 'Passport'
+}
+
+function generateId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return `aimt-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+}
+
 export interface ParsedStudentRow {
-  sr_no: number | null
+  sr_no: number
   student_name: string
-  student_id: string | null
-  agent: string | null
-  scholarship: string | null
-  pending_invoice: string | null
+  student_id: string
+  agent: string
+  scholarship: string
+  pending_invoice: string
   pending_amount: number
-  yet_to_raised: string | null
-  remarks: string | null
-  dob: string | null
-  document: string | null
-  status: string | null
-  intake: string | null
-  end_date: string | null
-  course: string | null
+  yet_to_raised: string
+  remarks: string
+  dob: string
+  document: string
+  status: string
+  intake: string
+  end_date: string
+  course: string
   admin_fee: number
   resource_fee: number
   tuition_fee: number
   total_fee: number
   paid_amount: number
   total_paid?: number
-  follow_up?: string | null
-  coe_issued_date: string | null
-  email_id: string | null
-  phone_no: string | null
-  payment_status: string | null
+  initial_payment?: number
+  follow_up?: string
+  coe_issued_date: string
+  email_id: string
+  phone_no: string
+  payment_status: string
   extra_data: Record<string, any>
 }
 
-export interface ParsedReportFileResult {
-  fileName: string
-  fileSize: number
+export function parseExcelBuffer(buffer: Buffer, _fileName?: string): {
   rawHeaders: string[]
   records: ParsedStudentRow[]
-  totalRecords: number
-  totalPendingAmount: number
-  totalYetToRaised: number
-}
+} {
+  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false })
+  const sheetName = workbook.SheetNames[0]
+  if (!sheetName) throw new Error('Excel workbook has no sheets')
 
-// Clean worksheet bounding box to prevent SheetJS from allocating 1M rows
-function getCleanSheetRows(ws: XLSX.WorkSheet): any[][] {
-  if (!ws || !ws['!ref']) return []
-  let maxR = 0
-  let maxC = 0
-  for (const k in ws) {
-    if (k.startsWith('!')) continue
-    const c = XLSX.utils.decode_cell(k)
-    if (c.r > maxR) maxR = c.r
-    if (c.c > maxC) maxC = c.c
+  const worksheet = workbook.Sheets[sheetName]
+  const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' })
+
+  if (!rows || rows.length < 2) {
+    throw new Error('Excel file must contain at least a header row and data rows')
   }
-  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } })
-  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
-}
 
-// Parse Excel file buffer into structured student rows
-export function parseStudentReportExcel(buffer: ArrayBuffer | Buffer, fileName: string): ParsedReportFileResult {
-  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true })
-
-  let bestSheetName = workbook.SheetNames[0]
-  let bestRows: any[][] = []
-  let bestHeaderIndex = 0
-  let maxScore = -1
-
-  // Scan all sheets in the workbook to automatically pick the most comprehensive report sheet
-  for (const sheetName of workbook.SheetNames) {
-    const ws = workbook.Sheets[sheetName]
-    const rawRows = getCleanSheetRows(ws)
-    if (!rawRows || rawRows.length === 0) continue
-
-    for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
-      const row = rawRows[i]
-      if (!Array.isArray(row)) continue
-      const rowText = row.map((c) => String(c).toLowerCase().replace(/[^a-z0-9]/g, ' ')).join(' ')
-
-      let score = 0
-      if (rowText.includes('student name') || rowText.includes('student') || rowText.includes('name')) score += 10
-      if (rowText.includes('pending amount') || rowText.includes('amount')) score += 15
-      if (rowText.includes('pending invoice') || rowText.includes('pending inv')) score += 15
-      if (rowText.includes('yet to raised') || rowText.includes('raised')) score += 15
-      if (rowText.includes('intake') || rowText.includes('intake date')) score += 15
-      if (rowText.includes('agent') || rowText.includes('agency')) score += 5
-      if (rowText.includes('course') || rowText.includes('qualification')) score += 5
-
-      if (score > maxScore) {
-        maxScore = score
-        bestSheetName = sheetName
-        bestRows = rawRows
-        bestHeaderIndex = i
-      }
+  let headerRowIndex = 0
+  for (let i = 0; i < Math.min(10, rows.length); i++) {
+    const rowStr = rows[i].map((c) => String(c).toLowerCase()).join(' ')
+    if (rowStr.includes('student name') || rowStr.includes('agent') || rowStr.includes('pending invoice') || rowStr.includes('sr no')) {
+      headerRowIndex = i
+      break
     }
   }
 
-  if (bestRows.length === 0) {
-    const ws = workbook.Sheets[workbook.SheetNames[0]]
-    bestRows = getCleanSheetRows(ws)
-    bestHeaderIndex = 0
+  const headerRow = rows[headerRowIndex].map((h) => cleanString(h))
+  const rawHeaders = headerRow.filter(Boolean)
+
+  const findColIndex = (keywords: string[]): number => {
+    return headerRow.findIndex((h) => {
+      const lower = h.toLowerCase()
+      return keywords.some((k) => lower.includes(k.toLowerCase()))
+    })
   }
 
-  if (!bestRows || bestRows.length === 0) {
-    throw new Error('The uploaded Excel file is empty.')
-  }
+  const idxSrNo = findColIndex(['sr no', 'sr.no', 'sr#', 'serial', 's.no'])
+  const idxStudentName = findColIndex(['student name', 'name', 'student'])
+  const idxStudentId = findColIndex(['student id', 'student_id', 'id no', 'id'])
+  const idxAgent = findColIndex(['agent', 'counselor', 'consultant'])
+  const idxScholarship = findColIndex(['scholarship'])
+  const idxPendingInvoice = findColIndex(['pending invoice', 'invoice no', 'invoice'])
+  const idxPendingAmount = findColIndex(['pending amount', 'balance', 'pending'])
+  const idxYetToRaised = findColIndex(['yet to raised', 'yet to raise', 'unraised'])
+  const idxRemarks = findColIndex(['remarks', 'notes', 'comment'])
+  const idxDob = findColIndex(['dob', 'date of birth', 'birth date'])
+  const idxDocument = findColIndex(['document', 'doc type', 'cnic', 'passport'])
+  const idxStatus = findColIndex(['status', 'student status'])
+  const idxIntake = findColIndex(['intake', 'batch', 'session'])
+  const idxEndDate = findColIndex(['end date', 'completion date', 'finish date'])
+  const idxCourse = findColIndex(['course', 'program', 'qualification'])
 
-  const headerRowIndex = bestHeaderIndex
-  const rawRows = bestRows
+  const idxAdminFee = findColIndex(['admin fee', 'admission fee'])
+  const idxResourceFee = findColIndex(['resource fee', 'material fee', 'resources'])
+  const idxTuitionFee = findColIndex(['tuition fee', 'tuition'])
+  const idxTotalFee = findColIndex(['total fee', 'course fee', 'total amount'])
+  const idxPaidAmount = findColIndex(['paid amount', 'initial payment', 'deposit', 'paid'])
+  const idxTotalPaid = findColIndex(['total paid', 'total received'])
+  const idxFollowUp = findColIndex(['follow up', 'followup', 'next action'])
+  const idxCoeIssuedDate = findColIndex(['coe issued date', 'coe date', 'coe issued'])
+  const idxEmailId = findColIndex(['email id', 'email', 'e-mail'])
+  const idxPhoneNo = findColIndex(['phone no', 'phone', 'contact', 'mobile'])
+  const idxPaymentStatus = findColIndex(['payment status', 'pay status'])
 
-  const rawHeaders: string[] = (rawRows[headerRowIndex] || []).map((h) => cleanString(h))
-  const normalizedHeaders = rawHeaders.map((h) => normalizeHeader(h))
+  const records: ParsedStudentRow[] = []
 
-  // Find column index helper with exact-first priority and exclusion filters
-  function findColIndex(possibleNames: string[], excludeWords: string[] = []): number {
-    // Phase 1: Exact match
-    for (const name of possibleNames) {
-      const idx = normalizedHeaders.findIndex((h) => {
-        if (excludeWords.some((ew) => h.includes(ew))) return false
-        return h === name
-      })
-      if (idx !== -1) return idx
+  for (let i = headerRowIndex + 1; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row || row.every((cell) => cell === '' || cell === null || cell === undefined)) {
+      continue
     }
 
-    // Phase 2: Whole word match
-    for (const name of possibleNames) {
-      const idx = normalizedHeaders.findIndex((h) => {
-        if (excludeWords.some((ew) => h.includes(ew))) return false
-        const regex = new RegExp(`(^|\\s)${name}(\\s|$)`, 'i')
-        return regex.test(h)
-      })
-      if (idx !== -1) return idx
-    }
+    const studentName = idxStudentName !== -1 ? cleanString(row[idxStudentName]) : ''
+    if (!studentName) continue
 
-    // Phase 3: Substring match (with exclusions)
-    for (const name of possibleNames) {
-      const idx = normalizedHeaders.findIndex((h) => {
-        if (excludeWords.some((ew) => h.includes(ew))) return false
-        return h.includes(name)
-      })
-      if (idx !== -1) return idx
-    }
+    const srNo = idxSrNo !== -1 ? (cleanNumber(row[idxSrNo]) || i - headerRowIndex) : i - headerRowIndex
+    const studentId = idxStudentId !== -1 ? cleanString(row[idxStudentId]) : ''
+    const agent = idxAgent !== -1 ? cleanString(row[idxAgent]) : ''
+    const scholarship = idxScholarship !== -1 ? cleanString(row[idxScholarship]) : ''
+    const pendingInvoice = idxPendingInvoice !== -1 ? cleanString(row[idxPendingInvoice]) : ''
+    const pendingAmount = idxPendingAmount !== -1 ? cleanNumber(row[idxPendingAmount]) : 0
+    const yetToRaised = idxYetToRaised !== -1 ? cleanString(row[idxYetToRaised]) : ''
+    const remarks = idxRemarks !== -1 ? cleanString(row[idxRemarks]) : ''
+    const dob = idxDob !== -1 ? formatExcelDate(row[idxDob]) : ''
+    const document = idxDocument !== -1 ? normalizeDocumentType(cleanString(row[idxDocument])) : 'Passport'
+    const status = idxStatus !== -1 ? (cleanString(row[idxStatus]) || 'Current') : 'Current'
+    const intake = idxIntake !== -1 ? cleanString(row[idxIntake]) : ''
+    const endDate = idxEndDate !== -1 ? formatExcelDate(row[idxEndDate]) : ''
+    const course = idxCourse !== -1 ? cleanString(row[idxCourse]) : ''
 
-    return -1
-  }
-
-  const colMap = {
-    sr_no: findColIndex(['sr no', 'sr_no', 'srno', 's no', 's_no', 'sno', 'serial no', 'serial number', 'sl no', 'sr #', 'sr. no'], ['phone', 'mobile', 'contact', 'invoice', 'student', 'inv', 'account', 'card']),
-    student_name: findColIndex(['student name', 'name of student', 'candidate name', 'student full name', 'student', 'candidate', 'name'], ['agent', 'agency', 'course', 'company', 'consultant']),
-    student_id: findColIndex(['student id', 'student no', 'student number', 'student_id', 'studentid', 'student code', 'candidate id'], ['email', 'mail', 'phone', 'contact']),
-    agent: findColIndex(['agent name', 'agent', 'agency', 'agency name', 'consultant', 'recruiter', 'education agent'], ['student', 'candidate']),
-    scholarship: findColIndex(['scholarship', 'scholarship amount', 'scholarship fee', 'scholarship ($)']),
-    pending_invoice: findColIndex(['pending invoice', 'pending invoices', 'pending inv', 'inv pending', 'invoice pending', 'pending inv count']),
-    pending_amount: findColIndex(['pending amount', 'amount pending', 'pending balance', 'pending amt', 'due amount', 'balance due', 'pending ($)']),
-    yet_to_raised: findColIndex(['yet to raised', 'yet to be raised', 'yet to raise', 'unraised', 'yet raised', 'yet to issue', 'unraised amount']),
-    remarks: findColIndex(['installment breakup', 'installment break up', 'installment breakdown', 'breakup', 'remarks', 'remark', 'comments', 'comment', 'notes', 'note']),
-    follow_up: findColIndex(['follow-up', 'follow up', 'followup', 'follow up notes', 'follow up status', 'follow up note']),
-    dob: findColIndex(['dob', 'date of birth', 'birth date', 'birthdate', 'd.o.b']),
-    document: findColIndex(['document type', 'document', 'documents', 'doc status', 'coe status', 'doc type', 'doc']),
-    status: findColIndex(['student id status', 'student status', 'enrollment status', 'status']),
-    intake: findColIndex(['intake date', 'intake', 'start date', 'commencement date', 'course start date']),
-    end_date: findColIndex(['course end date', 'end date', 'completion date', 'course completion date', 'finish date']),
-    course: findColIndex(['course name', 'qualification', 'course', 'program', 'course title']),
-    admin_fee: findColIndex(['admin fee', 'administration fee', 'admin fees', 'admin ($)'], ['tuition', 'resource', 'total']),
-    resource_fee: findColIndex(['resource fee', 'resources fee', 'materials fee', 'material fee', 'resource ($)'], ['admin', 'tuition', 'total']),
-    tuition_fee: findColIndex(['tuition fee', 'tuition fees', 'tuition', 'tuition ($)'], ['admin', 'resource', 'total']),
-    total_fee: findColIndex(['total fee', 'total fees', 'course fee', 'total course fee', 'total ($)'], ['paid', 'initial', 'admin', 'resource', 'tuition']),
-    paid_amount: findColIndex(['initial payment', 'initial paid', 'initial fee', 'first payment', 'paid amount', 'amount paid', 'fee paid'], ['total paid']),
-    total_paid: findColIndex(['total paid', 'total fee paid', 'total amount paid', 'total paid amount', 'total paid ($)'], ['initial']),
-    coe_issued_date: findColIndex(['coe issued date', 'coe date', 'coe issued', 'date coe issued']),
-    email_id: findColIndex(['email id', 'student email', 'email address', 'email', 'e-mail'], ['student id', 'candidate id']),
-    phone_no: findColIndex(['phone no', 'mobile no', 'contact no', 'phone number', 'mobile number', 'contact number', 'phone', 'mobile', 'contact'], ['sr', 'serial', 'invoice', 'inv']),
-    payment_status: findColIndex(['payment status', 'pay status', 'invoice status', 'payment plan status', 'plan status']),
-  }
-
-  const parsedRecords: ParsedStudentRow[] = []
-  let totalPendingAmount = 0
-  let totalYetToRaised = 0
-
-  for (let r = headerRowIndex + 1; r < rawRows.length; r++) {
-    const row = rawRows[r]
-    if (!row || !Array.isArray(row)) continue
-
-    // Extract student name
-    const studentName = colMap.student_name !== -1 ? cleanString(row[colMap.student_name]) : ''
+    const adminFee = idxAdminFee !== -1 ? cleanNumber(row[idxAdminFee]) : 0
+    const resourceFee = idxResourceFee !== -1 ? cleanNumber(row[idxResourceFee]) : 0
+    const tuitionFee = idxTuitionFee !== -1 ? cleanNumber(row[idxTuitionFee]) : 0
     
-    // Skip empty row if student name and most cells are empty
-    const nonBlankCount = row.filter((c) => c !== '' && c !== null && c !== undefined).length
-    if (!studentName && nonBlankCount < 2) continue
-
-    // Fallback if student name is empty but other columns exist
-    const finalStudentName = studentName || (colMap.student_id !== -1 && row[colMap.student_id] ? `Student (${row[colMap.student_id]})` : `Record #${r}`)
-
-    let srNoVal = colMap.sr_no !== -1 ? cleanNumber(row[colMap.sr_no]) : (r - headerRowIndex)
-    if (srNoVal <= 0 || srNoVal > 100000) {
-      srNoVal = r - headerRowIndex
+    let totalFee = idxTotalFee !== -1 ? cleanNumber(row[idxTotalFee]) : 0
+    if (totalFee === 0 && (adminFee > 0 || resourceFee > 0 || tuitionFee > 0)) {
+      totalFee = adminFee + resourceFee + tuitionFee - cleanNumber(scholarship)
+      if (totalFee < 0) totalFee = 0
     }
-    const pendingAmount = colMap.pending_amount !== -1 ? cleanNumber(row[colMap.pending_amount]) : 0
-    const yetToRaisedRaw = colMap.yet_to_raised !== -1 ? cleanString(row[colMap.yet_to_raised]) : ''
-    const yetToRaisedNum = cleanNumber(yetToRaisedRaw)
 
-    totalPendingAmount += pendingAmount
-    totalYetToRaised += yetToRaisedNum
+    const paidAmount = idxPaidAmount !== -1 ? cleanNumber(row[idxPaidAmount]) : 0
+    const totalPaid = idxTotalPaid !== -1 ? cleanNumber(row[idxTotalPaid]) : paidAmount
+    const followUp = idxFollowUp !== -1 ? cleanString(row[idxFollowUp]) : ''
+    const coeIssuedDate = idxCoeIssuedDate !== -1 ? formatExcelDate(row[idxCoeIssuedDate]) : ''
+    const emailId = idxEmailId !== -1 ? cleanString(row[idxEmailId]) : ''
+    const phoneNo = idxPhoneNo !== -1 ? cleanString(row[idxPhoneNo]) : ''
+    const paymentStatus = idxPaymentStatus !== -1 ? cleanString(row[idxPaymentStatus]) : (pendingAmount > 0 ? 'Pending' : 'Paid')
 
-    // Extra columns collector
-    const extraData: Record<string, any> = {}
-    row.forEach((cellVal, cIdx) => {
-      const headerTitle = rawHeaders[cIdx] || `col_${cIdx + 1}`
-      extraData[headerTitle] = cellVal
+    const extra_data: Record<string, any> = {}
+    headerRow.forEach((colName, cIdx) => {
+      if (colName && row[cIdx] !== undefined && row[cIdx] !== '') {
+        extra_data[colName] = row[cIdx]
+      }
     })
 
-    const totalPaidNum = colMap.total_paid !== -1 ? cleanNumber(row[colMap.total_paid]) : (cleanNumber(extraData['Total Paid']) || cleanNumber(extraData['Total Paid ($)']) || 0)
-    extraData['total_paid'] = totalPaidNum
-
-    const followUpVal = colMap.follow_up !== -1 ? cleanString(row[colMap.follow_up]) : (cleanString(extraData['Follow-up']) || cleanString(extraData['Follow up']) || cleanString(extraData['follow_up']) || '')
-    if (followUpVal) {
-      extraData['follow_up'] = followUpVal
-    }
-
-    parsedRecords.push({
-      sr_no: srNoVal > 0 ? srNoVal : r - headerRowIndex,
-      student_name: finalStudentName,
-      student_id: colMap.student_id !== -1 ? cleanString(row[colMap.student_id]) || null : null,
-      agent: colMap.agent !== -1 ? cleanString(row[colMap.agent]) || null : null,
-      scholarship: colMap.scholarship !== -1 ? cleanString(row[colMap.scholarship]) || null : null,
-      pending_invoice: colMap.pending_invoice !== -1 ? cleanString(row[colMap.pending_invoice]) || null : null,
+    records.push({
+      sr_no: srNo,
+      student_name: studentName,
+      student_id: studentId,
+      agent,
+      scholarship,
+      pending_invoice: pendingInvoice,
       pending_amount: pendingAmount,
-      yet_to_raised: yetToRaisedRaw || null,
-      remarks: colMap.remarks !== -1 ? cleanString(row[colMap.remarks]) || null : null,
-      follow_up: followUpVal || null,
-      dob: colMap.dob !== -1 ? formatExcelDate(row[colMap.dob]) || null : null,
-      document: colMap.document !== -1 ? normalizeDocumentType(row[colMap.document]) || null : null,
-      status: colMap.status !== -1 ? cleanString(row[colMap.status]) || null : null,
-      intake: colMap.intake !== -1 ? formatExcelDate(row[colMap.intake]) || null : null,
-      end_date: colMap.end_date !== -1 ? formatExcelDate(row[colMap.end_date]) || null : null,
-      course: colMap.course !== -1 ? cleanString(row[colMap.course]) || null : null,
-      admin_fee: colMap.admin_fee !== -1 ? cleanNumber(row[colMap.admin_fee]) : 0,
-      resource_fee: colMap.resource_fee !== -1 ? cleanNumber(row[colMap.resource_fee]) : 0,
-      tuition_fee: colMap.tuition_fee !== -1 ? cleanNumber(row[colMap.tuition_fee]) : 0,
-      total_fee: colMap.total_fee !== -1 ? cleanNumber(row[colMap.total_fee]) : 0,
-      paid_amount: colMap.paid_amount !== -1 ? cleanNumber(row[colMap.paid_amount]) : 0,
-      total_paid: totalPaidNum,
-      coe_issued_date: colMap.coe_issued_date !== -1 ? formatExcelDate(row[colMap.coe_issued_date]) || null : null,
-      email_id: colMap.email_id !== -1 ? cleanString(row[colMap.email_id]) || null : null,
-      phone_no: colMap.phone_no !== -1 ? cleanString(row[colMap.phone_no]) || null : null,
-      payment_status: colMap.payment_status !== -1 ? cleanString(row[colMap.payment_status]) || null : null,
-      extra_data: extraData,
+      yet_to_raised: yetToRaised,
+      remarks,
+      dob,
+      document,
+      status,
+      intake,
+      end_date: endDate,
+      course,
+      admin_fee: adminFee,
+      resource_fee: resourceFee,
+      tuition_fee: tuitionFee,
+      total_fee: totalFee,
+      paid_amount: paidAmount,
+      total_paid: totalPaid,
+      initial_payment: paidAmount,
+      follow_up: followUp,
+      coe_issued_date: coeIssuedDate,
+      email_id: emailId,
+      phone_no: phoneNo,
+      payment_status: paymentStatus,
+      extra_data,
     })
   }
 
+  return { rawHeaders, records }
+}
+
+export const parseStudentReportExcel = parseExcelBuffer
+
+export async function previewReportImport(buffer: Buffer, _fileName?: string) {
+  const { rawHeaders, records } = parseExcelBuffer(buffer, _fileName)
   return {
-    fileName,
-    fileSize: typeof buffer.byteLength === 'number' ? buffer.byteLength : (buffer as Buffer).length || 0,
     rawHeaders,
-    records: parsedRecords,
-    totalRecords: parsedRecords.length,
-    totalPendingAmount: Number(totalPendingAmount.toFixed(2)),
-    totalYetToRaised: Number(totalYetToRaised.toFixed(2)),
+    records,
+    totalCount: records.length,
   }
 }
 
-// Server-side fallback file storage helper
-function getFsAndPath() {
-  if (typeof window !== 'undefined') return null
-  try {
-    const fs = require('fs')
-    const path = require('path')
-    return { fs, path }
-  } catch {
-    return null
-  }
-}
-
-function getReportStoragePath(): string | null {
-  const tools = getFsAndPath()
-  if (!tools) return null
-  return tools.path.join(process.cwd(), 'data', 'aimt_reports_storage.json')
-}
-
-interface LocalReportStorageData {
-  imports: Record<string, AimtReportImport>
-  records: Record<string, AimtReportRecord[]>
-}
-
-let inMemoryReportStorage: LocalReportStorageData | null = null
-
-function readLocalReportStorage(): LocalReportStorageData {
-  if (inMemoryReportStorage) return inMemoryReportStorage
-  const tools = getFsAndPath()
-  const filePath = getReportStoragePath()
-  if (!tools || !filePath) return { imports: {}, records: {} }
-
-  try {
-    if (!tools.fs.existsSync(filePath)) {
-      const dir = tools.path.dirname(filePath)
-      if (!tools.fs.existsSync(dir)) {
-        tools.fs.mkdirSync(dir, { recursive: true })
-      }
-      tools.fs.writeFileSync(filePath, JSON.stringify({ imports: {}, records: {} }, null, 2), 'utf-8')
-      inMemoryReportStorage = { imports: {}, records: {} }
-      return inMemoryReportStorage
-    }
-    const raw = tools.fs.readFileSync(filePath, 'utf-8')
-    inMemoryReportStorage = JSON.parse(raw || '{"imports":{},"records":{}}')
-    return inMemoryReportStorage || { imports: {}, records: {} }
-  } catch (err) {
-    console.error('Error reading local report storage:', err)
-    return { imports: {}, records: {} }
-  }
-}
-
-function saveLocalReportStorage(data: LocalReportStorageData) {
-  inMemoryReportStorage = data
-  const tools = getFsAndPath()
-  const filePath = getReportStoragePath()
-  if (!tools || !filePath) return
-
-  try {
-    const dir = tools.path.dirname(filePath)
-    if (!tools.fs.existsSync(dir)) {
-      tools.fs.mkdirSync(dir, { recursive: true })
-    }
-    tools.fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
-  } catch (err) {
-    console.error('Error writing local report storage:', err)
-  }
-}
-
-// Generate standard RFC 4122 UUID
-function generateId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0
-    const v = c === 'x' ? r : (r & 0x3) | 0x8
-    return v.toString(16)
-  })
-}
-
-// Preview an Excel file before committing to database (detects matches vs new records)
-export async function previewReportImport(buffer: ArrayBuffer | Buffer, fileName: string): Promise<{
-  totalRecords: number
-  matchingCount: number
-  newCount: number
-  sampleMatches: { student_name: string; student_id?: string | null; course?: string | null }[]
-  sampleNew: { student_name: string; student_id?: string | null; course?: string | null }[]
-  totalPendingAmount: number
-  totalYetToRaised: number
-}> {
-  const parseResult = parseStudentReportExcel(buffer, fileName)
-  const supabase = await getSupabase()
-
-  let existingRecords: AimtReportRecord[] = []
-  try {
-    const { data } = await supabase.from('aimt_report_records').select('id, student_name, student_id, course')
-    if (data) existingRecords = data as AimtReportRecord[]
-  } catch {
-    // fallback
-  }
-
-  const existingById = new Map<string, AimtReportRecord>()
-  const existingByName = new Map<string, AimtReportRecord>()
-
-  existingRecords.forEach((r) => {
-    if (r.student_id && r.student_id.trim()) {
-      existingById.set(r.student_id.trim().toLowerCase(), r)
-    }
-    if (r.student_name && r.student_name.trim()) {
-      existingByName.set(r.student_name.trim().toLowerCase(), r)
-    }
-  })
-
-  const sampleMatches: any[] = []
-  const sampleNew: any[] = []
-  let matchingCount = 0
-  let newCount = 0
-
-  parseResult.records.forEach((incoming) => {
-    const idKey = incoming.student_id ? incoming.student_id.trim().toLowerCase() : ''
-    const nameKey = incoming.student_name ? incoming.student_name.trim().toLowerCase() : ''
-
-    const matched = (idKey && existingById.get(idKey)) || (nameKey && existingByName.get(nameKey))
-
-    if (matched) {
-      matchingCount++
-      if (sampleMatches.length < 5) {
-        sampleMatches.push({
-          student_name: incoming.student_name,
-          student_id: incoming.student_id,
-          course: incoming.course,
-        })
-      }
-    } else {
-      newCount++
-      if (sampleNew.length < 5) {
-        sampleNew.push({
-          student_name: incoming.student_name,
-          student_id: incoming.student_id,
-          course: incoming.course,
-        })
-      }
-    }
-  })
+function prismaAimtRecordToSnake(r: any): AimtReportRecord {
+  const extraData = (r.extraData as Record<string, any>) || {}
+  const rawFollowUp = r.followUp !== undefined && r.followUp !== null ? r.followUp : extraData.follow_up
+  const safeFollowUp =
+    rawFollowUp && String(rawFollowUp).trim() !== 'null' && String(rawFollowUp).trim() !== 'undefined'
+      ? String(rawFollowUp).trim()
+      : null
 
   return {
-    totalRecords: parseResult.records.length,
-    matchingCount,
-    newCount,
-    sampleMatches,
-    sampleNew,
-    totalPendingAmount: parseResult.totalPendingAmount,
-    totalYetToRaised: parseResult.totalYetToRaised,
+    id: r.id,
+    import_id: r.importId,
+    sr_no: r.srNo,
+    student_name: r.studentName,
+    student_id: r.studentId,
+    agent: r.agent,
+    scholarship: r.scholarship,
+    pending_invoice: r.pendingInvoice,
+    pending_amount: Number(r.pendingAmount ?? 0),
+    yet_to_raised: r.yetToRaised,
+    remarks: r.remarks,
+    dob: r.dob,
+    document: r.document,
+    status: r.status,
+    intake: r.intake,
+    end_date: r.endDate,
+    course: r.course,
+    admin_fee: Number(r.adminFee ?? 0),
+    resource_fee: Number(r.resourceFee ?? 0),
+    tuition_fee: Number(r.tuitionFee ?? 0),
+    total_fee: Number(r.totalFee ?? 0),
+    paid_amount: Number(r.paidAmount ?? 0),
+    total_paid: Number(r.totalPaid ?? extraData.total_paid ?? r.paidAmount ?? 0),
+    initial_payment: Number(r.paidAmount ?? 0),
+    follow_up: safeFollowUp,
+    coe_issued_date: r.coeIssuedDate,
+    email_id: r.emailId,
+    phone_no: r.phoneNo,
+    payment_status: r.paymentStatus,
+    extra_data: extraData as any,
+    created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt || new Date().toISOString()),
   }
 }
 
-// Save or Update imported Excel data to Supabase Live Database
+// Save AIMT imported Excel data to MySQL (Prisma)
 export async function saveReportImportToDatabase(params: {
   fileName: string
   fileSize: number
@@ -513,26 +311,21 @@ export async function saveReportImportToDatabase(params: {
   skippedCount: number
   newCount: number
 }> {
-  const supabase = await getSupabase()
   const entity = params.entity || 'aimt'
   const duplicateStrategy = params.duplicateStrategy || 'override'
   const nowStr = new Date().toISOString()
-  const fallbackId = generateId()
+  const importBatchId = generateId()
 
-  let importBatchId = fallbackId
-
-  // 1. Fetch all existing records in Supabase to compare
   let existingRecords: AimtReportRecord[] = []
   try {
-    const { data: dbRecords } = await supabase.from('aimt_report_records').select('*')
-    if (dbRecords) {
-      existingRecords = dbRecords as AimtReportRecord[]
+    const dbRecords = await prisma.aimtReportRecord.findMany()
+    if (dbRecords && dbRecords.length > 0) {
+      existingRecords = dbRecords.map(prismaAimtRecordToSnake)
     }
   } catch (err) {
-    console.warn('Could not fetch existing records from Supabase:', err)
+    console.warn('Could not fetch existing AIMT records from MySQL:', err)
   }
 
-  // Create lookup maps by student_id and student_name
   const existingById = new Map<string, AimtReportRecord>()
   const existingByName = new Map<string, AimtReportRecord>()
 
@@ -545,57 +338,39 @@ export async function saveReportImportToDatabase(params: {
     }
   })
 
-  // 2. Handle 'replace' strategy (clears prior data)
   if (duplicateStrategy === 'replace') {
     try {
-      await supabase.from('aimt_report_records').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      existingRecords = []
-      existingById.clear()
-      existingByName.clear()
+      await prisma.aimtReportRecord.deleteMany({})
     } catch (err) {
-      console.error('Error clearing existing records for replace strategy:', err)
+      console.warn('Error clearing MySQL AIMT records for replace strategy:', err)
     }
+    existingRecords = []
+    existingById.clear()
+    existingByName.clear()
   }
 
-  // 3. Process records according to strategy
   let overriddenCount = 0
   let skippedCount = 0
   let newCount = 0
 
-  const recordsToInsert: any[] = []
+  const recordsToInsertPrisma: any[] = []
 
-  // Create or get import batch
-  const importPayload = {
-    id: importBatchId,
-    file_name: params.fileName,
-    file_size: params.fileSize,
-    uploaded_at: nowStr,
-    uploaded_by: params.uploadedBy || 'admin@isquarebpo.com',
-    total_records: 0,
-    total_pending_amount: 0,
-    total_yet_to_raised: 0,
-    entity: entity,
-    raw_headers: (params.rawHeaders || []) as any,
-    created_at: nowStr,
-    updated_at: nowStr,
-  }
+  await prisma.aimtReportImport.create({
+    data: {
+      id: importBatchId,
+      fileName: params.fileName,
+      fileSize: BigInt(params.fileSize || 0),
+      uploadedAt: new Date(),
+      uploadedBy: params.uploadedBy || 'admin@isquarebpo.com',
+      totalRecords: 0,
+      totalPendingAmount: 0,
+      totalYetToRaised: 0,
+      entity: entity,
+      originalFileData: params.originalBase64 || null,
+      rawHeaders: (params.rawHeaders || []) as any,
+    },
+  })
 
-  try {
-    const { data, error } = await supabase.from('aimt_report_imports').insert(importPayload).select().single()
-    if (!error && data) {
-      importBatchId = data.id
-    } else if (error) {
-      console.warn('Import batch insert with ID failed, attempting fallback query:', error)
-      const { data: defaultBatch } = await supabase.from('aimt_report_imports').select('id').limit(1).maybeSingle()
-      if (defaultBatch) {
-        importBatchId = defaultBatch.id
-      }
-    }
-  } catch (err) {
-    console.warn('Error creating import batch in Supabase:', err)
-  }
-
-  // Find max sr_no
   let nextSrNo = existingRecords.reduce((max, r) => Math.max(max, r.sr_no || 0), 0) + 1
   if (duplicateStrategy === 'replace') {
     nextSrNo = 1
@@ -613,317 +388,219 @@ export async function saveReportImportToDatabase(params: {
         skippedCount++
         continue
       } else if (duplicateStrategy === 'override') {
-        // Update the existing record in Supabase
-        const updatedPayload: any = {
-          student_name: incoming.student_name,
-          student_id: incoming.student_id || existing.student_id,
+        const updatedPayloadPrisma: any = {
+          studentName: incoming.student_name,
+          studentId: incoming.student_id || existing.student_id,
           agent: incoming.agent || existing.agent,
           scholarship: incoming.scholarship || existing.scholarship,
-          pending_invoice: incoming.pending_invoice,
-          pending_amount: incoming.pending_amount,
-          yet_to_raised: incoming.yet_to_raised,
+          pendingInvoice: incoming.pending_invoice,
+          pendingAmount: incoming.pending_amount,
+          yetToRaised: incoming.yet_to_raised,
           remarks: incoming.remarks || existing.remarks,
           dob: incoming.dob || existing.dob,
-          document: normalizeDocumentType(incoming.document || existing.document) || null,
+          document: normalizeDocumentType(incoming.document || existing.document),
           status: incoming.status || existing.status,
           intake: incoming.intake || existing.intake,
-          end_date: incoming.end_date || existing.end_date,
+          endDate: incoming.end_date || existing.end_date,
           course: incoming.course || existing.course,
-          admin_fee: incoming.admin_fee,
-          resource_fee: incoming.resource_fee,
-          tuition_fee: incoming.tuition_fee,
-          total_fee: incoming.total_fee,
-          paid_amount: incoming.paid_amount,
-          coe_issued_date: incoming.coe_issued_date || existing.coe_issued_date,
-          email_id: incoming.email_id || existing.email_id,
-          phone_no: incoming.phone_no || existing.phone_no,
-          payment_status: incoming.payment_status || existing.payment_status,
-          extra_data: {
-            ...((existing.extra_data as Record<string, any>) || {}),
+          adminFee: incoming.admin_fee,
+          resourceFee: incoming.resource_fee,
+          tuitionFee: incoming.tuition_fee,
+          totalFee: incoming.total_fee,
+          paidAmount: incoming.paid_amount,
+          totalPaid: incoming.total_paid || existing.total_paid,
+          followUp: incoming.follow_up || existing.follow_up,
+          coeIssuedDate: incoming.coe_issued_date || existing.coe_issued_date,
+          emailId: incoming.email_id || existing.email_id,
+          phoneNo: incoming.phone_no || existing.phone_no,
+          paymentStatus: incoming.payment_status || existing.payment_status,
+          extraData: {
+            ...((existing.extra_data as any) || {}),
             ...(incoming.extra_data || {}),
-            total_paid: incoming.total_paid || incoming.paid_amount,
+            total_paid: incoming.total_paid || existing.total_paid,
             initial_payment: incoming.paid_amount,
+            follow_up: incoming.follow_up || existing.follow_up,
           },
         }
 
-        try {
-          const { error: updErr } = await supabase.from('aimt_report_records').update(updatedPayload).eq('id', existing.id)
-          if (updErr) {
-            console.error(`Error overriding student ${incoming.student_name}:`, updErr)
-          } else {
-            overriddenCount++
-          }
-        } catch (err) {
-          console.error(`Error overriding student ${incoming.student_name}:`, err)
-        }
+        await prisma.aimtReportRecord.update({
+          where: { id: existing.id },
+          data: updatedPayloadPrisma,
+        })
+        overriddenCount++
         continue
       }
     }
 
-    // New non-matching record: prepare insert
-    newCount++
-    let newSrNo = incoming.sr_no || nextSrNo++
-    if (newSrNo <= 0 || newSrNo > 100000) {
-      newSrNo = nextSrNo++
-    }
-    recordsToInsert.push({
-      id: generateId(),
-      import_id: importBatchId,
-      sr_no: newSrNo,
-      student_name: incoming.student_name,
-      student_id: incoming.student_id,
-      agent: incoming.agent,
-      scholarship: incoming.scholarship,
-      pending_invoice: incoming.pending_invoice,
-      pending_amount: incoming.pending_amount,
-      yet_to_raised: incoming.yet_to_raised,
-      remarks: incoming.remarks,
-      dob: incoming.dob,
+    const assignedSrNo = incoming.sr_no || nextSrNo++
+    const newRecordId = generateId()
+
+    recordsToInsertPrisma.push({
+      id: newRecordId,
+      importId: importBatchId,
+      srNo: assignedSrNo,
+      studentName: incoming.student_name,
+      studentId: incoming.student_id || null,
+      agent: incoming.agent || null,
+      scholarship: incoming.scholarship || null,
+      pendingInvoice: incoming.pending_invoice || null,
+      pendingAmount: incoming.pending_amount || 0,
+      yetToRaised: incoming.yet_to_raised || null,
+      remarks: incoming.remarks || null,
+      followUp: incoming.follow_up || null,
+      dob: incoming.dob || null,
       document: normalizeDocumentType(incoming.document) || null,
-      status: incoming.status,
-      intake: incoming.intake,
-      end_date: incoming.end_date,
-      course: incoming.course,
-      admin_fee: incoming.admin_fee,
-      resource_fee: incoming.resource_fee,
-      tuition_fee: incoming.tuition_fee,
-      total_fee: incoming.total_fee,
-      paid_amount: incoming.paid_amount,
-      coe_issued_date: incoming.coe_issued_date,
-      email_id: incoming.email_id,
-      phone_no: incoming.phone_no,
-      payment_status: incoming.payment_status,
-      extra_data: {
-        ...(incoming.extra_data || {}),
-        total_paid: incoming.total_paid || incoming.paid_amount,
-        initial_payment: incoming.paid_amount,
+      status: incoming.status || 'Current',
+      intake: incoming.intake || null,
+      endDate: incoming.end_date || null,
+      course: incoming.course || null,
+      adminFee: incoming.admin_fee || 0,
+      resourceFee: incoming.resource_fee || 0,
+      tuitionFee: incoming.tuition_fee || 0,
+      totalFee: incoming.total_fee || 0,
+      paidAmount: incoming.paid_amount || 0,
+      totalPaid: incoming.total_paid || incoming.paid_amount || 0,
+      coeIssuedDate: incoming.coe_issued_date || null,
+      emailId: incoming.email_id || null,
+      phoneNo: incoming.phone_no || null,
+      paymentStatus: incoming.payment_status || 'Pending',
+      extraData: {
+        ...incoming.extra_data,
+        total_paid: incoming.total_paid || incoming.paid_amount || 0,
+        initial_payment: incoming.paid_amount || 0,
+        follow_up: incoming.follow_up || null,
       },
-      created_at: nowStr,
     })
+    newCount++
   }
 
-  // Insert new records in chunks to Supabase
-  if (recordsToInsert.length > 0) {
-    const chunkSize = 100
-    for (let i = 0; i < recordsToInsert.length; i += chunkSize) {
-      const chunk = recordsToInsert.slice(i, i + chunkSize)
-      try {
-        const { error: insErr } = await supabase.from('aimt_report_records').insert(chunk)
-        if (insErr) {
-          console.error('CRITICAL: Error inserting records chunk to Supabase:', insErr)
-          throw new Error(insErr.message)
-        }
-      } catch (err) {
-        console.error('Error inserting records chunk to Supabase:', err)
-        throw err
-      }
+  const CHUNK_SIZE = 250
+  if (recordsToInsertPrisma.length > 0) {
+    for (let i = 0; i < recordsToInsertPrisma.length; i += CHUNK_SIZE) {
+      const chunk = recordsToInsertPrisma.slice(i, i + CHUNK_SIZE)
+      await prisma.aimtReportRecord.createMany({ data: chunk })
     }
   }
 
-  // Recalculate totals in Supabase
-  let finalTotalRecords = 0
-  let finalPendingAmount = 0
-  let finalYetToRaised = 0
+  const allFinalRows = await prisma.aimtReportRecord.findMany({
+    where: { importId: importBatchId },
+    select: { pendingAmount: true, yetToRaised: true },
+  })
 
-  try {
-    const { data: allFinalRows } = await supabase.from('aimt_report_records').select('pending_amount, yet_to_raised')
-    if (allFinalRows) {
-      finalTotalRecords = allFinalRows.length
-      finalPendingAmount = allFinalRows.reduce((sum, r) => sum + (Number(r.pending_amount) || 0), 0)
-      finalYetToRaised = allFinalRows.reduce((sum, r) => sum + cleanNumber(r.yet_to_raised), 0)
+  let sumPending = 0
+  let sumYetRaised = 0
+  allFinalRows.forEach((r) => {
+    sumPending += Number(r.pendingAmount ?? 0)
+    sumYetRaised += cleanNumber(r.yetToRaised)
+  })
 
-      await supabase.from('aimt_report_imports').update({
-        total_records: finalTotalRecords,
-        total_pending_amount: finalPendingAmount,
-        total_yet_to_raised: finalYetToRaised,
-        updated_at: nowStr,
-      }).eq('id', importBatchId)
-    }
-  } catch {
-    // ignore
-  }
+  await prisma.aimtReportImport.update({
+    where: { id: importBatchId },
+    data: {
+      totalRecords: recordsToInsertPrisma.length + overriddenCount,
+      totalPendingAmount: sumPending,
+      totalYetToRaised: sumYetRaised,
+    },
+  })
 
-  // Update server storage backup
-  const store = readLocalReportStorage()
-  if (duplicateStrategy === 'replace') {
-    store.records = {}
-    store.records[importBatchId] = recordsToInsert
-  } else {
-    if (!store.records[importBatchId]) store.records[importBatchId] = []
-    store.records[importBatchId].push(...recordsToInsert)
-  }
-  store.imports[importBatchId] = {
-    ...importPayload,
+  const importBatch: AimtReportImport = {
     id: importBatchId,
-    total_records: finalTotalRecords,
-    total_pending_amount: finalPendingAmount,
-    total_yet_to_raised: finalYetToRaised,
-  } as AimtReportImport
-  saveLocalReportStorage(store)
+    file_name: params.fileName,
+    file_size: params.fileSize,
+    uploaded_at: nowStr,
+    uploaded_by: params.uploadedBy || 'admin@isquarebpo.com',
+    total_records: recordsToInsertPrisma.length + overriddenCount,
+    total_pending_amount: sumPending,
+    total_yet_to_raised: sumYetRaised,
+    entity: entity,
+    original_file_data: params.originalBase64 || null,
+    raw_headers: (params.rawHeaders || []) as any,
+    created_at: nowStr,
+    updated_at: nowStr,
+  }
 
   return {
-    importBatch: store.imports[importBatchId],
-    recordCount: finalTotalRecords,
+    importBatch,
+    recordCount: recordsToInsertPrisma.length + overriddenCount,
     overriddenCount,
     skippedCount,
     newCount,
   }
 }
 
-// Fetch all import history batches
-export async function getReportImports(entity: string = 'aimt'): Promise<AimtReportImport[]> {
-  // 1. Primary: Hostinger MySQL via Prisma
+// Fetch all AIMT import history batches
+export async function getReportImports(entity?: string): Promise<AimtReportImport[]> {
   try {
     const dbImports = await prisma.aimtReportImport.findMany({
-      where: { entity },
       orderBy: { uploadedAt: 'desc' },
+      select: {
+        id: true,
+        fileName: true,
+        fileSize: true,
+        uploadedAt: true,
+        uploadedBy: true,
+        totalRecords: true,
+        totalPendingAmount: true,
+        totalYetToRaised: true,
+        entity: true,
+        rawHeaders: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     })
+
     if (dbImports && dbImports.length > 0) {
-      return dbImports.map((imp: any) => ({
+      return dbImports.map((imp) => ({
         id: imp.id,
         file_name: imp.fileName,
-        file_size: Number(imp.fileSize || 0),
+        file_size: Number(imp.fileSize ?? 0),
         uploaded_at: imp.uploadedAt.toISOString(),
         uploaded_by: imp.uploadedBy,
         total_records: imp.totalRecords,
-        total_pending_amount: Number(imp.totalPendingAmount || 0),
-        total_yet_to_raised: Number(imp.totalYetToRaised || 0),
-        entity: imp.entity,
-        raw_headers: imp.rawHeaders,
-        created_at: imp.createdAt.toISOString(),
-        updated_at: imp.updatedAt.toISOString(),
+        total_pending_amount: Number(imp.totalPendingAmount ?? 0),
+        total_yet_to_raised: Number(imp.totalYetToRaised ?? 0),
+        entity: imp.entity ?? 'aimt',
+        original_file_data: null,
+        raw_headers: (imp.rawHeaders as any) ?? [],
+        created_at: imp.createdAt?.toISOString() ?? imp.uploadedAt.toISOString(),
+        updated_at: imp.updatedAt?.toISOString() ?? imp.uploadedAt.toISOString(),
       })) as unknown as AimtReportImport[]
     }
   } catch (err) {
-    console.warn('MySQL getReportImports failed, falling back to Supabase:', err)
+    console.warn('MySQL getReportImports failed:', err)
   }
 
-  // 2. Supabase fallback
-  const supabase = await getSupabase()
-  try {
-    const { data, error } = await supabase
-      .from('aimt_report_imports')
-      .select('id, file_name, file_size, uploaded_at, uploaded_by, total_records, total_pending_amount, total_yet_to_raised, entity, raw_headers, created_at, updated_at')
-      .eq('entity', entity)
-      .order('uploaded_at', { ascending: false })
-
-    if (!error && data && data.length > 0) {
-      return data as unknown as AimtReportImport[]
-    }
-  } catch {
-    // ignore
-  }
-
-  // Fallback to local storage
-  const store = readLocalReportStorage()
-  const list = Object.values(store.imports || {})
-    .filter((item) => (item.entity || 'aimt') === entity)
-    .sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())
-
-  return list
+  return []
 }
 
-// Fetch a single import batch by ID (including original file data if needed)
+// Fetch a single import batch by ID
 export async function getReportImportById(id: string, includeFileData: boolean = false): Promise<AimtReportImport | null> {
-  // 1. Primary: MySQL via Prisma
   try {
     const imp = await prisma.aimtReportImport.findUnique({ where: { id } })
     if (imp) {
       return {
         id: imp.id,
         file_name: imp.fileName,
-        file_size: Number(imp.fileSize || 0),
+        file_size: Number(imp.fileSize ?? 0),
         uploaded_at: imp.uploadedAt.toISOString(),
         uploaded_by: imp.uploadedBy,
         total_records: imp.totalRecords,
-        total_pending_amount: Number(imp.totalPendingAmount || 0),
-        total_yet_to_raised: Number(imp.totalYetToRaised || 0),
-        entity: imp.entity,
-        raw_headers: imp.rawHeaders,
-        created_at: imp.createdAt.toISOString(),
-        updated_at: imp.updatedAt.toISOString(),
+        total_pending_amount: Number(imp.totalPendingAmount ?? 0),
+        total_yet_to_raised: Number(imp.totalYetToRaised ?? 0),
+        entity: imp.entity ?? 'aimt',
+        original_file_data: includeFileData ? (imp.originalFileData ?? null) : null,
+        raw_headers: (imp.rawHeaders as any) ?? [],
+        created_at: imp.createdAt?.toISOString() ?? imp.uploadedAt.toISOString(),
+        updated_at: imp.updatedAt?.toISOString() ?? imp.uploadedAt.toISOString(),
       } as unknown as AimtReportImport
     }
-  } catch {
-    // ignore, fall through
+  } catch (err) {
+    console.warn('MySQL getReportImportById failed:', err)
   }
-
-  // 2. Supabase fallback
-  const supabase = await getSupabase()
-  try {
-    const query = includeFileData
-      ? supabase.from('aimt_report_imports').select('*')
-      : supabase.from('aimt_report_imports').select('id, file_name, file_size, uploaded_at, uploaded_by, total_records, total_pending_amount, total_yet_to_raised, entity, raw_headers, created_at, updated_at')
-    
-    const { data, error } = await query.eq('id', id).maybeSingle()
-    if (!error && data) {
-      return data as unknown as AimtReportImport
-    }
-  } catch {
-    // ignore
-  }
-
-  // 3. Local storage fallback
-  const store = readLocalReportStorage()
-  return store.imports[id] || null
+  return null
 }
 
-// ─── Helper: map Prisma AimtReportRecord row → AimtReportRecord (snake_case) ────
-function prismaRecordToSnake(r: any): AimtReportRecord {
-  const extraData = r.extraData
-    ? (typeof r.extraData === 'string' ? JSON.parse(r.extraData) : r.extraData)
-    : {}
-
-  // follow_up: prefer dedicated column, fallback to extra_data.follow_up
-  const rawFollowUp = r.followUp !== null && r.followUp !== undefined
-    ? r.followUp
-    : extraData?.follow_up
-  const safeFollowUp =
-    rawFollowUp && String(rawFollowUp).trim() !== 'null' && String(rawFollowUp).trim() !== 'undefined'
-      ? String(rawFollowUp).trim()
-      : null
-
-  // total_paid: prefer dedicated column, fallback to extra_data.total_paid
-  const totalPaidVal = r.totalPaid !== null && r.totalPaid !== undefined
-    ? Number(r.totalPaid)
-    : (extraData?.total_paid !== undefined ? Number(extraData.total_paid) : 0)
-
-  return {
-    id: r.id,
-    import_id: r.importId,
-    sr_no: r.srNo ?? null,
-    student_name: r.studentName,
-    student_id: r.studentId ?? null,
-    agent: r.agent ?? null,
-    scholarship: r.scholarship ?? null,
-    pending_invoice: r.pendingInvoice ?? null,
-    pending_amount: Number(r.pendingAmount ?? 0),
-    yet_to_raised: r.yetToRaised ?? null,
-    remarks: r.remarks ?? null,
-    follow_up: safeFollowUp,
-    dob: r.dob ?? null,
-    document: r.document ?? null,
-    status: r.status ?? null,
-    intake: r.intake ?? null,
-    end_date: r.endDate ?? null,
-    course: r.course ?? null,
-    admin_fee: Number(r.adminFee ?? 0),
-    resource_fee: Number(r.resourceFee ?? 0),
-    tuition_fee: Number(r.tuitionFee ?? 0),
-    total_fee: Number(r.totalFee ?? 0),
-    paid_amount: Number(r.paidAmount ?? 0),
-    total_paid: totalPaidVal,
-    initial_payment: Number(r.paidAmount ?? 0),
-    coe_issued_date: r.coeIssuedDate ?? null,
-    email_id: r.emailId ?? null,
-    phone_no: r.phoneNo ?? null,
-    payment_status: r.paymentStatus ?? null,
-    extra_data: extraData,
-    created_at: r.createdAt ? (r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt) : new Date().toISOString(),
-  } as AimtReportRecord
-}
-
-// Fetch records for an import batch or all recent records with filters
+// Fetch records from aimt_report_records with filters and stats
 export async function getReportRecords(params: {
   importId?: string
   search?: string
@@ -943,7 +620,6 @@ export async function getReportRecords(params: {
   availableIntakes: string[]
   availableCourses: string[]
 }> {
-  // 1. Primary: Hostinger MySQL via Prisma
   try {
     const page = params.page || 1
     const pageSize = params.pageSize || 50
@@ -966,7 +642,6 @@ export async function getReportRecords(params: {
       ]
     }
 
-    // Prisma field name map
     const sortFieldMap: Record<string, string> = {
       sr_no: 'srNo',
       student_name: 'studentName',
@@ -985,11 +660,17 @@ export async function getReportRecords(params: {
       ...(pageSize === -1 ? {} : { skip: (page - 1) * pageSize, take: pageSize }),
     })
 
-    // MySQL connection succeeded — always use it even if 0 rows match the filter
-    // Compute totals over the base unfiltered set for this import/all
     const allForTotals = await prisma.aimtReportRecord.findMany({
       where: params.importId ? { importId: params.importId } : {},
-      select: { pendingAmount: true, yetToRaised: true, agent: true, intake: true, course: true },
+      select: {
+        pendingAmount: true,
+        totalFee: true,
+        paidAmount: true,
+        yetToRaised: true,
+        agent: true,
+        intake: true,
+        course: true,
+      },
     })
 
     let totalPending = 0
@@ -999,7 +680,13 @@ export async function getReportRecords(params: {
     const courseSet = new Set<string>()
 
     for (const r of allForTotals) {
-      totalPending += Number(r.pendingAmount ?? 0)
+      let pAmt = Number(r.pendingAmount ?? 0)
+      const fee = Number(r.totalFee ?? 0)
+      const paid = Number(r.paidAmount ?? 0)
+      if (pAmt === 0 && fee > paid) {
+        pAmt = Math.max(0, fee - paid)
+      }
+      totalPending += pAmt
       totalYetRaised += cleanNumber(r.yetToRaised)
       if (r.agent) agentSet.add(r.agent)
       if (r.intake) intakeSet.add(r.intake)
@@ -1007,7 +694,7 @@ export async function getReportRecords(params: {
     }
 
     return {
-      records: rows.map(prismaRecordToSnake),
+      records: rows.map(prismaAimtRecordToSnake),
       totalCount,
       totalPendingAmount: Number(totalPending.toFixed(2)),
       totalYetToRaised: Number(totalYetRaised.toFixed(2)),
@@ -1016,165 +703,39 @@ export async function getReportRecords(params: {
       availableCourses: Array.from(courseSet).sort(),
     }
   } catch (err) {
-    console.warn('MySQL getReportRecords failed, falling back to Supabase:', err)
+    console.warn('MySQL getReportRecords failed:', err)
   }
 
-  // 2. Supabase fallback
-  const supabase = await getSupabase()
-  const page = params.page || 1
-  const pageSize = params.pageSize || 50
-  const sortBy = params.sortBy || 'sr_no'
-  const sortOrder = params.sortOrder || 'asc'
-  const targetImportId = params.importId
-
-  let query = supabase.from('aimt_report_records').select('*', { count: 'exact' })
-  if (targetImportId) query = query.eq('import_id', targetImportId)
-  if (params.search?.trim()) {
-    const q = params.search.trim()
-    query = query.or(`student_name.ilike.%${q}%,agent.ilike.%${q}%,course.ilike.%${q}%,student_id.ilike.%${q}%,intake.ilike.%${q}%`)
-  }
-  if (params.agent && params.agent !== 'all') query = query.eq('agent', params.agent)
-  if (params.intake && params.intake !== 'all') query = query.eq('intake', params.intake)
-  if (params.course && params.course !== 'all') query = query.eq('course', params.course)
-  query = query.order(sortBy, { ascending: sortOrder === 'asc' })
-  if (pageSize !== -1) {
-    const from = (page - 1) * pageSize
-    query = query.range(from, from + pageSize - 1)
-  }
-
-  let sbData: any[] | null = null
-  let sbCount: number | null = null
-  let sbError: any = null
-  try {
-    const res = await query
-    sbData = res.data
-    sbCount = res.count
-    sbError = res.error
-  } catch (err) {
-    sbError = err
-  }
-
-  if (!sbError && sbData !== null) {
-    let totalsQuery = supabase.from('aimt_report_records').select('pending_amount, yet_to_raised, agent, intake, course')
-    if (targetImportId) totalsQuery = totalsQuery.eq('import_id', targetImportId)
-    const { data: allBatchRecords } = await totalsQuery
-
-    let totalPending = 0
-    let totalYetRaised = 0
-    const agentSet = new Set<string>()
-    const intakeSet = new Set<string>()
-    const courseSet = new Set<string>()
-
-    if (allBatchRecords) {
-      allBatchRecords.forEach((r) => {
-        totalPending += Number(r.pending_amount || 0)
-        totalYetRaised += cleanNumber(r.yet_to_raised)
-        if (r.agent) agentSet.add(r.agent)
-        if (r.intake) intakeSet.add(r.intake)
-        if (r.course) courseSet.add(r.course)
-      })
-    }
-
-    return {
-      records: (sbData || []).map((r: any) => {
-        const rawFollowUp = r.follow_up ?? r.extra_data?.follow_up
-        const safeFollowUp = rawFollowUp && String(rawFollowUp).trim() !== 'null' ? String(rawFollowUp).trim() : null
-        return {
-          ...r,
-          total_paid: r.total_paid != null ? Number(r.total_paid) : (r.extra_data?.total_paid != null ? Number(r.extra_data.total_paid) : 0),
-          paid_amount: r.paid_amount != null ? Number(r.paid_amount) : 0,
-          follow_up: safeFollowUp,
-        }
-      }),
-      totalCount: sbCount !== null ? sbCount : sbData.length,
-      totalPendingAmount: Number(totalPending.toFixed(2)),
-      totalYetToRaised: Number(totalYetRaised.toFixed(2)),
-      availableAgents: Array.from(agentSet).sort(),
-      availableIntakes: Array.from(intakeSet).sort(),
-      availableCourses: Array.from(courseSet).sort(),
-    }
-  }
-
-  // 3. Local JSON fallback
-  const store = readLocalReportStorage()
-  const rawBatch = targetImportId
-    ? store.records[targetImportId] || []
-    : Object.values(store.records || {}).flat()
-
-  let filtered = [...rawBatch]
-  if (params.search?.trim()) {
-    const q = params.search.trim().toLowerCase()
-    filtered = filtered.filter((r) =>
-      r.student_name?.toLowerCase().includes(q) ||
-      r.agent?.toLowerCase().includes(q) ||
-      r.course?.toLowerCase().includes(q) ||
-      r.student_id?.toLowerCase().includes(q) ||
-      r.intake?.toLowerCase().includes(q)
-    )
-  }
-  if (params.agent && params.agent !== 'all') filtered = filtered.filter((r) => r.agent === params.agent)
-  if (params.intake && params.intake !== 'all') filtered = filtered.filter((r) => r.intake === params.intake)
-  if (params.course && params.course !== 'all') filtered = filtered.filter((r) => r.course === params.course)
-
-  filtered.sort((a, b) => {
-    let aVal: any = a[sortBy as keyof AimtReportRecord] ?? ''
-    let bVal: any = b[sortBy as keyof AimtReportRecord] ?? ''
-    if (sortBy === 'pending_amount' || sortBy === 'sr_no') {
-      return (sortOrder === 'asc' ? 1 : -1) * (Number(aVal) - Number(bVal))
-    }
-    if (typeof aVal === 'string') aVal = aVal.toLowerCase()
-    if (typeof bVal === 'string') bVal = bVal.toLowerCase()
-    return sortOrder === 'asc' ? (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) : (aVal > bVal ? -1 : aVal < bVal ? 1 : 0)
-  })
-
-  let totalPending = 0
-  let totalYetRaised = 0
-  const agentSet = new Set<string>()
-  const intakeSet = new Set<string>()
-  const courseSet = new Set<string>()
-  rawBatch.forEach((r) => {
-    totalPending += Number(r.pending_amount || 0)
-    totalYetRaised += cleanNumber(r.yet_to_raised)
-    if (r.agent) agentSet.add(r.agent)
-    if (r.intake) intakeSet.add(r.intake)
-    if (r.course) courseSet.add(r.course)
-  })
-
-  const localFrom = (page - 1) * pageSize
   return {
-    records: pageSize === -1 ? filtered : filtered.slice(localFrom, localFrom + pageSize),
-    totalCount: filtered.length,
-    totalPendingAmount: Number(totalPending.toFixed(2)),
-    totalYetToRaised: Number(totalYetRaised.toFixed(2)),
-    availableAgents: Array.from(agentSet).sort(),
-    availableIntakes: Array.from(intakeSet).sort(),
-    availableCourses: Array.from(courseSet).sort(),
+    records: [],
+    totalCount: 0,
+    totalPendingAmount: 0,
+    totalYetToRaised: 0,
+    availableAgents: [],
+    availableIntakes: [],
+    availableCourses: [],
   }
 }
 
-// Delete an import batch and all its records
+// Delete an AIMT import batch and cascade delete its records
 export async function deleteReportImport(id: string): Promise<void> {
-  const supabase = await getSupabase()
   try {
-    await supabase.from('aimt_report_imports').delete().eq('id', id)
-  } catch {
-    // ignore
+    await prisma.aimtReportImport.delete({ where: { id } })
+  } catch (mysqlErr: any) {
+    if (mysqlErr?.code !== 'P2025') {
+      console.error('MySQL deleteReportImport FAILED:', mysqlErr)
+      throw mysqlErr
+    }
   }
-
-  const store = readLocalReportStorage()
-  delete store.imports[id]
-  delete store.records[id]
-  saveLocalReportStorage(store)
 }
 
-// Get or create a manual entries import batch to link manually added records
-export async function getOrCreateManualImportBatch(entity: string = 'aimt'): Promise<AimtReportImport> {
+// Get or create a manual entries import batch for AIMT
+export async function getOrCreateManualImportBatch(): Promise<AimtReportImport> {
   const nowStr = new Date().toISOString()
 
-  // 1. PRIMARY: Try MySQL first
   try {
     const mysqlBatch = await prisma.aimtReportImport.findFirst({
-      where: { entity },
+      where: { entity: 'aimt' },
       orderBy: { uploadedAt: 'desc' },
     })
     if (mysqlBatch) {
@@ -1185,9 +746,9 @@ export async function getOrCreateManualImportBatch(entity: string = 'aimt'): Pro
         uploaded_at: mysqlBatch.uploadedAt.toISOString(),
         uploaded_by: mysqlBatch.uploadedBy,
         total_records: mysqlBatch.totalRecords,
-        total_pending_amount: Number(mysqlBatch.totalPendingAmount),
-        total_yet_to_raised: Number(mysqlBatch.totalYetToRaised),
-        entity: mysqlBatch.entity ?? entity,
+        total_pending_amount: Number(mysqlBatch.totalPendingAmount ?? 0),
+        total_yet_to_raised: Number(mysqlBatch.totalYetToRaised ?? 0),
+        entity: mysqlBatch.entity ?? 'aimt',
         original_file_data: null,
         raw_headers: (mysqlBatch.rawHeaders as any) ?? [],
         created_at: mysqlBatch.createdAt?.toISOString() ?? nowStr,
@@ -1198,25 +759,34 @@ export async function getOrCreateManualImportBatch(entity: string = 'aimt'): Pro
     console.warn('MySQL getOrCreateManualImportBatch query failed:', err)
   }
 
-  // 2. Fallback: Try Supabase
-  try {
-    const supabase = await getSupabase()
-    const { data, error } = await supabase
-      .from('aimt_report_imports')
-      .select('*')
-      .eq('entity', entity)
-      .order('uploaded_at', { ascending: false })
-      .limit(1)
-    if (!error && data && data.length > 0) {
-      return data[0] as AimtReportImport
-    }
-  } catch (err) {
-    console.warn('Supabase getOrCreateManualImportBatch query failed (non-fatal):', err)
-  }
-
-  // 3. Create a new batch in MySQL
   const manualBatchId = generateId()
-  const newBatchPayload: any = {
+  const raw_headers = [
+    'Sr No',
+    'Student Name',
+    'Agent',
+    'Pending Invoice',
+    'Pending Amount',
+    'Yet to Raised',
+    'Intake',
+    'Course',
+  ]
+
+  await prisma.aimtReportImport.create({
+    data: {
+      id: manualBatchId,
+      fileName: 'Manual Student Records',
+      fileSize: 0,
+      uploadedAt: new Date(),
+      uploadedBy: 'admin@isquarebpo.com',
+      totalRecords: 0,
+      totalPendingAmount: 0,
+      totalYetToRaised: 0,
+      entity: 'aimt',
+      rawHeaders: raw_headers,
+    },
+  })
+
+  return {
     id: manualBatchId,
     file_name: 'Manual Student Records',
     file_size: 0,
@@ -1225,47 +795,15 @@ export async function getOrCreateManualImportBatch(entity: string = 'aimt'): Pro
     total_records: 0,
     total_pending_amount: 0,
     total_yet_to_raised: 0,
-    entity: entity,
-    raw_headers: ['Sr No', 'Student Name', 'Agent', 'Pending Invoice', 'Pending Amount', 'Yet to Raised', 'Intake', 'Course'],
+    entity: 'aimt',
+    original_file_data: null,
+    raw_headers: raw_headers as any,
+    created_at: nowStr,
+    updated_at: nowStr,
   }
-
-  try {
-    await prisma.aimtReportImport.create({
-      data: {
-        id: manualBatchId,
-        fileName: 'Manual Student Records',
-        fileSize: 0,
-        uploadedAt: new Date(),
-        uploadedBy: 'admin@isquarebpo.com',
-        totalRecords: 0,
-        totalPendingAmount: 0,
-        totalYetToRaised: 0,
-        entity: entity,
-        rawHeaders: newBatchPayload.raw_headers,
-      },
-    })
-  } catch (mysqlErr) {
-    console.warn('MySQL createManualImportBatch failed (non-fatal):', mysqlErr)
-  }
-
-  // Mirror to Supabase non-fatally
-  try {
-    const supabase = await getSupabase()
-    await supabase.from('aimt_report_imports').insert(newBatchPayload)
-  } catch (err) {
-    console.warn('Supabase mirror createManualImportBatch failed (non-fatal):', err)
-  }
-
-  const createdBatch = { ...newBatchPayload, created_at: nowStr, updated_at: nowStr } as AimtReportImport
-  const store = readLocalReportStorage()
-  store.imports[manualBatchId] = createdBatch
-  if (!store.records[manualBatchId]) store.records[manualBatchId] = []
-  saveLocalReportStorage(store)
-
-  return createdBatch
 }
 
-// 1. Create a single new student report record directly in the database
+// Create a single new AIMT student record
 export async function createReportRecord(params: {
   importId?: string | null
   student_name: string
@@ -1297,35 +835,20 @@ export async function createReportRecord(params: {
   extra_data?: Record<string, any>
 }): Promise<AimtReportRecord> {
   let targetImportId = params.importId
-  const nowStr = new Date().toISOString()
 
-  // Ensure an import batch exists — MySQL first
   if (!targetImportId) {
-    const defaultBatch = await getOrCreateManualImportBatch('aimt')
+    const defaultBatch = await getOrCreateManualImportBatch()
     targetImportId = defaultBatch.id
-  } else {
-    // Verify targetImportId exists in MySQL, fallback to create
-    try {
-      const existingBatch = await prisma.aimtReportImport.findUnique({ where: { id: targetImportId } })
-      if (!existingBatch) {
-        const defaultBatch = await getOrCreateManualImportBatch('aimt')
-        targetImportId = defaultBatch.id
-      }
-    } catch {
-      const defaultBatch = await getOrCreateManualImportBatch('aimt')
-      targetImportId = defaultBatch.id
-    }
   }
 
   const newId = generateId()
 
-  // Clean numeric values
   const pendingAmountNum = cleanNumber(params.pending_amount)
   const yetToRaisedVal = cleanString(params.yet_to_raised)
   const adminFeeNum = cleanNumber(params.admin_fee)
   const resourceFeeNum = cleanNumber(params.resource_fee)
   const tuitionFeeNum = cleanNumber(params.tuition_fee)
-
+  
   const totalFeeNum = params.total_fee !== undefined && params.total_fee !== null && params.total_fee !== ''
     ? cleanNumber(params.total_fee)
     : Math.max(0, adminFeeNum + resourceFeeNum + tuitionFeeNum - (cleanNumber(params.scholarship)))
@@ -1334,19 +857,16 @@ export async function createReportRecord(params: {
   const totalPaidNum = cleanNumber(params.total_paid)
   const followUpVal = cleanString(params.follow_up) || null
 
-  // Find highest Sr No in MySQL
   let nextSrNo = 1
   try {
     const maxRecord = await prisma.aimtReportRecord.findFirst({
       orderBy: { srNo: 'desc' },
       select: { srNo: true },
     })
-    if (maxRecord && maxRecord.srNo != null) {
+    if (maxRecord && typeof maxRecord.srNo === 'number') {
       nextSrNo = maxRecord.srNo + 1
     }
-  } catch {
-    // fallback
-  }
+  } catch {}
 
   const extraData = {
     ...(params.extra_data || {}),
@@ -1355,370 +875,120 @@ export async function createReportRecord(params: {
     follow_up: followUpVal,
   }
 
-  const recordPayload: AimtReportRecord = {
-    id: newId,
-    import_id: targetImportId!,
-    sr_no: nextSrNo,
-    student_name: cleanString(params.student_name) || 'Unnamed Student',
-    student_id: cleanString(params.student_id) || null,
-    agent: cleanString(params.agent) || null,
-    scholarship: cleanString(params.scholarship) || null,
-    pending_invoice: cleanString(params.pending_invoice) || null,
-    pending_amount: pendingAmountNum,
-    yet_to_raised: yetToRaisedVal || null,
-    remarks: cleanString(params.remarks) || null,
-    follow_up: followUpVal,
-    dob: cleanString(params.dob) || null,
-    document: normalizeDocumentType(params.document) || null,
-    status: cleanString(params.status) || 'Current',
-    intake: cleanString(params.intake) || null,
-    end_date: cleanString(params.end_date) || null,
-    course: cleanString(params.course) || null,
-    admin_fee: adminFeeNum,
-    resource_fee: resourceFeeNum,
-    tuition_fee: tuitionFeeNum,
-    total_fee: totalFeeNum,
-    paid_amount: paidAmountNum,
-    total_paid: totalPaidNum,
-    initial_payment: paidAmountNum,
-    coe_issued_date: cleanString(params.coe_issued_date) || null,
-    email_id: cleanString(params.email_id) || null,
-    phone_no: cleanString(params.phone_no) || null,
-    payment_status: cleanString(params.payment_status) || 'Pending',
-    extra_data: extraData,
-    created_at: nowStr,
-  }
-
-  let savedRecord = recordPayload
-
-  // 1. PRIMARY: Insert into MySQL (Prisma)
-  try {
-    // Ensure the import batch exists in MySQL
-    const importExists = await prisma.aimtReportImport.findUnique({ where: { id: targetImportId! } })
-    if (!importExists) {
-      await prisma.aimtReportImport.create({
-        data: {
-          id: targetImportId!,
-          fileName: 'Manual Student Records',
-          fileSize: 0,
-          uploadedAt: new Date(),
-          uploadedBy: 'admin@isquarebpo.com',
-          totalRecords: 0,
-          totalPendingAmount: 0,
-          totalYetToRaised: 0,
-          entity: 'aimt',
-        },
-      })
-    }
-    const mysqlRow = await prisma.aimtReportRecord.create({
+  const importExists = await prisma.aimtReportImport.findUnique({ where: { id: targetImportId! } })
+  if (!importExists) {
+    await prisma.aimtReportImport.create({
       data: {
-        id: newId,
-        importId: targetImportId!,
-        srNo: nextSrNo,
-        studentName: recordPayload.student_name,
-        studentId: recordPayload.student_id ?? null,
-        agent: recordPayload.agent ?? null,
-        scholarship: recordPayload.scholarship ?? null,
-        pendingInvoice: recordPayload.pending_invoice ?? null,
-        pendingAmount: pendingAmountNum,
-        yetToRaised: recordPayload.yet_to_raised ?? null,
-        remarks: recordPayload.remarks ?? null,
-        followUp: followUpVal ?? null,
-        dob: recordPayload.dob ?? null,
-        document: recordPayload.document ?? null,
-        status: recordPayload.status ?? null,
-        intake: recordPayload.intake ?? null,
-        endDate: recordPayload.end_date ?? null,
-        course: recordPayload.course ?? null,
-        adminFee: adminFeeNum,
-        resourceFee: resourceFeeNum,
-        tuitionFee: tuitionFeeNum,
-        totalFee: totalFeeNum,
-        paidAmount: paidAmountNum,
-        totalPaid: totalPaidNum,
-        coeIssuedDate: recordPayload.coe_issued_date ?? null,
-        emailId: recordPayload.email_id ?? null,
-        phoneNo: recordPayload.phone_no ?? null,
-        paymentStatus: recordPayload.payment_status ?? null,
-        extraData: extraData as any,
+        id: targetImportId!,
+        fileName: 'Manual Student Records',
+        fileSize: 0,
+        uploadedAt: new Date(),
+        uploadedBy: 'admin@isquarebpo.com',
+        totalRecords: 0,
+        totalPendingAmount: 0,
+        totalYetToRaised: 0,
+        entity: 'aimt',
       },
     })
-    savedRecord = prismaRecordToSnake(mysqlRow)
-  } catch (mysqlErr: any) {
-    console.error('MySQL createReportRecord FAILED:', mysqlErr)
-    throw mysqlErr
   }
 
-  // 2. NON-FATAL: Mirror to Supabase
-  try {
-    const supabase = await getSupabase()
-    const { initial_payment, total_paid, follow_up, ...dbPayload } = recordPayload as any
-    await supabase.from('aimt_report_records').insert({ ...dbPayload, id: newId })
-  } catch (err) {
-    console.warn('Supabase mirror createReportRecord failed (non-fatal):', err)
-  }
+  const mysqlRow = await prisma.aimtReportRecord.create({
+    data: {
+      id: newId,
+      importId: targetImportId!,
+      srNo: nextSrNo,
+      studentName: cleanString(params.student_name) || 'Unnamed Student',
+      studentId: cleanString(params.student_id) || null,
+      agent: cleanString(params.agent) || null,
+      scholarship: cleanString(params.scholarship) || null,
+      pendingInvoice: cleanString(params.pending_invoice) || null,
+      pendingAmount: pendingAmountNum,
+      yetToRaised: yetToRaisedVal || null,
+      remarks: cleanString(params.remarks) || null,
+      followUp: followUpVal,
+      dob: cleanString(params.dob) || null,
+      document: normalizeDocumentType(params.document) || null,
+      status: cleanString(params.status) || 'Current',
+      intake: cleanString(params.intake) || null,
+      endDate: cleanString(params.end_date) || null,
+      course: cleanString(params.course) || null,
+      adminFee: adminFeeNum,
+      resourceFee: resourceFeeNum,
+      tuitionFee: tuitionFeeNum,
+      totalFee: totalFeeNum,
+      paidAmount: paidAmountNum,
+      totalPaid: totalPaidNum,
+      coeIssuedDate: cleanString(params.coe_issued_date) || null,
+      emailId: cleanString(params.email_id) || null,
+      phoneNo: cleanString(params.phone_no) || null,
+      paymentStatus: cleanString(params.payment_status) || 'Pending',
+      extraData: extraData as any,
+    },
+  })
 
-  // 3. Backup in local server storage
-  const store = readLocalReportStorage()
-  if (!store.records[targetImportId!]) store.records[targetImportId!] = []
-  store.records[targetImportId!].push(savedRecord)
-  saveLocalReportStorage(store)
-
-  return savedRecord
+  return prismaAimtRecordToSnake(mysqlRow)
 }
 
-// 2. Update a student record directly in the database
+// Update a single AIMT student record
 export async function updateReportRecord(
   id: string,
   updates: Partial<AimtReportRecord>
 ): Promise<AimtReportRecord | null> {
-  const nowStr = new Date().toISOString()
-
-  // Clean numeric values if provided
-  const cleanedUpdates: any = { ...updates }
-  if (updates.pending_amount !== undefined) cleanedUpdates.pending_amount = cleanNumber(updates.pending_amount)
-  if (updates.admin_fee !== undefined) cleanedUpdates.admin_fee = cleanNumber(updates.admin_fee)
-  if (updates.resource_fee !== undefined) cleanedUpdates.resource_fee = cleanNumber(updates.resource_fee)
-  if (updates.tuition_fee !== undefined) cleanedUpdates.tuition_fee = cleanNumber(updates.tuition_fee)
-  if (updates.total_fee !== undefined) cleanedUpdates.total_fee = cleanNumber(updates.total_fee)
-  if (updates.paid_amount !== undefined || updates.initial_payment !== undefined) {
-    const pAmt = cleanNumber(updates.paid_amount ?? updates.initial_payment)
-    cleanedUpdates.paid_amount = pAmt
+  const mysqlUpdate: any = {}
+  if (updates.student_name !== undefined) mysqlUpdate.studentName = cleanString(updates.student_name) || undefined
+  if (updates.student_id !== undefined) mysqlUpdate.studentId = cleanString(updates.student_id) || null
+  if (updates.agent !== undefined) mysqlUpdate.agent = cleanString(updates.agent) || null
+  if (updates.scholarship !== undefined) mysqlUpdate.scholarship = cleanString(updates.scholarship) || null
+  if (updates.pending_invoice !== undefined) mysqlUpdate.pendingInvoice = cleanString(updates.pending_invoice) || null
+  if (updates.pending_amount !== undefined) mysqlUpdate.pendingAmount = cleanNumber(updates.pending_amount)
+  if (updates.yet_to_raised !== undefined) mysqlUpdate.yetToRaised = cleanString(updates.yet_to_raised) || null
+  if (updates.remarks !== undefined) mysqlUpdate.remarks = cleanString(updates.remarks) || null
+  if (updates.follow_up !== undefined) mysqlUpdate.followUp = cleanString(updates.follow_up) || null
+  if (updates.dob !== undefined) mysqlUpdate.dob = cleanString(updates.dob) || null
+  if (updates.document !== undefined) mysqlUpdate.document = normalizeDocumentType(updates.document) || null
+  if (updates.status !== undefined) mysqlUpdate.status = cleanString(updates.status) || null
+  if (updates.intake !== undefined) mysqlUpdate.intake = cleanString(updates.intake) || null
+  if (updates.end_date !== undefined) mysqlUpdate.endDate = cleanString(updates.end_date) || null
+  if (updates.course !== undefined) mysqlUpdate.course = cleanString(updates.course) || null
+  if (updates.admin_fee !== undefined) mysqlUpdate.adminFee = cleanNumber(updates.admin_fee)
+  if (updates.resource_fee !== undefined) mysqlUpdate.resourceFee = cleanNumber(updates.resource_fee)
+  if (updates.tuition_fee !== undefined) mysqlUpdate.tuitionFee = cleanNumber(updates.tuition_fee)
+  if (updates.total_fee !== undefined) mysqlUpdate.totalFee = cleanNumber(updates.total_fee)
+  if (updates.paid_amount !== undefined || (updates as any).initial_payment !== undefined) {
+    mysqlUpdate.paidAmount = cleanNumber(updates.paid_amount ?? (updates as any).initial_payment)
   }
-  if (updates.yet_to_raised !== undefined) cleanedUpdates.yet_to_raised = cleanString(updates.yet_to_raised) || null
-  if (updates.document !== undefined) cleanedUpdates.document = normalizeDocumentType(updates.document) || null
+  if (updates.total_paid !== undefined) mysqlUpdate.totalPaid = cleanNumber(updates.total_paid)
+  if (updates.coe_issued_date !== undefined) mysqlUpdate.coeIssuedDate = cleanString(updates.coe_issued_date) || null
+  if (updates.email_id !== undefined) mysqlUpdate.emailId = cleanString(updates.email_id) || null
+  if (updates.phone_no !== undefined) mysqlUpdate.phoneNo = cleanString(updates.phone_no) || null
+  if (updates.payment_status !== undefined) mysqlUpdate.paymentStatus = cleanString(updates.payment_status) || null
+  if (updates.extra_data !== undefined) mysqlUpdate.extraData = updates.extra_data as any
 
-  let updatedRecord: AimtReportRecord | null = null
-
-  // 1. PRIMARY: MySQL (Prisma) update — Hostinger live database
-  try {
-    const mysqlUpdate: any = {}
-    if (updates.student_name !== undefined) mysqlUpdate.studentName = cleanString(updates.student_name) || undefined
-    if (updates.student_id !== undefined) mysqlUpdate.studentId = cleanString(updates.student_id) || null
-    if (updates.agent !== undefined) mysqlUpdate.agent = cleanString(updates.agent) || null
-    if (updates.scholarship !== undefined) mysqlUpdate.scholarship = cleanString(updates.scholarship) || null
-    if (updates.pending_invoice !== undefined) mysqlUpdate.pendingInvoice = cleanString(updates.pending_invoice) || null
-    if (updates.pending_amount !== undefined) mysqlUpdate.pendingAmount = cleanNumber(updates.pending_amount)
-    if (updates.yet_to_raised !== undefined) mysqlUpdate.yetToRaised = cleanString(updates.yet_to_raised) || null
-    if (updates.remarks !== undefined) mysqlUpdate.remarks = cleanString(updates.remarks) || null
-    if (updates.follow_up !== undefined) mysqlUpdate.followUp = cleanString(updates.follow_up) || null
-    if (updates.dob !== undefined) mysqlUpdate.dob = cleanString(updates.dob) || null
-    if (updates.document !== undefined) mysqlUpdate.document = normalizeDocumentType(updates.document) || null
-    if (updates.status !== undefined) mysqlUpdate.status = cleanString(updates.status) || null
-    if (updates.intake !== undefined) mysqlUpdate.intake = cleanString(updates.intake) || null
-    if (updates.end_date !== undefined) mysqlUpdate.endDate = cleanString(updates.end_date) || null
-    if (updates.course !== undefined) mysqlUpdate.course = cleanString(updates.course) || null
-    if (updates.admin_fee !== undefined) mysqlUpdate.adminFee = cleanNumber(updates.admin_fee)
-    if (updates.resource_fee !== undefined) mysqlUpdate.resourceFee = cleanNumber(updates.resource_fee)
-    if (updates.tuition_fee !== undefined) mysqlUpdate.tuitionFee = cleanNumber(updates.tuition_fee)
-    if (updates.total_fee !== undefined) mysqlUpdate.totalFee = cleanNumber(updates.total_fee)
-    if (updates.paid_amount !== undefined || updates.initial_payment !== undefined) mysqlUpdate.paidAmount = cleanNumber(updates.paid_amount ?? updates.initial_payment)
-    if (updates.total_paid !== undefined) mysqlUpdate.totalPaid = cleanNumber(updates.total_paid)
-    if (updates.coe_issued_date !== undefined) mysqlUpdate.coeIssuedDate = cleanString(updates.coe_issued_date) || null
-    if (updates.email_id !== undefined) mysqlUpdate.emailId = cleanString(updates.email_id) || null
-    if (updates.phone_no !== undefined) mysqlUpdate.phoneNo = cleanString(updates.phone_no) || null
-    if (updates.payment_status !== undefined) mysqlUpdate.paymentStatus = cleanString(updates.payment_status) || null
-    if (updates.extra_data !== undefined) mysqlUpdate.extraData = updates.extra_data as any
-
-    if (Object.keys(mysqlUpdate).length > 0) {
-      const mysqlRow = await prisma.aimtReportRecord.update({ where: { id }, data: mysqlUpdate })
-      updatedRecord = prismaRecordToSnake(mysqlRow)
-    } else {
-      // Nothing to update — fetch current row for return value
-      const mysqlRow = await prisma.aimtReportRecord.findUnique({ where: { id } })
-      if (mysqlRow) updatedRecord = prismaRecordToSnake(mysqlRow)
-    }
-  } catch (mysqlErr: any) {
-    console.error('MySQL updateReportRecord FAILED:', mysqlErr)
-    throw mysqlErr
+  let mysqlRow: any = null
+  if (Object.keys(mysqlUpdate).length > 0) {
+    mysqlRow = await prisma.aimtReportRecord.update({ where: { id }, data: mysqlUpdate })
+  } else {
+    mysqlRow = await prisma.aimtReportRecord.findUnique({ where: { id } })
   }
 
-  // 2. NON-FATAL: Supabase mirror update
-  try {
-    const supabase = await getSupabase()
-    // Fetch existing extra_data to merge safely for Supabase
-    const { data: existingRec } = await supabase
-      .from('aimt_report_records')
-      .select('extra_data, import_id')
-      .eq('id', id)
-      .maybeSingle()
-
-    const mergedExtraData = {
-      ...((existingRec?.extra_data as Record<string, any>) || {}),
-      ...((cleanedUpdates.extra_data as Record<string, any>) || {}),
-      ...(updates.total_paid !== undefined ? { total_paid: cleanNumber(updates.total_paid) } : {}),
-      ...(updates.initial_payment !== undefined || updates.paid_amount !== undefined ? { initial_payment: cleanNumber(updates.paid_amount ?? updates.initial_payment) } : {}),
-      ...(updates.follow_up !== undefined ? { follow_up: cleanString(updates.follow_up) || null } : {}),
-    }
-
-    const supabaseUpdates = { ...cleanedUpdates, extra_data: mergedExtraData }
-    delete supabaseUpdates.initial_payment
-    delete supabaseUpdates.total_paid
-    delete supabaseUpdates.follow_up
-
-    await supabase.from('aimt_report_records').update(supabaseUpdates).eq('id', id)
-
-    // Recalculate batch totals in Supabase non-fatally
-    if (updatedRecord?.import_id) {
-      try {
-        const { data: allRows } = await supabase
-          .from('aimt_report_records')
-          .select('pending_amount, yet_to_raised')
-          .eq('import_id', updatedRecord.import_id)
-        if (allRows) {
-          const totalPending = allRows.reduce((acc, r) => acc + (Number(r.pending_amount) || 0), 0)
-          const totalYet = allRows.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
-          await supabase
-            .from('aimt_report_imports')
-            .update({ total_pending_amount: totalPending, total_yet_to_raised: totalYet, updated_at: nowStr })
-            .eq('id', updatedRecord.import_id)
-        }
-      } catch {
-        // ignore batch recalculation error
-      }
-    }
-  } catch (err: any) {
-    console.warn('Supabase mirror update failed (non-fatal):', err)
-  }
-
-  // 3. Server storage backup update
-  const store = readLocalReportStorage()
-  for (const importId in store.records) {
-    const recordIndex = store.records[importId].findIndex((r) => r.id === id)
-    if (recordIndex !== -1) {
-      store.records[importId][recordIndex] = {
-        ...store.records[importId][recordIndex],
-        ...cleanedUpdates,
-      }
-      if (!updatedRecord) {
-        updatedRecord = store.records[importId][recordIndex]
-      }
-      saveLocalReportStorage(store)
-      break
-    }
-  }
-
-  return updatedRecord
+  return mysqlRow ? prismaAimtRecordToSnake(mysqlRow) : null
 }
 
-// 3. Delete a student record directly from the database
+// Delete a single AIMT student record
 export async function deleteReportRecord(id: string): Promise<boolean> {
-  let importId: string | null = null
-
-  // 1. PRIMARY: Delete from MySQL (Prisma)
   try {
-    const target = await prisma.aimtReportRecord.findUnique({ where: { id }, select: { importId: true } })
-    if (target) importId = target.importId
     await prisma.aimtReportRecord.delete({ where: { id } })
   } catch (mysqlErr: any) {
-    // If not found in MySQL, still try to delete from Supabase
     if (mysqlErr?.code !== 'P2025') {
-      console.error('MySQL deleteReportRecord FAILED:', mysqlErr)
       throw mysqlErr
     }
   }
-
-  // 2. NON-FATAL: Delete from Supabase mirror
-  try {
-    const supabase = await getSupabase()
-    if (!importId) {
-      const { data: target } = await supabase
-        .from('aimt_report_records')
-        .select('import_id')
-        .eq('id', id)
-        .maybeSingle()
-      if (target) importId = target.import_id
-    }
-    await supabase.from('aimt_report_records').delete().eq('id', id)
-
-    // Recalculate batch totals in Supabase non-fatally
-    if (importId) {
-      try {
-        const { data: allRows } = await supabase
-          .from('aimt_report_records')
-          .select('pending_amount, yet_to_raised')
-          .eq('import_id', importId)
-        if (allRows) {
-          const totalPending = allRows.reduce((acc, r) => acc + (Number(r.pending_amount) || 0), 0)
-          const totalYet = allRows.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
-          await supabase
-            .from('aimt_report_imports')
-            .update({ total_records: allRows.length, total_pending_amount: totalPending, total_yet_to_raised: totalYet, updated_at: new Date().toISOString() })
-            .eq('id', importId)
-        }
-      } catch {
-        // ignore
-      }
-    }
-  } catch (err) {
-    console.warn('Supabase mirror deleteReportRecord failed (non-fatal):', err)
-  }
-
-  // 3. Delete from server storage backup
-  const store = readLocalReportStorage()
-  for (const bId in store.records) {
-    store.records[bId] = store.records[bId].filter((r) => r.id !== id)
-  }
-  saveLocalReportStorage(store)
-
   return true
 }
 
-// 4. Bulk delete student records directly from the database
+// Bulk delete AIMT student records
 export async function deleteReportRecords(ids: string[]): Promise<number> {
   if (!ids || ids.length === 0) return 0
-
-  // 1. PRIMARY: Bulk delete from MySQL (Prisma)
-  try {
-    await prisma.aimtReportRecord.deleteMany({ where: { id: { in: ids } } })
-  } catch (mysqlErr: any) {
-    console.error('MySQL deleteReportRecords FAILED:', mysqlErr)
-    throw mysqlErr
-  }
-
-  // 2. NON-FATAL: Mirror bulk delete to Supabase
-  try {
-    const supabase = await getSupabase()
-    // Find unique import_ids for batch totals recalculation
-    const { data: targets } = await supabase
-      .from('aimt_report_records')
-      .select('import_id')
-      .in('id', ids)
-    const importIds = Array.from(
-      new Set((targets || []).map((t: any) => t.import_id).filter(Boolean))
-    )
-    await supabase.from('aimt_report_records').delete().in('id', ids)
-    // Recalculate batch totals non-fatally
-    for (const impId of importIds) {
-      try {
-        const { data: allRows } = await supabase
-          .from('aimt_report_records')
-          .select('pending_amount, yet_to_raised')
-          .eq('import_id', impId)
-        if (allRows) {
-          const totalPending = allRows.reduce((acc, r) => acc + (Number(r.pending_amount) || 0), 0)
-          const totalYet = allRows.reduce((acc, r) => acc + cleanNumber(r.yet_to_raised), 0)
-          await supabase
-            .from('aimt_report_imports')
-            .update({ total_records: allRows.length, total_pending_amount: totalPending, total_yet_to_raised: totalYet, updated_at: new Date().toISOString() })
-            .eq('id', impId)
-        }
-      } catch {
-        // ignore
-      }
-    }
-  } catch (err) {
-    console.warn('Supabase mirror deleteReportRecords failed (non-fatal):', err)
-  }
-
-  // 3. Delete from server storage backup
-  const idSet = new Set(ids)
-  const store = readLocalReportStorage()
-  for (const bId in store.records) {
-    store.records[bId] = store.records[bId].filter((r) => !idSet.has(r.id))
-  }
-  saveLocalReportStorage(store)
-
+  await prisma.aimtReportRecord.deleteMany({ where: { id: { in: ids } } })
   return ids.length
 }
-

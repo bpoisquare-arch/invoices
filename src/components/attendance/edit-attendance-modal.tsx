@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { AttendanceRecordWithEmployee, AttendanceSettings, EmployeeLeaveQuotas } from '@/lib/supabase/database.types'
+import { AttendanceRecordWithEmployee, AttendanceSettings, EmployeeLeaveQuotas } from '@/types/database.types'
 import {
   calculateArrivalStatus,
   calculateDepartureStatus,

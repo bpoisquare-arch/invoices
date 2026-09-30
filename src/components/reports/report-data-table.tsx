@@ -46,7 +46,7 @@ import {
   PlusCircle,
   UploadCloud,
 } from 'lucide-react'
-import type { AimtReportRecord } from '@/lib/supabase/database.types'
+import type { AimtReportRecord } from '@/types/database.types'
 import TablePagination from '@/components/ui/table-pagination'
 
 interface ReportDataTableProps {

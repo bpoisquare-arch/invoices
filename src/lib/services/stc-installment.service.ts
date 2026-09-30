@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { prisma } from '@/lib/prisma'
 import { format, parseISO } from 'date-fns'
 
 export interface STCFixedInfo {
@@ -611,28 +611,20 @@ export async function getSTCInstallments(): Promise<STCStudentInstallmentSchedul
         }
       }
     } catch (err) {
-      console.warn('API getSTCInstallments failed, falling back:', err)
+      console.warn('API getSTCInstallments failed, falling back to local:', err)
     }
+    return getLocalSchedules()
   }
 
   try {
-    const supabase = createClient()
-    const { data, error } = await (supabase as any)
-      .from('stc_installment_schedules')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.warn('STC table in Supabase query returned:', error.message, 'Using local fallback')
-      return getLocalSchedules()
-    }
-
+    const data = await prisma.stcInstallmentSchedule.findMany({
+      orderBy: { createdAt: 'desc' },
+    })
     const schedules = (data || []).map(mapDbRowToSchedule)
-    saveLocalSchedules(schedules)
     return schedules
   } catch (err) {
-    console.warn('Exception fetching STC installment schedules, using local fallback:', err)
-    return getLocalSchedules()
+    console.warn('Exception fetching STC installment schedules via Prisma:', err)
+    return []
   }
 }
 
@@ -675,25 +667,15 @@ export async function getSTCInstallmentById(id: string): Promise<STCStudentInsta
     } catch (err) {
       console.warn('API getSTCInstallmentById failed, falling back:', err)
     }
+    const locals = getLocalSchedules()
+    return locals.find((s) => s.id === id) || null
   }
 
   try {
-    const supabase = createClient()
-    const { data, error } = await (supabase as any)
-      .from('stc_installment_schedules')
-      .select('*')
-      .eq('id', id)
-      .single()
-
-    if (error || !data) {
-      const locals = getLocalSchedules()
-      return locals.find((s) => s.id === id) || null
-    }
-
-    return mapDbRowToSchedule(data)
+    const data = await prisma.stcInstallmentSchedule.findUnique({ where: { id } })
+    return data ? mapDbRowToSchedule(data) : null
   } catch (err) {
-    const locals = getLocalSchedules()
-    return locals.find((s) => s.id === id) || null
+    return null
   }
 }
 
@@ -710,7 +692,6 @@ export async function saveSTCInstallment(
     updated_at: now,
   }
 
-  // Update local cache
   const locals = getLocalSchedules()
   const idx = locals.findIndex((s) => s.id === scheduleId)
   if (idx >= 0) {
@@ -735,34 +716,70 @@ export async function saveSTCInstallment(
     } catch (err) {
       console.warn('API saveSTCInstallment failed, falling back:', err)
     }
+    return finalSchedule
   }
 
   try {
-    const supabase = createClient()
-    let { error } = await (supabase as any)
-      .from('stc_installment_schedules')
-      .upsert(dbRow, { onConflict: 'id' })
-
-    if (error && (error.message.includes('material_fee') || error.code === '42703')) {
-      delete dbRow.material_fee
-      const retry = await (supabase as any)
-        .from('stc_installment_schedules')
-        .upsert(dbRow, { onConflict: 'id' })
-      error = retry.error
-    }
-
-    if (error) {
-      console.warn('STC table save to Supabase returned error (saved to local cache):', error.message)
-    }
+    await prisma.stcInstallmentSchedule.upsert({
+      where: { id: scheduleId },
+      update: {
+        date: new Date(dbRow.date),
+        studentName: dbRow.student_name,
+        studentId: dbRow.student_id,
+        courseName: dbRow.course_name,
+        duration: dbRow.duration,
+        startDate: new Date(dbRow.start_date),
+        endDate: new Date(dbRow.end_date),
+        startMonthYear: dbRow.start_month_year || null,
+        endMonthOffset: dbRow.end_month_offset ?? 3,
+        adminFee: dbRow.admin_fee ?? 0,
+        resourcesFee: dbRow.resources_fee ?? 0,
+        materialFee: dbRow.material_fee ?? 0,
+        tuitionFee: dbRow.tuition_fee ?? 0,
+        scholarship: dbRow.scholarship ?? 0,
+        totalAmount: dbRow.total_amount ?? 0,
+        firstInstallmentAmount: dbRow.first_installment_amount ?? 0,
+        scheduleItems: dbRow.schedule_items || [],
+        agency: dbRow.agency || null,
+        recipientEmail: dbRow.recipient_email || null,
+        fromEmail: dbRow.from_email || null,
+        emailSubject: dbRow.email_subject || null,
+        emailMessage: dbRow.email_message || null,
+      },
+      create: {
+        id: scheduleId,
+        date: new Date(dbRow.date),
+        studentName: dbRow.student_name,
+        studentId: dbRow.student_id,
+        courseName: dbRow.course_name,
+        duration: dbRow.duration,
+        startDate: new Date(dbRow.start_date),
+        endDate: new Date(dbRow.end_date),
+        startMonthYear: dbRow.start_month_year || null,
+        endMonthOffset: dbRow.end_month_offset ?? 3,
+        adminFee: dbRow.admin_fee ?? 0,
+        resourcesFee: dbRow.resources_fee ?? 0,
+        materialFee: dbRow.material_fee ?? 0,
+        tuitionFee: dbRow.tuition_fee ?? 0,
+        scholarship: dbRow.scholarship ?? 0,
+        totalAmount: dbRow.total_amount ?? 0,
+        firstInstallmentAmount: dbRow.first_installment_amount ?? 0,
+        scheduleItems: dbRow.schedule_items || [],
+        agency: dbRow.agency || null,
+        recipientEmail: dbRow.recipient_email || null,
+        fromEmail: dbRow.from_email || null,
+        emailSubject: dbRow.email_subject || null,
+        emailMessage: dbRow.email_message || null,
+      },
+    })
   } catch (err) {
-    console.warn('STC save exception (saved to local cache):', err)
+    console.warn('STC save exception in Prisma:', err)
   }
 
   return finalSchedule
 }
 
 export async function deleteSTCInstallment(id: string): Promise<void> {
-  // Update local cache
   const locals = getLocalSchedules().filter((s) => s.id !== id)
   saveLocalSchedules(locals)
 
@@ -773,16 +790,16 @@ export async function deleteSTCInstallment(id: string): Promise<void> {
       })
       if (res.ok) return
     } catch (err) {
-      console.warn('API deleteSTCInstallment failed, falling back:', err)
+      console.warn('API deleteSTCInstallment failed:', err)
     }
+    return
   }
 
   try {
-    const supabase = createClient()
-    await (supabase as any).from('stc_installment_email_logs').delete().eq('schedule_id', id)
-    await (supabase as any).from('stc_installment_schedules').delete().eq('id', id)
+    await prisma.stcInstallmentEmailLog.deleteMany({ where: { scheduleId: id } })
+    await prisma.stcInstallmentSchedule.deleteMany({ where: { id } })
   } catch (err) {
-    console.warn('STC delete exception:', err)
+    console.warn('STC delete exception in Prisma:', err)
   }
 }
 
@@ -798,49 +815,16 @@ export async function syncLocalSTCToCloud(): Promise<{
   }
 
   try {
-    const supabase = createClient()
     let successCount = 0
     let lastError: string | null = null
 
     for (const schedule of locals) {
-      const dbRow = mapScheduleToDbRow(schedule)
-      let { error } = await (supabase as any)
-        .from('stc_installment_schedules')
-        .upsert(dbRow, { onConflict: 'id' })
-
-      if (error && (error.message.includes('material_fee') || error.code === '42703')) {
-        delete dbRow.material_fee
-        const retry = await (supabase as any)
-          .from('stc_installment_schedules')
-          .upsert(dbRow, { onConflict: 'id' })
-        error = retry.error
-      }
-
-      if (!error) {
+      try {
+        await saveSTCInstallment(schedule)
         successCount++
-      } else {
-        lastError = error.message
+      } catch (err: any) {
+        lastError = err?.message || 'Save error'
       }
-    }
-
-    if (lastError && successCount === 0) {
-      return {
-        success: false,
-        syncedCount: 0,
-        totalCount: locals.length,
-        error: lastError,
-      }
-    }
-
-    // Refresh local cache with latest cloud rows
-    const { data } = await (supabase as any)
-      .from('stc_installment_schedules')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (data && data.length > 0) {
-      const schedules = data.map(mapDbRowToSchedule)
-      saveLocalSchedules(schedules)
     }
 
     return {
@@ -854,7 +838,7 @@ export async function syncLocalSTCToCloud(): Promise<{
       success: false,
       syncedCount: 0,
       totalCount: locals.length,
-      error: e?.message || 'Failed to connect to cloud database',
+      error: e?.message || 'Failed to sync local schedules',
     }
   }
 }

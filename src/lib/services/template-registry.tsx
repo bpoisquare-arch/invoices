@@ -7,7 +7,7 @@ import EdLinkPDFTemplate from '@/components/pdf/edlink-pdf-template'
 import AnonymousPDFTemplate from '@/components/pdf/anonymous-pdf-template'
 import DefaultPDFTemplate from '@/components/pdf/default-pdf-template'
 import NSCPDFTemplate from '@/components/pdf/nsc-pdf-template'
-import { InvoiceWithDetails, TemplateSnapshot } from '@/lib/supabase/database.types'
+import { InvoiceWithDetails, TemplateSnapshot } from '@/types/database.types'
 
 export function renderInvoiceWebPreview(invoice: Partial<InvoiceWithDetails>, snapshot?: TemplateSnapshot) {
   const layout = snapshot?.layout_type || invoice.templates?.layout_type || 'edlink_v1'

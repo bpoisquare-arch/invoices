@@ -54,7 +54,7 @@ import {
   AttendanceSettings,
   Employee,
   EmployeeLeaveQuotas,
-} from '@/lib/supabase/database.types'
+} from '@/types/database.types'
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
 import * as XLSX from 'xlsx'

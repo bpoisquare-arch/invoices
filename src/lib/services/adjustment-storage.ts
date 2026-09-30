@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { prisma } from '@/lib/prisma'
 
 export interface EmployeeAdjustment {
   id: string
@@ -36,7 +37,7 @@ function writeAdjustmentsFile(adjustments: EmployeeAdjustment[]): void {
     }
     fs.writeFileSync(ADJUSTMENTS_FILE, JSON.stringify(adjustments, null, 2), 'utf-8')
   } catch (error) {
-    // Silent ignore on serverless read-only filesystem
+    // Silent ignore
   }
 }
 
@@ -44,56 +45,25 @@ export async function getAllAdjustments(): Promise<EmployeeAdjustment[]> {
   const fileAdjs = readAdjustmentsFile()
 
   try {
-    const { createClient } = await import('@/lib/supabase/server')
-    const supabase = await createClient()
+    const dbRows = await prisma.employeeAdjustment.findMany()
 
-    // 1. Try dedicated employee_adjustments table first
-    const { data: dbRows, error: tableError } = await supabase
-      .from('employee_adjustments')
-      .select('*')
-
-    if (!tableError && Array.isArray(dbRows) && dbRows.length > 0) {
+    if (Array.isArray(dbRows) && dbRows.length > 0) {
       const map = new Map<string, EmployeeAdjustment>()
       fileAdjs.forEach((a) => {
         const key = `${a.employee_id}_${a.month_year}`.toLowerCase()
         map.set(key, a)
       })
       dbRows.forEach((a: any) => {
-        const key = `${a.employee_id}_${a.month_year}`.toLowerCase()
+        const key = `${a.employeeId}_${a.monthYear}`.toLowerCase()
         map.set(key, {
           id: a.id,
-          employee_id: a.employee_id,
-          month_year: a.month_year,
+          employee_id: a.employeeId,
+          month_year: a.monthYear,
           amount: Number(a.amount) || 0,
           notes: a.notes || '',
-          created_at: a.created_at,
-          updated_at: a.updated_at,
+          created_at: a.createdAt instanceof Date ? a.createdAt.toISOString() : String(a.createdAt),
+          updated_at: a.updatedAt instanceof Date ? a.updatedAt.toISOString() : String(a.updatedAt),
         })
-      })
-      const merged = Array.from(map.values())
-      inMemoryAdjustments = merged
-      return merged
-    }
-
-    // 2. Fallback to audit logs if table is empty
-    const { data, error } = await supabase
-      .from('attendance_audit_logs')
-      .select('details')
-      .eq('action', 'EMPLOYEE_ADJUSTMENTS_STORE')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (data && data.details && Array.isArray(data.details)) {
-      const dbAdjs = data.details as unknown as EmployeeAdjustment[]
-      const map = new Map<string, EmployeeAdjustment>()
-      fileAdjs.forEach((a) => {
-        const key = `${a.employee_id}_${a.month_year}`.toLowerCase()
-        map.set(key, a)
-      })
-      dbAdjs.forEach((a) => {
-        const key = `${a.employee_id}_${a.month_year}`.toLowerCase()
-        map.set(key, a)
       })
       const merged = Array.from(map.values())
       inMemoryAdjustments = merged
@@ -159,23 +129,25 @@ export async function setEmployeeAdjustment(params: {
   inMemoryAdjustments = adjustments
   writeAdjustmentsFile(adjustments)
 
-  // Persist to Supabase Database (both dedicated table and audit log)
   try {
-    const { createClient } = await import('@/lib/supabase/server')
-    const supabase = await createClient()
-
-    await supabase.from('employee_adjustments').upsert({
-      id: result.id,
-      employee_id: result.employee_id,
-      month_year: result.month_year,
-      amount: result.amount,
-      notes: result.notes || '',
-      updated_at: now,
-    }, { onConflict: 'employee_id,month_year' })
-
-    await supabase.from('attendance_audit_logs').insert({
-      action: 'EMPLOYEE_ADJUSTMENTS_STORE',
-      details: adjustments as any,
+    await prisma.employeeAdjustment.upsert({
+      where: {
+        employeeId_monthYear: {
+          employeeId: result.employee_id,
+          monthYear: result.month_year,
+        },
+      },
+      update: {
+        amount: result.amount,
+        notes: result.notes || '',
+      },
+      create: {
+        id: result.id,
+        employeeId: result.employee_id,
+        monthYear: result.month_year,
+        amount: result.amount,
+        notes: result.notes || '',
+      },
     })
   } catch (err) {
     console.error('Error in setEmployeeAdjustment db write:', err)
@@ -217,20 +189,12 @@ export async function deleteEmployeeAdjustment(
   inMemoryAdjustments = filtered
   writeAdjustmentsFile(filtered)
 
-  // Persist deletion to Supabase Database
   try {
-    const { createClient } = await import('@/lib/supabase/server')
-    const supabase = await createClient()
-
-    await supabase
-      .from('employee_adjustments')
-      .delete()
-      .eq('employee_id', employeeId)
-      .eq('month_year', monthYear)
-
-    await supabase.from('attendance_audit_logs').insert({
-      action: 'EMPLOYEE_ADJUSTMENTS_STORE',
-      details: filtered as any,
+    await prisma.employeeAdjustment.deleteMany({
+      where: {
+        employeeId: employeeId,
+        monthYear: monthYear,
+      },
     })
   } catch (err) {
     console.error('Error in deleteEmployeeAdjustment db write:', err)

@@ -8,7 +8,6 @@ import {
   STCStudentInstallmentSchedule,
   STCFixedInfo,
 } from '@/lib/services/stc-installment.service'
-import { createClient } from '@/lib/supabase/server'
 import STCSchedulePDFTemplate from '@/components/pdf/stc-schedule-pdf-template'
 
 export const dynamic = 'force-dynamic'
@@ -19,25 +18,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    let schedule: STCStudentInstallmentSchedule | null = null
-
-    try {
-      const supabase = await createClient()
-      const { data } = await (supabase as any)
-        .from('stc_installment_schedules')
-        .select('*')
-        .eq('id', id)
-        .single()
-      if (data) {
-        schedule = data
-      }
-    } catch {
-      // Fallback
-    }
-
-    if (!schedule) {
-      schedule = await getSTCInstallmentById(id)
-    }
+    const schedule = await getSTCInstallmentById(id)
 
     if (!schedule) {
       return new NextResponse('STC Schedule not found', { status: 404 })

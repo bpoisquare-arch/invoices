@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { InvoiceWithDetails } from '@/lib/supabase/database.types'
+import { InvoiceWithDetails } from '@/types/database.types'
 import { getInvoiceById, getInvoicePdfFilename } from '@/lib/services/invoice.service'
 import { renderInvoiceWebPreview, renderInvoicePDFDocument } from '@/lib/services/template-registry'
 import { Button } from '@/components/ui/button'

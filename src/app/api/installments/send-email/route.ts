@@ -15,7 +15,6 @@ import {
   getEmailLogsByScheduleId,
   DEFAULT_FROM_EMAIL,
 } from '@/lib/services/installment-email.service'
-import { createClient } from '@/lib/supabase/server'
 import { logAuditEventServer } from '@/lib/services/audit-server'
 import AimtSchedulePDFTemplate from '@/components/pdf/aimt-schedule-pdf-template'
 
@@ -23,15 +22,12 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    // Session Verification
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
     const devSessionVal = request.cookies.get('dev-auth-session')?.value
     const userRoleVal = request.cookies.get('user-role')?.value
     const devSession = !!devSessionVal && devSessionVal !== 'false'
-    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer' || user?.user_metadata?.role === 'viewer'
+    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer'
     
-    if ((!user && !devSession) || isViewer) {
+    if (!devSession || isViewer) {
       return NextResponse.json({ success: false, error: 'Unauthorized: Valid session required.' }, { status: 401 })
     }
 

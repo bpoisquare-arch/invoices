@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { prisma } from '@/lib/prisma'
 
 export interface InstallmentEmailLog {
   id: string
@@ -83,15 +83,28 @@ export async function getEmailLogsByScheduleId(scheduleId: string): Promise<Inst
   const localLogs = getStoredEmailLogs().filter((log) => log.schedule_id === scheduleId)
 
   try {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('installment_email_logs')
-      .select('*')
-      .eq('schedule_id', scheduleId)
-      .order('sent_at', { ascending: false })
+    const data = await prisma.installmentEmailLog.findMany({
+      where: { scheduleId },
+      orderBy: { sentAt: 'desc' },
+    })
 
-    if (!error && data && data.length > 0) {
-      const dbLogs = data as unknown as InstallmentEmailLog[]
+    if (data && data.length > 0) {
+      const dbLogs: InstallmentEmailLog[] = data.map((d) => ({
+        id: d.id,
+        schedule_id: d.scheduleId,
+        from_email: d.fromEmail,
+        to_email: d.toEmail,
+        subject: d.subject,
+        message: d.message || undefined,
+        email_type: d.emailType as any,
+        resend_number: d.resendNumber,
+        status: d.status as any,
+        provider_message_id: d.providerMessageId,
+        sent_at: d.sentAt instanceof Date ? d.sentAt.toISOString() : String(d.sentAt),
+        error_message: d.errorMessage,
+        next_resend_at: d.nextResendAt ? (d.nextResendAt instanceof Date ? d.nextResendAt.toISOString() : String(d.nextResendAt)) : null,
+        created_at: d.createdAt instanceof Date ? d.createdAt.toISOString() : String(d.createdAt),
+      }))
       const combined = [...dbLogs, ...localLogs.filter((l) => !dbLogs.some((d) => d.id === l.id))]
       return combined.sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())
     }
@@ -111,13 +124,6 @@ export interface ResendEligibility {
   message?: string
 }
 
-/**
- * Calculates resend rate limit strictly:
- * - Initial automatic email does NOT count as a resend.
- * - Max 2 successful resends within a 24-hour sliding window.
- * - Failed attempts do NOT consume the resend quota.
- * - If 2 successful resends exist in 24h, cooldown is based on the oldest of the 2 successful resends.
- */
 export async function checkResendEligibility(
   scheduleId: string,
   providedLogs?: InstallmentEmailLog[]
@@ -126,7 +132,6 @@ export async function checkResendEligibility(
   const now = Date.now()
   const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000
 
-  // Filter only SUCCESSFUL RESEND emails sent within the last 24 hours
   const successfulResendsIn24h = logs.filter(
     (log) =>
       log.email_type === 'resend' &&
@@ -134,7 +139,6 @@ export async function checkResendEligibility(
       new Date(log.sent_at).getTime() >= twentyFourHoursAgo
   )
 
-  // Sort ascending by sent_at so index 0 is the oldest in the 24h window
   successfulResendsIn24h.sort((a, b) => new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime())
 
   const count = successfulResendsIn24h.length
@@ -180,32 +184,30 @@ export async function logEmailAttempt(
     created_at: new Date().toISOString(),
   }
 
-  // Save to memory and local storage
   const current = getStoredEmailLogs()
   current.unshift(newLog)
   saveStoredEmailLogs(current)
 
-  // Try saving to Supabase if accessible
   try {
-    const supabase = createClient()
-    await supabase.from('installment_email_logs').insert([
-      {
-        schedule_id: newLog.schedule_id,
-        from_email: newLog.from_email,
-        to_email: newLog.to_email,
+    await prisma.installmentEmailLog.create({
+      data: {
+        id: newLog.id,
+        scheduleId: newLog.schedule_id,
+        fromEmail: newLog.from_email,
+        toEmail: newLog.to_email,
         subject: newLog.subject,
         message: newLog.message || null,
-        email_type: newLog.email_type,
-        resend_number: newLog.resend_number,
+        emailType: newLog.email_type,
+        resendNumber: newLog.resend_number,
         status: newLog.status,
-        provider_message_id: newLog.provider_message_id || null,
-        sent_at: newLog.sent_at,
-        error_message: newLog.error_message || null,
-        next_resend_at: newLog.next_resend_at || null,
+        providerMessageId: newLog.provider_message_id || null,
+        sentAt: new Date(newLog.sent_at),
+        errorMessage: newLog.error_message || null,
+        nextResendAt: newLog.next_resend_at ? new Date(newLog.next_resend_at) : null,
       },
-    ])
+    })
   } catch {
-    // Ignore database error, local log is preserved
+    // Local log is preserved
   }
 
   return newLog

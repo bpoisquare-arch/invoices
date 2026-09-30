@@ -1,11 +1,9 @@
-import { createClient as createServerClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import {
   calculateArrivalStatus,
   calculateDepartureStatus,
   calculateWorkingDuration,
   parseDateString,
-  DEFAULT_ATTENDANCE_SETTINGS,
 } from './attendance-calculator'
 import { getAttendanceSettings } from './attendance.service'
 import fs from 'fs'
@@ -19,7 +17,7 @@ export interface AttendanceRequestItem {
   employee_id: string
   employee_name?: string
   batch_id?: string
-  branch: string // 'Lahore' | 'Multan'
+  branch: string
   attendance_date: string // 'YYYY-MM-DD'
   request_type: AttendanceRequestType
   leave_type?: string | null
@@ -36,10 +34,8 @@ export interface AttendanceRequestItem {
   updated_at: string
 }
 
-// Local fallback file path (shared across both projects on the machine)
 function getFallbackStorePath(): string {
   const primaryPath = path.join(process.cwd(), 'data', 'attendance_requests.json')
-  // Ensure directory exists
   const dir = path.dirname(primaryPath)
   if (!fs.existsSync(dir)) {
     try {
@@ -49,7 +45,6 @@ function getFallbackStorePath(): string {
   return primaryPath
 }
 
-// Also sync to Grocery Management's data folder if it exists
 function getGroceryStorePath(): string | null {
   const p = path.resolve('D:\\Grocery Management\\data\\attendance_requests.json')
   try {
@@ -100,7 +95,6 @@ export async function getAttendanceRequests(filter?: {
   startDate?: string
   endDate?: string
 }): Promise<AttendanceRequestItem[]> {
-  const supabase = await createServerClient()
   let requestsList: AttendanceRequestItem[] = []
 
   // 1. Query dedicated attendance_requests from Hostinger MySQL via Prisma
@@ -153,7 +147,7 @@ export async function getAttendanceRequests(filter?: {
     console.warn('MySQL attendance requests fetch failed, falling back:', err)
   }
 
-  // 1b. Check MySQL attendanceRecord rawPunches for live branch requests
+  // 2. Check MySQL attendanceRecord rawPunches for branch requests
   try {
     const mysqlRecsWithReqs = await prisma.attendanceRecord.findMany({
       where: {
@@ -198,61 +192,6 @@ export async function getAttendanceRequests(filter?: {
     }
   } catch {}
 
-  // 2. Query attendance_records table from Supabase for live branch requests!
-  try {
-    let recQuery = supabase
-      .from('attendance_records')
-      .select('id, employee_id, attendance_date, arrival_status, departure_status, raw_punches')
-      .not('raw_punches', 'is', null)
-      .order('attendance_date', { ascending: false })
-
-    if (filter?.startDate) {
-      recQuery = recQuery.gte('attendance_date', filter.startDate)
-    }
-    if (filter?.endDate) {
-      recQuery = recQuery.lte('attendance_date', filter.endDate)
-    }
-    if (filter?.employeeId && filter.employeeId !== 'all') {
-      recQuery = recQuery.eq('employee_id', filter.employeeId)
-    }
-
-    const { data: recs } = await recQuery
-
-    if (recs && recs.length > 0) {
-      for (const r of recs) {
-        const reqObj: any = Array.isArray(r.raw_punches)
-          ? (r.raw_punches as any[]).find((p: any) => p && p.type === 'BRANCH_REQUEST')
-          : null
-        if (reqObj) {
-          const item: AttendanceRequestItem = {
-            id: reqObj.id || reqObj.request_id || `req-${r.id}`,
-            employee_id: reqObj.employee_id || r.employee_id,
-            employee_name: reqObj.employee_name || '',
-            batch_id: reqObj.batch_id || '',
-            branch: reqObj.branch || 'Multan',
-            attendance_date: reqObj.attendance_date || r.attendance_date,
-            request_type: reqObj.request_type || 'LEAVE',
-            leave_type: reqObj.leave_type || null,
-            leave_duration: reqObj.leave_duration !== undefined ? reqObj.leave_duration : 1,
-            requested_in_time: reqObj.requested_in_time || null,
-            requested_out_time: reqObj.requested_out_time || null,
-            reason: reqObj.reason || null,
-            status: reqObj.status || 'PENDING',
-            submitted_by: reqObj.submitted_by || 'Branch User',
-            reviewed_by: reqObj.reviewed_by || null,
-            reviewed_at: reqObj.reviewed_at || null,
-            review_notes: reqObj.review_notes || null,
-            created_at: reqObj.created_at || r.attendance_date,
-            updated_at: reqObj.updated_at || r.attendance_date,
-          }
-          requestsList.push(item)
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Error fetching live requests from attendance_records:', err)
-  }
-
   // 3. Fallback to local store as extra layer
   try {
     const local = readFallbackRequests()
@@ -263,7 +202,6 @@ export async function getAttendanceRequests(filter?: {
     }
   } catch {}
 
-  // Filter in-memory
   if (filter?.branch && filter.branch !== 'all') {
     requestsList = requestsList.filter((r) => (r.branch || '').toLowerCase().includes(filter.branch!.toLowerCase()))
   }
@@ -284,7 +222,7 @@ export async function getAttendanceRequests(filter?: {
 }
 
 /**
- * 2. Create a new Attendance Request (from branch user in Grocery Management)
+ * 2. Create a new Attendance Request
  */
 export async function createAttendanceRequest(params: {
   employee_id: string
@@ -302,7 +240,6 @@ export async function createAttendanceRequest(params: {
 }): Promise<AttendanceRequestItem> {
   const reqId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
 
-  // 1. Resolve employee UUID for relational integrity
   let empUuid = params.employee_id
   let empName = params.employee_name || ''
   let empBatch = params.batch_id || ''
@@ -345,7 +282,6 @@ export async function createAttendanceRequest(params: {
     updated_at: new Date().toISOString(),
   }
 
-  // 2. Primary Save: Hostinger MySQL via Prisma
   try {
     await prisma.attendanceRequest.create({
       data: {
@@ -366,63 +302,9 @@ export async function createAttendanceRequest(params: {
       },
     })
   } catch (err) {
-    console.warn('MySQL attendance request insert warning (proceeding with fallback):', err)
+    console.warn('MySQL attendance request insert warning:', err)
   }
 
-  // 3. Fallback: Supabase dedicated table
-  const supabase = await createServerClient()
-  try {
-    await supabase.from('attendance_requests').insert(newItem as any)
-  } catch {}
-
-  // 4. ALWAYS also sync to attendance_records table in Supabase & MySQL
-  try {
-    const branchReqPayload = {
-      type: 'BRANCH_REQUEST',
-      ...newItem,
-    }
-
-    const { data: existingRecs } = await supabase
-      .from('attendance_records')
-      .select('id, employee_id, attendance_date, raw_punches')
-      .eq('employee_id', newItem.employee_id)
-      .eq('attendance_date', newItem.attendance_date)
-      .limit(1)
-
-    if (existingRecs && existingRecs.length > 0) {
-      const rec = existingRecs[0]
-      const punches = Array.isArray(rec.raw_punches) ? [...rec.raw_punches] : []
-      const updatedPunches = [
-        ...punches.filter((p: any) => p && p.type !== 'BRANCH_REQUEST'),
-        branchReqPayload,
-      ]
-      await supabase
-        .from('attendance_records')
-        .update({
-          raw_punches: updatedPunches,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', rec.id)
-    } else {
-      const parsedDate = parseDateString(newItem.attendance_date)
-      const dayName = parsedDate ? parsedDate.dayName : 'Monday'
-      await supabase
-        .from('attendance_records')
-        .insert({
-          employee_id: newItem.employee_id,
-          attendance_date: newItem.attendance_date,
-          day_of_week: dayName,
-          arrival_status: 'Absent',
-          departure_status: 'Absent',
-          raw_punches: [branchReqPayload] as any,
-          updated_at: new Date().toISOString(),
-        })
-    }
-  } catch (recErr) {
-    console.error('Error syncing request to attendance_records:', recErr)
-  }
-
-  // 5. Fallback save to local store
   try {
     const current = readFallbackRequests().filter(
       (r) => !(r.employee_id === newItem.employee_id && r.attendance_date === newItem.attendance_date && r.status === 'PENDING')
@@ -434,7 +316,7 @@ export async function createAttendanceRequest(params: {
 }
 
 /**
- * 3. Review Request (Admin Action in MIS - Invoice Gen: APPROVE or REJECT)
+ * 3. Review Request (APPROVE or REJECT)
  */
 export async function reviewAttendanceRequest(params: {
   requestId: string
@@ -442,10 +324,8 @@ export async function reviewAttendanceRequest(params: {
   reviewedBy?: string
   reviewNotes?: string
 }): Promise<{ success: boolean; request: AttendanceRequestItem; updatedRecord?: any; message: string }> {
-  const supabase = await createServerClient()
   const settings = await getAttendanceSettings()
 
-  // 1. Find the request: Check Hostinger MySQL via Prisma first
   let targetRequest: AttendanceRequestItem | null = null
   try {
     const dbReq = await prisma.attendanceRequest.findUnique({
@@ -479,63 +359,8 @@ export async function reviewAttendanceRequest(params: {
   }
 
   if (!targetRequest) {
-    try {
-      const { data } = await supabase.from('attendance_requests').select('*').eq('id', params.requestId).single()
-      if (data) {
-        targetRequest = data as AttendanceRequestItem
-      }
-    } catch {}
-  }
-
-  if (!targetRequest) {
     const all = readFallbackRequests()
     targetRequest = all.find((r) => r.id === params.requestId) || null
-  }
-
-  // If not in local fallback, search directly in Supabase attendance_records for live cloud requests!
-  if (!targetRequest) {
-    try {
-      const { data: recs } = await supabase
-        .from('attendance_records')
-        .select('*')
-        .not('raw_punches', 'is', null)
-        .order('attendance_date', { ascending: false })
-
-      if (recs && recs.length > 0) {
-        for (const r of recs) {
-          if (!Array.isArray(r.raw_punches)) continue
-          const reqObj: any = (r.raw_punches as any[]).find(
-            (p: any) => p && p.type === 'BRANCH_REQUEST' && (p.id === params.requestId || p.request_id === params.requestId || `req-${r.id}` === params.requestId)
-          )
-          if (reqObj) {
-            targetRequest = {
-              id: reqObj.id || reqObj.request_id || `req-${r.id}`,
-              employee_id: reqObj.employee_id || r.employee_id,
-              employee_name: reqObj.employee_name || '',
-              batch_id: reqObj.batch_id || '',
-              branch: reqObj.branch || 'Multan',
-              attendance_date: reqObj.attendance_date || r.attendance_date,
-              request_type: reqObj.request_type || 'LEAVE',
-              leave_type: reqObj.leave_type || null,
-              leave_duration: reqObj.leave_duration !== undefined ? reqObj.leave_duration : 1,
-              requested_in_time: reqObj.requested_in_time || null,
-              requested_out_time: reqObj.requested_out_time || null,
-              reason: reqObj.reason || null,
-              status: reqObj.status || 'PENDING',
-              submitted_by: reqObj.submitted_by || 'Branch User',
-              reviewed_by: reqObj.reviewed_by || null,
-              reviewed_at: reqObj.reviewed_at || null,
-              review_notes: reqObj.review_notes || null,
-              created_at: reqObj.created_at || r.attendance_date,
-              updated_at: reqObj.updated_at || r.attendance_date,
-            }
-            break
-          }
-        }
-      }
-    } catch (findErr) {
-      console.error('Error finding request in attendance_records:', findErr)
-    }
   }
 
   if (!targetRequest) {
@@ -549,7 +374,6 @@ export async function reviewAttendanceRequest(params: {
   const reviewedAt = new Date().toISOString()
   const reviewedBy = params.reviewedBy || 'Admin'
 
-  // CASE A: REJECT
   if (params.action === 'REJECT') {
     targetRequest.status = 'REJECTED'
     targetRequest.reviewed_by = reviewedBy
@@ -557,7 +381,6 @@ export async function reviewAttendanceRequest(params: {
     targetRequest.review_notes = params.reviewNotes || 'Rejected by Admin'
     targetRequest.updated_at = reviewedAt
 
-    // Update in MySQL via Prisma
     try {
       await prisma.attendanceRequest.updateMany({
         where: { id: params.requestId },
@@ -572,53 +395,6 @@ export async function reviewAttendanceRequest(params: {
       console.warn('MySQL request reject update warning:', err)
     }
 
-    // Update in Supabase dedicated table
-    try {
-      await supabase
-        .from('attendance_requests')
-        .update({
-          status: 'REJECTED',
-          reviewed_by: reviewedBy,
-          reviewed_at: reviewedAt,
-          review_notes: targetRequest.review_notes,
-          updated_at: reviewedAt,
-        } as any)
-        .eq('id', params.requestId)
-    } catch {}
-
-    // ALWAYS also update raw_punches in attendance_records in Supabase
-    try {
-      const { data: recs } = await supabase
-        .from('attendance_records')
-        .select('id, raw_punches')
-        .eq('employee_id', targetRequest.employee_id)
-        .eq('attendance_date', targetRequest.attendance_date)
-        .limit(1)
-
-      if (recs && recs.length > 0) {
-        const rec = recs[0]
-        const punches = Array.isArray(rec.raw_punches) ? [...rec.raw_punches] : []
-        const updatedPunches = [
-          ...punches.filter((p: any) => p && p.type !== 'BRANCH_REQUEST'),
-          {
-            type: 'BRANCH_REQUEST',
-            ...targetRequest,
-            status: 'REJECTED',
-            reviewed_by: reviewedBy,
-            reviewed_at: reviewedAt,
-            review_notes: targetRequest.review_notes,
-          },
-        ]
-        await supabase
-          .from('attendance_records')
-          .update({ raw_punches: updatedPunches, updated_at: reviewedAt })
-          .eq('id', rec.id)
-      }
-    } catch (err) {
-      console.error('Error updating raw_punches on reject:', err)
-    }
-
-    // Update fallback store
     const all = readFallbackRequests().map((r) => (r.id === params.requestId ? targetRequest! : r))
     writeFallbackRequests(all)
 
@@ -629,7 +405,7 @@ export async function reviewAttendanceRequest(params: {
     }
   }
 
-  // CASE B: APPROVE -> Live Database Update in `attendance_records`!
+  // CASE B: APPROVE
   targetRequest.status = 'APPROVED'
   targetRequest.reviewed_by = reviewedBy
   targetRequest.reviewed_at = reviewedAt
@@ -640,15 +416,16 @@ export async function reviewAttendanceRequest(params: {
   const dayOfWeek = parsedDate ? parsedDate.dayOfWeek : 1
   const dayName = parsedDate ? parsedDate.dayName : 'Monday'
 
-  // Fetch current attendance_record for this employee & date if exists
-  const { data: existingRecords } = await supabase
-    .from('attendance_records')
-    .select('*')
-    .eq('employee_id', targetRequest.employee_id)
-    .eq('attendance_date', targetRequest.attendance_date)
-    .limit(1)
+  let currentRecord: any = null
+  try {
+    currentRecord = await prisma.attendanceRecord.findFirst({
+      where: {
+        employeeId: targetRequest.employee_id,
+        attendanceDate: new Date(targetRequest.attendance_date),
+      },
+    })
+  } catch {}
 
-  const currentRecord = existingRecords && existingRecords[0] ? existingRecords[0] : null
   let updatedRecord: any = null
 
   if (targetRequest.request_type === 'LEAVE') {
@@ -656,19 +433,13 @@ export async function reviewAttendanceRequest(params: {
     const duration = targetRequest.leave_duration === 0.5 ? 0.5 : 1
     const leaveName = targetRequest.leave_type || 'Casual Leave'
 
-    let payload: any
-
     if (isWfh) {
-      // Work From Home: Shift timings locked, 100% Present
       const wfhIn = '10:30 AM'
       const wfhOut = dayOfWeek === 6 ? '03:00 PM' : '06:30 PM'
       const wfhMinutes = dayOfWeek === 6 ? 4 * 60 : 8 * 60
       const wfhFormatted = dayOfWeek === 6 ? '4h 0m' : '8h 0m'
 
-      payload = {
-        employee_id: targetRequest.employee_id,
-        attendance_date: targetRequest.attendance_date,
-        day_of_week: dayName,
+      updatedRecord = {
         in_time: wfhIn,
         out_time: wfhOut,
         arrival_status: 'On Time Arrival',
@@ -687,18 +458,13 @@ export async function reviewAttendanceRequest(params: {
           { punch_time: wfhIn, type: 'IN', source: 'WFH', notes: targetRequest.reason || 'Work From Home (1 day)' },
           { punch_time: wfhOut, type: 'OUT', source: 'WFH', notes: targetRequest.reason || 'Work From Home (1 day)' },
         ],
-        updated_at: new Date().toISOString(),
       }
     } else {
-      // Standard / Probation Leave (0.5 or 1 day)
       const noteDetails = targetRequest.reason
         ? `${leaveName} (${duration} day${duration === 1 ? '' : 's'}): ${targetRequest.reason}`
         : `${leaveName} (${duration} day${duration === 1 ? '' : 's'})`
 
-      payload = {
-        employee_id: targetRequest.employee_id,
-        attendance_date: targetRequest.attendance_date,
-        day_of_week: dayName,
+      updatedRecord = {
         in_time: null,
         out_time: null,
         arrival_status: 'Leave',
@@ -714,52 +480,20 @@ export async function reviewAttendanceRequest(params: {
             reviewed_at: reviewedAt,
             review_notes: targetRequest.review_notes,
           },
-          {
-            punch_time: null,
-            type: 'LEAVE',
-            notes: noteDetails,
-          },
+          { punch_time: null, type: 'LEAVE', notes: noteDetails },
         ],
-        updated_at: new Date().toISOString(),
       }
-    }
-
-    if (currentRecord?.id) {
-      const { data, error } = await supabase
-        .from('attendance_records')
-        .update(payload as any)
-        .eq('id', currentRecord.id)
-        .select()
-        .single()
-      if (error) throw new Error(error.message)
-      updatedRecord = data
-    } else {
-      const { data, error } = await supabase
-        .from('attendance_records')
-        .insert({
-          ...payload,
-          created_at: new Date().toISOString(),
-        } as any)
-        .select()
-        .single()
-      if (error) throw new Error(error.message)
-      updatedRecord = data
     }
   } else if (targetRequest.request_type === 'MISSING_IN') {
     const inTimeToUse = targetRequest.requested_in_time || '10:30 AM'
-    const outTimeToUse = currentRecord?.out_time || null
-
+    const outTimeToUse = currentRecord?.outTime || null
     const arrivalStatus = calculateArrivalStatus(inTimeToUse, dayOfWeek, settings)
     const departureStatus = outTimeToUse
       ? calculateDepartureStatus(outTimeToUse, dayOfWeek, settings)
-      : (currentRecord?.departure_status || 'On Time Departure')
-
+      : (currentRecord?.departureStatus || 'On Time Departure')
     const duration = calculateWorkingDuration(inTimeToUse, outTimeToUse)
 
-    const payload = {
-      employee_id: targetRequest.employee_id,
-      attendance_date: targetRequest.attendance_date,
-      day_of_week: dayName,
+    updatedRecord = {
       in_time: inTimeToUse,
       out_time: outTimeToUse,
       arrival_status: arrivalStatus,
@@ -775,49 +509,21 @@ export async function reviewAttendanceRequest(params: {
           reviewed_at: reviewedAt,
           review_notes: targetRequest.review_notes,
         },
-        ...(Array.isArray(currentRecord?.raw_punches)
-          ? (currentRecord.raw_punches as any[]).filter((p: any) => p && p.type !== 'BRANCH_REQUEST')
+        ...(Array.isArray(currentRecord?.rawPunches)
+          ? (currentRecord.rawPunches as any[]).filter((p: any) => p && p.type !== 'BRANCH_REQUEST')
           : []),
       ],
-      updated_at: new Date().toISOString(),
-    }
-
-    if (currentRecord?.id) {
-      const { data, error } = await supabase
-        .from('attendance_records')
-        .update(payload as any)
-        .eq('id', currentRecord.id)
-        .select()
-        .single()
-      if (error) throw new Error(error.message)
-      updatedRecord = data
-    } else {
-      const { data, error } = await supabase
-        .from('attendance_records')
-        .insert({
-          ...payload,
-          created_at: new Date().toISOString(),
-        } as any)
-        .select()
-        .single()
-      if (error) throw new Error(error.message)
-      updatedRecord = data
     }
   } else if (targetRequest.request_type === 'MISSING_OUT') {
-    const inTimeToUse = currentRecord?.in_time || null
+    const inTimeToUse = currentRecord?.inTime || null
     const outTimeToUse = targetRequest.requested_out_time || '06:30 PM'
-
     const arrivalStatus = inTimeToUse
       ? calculateArrivalStatus(inTimeToUse, dayOfWeek, settings)
-      : (currentRecord?.arrival_status || 'On Time Arrival')
+      : (currentRecord?.arrivalStatus || 'On Time Arrival')
     const departureStatus = calculateDepartureStatus(outTimeToUse, dayOfWeek, settings)
-
     const duration = calculateWorkingDuration(inTimeToUse, outTimeToUse)
 
-    const payload = {
-      employee_id: targetRequest.employee_id,
-      attendance_date: targetRequest.attendance_date,
-      day_of_week: dayName,
+    updatedRecord = {
       in_time: inTimeToUse,
       out_time: outTimeToUse,
       arrival_status: arrivalStatus,
@@ -833,33 +539,10 @@ export async function reviewAttendanceRequest(params: {
           reviewed_at: reviewedAt,
           review_notes: targetRequest.review_notes,
         },
-        ...(Array.isArray(currentRecord?.raw_punches)
-          ? (currentRecord.raw_punches as any[]).filter((p: any) => p && p.type !== 'BRANCH_REQUEST')
+        ...(Array.isArray(currentRecord?.rawPunches)
+          ? (currentRecord.rawPunches as any[]).filter((p: any) => p && p.type !== 'BRANCH_REQUEST')
           : []),
       ],
-      updated_at: new Date().toISOString(),
-    }
-
-    if (currentRecord?.id) {
-      const { data, error } = await supabase
-        .from('attendance_records')
-        .update(payload as any)
-        .eq('id', currentRecord.id)
-        .select()
-        .single()
-      if (error) throw new Error(error.message)
-      updatedRecord = data
-    } else {
-      const { data, error } = await supabase
-        .from('attendance_records')
-        .insert({
-          ...payload,
-          created_at: new Date().toISOString(),
-        } as any)
-        .select()
-        .single()
-      if (error) throw new Error(error.message)
-      updatedRecord = data
     }
   }
 
@@ -915,21 +598,6 @@ export async function reviewAttendanceRequest(params: {
     console.warn('MySQL attendance record upsert on approval warning:', err)
   }
 
-  // Update request status to APPROVED in Supabase
-  try {
-    await supabase
-      .from('attendance_requests')
-      .update({
-        status: 'APPROVED',
-        reviewed_by: reviewedBy,
-        reviewed_at: reviewedAt,
-        review_notes: targetRequest.review_notes,
-        updated_at: reviewedAt,
-      } as any)
-      .eq('id', params.requestId)
-  } catch {}
-
-  // Update request in fallback store
   const all = readFallbackRequests().map((r) => (r.id === params.requestId ? targetRequest! : r))
   writeFallbackRequests(all)
 
@@ -942,46 +610,15 @@ export async function reviewAttendanceRequest(params: {
 }
 
 /**
- * 4. Cancel Pending Request (by branch user or admin)
+ * 4. Cancel Pending Request
  */
 export async function cancelAttendanceRequest(requestId: string): Promise<boolean> {
-  // 1. Delete from MySQL via Prisma
   try {
     await prisma.attendanceRequest.deleteMany({
       where: { id: requestId, status: 'PENDING' },
     })
   } catch (err) {
     console.warn('MySQL cancel attendance request error:', err)
-  }
-
-  const supabase = await createServerClient()
-  try {
-    await supabase.from('attendance_requests').delete().eq('id', requestId).eq('status', 'PENDING')
-  } catch {}
-
-  // Also remove from attendance_records raw_punches
-  try {
-    const { data: recs } = await supabase
-      .from('attendance_records')
-      .select('id, raw_punches')
-      .not('raw_punches', 'is', null)
-
-    if (recs && recs.length > 0) {
-      for (const rec of recs) {
-        if (!Array.isArray(rec.raw_punches)) continue
-        const hasReq = (rec.raw_punches as any[]).some(
-          (p: any) => p && (p.id === requestId || p.request_id === requestId || `req-${rec.id}` === requestId)
-        )
-        if (hasReq) {
-          const cleaned = (rec.raw_punches as any[]).filter(
-            (p: any) => !(p && (p.id === requestId || p.request_id === requestId || `req-${rec.id}` === requestId))
-          )
-          await supabase.from('attendance_records').update({ raw_punches: cleaned }).eq('id', rec.id)
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Error cleaning raw_punches on cancel:', err)
   }
 
   const current = readFallbackRequests().filter((r) => !(r.id === requestId && r.status === 'PENDING'))

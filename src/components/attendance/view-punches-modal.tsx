@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { AttendanceRecordWithEmployee, RawPunch } from '@/lib/supabase/database.types'
+import { AttendanceRecordWithEmployee, RawPunch } from '@/types/database.types'
 import {
   Dialog,
   DialogContent,

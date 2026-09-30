@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { InvoiceWithDetails, TemplateSnapshot } from '@/lib/supabase/database.types'
+import { InvoiceWithDetails, TemplateSnapshot } from '@/types/database.types'
 import { numberToWords } from '@/lib/utils/number-to-words'
 
 interface NSCWebPreviewProps {

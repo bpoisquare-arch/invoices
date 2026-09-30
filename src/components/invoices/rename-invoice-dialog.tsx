@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { InvoiceWithDetails } from '@/lib/supabase/database.types'
+import { InvoiceWithDetails } from '@/types/database.types'
 import { renameInvoiceReference } from '@/lib/services/invoice.service'
 import {
   Dialog,

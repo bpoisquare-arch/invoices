@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { AttendanceSettings } from '@/lib/supabase/database.types'
+import { AttendanceSettings } from '@/types/database.types'
 import {
   calculateArrivalStatus,
   calculateDepartureStatus,

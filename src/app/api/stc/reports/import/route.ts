@@ -4,7 +4,6 @@ import {
   previewStcReportImport,
   saveStcReportImportToDatabase,
 } from '@/lib/services/stc-report.service'
-import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -65,16 +64,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    let userEmail = 'admin@isquarebpo.com'
-    try {
-      const supabase = await createClient()
-      const { data } = await supabase.auth.getUser()
-      if (data?.user?.email) {
-        userEmail = data.user.email
-      }
-    } catch {
-      // ignore
-    }
+    const userEmail = 'admin@isquarebpo.com'
 
     const saved = await saveStcReportImportToDatabase({
       fileName,

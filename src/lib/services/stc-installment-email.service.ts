@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { prisma } from '@/lib/prisma'
 
 export interface STCInstallmentEmailLog {
   id: string
@@ -83,15 +83,28 @@ export async function getSTCEmailLogsByScheduleId(scheduleId: string): Promise<S
   const localLogs = getStoredEmailLogs().filter((log) => log.schedule_id === scheduleId)
 
   try {
-    const supabase = createClient()
-    const { data, error } = await (supabase as any)
-      .from('stc_installment_email_logs')
-      .select('*')
-      .eq('schedule_id', scheduleId)
-      .order('sent_at', { ascending: false })
+    const data = await prisma.stcInstallmentEmailLog.findMany({
+      where: { scheduleId },
+      orderBy: { sentAt: 'desc' },
+    })
 
-    if (!error && data && data.length > 0) {
-      const dbLogs = data as unknown as STCInstallmentEmailLog[]
+    if (data && data.length > 0) {
+      const dbLogs: STCInstallmentEmailLog[] = data.map((d) => ({
+        id: d.id,
+        schedule_id: d.scheduleId,
+        from_email: d.fromEmail,
+        to_email: d.toEmail,
+        subject: d.subject,
+        message: d.message || undefined,
+        email_type: d.emailType as any,
+        resend_number: d.resendNumber,
+        status: d.status as any,
+        provider_message_id: d.providerMessageId,
+        sent_at: d.sentAt instanceof Date ? d.sentAt.toISOString() : String(d.sentAt),
+        error_message: d.errorMessage,
+        next_resend_at: d.nextResendAt ? (d.nextResendAt instanceof Date ? d.nextResendAt.toISOString() : String(d.nextResendAt)) : null,
+        created_at: d.createdAt instanceof Date ? d.createdAt.toISOString() : String(d.createdAt),
+      }))
       const combined = [...dbLogs, ...localLogs.filter((l) => !dbLogs.some((d) => d.id === l.id))]
       return combined.sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())
     }
@@ -176,23 +189,23 @@ export async function logSTCEmailAttempt(
   saveStoredEmailLogs(current)
 
   try {
-    const supabase = createClient()
-    await (supabase as any).from('stc_installment_email_logs').insert([
-      {
-        schedule_id: newLog.schedule_id,
-        from_email: newLog.from_email,
-        to_email: newLog.to_email,
+    await prisma.stcInstallmentEmailLog.create({
+      data: {
+        id: newLog.id,
+        scheduleId: newLog.schedule_id,
+        fromEmail: newLog.from_email,
+        toEmail: newLog.to_email,
         subject: newLog.subject,
         message: newLog.message || null,
-        email_type: newLog.email_type,
-        resend_number: newLog.resend_number,
+        emailType: newLog.email_type,
+        resendNumber: newLog.resend_number,
         status: newLog.status,
-        provider_message_id: newLog.provider_message_id || null,
-        sent_at: newLog.sent_at,
-        error_message: newLog.error_message || null,
-        next_resend_at: newLog.next_resend_at || null,
+        providerMessageId: newLog.provider_message_id || null,
+        sentAt: new Date(newLog.sent_at),
+        errorMessage: newLog.error_message || null,
+        nextResendAt: newLog.next_resend_at ? new Date(newLog.next_resend_at) : null,
       },
-    ])
+    })
   } catch {
     // Ignore error
   }

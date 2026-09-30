@@ -22,7 +22,7 @@ import {
   ExternalLink,
   Eye,
 } from 'lucide-react'
-import type { AimtReportImport } from '@/lib/supabase/database.types'
+import type { AimtReportImport } from '@/types/database.types'
 
 interface ImportHistoryDrawerProps {
   isOpen: boolean

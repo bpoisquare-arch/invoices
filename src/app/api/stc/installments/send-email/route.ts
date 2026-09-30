@@ -1,5 +1,6 @@
 import React from 'react'
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 import { renderToStream } from '@react-pdf/renderer'
 import {
   STCStudentInstallmentSchedule,
@@ -15,7 +16,6 @@ import {
   getSTCEmailLogsByScheduleId,
   DEFAULT_STC_FROM_EMAIL,
 } from '@/lib/services/stc-installment-email.service'
-import { createClient } from '@/lib/supabase/server'
 import { logAuditEventServer } from '@/lib/services/audit-server'
 import STCSchedulePDFTemplate from '@/components/pdf/stc-schedule-pdf-template'
 
@@ -23,16 +23,12 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
     const devSessionVal = request.cookies.get('dev-auth-session')?.value
     const userRoleVal = request.cookies.get('user-role')?.value
     const devSession = !!devSessionVal && devSessionVal !== 'false'
-    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer' || user?.user_metadata?.role === 'viewer'
+    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer'
 
-    if ((!user && !devSession) || isViewer) {
+    if (!devSession || isViewer) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized: Valid session required.' },
         { status: 401 }
@@ -216,18 +212,17 @@ export async function POST(request: NextRequest) {
 
     // Update schedule record
     try {
-      await (supabase as any)
-        .from('stc_installment_schedules')
-        .update({
-          recipient_email: trimmedTo,
-          from_email: trimmedFrom,
-          email_subject: emailSubject,
-          email_message: message || null,
-          last_email_sent_at: new Date().toISOString(),
-          last_email_status: sendSuccess ? 'sent' : 'failed',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', schedule.id)
+      await prisma.installmentSchedule.update({
+        where: { id: schedule.id },
+        data: {
+          recipientEmail: trimmedTo,
+          fromEmail: trimmedFrom,
+          emailSubject,
+          emailMessage: message || null,
+          lastEmailSentAt: new Date(),
+          lastEmailStatus: sendSuccess ? 'sent' : 'failed',
+        },
+      })
     } catch {
       // Non-fatal
     }

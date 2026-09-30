@@ -50,7 +50,7 @@ import {
   AttendanceRecordWithEmployee,
   AttendanceSettings,
   Employee,
-} from '@/lib/supabase/database.types'
+} from '@/types/database.types'
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
 import { BranchRequestsModal } from '@/components/attendance/branch-requests-modal'

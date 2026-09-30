@@ -103,7 +103,7 @@ export default function STCInstallmentList() {
       } else {
         setSyncFeedback({
           type: 'error',
-          message: res.error || 'Failed to sync to database. Please make sure the table exists in Supabase.',
+          message: res.error || 'Failed to sync to database.',
         })
       }
     } catch (err: any) {

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { prisma } from '@/lib/prisma'
 
 export interface AIMTPayslip {
   id: string
@@ -105,67 +105,50 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-/**
- * Sanitize frontend payload to match exact database columns
- */
-function toDbPayload(payslip: AIMTPayslip, includeSuperCols = true) {
-  const payload: Record<string, any> = {
-    id: payslip.id,
-    paid_by_name: payslip.paid_by_name,
-    paid_by_address_1: payslip.paid_by_address_1,
-    paid_by_address_2: payslip.paid_by_address_2,
-    paid_by_abn: payslip.paid_by_abn,
-    employee_name: payslip.employee_name,
-    address_line_1: payslip.address_line_1,
-    address_line_2: payslip.address_line_2,
-    pay_frequency: payslip.pay_frequency || 'Fortnightly',
-    annual_salary: payslip.show_annual_salary === false ? 0 : Number(payslip.annual_salary || 0),
-    employment_basis: payslip.employment_basis || 'Full-time employment',
-    pay_period_start: payslip.pay_period_start,
-    pay_period_end: payslip.pay_period_end,
-    payment_date: payslip.payment_date,
-    total_earnings: Number(payslip.total_earnings || 0),
-    net_pay: Number(payslip.net_pay || 0),
-    wages_description: payslip.wages_description || 'Ordinary Hours',
-    ordinary_hours: Number(payslip.ordinary_hours || 0),
-    hourly_rate: Number(payslip.hourly_rate || 0),
-    wages_amount: Number(payslip.wages_amount || 0),
-    wages_total: Number(payslip.wages_total || 0),
-    tax_description: payslip.tax_description || 'PAYG',
-    tax_amount: Number(payslip.tax_amount || 0),
-    tax_total: Number(payslip.tax_total || 0),
-    bank_account_masked: payslip.bank_account_masked || '',
-    account_name: payslip.account_name || '',
-    payment_reference: payslip.payment_reference || 'AIMT Pay',
-    payment_amount: Number(payslip.payment_amount || 0),
-    created_at: payslip.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
-
-  if (includeSuperCols) {
-    payload.superannuation_description = payslip.superannuation_description || ''
-    payload.superannuation_amount = Number(payslip.superannuation_amount || 0)
-    payload.superannuation_total = Number(payslip.superannuation_total || payslip.superannuation_amount || 0)
-  }
-
-  return payload
-}
-
 function fromDbRow(row: any): AIMTPayslip {
   const hasSuper = Boolean(
-    row.include_superannuation ||
-    Number(row.superannuation_amount || 0) > 0 ||
+    Number(row.superannuationAmount ?? row.superannuation_amount ?? 0) > 0 ||
+    (row.superannuationDescription && row.superannuationDescription.trim() !== '') ||
     (row.superannuation_description && row.superannuation_description.trim() !== '')
   )
 
   return {
-    ...row,
-    show_annual_salary: Number(row.annual_salary || 0) > 0,
+    id: row.id,
+    created_at: row.createdAt instanceof Date ? row.createdAt.toISOString() : (row.created_at || new Date().toISOString()),
+    updated_at: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : (row.updated_at || new Date().toISOString()),
+    paid_by_name: row.paidByName || row.paid_by_name || 'Australian Institute of Management and Technology',
+    paid_by_address_1: row.paidByAddress1 || row.paid_by_address_1 || '84 Buckley Street',
+    paid_by_address_2: row.paidByAddress2 || row.paid_by_address_2 || 'Footscray VIC 3011',
+    paid_by_abn: row.paidByAbn || row.paid_by_abn || '85 136 626 956',
+    employee_name: row.employeeName || row.employee_name || '',
+    address_line_1: row.addressLine1 || row.address_line_1 || '',
+    address_line_2: row.addressLine2 || row.address_line_2 || '',
+    pay_frequency: row.payFrequency || row.pay_frequency || 'Fortnightly',
+    show_annual_salary: Number(row.annualSalary ?? row.annual_salary ?? 0) > 0,
+    annual_salary: Number(row.annualSalary ?? row.annual_salary ?? 0),
+    employment_basis: row.employmentBasis || row.employment_basis || 'Full-time employment',
+    pay_period_start: row.payPeriodStart || row.pay_period_start || '',
+    pay_period_end: row.payPeriodEnd || row.pay_period_end || '',
+    payment_date: row.paymentDate || row.payment_date || '',
+    total_earnings: Number(row.totalEarnings ?? row.total_earnings ?? 0),
+    net_pay: Number(row.netPay ?? row.net_pay ?? 0),
+    wages_description: row.wagesDescription || row.wages_description || 'Ordinary Hours',
+    ordinary_hours: Number(row.ordinaryHours ?? row.ordinary_hours ?? 0),
+    hourly_rate: Number(row.hourlyRate ?? row.hourly_rate ?? 0),
+    wages_amount: Number(row.wagesAmount ?? row.wages_amount ?? 0),
+    wages_total: Number(row.wagesTotal ?? row.wages_total ?? 0),
+    tax_description: row.taxDescription || row.tax_description || 'PAYG',
+    tax_amount: Number(row.taxAmount ?? row.tax_amount ?? 0),
+    tax_total: Number(row.taxTotal ?? row.tax_total ?? 0),
     include_superannuation: hasSuper,
     superannuation_description:
-      row.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122',
-    superannuation_amount: Number(row.superannuation_amount || 0),
-    superannuation_total: Number(row.superannuation_total || row.superannuation_amount || 0),
+      row.superannuationDescription || row.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122',
+    superannuation_amount: Number(row.superannuationAmount ?? row.superannuation_amount ?? 0),
+    superannuation_total: Number(row.superannuationTotal ?? row.superannuation_total ?? row.superannuationAmount ?? 0),
+    bank_account_masked: row.bankAccountMasked || row.bank_account_masked || '',
+    account_name: row.accountName || row.account_name || '',
+    payment_reference: row.paymentReference || row.payment_reference || 'AIMT Pay',
+    payment_amount: Number(row.paymentAmount ?? row.payment_amount ?? 0),
   }
 }
 
@@ -177,7 +160,6 @@ function getLocalPayslips(): AIMTPayslip[] {
     if (!raw) return []
     return JSON.parse(raw)
   } catch (e) {
-    console.error('Error reading local payslips:', e)
     return []
   }
 }
@@ -187,63 +169,66 @@ function saveLocalPayslips(items: AIMTPayslip[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
   } catch (e) {
-    console.error('Error saving local payslips:', e)
+    // Ignore
   }
 }
 
 export const aimtPayslipService = {
   async getAll(): Promise<AIMTPayslip[]> {
-    try {
-      const supabase = createClient()
-      const { data, error } = await (supabase as any)
-        .from('aimt_payslips')
-        .select('*')
-        .not('paid_by_name', 'ilike', '%EdLink%')
-        .not('payment_reference', 'ilike', '%EdLink%')
-        .not('id', 'ilike', 'edlink_%')
-        .order('created_at', { ascending: false })
-
-      if (!error && data) {
-        const mapped = (data as any[]).map(fromDbRow)
-        // Sync local storage with DB data
-        saveLocalPayslips(mapped)
-        return mapped
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/aimt-payslips')
+        if (res.ok) {
+          const data = await res.json()
+          const mapped = data.map(fromDbRow)
+          saveLocalPayslips(mapped)
+          return mapped
+        }
+      } catch (e) {
+        console.warn('API fetch failed for AIMT payslips, using local storage fallback:', e)
       }
-    } catch (e) {
-      console.warn('Supabase fetch failed, using local storage fallback:', e)
+      return getLocalPayslips()
     }
-    return getLocalPayslips().filter(
-      (p) =>
-        !p.paid_by_name?.toLowerCase().includes('edlink') &&
-        !p.payment_reference?.toLowerCase().includes('edlink') &&
-        !p.id?.startsWith('edlink_')
-    )
+
+    try {
+      const rows = await prisma.aimtPayslip.findMany({
+        orderBy: { createdAt: 'desc' },
+      })
+      return rows.map(fromDbRow)
+    } catch (e) {
+      console.error('Prisma fetch failed for AIMT payslips:', e)
+      return []
+    }
   },
 
   async getById(id: string): Promise<AIMTPayslip | null> {
-    try {
-      const supabase = createClient()
-      const { data, error } = await (supabase as any)
-        .from('aimt_payslips')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (!error && data) {
-        return fromDbRow(data)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch(`/api/aimt-payslips?id=${encodeURIComponent(id)}`)
+        if (res.ok) {
+          const data = await res.json()
+          return fromDbRow(data)
+        }
+      } catch (e) {
+        console.warn('API getById failed for AIMT payslip, using local storage fallback:', e)
       }
-    } catch (e) {
-      console.warn('Supabase fetchById failed, using local storage fallback:', e)
+      const locals = getLocalPayslips()
+      return locals.find((p) => p.id === id) || null
     }
 
-    const locals = getLocalPayslips()
-    return locals.find((p) => p.id === id) || null
+    try {
+      const row = await prisma.aimtPayslip.findUnique({ where: { id } })
+      return row ? fromDbRow(row) : null
+    } catch (e) {
+      console.error('Prisma getById failed for AIMT payslip:', e)
+      return null
+    }
   },
 
   async save(
     payload: Omit<AIMTPayslip, 'id' | 'created_at'> & { id?: string }
   ): Promise<{ success: boolean; data?: AIMTPayslip; error?: string }> {
-    const id = payload.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `payslip_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`)
+    const id = payload.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `aimt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`)
     const now = new Date().toISOString()
 
     const payslip: AIMTPayslip = {
@@ -253,7 +238,7 @@ export const aimtPayslipService = {
       updated_at: now,
     }
 
-    // Always update local storage first for offline/immediate response
+    // Always update local storage first for immediate response
     const locals = getLocalPayslips()
     const existingIndex = locals.findIndex((p) => p.id === id)
     if (existingIndex >= 0) {
@@ -263,63 +248,124 @@ export const aimtPayslipService = {
     }
     saveLocalPayslips(locals)
 
-    const dbPayload = toDbPayload(payslip, true)
-
-    // Attempt Supabase insert/upsert
-    try {
-      const supabase = createClient()
-      let { data, error } = await (supabase as any)
-        .from('aimt_payslips')
-        .upsert(dbPayload)
-        .select()
-        .single()
-
-      if (error && error.message?.includes('superannuation')) {
-        // If live Supabase table does not yet have superannuation columns, fallback without them
-        const fallbackRes = await (supabase as any)
-          .from('aimt_payslips')
-          .upsert(toDbPayload(payslip, false))
-          .select()
-          .single()
-        data = fallbackRes.data
-        error = fallbackRes.error
-      }
-
-      if (!error && data) {
-        return {
-          success: true,
-          data: {
-            ...payslip,
-            ...fromDbRow(data),
-            include_superannuation: payslip.include_superannuation,
-            superannuation_description: payslip.superannuation_description,
-            superannuation_amount: payslip.superannuation_amount,
-            superannuation_total: payslip.superannuation_total,
-          },
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/aimt-payslips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payslip),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          return { success: true, data: fromDbRow(data) }
         }
+        const errJson = await res.json()
+        return { success: false, error: errJson.error || 'Failed to save payslip' }
+      } catch (e: any) {
+        return { success: true, data: payslip }
       }
-    } catch (e) {
-      console.warn('Supabase upsert failed, stored in local storage:', e)
     }
 
-    return { success: true, data: payslip }
+    try {
+      const row = await prisma.aimtPayslip.upsert({
+        where: { id },
+        update: {
+          paidByName: payload.paid_by_name || 'Australian Institute of Management and Technology',
+          paidByAddress1: payload.paid_by_address_1 || '84 Buckley Street',
+          paidByAddress2: payload.paid_by_address_2 || 'Footscray VIC 3011',
+          paidByAbn: payload.paid_by_abn || '85 136 626 956',
+          employeeName: payload.employee_name || '',
+          addressLine1: payload.address_line_1 || '',
+          addressLine2: payload.address_line_2 || '',
+          payFrequency: payload.pay_frequency || 'Fortnightly',
+          annualSalary: payload.show_annual_salary === false ? 0 : Number(payload.annual_salary || 0),
+          employmentBasis: payload.employment_basis || 'Full-time employment',
+          payPeriodStart: payload.pay_period_start || '',
+          payPeriodEnd: payload.pay_period_end || '',
+          paymentDate: payload.payment_date || '',
+          totalEarnings: Number(payload.total_earnings || 0),
+          netPay: Number(payload.net_pay || 0),
+          wagesDescription: payload.wages_description || 'Ordinary Hours',
+          ordinaryHours: Number(payload.ordinary_hours || 0),
+          hourlyRate: Number(payload.hourly_rate || 0),
+          wagesAmount: Number(payload.wages_amount || 0),
+          wagesTotal: Number(payload.wages_total || 0),
+          taxDescription: payload.tax_description || 'PAYG',
+          taxAmount: Number(payload.tax_amount || 0),
+          taxTotal: Number(payload.tax_total || 0),
+          superannuationDescription: payload.superannuation_description || '',
+          superannuationAmount: Number(payload.superannuation_amount || 0),
+          superannuationTotal: Number(payload.superannuation_total || payload.superannuation_amount || 0),
+          bankAccountMasked: payload.bank_account_masked || '',
+          accountName: payload.account_name || '',
+          paymentReference: payload.payment_reference || 'AIMT Pay',
+          paymentAmount: Number(payload.payment_amount || 0),
+        },
+        create: {
+          id,
+          paidByName: payload.paid_by_name || 'Australian Institute of Management and Technology',
+          paidByAddress1: payload.paid_by_address_1 || '84 Buckley Street',
+          paidByAddress2: payload.paid_by_address_2 || 'Footscray VIC 3011',
+          paidByAbn: payload.paid_by_abn || '85 136 626 956',
+          employeeName: payload.employee_name || '',
+          addressLine1: payload.address_line_1 || '',
+          addressLine2: payload.address_line_2 || '',
+          payFrequency: payload.pay_frequency || 'Fortnightly',
+          annualSalary: payload.show_annual_salary === false ? 0 : Number(payload.annual_salary || 0),
+          employmentBasis: payload.employment_basis || 'Full-time employment',
+          payPeriodStart: payload.pay_period_start || '',
+          payPeriodEnd: payload.pay_period_end || '',
+          paymentDate: payload.payment_date || '',
+          totalEarnings: Number(payload.total_earnings || 0),
+          netPay: Number(payload.net_pay || 0),
+          wagesDescription: payload.wages_description || 'Ordinary Hours',
+          ordinaryHours: Number(payload.ordinary_hours || 0),
+          hourlyRate: Number(payload.hourly_rate || 0),
+          wagesAmount: Number(payload.wages_amount || 0),
+          wagesTotal: Number(payload.wages_total || 0),
+          taxDescription: payload.tax_description || 'PAYG',
+          taxAmount: Number(payload.tax_amount || 0),
+          taxTotal: Number(payload.tax_total || 0),
+          superannuationDescription: payload.superannuation_description || '',
+          superannuationAmount: Number(payload.superannuation_amount || 0),
+          superannuationTotal: Number(payload.superannuation_total || payload.superannuation_amount || 0),
+          bankAccountMasked: payload.bank_account_masked || '',
+          accountName: payload.account_name || '',
+          paymentReference: payload.payment_reference || 'AIMT Pay',
+          paymentAmount: Number(payload.payment_amount || 0),
+        },
+      })
+      return { success: true, data: fromDbRow(row) }
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Prisma error' }
+    }
   },
 
   async delete(id: string): Promise<{ success: boolean; error?: string }> {
-    // Remove from local storage
     const locals = getLocalPayslips()
     const filtered = locals.filter((p) => p.id !== id)
     saveLocalPayslips(filtered)
 
-    // Attempt delete in Supabase
-    try {
-      const supabase = createClient()
-      await (supabase as any).from('aimt_payslips').delete().eq('id', id)
-    } catch (e) {
-      console.warn('Supabase delete failed, deleted from local storage:', e)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch(`/api/aimt-payslips?id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        })
+        if (res.ok) {
+          return { success: true }
+        }
+      } catch (e) {
+        // Fallback to local delete
+      }
+      return { success: true }
     }
 
-    return { success: true }
+    try {
+      await prisma.aimtPayslip.delete({ where: { id } })
+      return { success: true }
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Prisma error' }
+    }
   },
 
   async syncLocalToCloud(): Promise<{ success: boolean; syncedCount: number; totalCount: number; error?: string }> {
@@ -329,40 +375,16 @@ export const aimtPayslipService = {
     }
 
     try {
-      const supabase = createClient()
       let successCount = 0
       let lastError: string | null = null
 
       for (const payslip of locals) {
-        const dbPayload = toDbPayload(payslip)
-        const { error } = await (supabase as any)
-          .from('aimt_payslips')
-          .upsert(dbPayload, { onConflict: 'id' })
-
-        if (!error) {
+        const res = await this.save(payslip)
+        if (res.success) {
           successCount++
         } else {
-          lastError = error.message
+          lastError = res.error || 'Failed to sync'
         }
-      }
-
-      if (lastError && successCount === 0) {
-        return {
-          success: false,
-          syncedCount: 0,
-          totalCount: locals.length,
-          error: lastError,
-        }
-      }
-
-      // Refresh local cache with latest cloud rows
-      const { data } = await (supabase as any)
-        .from('aimt_payslips')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (data && data.length > 0) {
-        saveLocalPayslips((data as any[]).map(fromDbRow))
       }
 
       return {
@@ -376,7 +398,7 @@ export const aimtPayslipService = {
         success: false,
         syncedCount: 0,
         totalCount: locals.length,
-        error: e?.message || 'Failed to connect to cloud database',
+        error: e?.message || 'Failed to sync local payslips',
       }
     }
   },

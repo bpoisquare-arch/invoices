@@ -1,4 +1,4 @@
-import { EmployeeLeaveQuotas } from '@/lib/supabase/database.types'
+import { EmployeeLeaveQuotas } from '@/types/database.types'
 
 export interface EmployeeMetadata {
   branch?: string | null
@@ -188,38 +188,19 @@ export async function getGazettedHolidays(): Promise<Record<string, string>> {
   const fileHolidays = readAllHolidays()
 
   try {
-    const { createClient } = await import('@/lib/supabase/server')
-    const supabase = await createClient()
+    const { prisma } = await import('@/lib/prisma')
+    const dbRows = await prisma.gazettedHoliday.findMany()
 
-    // 1. Try dedicated gazetted_holidays table first
-    const { data: dbRows, error: tableError } = await supabase
-      .from('gazetted_holidays')
-      .select('*')
-
-    if (!tableError && Array.isArray(dbRows) && dbRows.length > 0) {
+    if (Array.isArray(dbRows) && dbRows.length > 0) {
       const holidaysMap: Record<string, string> = { ...fileHolidays }
       for (const row of dbRows) {
         if (row.date) {
-          holidaysMap[row.date] = row.name || 'Gazetted Holiday'
+          const dateStr = row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date).slice(0, 10)
+          holidaysMap[dateStr] = row.name || 'Gazetted Holiday'
         }
       }
       inMemoryHolidays = holidaysMap
       return holidaysMap
-    }
-
-    // 2. Fallback to audit logs if table is empty or not yet migrated
-    const { data, error } = await supabase
-      .from('attendance_audit_logs')
-      .select('details')
-      .eq('action', 'GAZETTED_HOLIDAYS_STORE')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (data && data.details && typeof data.details === 'object') {
-      const dbHolidays = data.details as Record<string, string>
-      inMemoryHolidays = { ...fileHolidays, ...dbHolidays }
-      return inMemoryHolidays
     }
   } catch (err) {
     console.error('Error fetching gazetted holidays from database:', err)
@@ -233,7 +214,6 @@ export async function saveGazettedHoliday(
   name?: string,
   isHoliday: boolean = true
 ): Promise<Record<string, string>> {
-  // 1. Fetch current holidays from DB / memory
   const currentMap = await getGazettedHolidays()
   const updatedMap = { ...currentMap }
 
@@ -248,25 +228,17 @@ export async function saveGazettedHoliday(
   inMemoryHolidays = updatedMap
   writeHoliday(date, name, isHoliday)
 
-  // 2. Persist to Supabase Database (both dedicated table & audit log for backward compatibility)
   try {
-    const { createClient } = await import('@/lib/supabase/server')
-    const supabase = await createClient()
-
+    const { prisma } = await import('@/lib/prisma')
     if (isHoliday) {
-      await supabase.from('gazetted_holidays').upsert({
-        date,
-        name: holidayName,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'date' })
+      await prisma.gazettedHoliday.upsert({
+        where: { date: new Date(date) },
+        update: { name: holidayName },
+        create: { date: new Date(date), name: holidayName },
+      })
     } else {
-      await supabase.from('gazetted_holidays').delete().eq('date', date)
+      await prisma.gazettedHoliday.delete({ where: { date: new Date(date) } }).catch(() => {})
     }
-
-    await supabase.from('attendance_audit_logs').insert({
-      action: 'GAZETTED_HOLIDAYS_STORE',
-      details: updatedMap as any,
-    })
   } catch (err) {
     console.error('Error in saveGazettedHoliday db write:', err)
   }

@@ -48,7 +48,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
-import { Employee } from '@/lib/supabase/database.types'
+import { Employee } from '@/types/database.types'
 import { pdf } from '@react-pdf/renderer'
 import PayslipPDFTemplate from '@/components/pdf/payslip-pdf-template'
 import EmployeeCommissionModal from '@/components/attendance/employee-commission-modal'

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer'
-import { Employee } from '@/lib/supabase/database.types'
+import { Employee } from '@/types/database.types'
 import { EDLINK_LOGO_BASE64 } from '@/lib/constants/edlink-assets'
 
 // Register Geist Font Family

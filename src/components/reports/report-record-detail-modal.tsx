@@ -30,7 +30,7 @@ import {
   Sparkles,
   MessageSquare,
 } from 'lucide-react'
-import type { AimtReportRecord } from '@/lib/supabase/database.types'
+import type { AimtReportRecord } from '@/types/database.types'
 
 interface ReportRecordDetailModalProps {
   isOpen: boolean

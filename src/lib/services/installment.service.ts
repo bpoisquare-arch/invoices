@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { prisma } from '@/lib/prisma'
 import { format, parseISO } from 'date-fns'
 
 export interface AIMTFixedInfo {
@@ -538,7 +538,7 @@ function mapScheduleToDbRow(schedule: StudentInstallmentSchedule): any {
 export async function getInstallments(): Promise<StudentInstallmentSchedule[]> {
   if (typeof window !== 'undefined') {
     try {
-      const res = await fetch('/api/installments')
+      const res = await fetch('/api/installments', { cache: 'no-store' })
       if (res.ok) {
         const rows = await res.json()
         if (Array.isArray(rows)) {
@@ -571,25 +571,18 @@ export async function getInstallments(): Promise<StudentInstallmentSchedule[]> {
         }
       }
     } catch (err) {
-      console.warn('API getInstallments failed, falling back to Supabase:', err)
+      console.warn('API getInstallments failed:', err)
     }
+    return []
   }
 
   try {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('installment_schedules')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching installment schedules from Supabase:', error.message)
-      return []
-    }
-
+    const data = await prisma.installmentSchedule.findMany({
+      orderBy: { createdAt: 'desc' },
+    })
     return (data || []).map(mapDbRowToSchedule)
   } catch (err) {
-    console.error('Exception fetching installment schedules:', err)
+    console.warn('Exception fetching installment schedules via Prisma:', err)
     return []
   }
 }
@@ -597,7 +590,7 @@ export async function getInstallments(): Promise<StudentInstallmentSchedule[]> {
 export async function getInstallmentById(id: string): Promise<StudentInstallmentSchedule | null> {
   if (typeof window !== 'undefined') {
     try {
-      const res = await fetch(`/api/installments?id=${encodeURIComponent(id)}`)
+      const res = await fetch(`/api/installments?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
       if (res.ok) {
         const r = await res.json()
         if (r && r.id) {
@@ -611,7 +604,7 @@ export async function getInstallmentById(id: string): Promise<StudentInstallment
             start_month_year: r.startMonthYear ?? r.start_month_year,
             end_month_offset: r.endMonthOffset ?? r.end_month_offset,
             admin_fee: Number(r.adminFee ?? r.admin_fee ?? 0),
-            resourcesFee: Number(r.resourcesFee ?? r.resources_fee ?? 0),
+            resources_fee: Number(r.resourcesFee ?? r.resources_fee ?? 0),
             material_fee: r.materialFee !== null && r.materialFee !== undefined ? Number(r.materialFee) : (r.material_fee !== undefined ? Number(r.material_fee) : undefined),
             tuition_fee: Number(r.tuitionFee ?? r.tuition_fee ?? 0),
             scholarship: Number(r.scholarship ?? 0),
@@ -630,25 +623,15 @@ export async function getInstallmentById(id: string): Promise<StudentInstallment
         }
       }
     } catch (err) {
-      console.warn('API getInstallmentById failed, falling back to Supabase:', err)
+      console.warn('API getInstallmentById failed:', err)
     }
+    return null
   }
 
   try {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('installment_schedules')
-      .select('*')
-      .eq('id', id)
-      .single()
-
-    if (error || !data) {
-      return null
-    }
-
-    return mapDbRowToSchedule(data)
+    const data = await prisma.installmentSchedule.findUnique({ where: { id } })
+    return data ? mapDbRowToSchedule(data) : null
   } catch (err) {
-    console.error('Exception fetching installment by ID:', err)
     return null
   }
 }
@@ -669,36 +652,72 @@ export async function saveInstallment(
   const dbRow = mapScheduleToDbRow(finalSchedule)
 
   if (typeof window !== 'undefined') {
-    try {
-      const res = await fetch('/api/installments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dbRow),
-      })
-      if (res.ok) {
-        return finalSchedule
-      }
-    } catch (err) {
-      console.warn('API saveInstallment failed, falling back to Supabase:', err)
+    const res = await fetch('/api/installments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dbRow),
+    })
+
+    if (!res.ok) {
+      throw new Error('Failed to save installment schedule to database')
     }
+
+    return finalSchedule
   }
 
-  const supabase = createClient()
-  let { error } = await supabase
-    .from('installment_schedules')
-    .upsert(dbRow, { onConflict: 'id' })
-
-  // If material_fee column doesn't exist yet in Supabase schema, gracefully retry
-  if (error && (error.message.includes('material_fee') || error.code === '42703')) {
-    delete dbRow.material_fee
-    const retry = await supabase
-      .from('installment_schedules')
-      .upsert(dbRow, { onConflict: 'id' })
-    error = retry.error
-  }
-
-  if (error) {
-    throw new Error(error.message || 'Failed to save installment schedule to database')
+  try {
+    await prisma.installmentSchedule.upsert({
+      where: { id: scheduleId },
+      update: {
+        date: new Date(dbRow.date),
+        studentName: dbRow.student_name,
+        studentId: dbRow.student_id,
+        courseName: dbRow.course_name,
+        duration: dbRow.duration,
+        startDate: new Date(dbRow.start_date),
+        endDate: new Date(dbRow.end_date),
+        startMonthYear: dbRow.start_month_year || null,
+        endMonthOffset: dbRow.end_month_offset ?? 3,
+        adminFee: dbRow.admin_fee ?? 0,
+        resourcesFee: dbRow.resources_fee ?? 0,
+        materialFee: dbRow.material_fee ?? 0,
+        tuitionFee: dbRow.tuition_fee ?? 0,
+        scholarship: dbRow.scholarship ?? 0,
+        totalAmount: dbRow.total_amount ?? 0,
+        firstInstallmentAmount: dbRow.first_installment_amount ?? 0,
+        scheduleItems: dbRow.schedule_items || [],
+        recipientEmail: dbRow.recipient_email || null,
+        fromEmail: dbRow.from_email || null,
+        emailSubject: dbRow.email_subject || null,
+        emailMessage: dbRow.email_message || null,
+      },
+      create: {
+        id: scheduleId,
+        date: new Date(dbRow.date),
+        studentName: dbRow.student_name,
+        studentId: dbRow.student_id,
+        courseName: dbRow.course_name,
+        duration: dbRow.duration,
+        startDate: new Date(dbRow.start_date),
+        endDate: new Date(dbRow.end_date),
+        startMonthYear: dbRow.start_month_year || null,
+        endMonthOffset: dbRow.end_month_offset ?? 3,
+        adminFee: dbRow.admin_fee ?? 0,
+        resourcesFee: dbRow.resources_fee ?? 0,
+        materialFee: dbRow.material_fee ?? 0,
+        tuitionFee: dbRow.tuition_fee ?? 0,
+        scholarship: dbRow.scholarship ?? 0,
+        totalAmount: dbRow.total_amount ?? 0,
+        firstInstallmentAmount: dbRow.first_installment_amount ?? 0,
+        scheduleItems: dbRow.schedule_items || [],
+        recipientEmail: dbRow.recipient_email || null,
+        fromEmail: dbRow.from_email || null,
+        emailSubject: dbRow.email_subject || null,
+        emailMessage: dbRow.email_message || null,
+      },
+    })
+  } catch (err) {
+    console.warn('MySQL saveInstallment failed:', err)
   }
 
   return finalSchedule
@@ -706,29 +725,23 @@ export async function saveInstallment(
 
 export async function deleteInstallment(id: string): Promise<void> {
   if (typeof window !== 'undefined') {
-    try {
-      const res = await fetch(`/api/installments?id=${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      })
-      if (res.ok) return
-    } catch (err) {
-      console.warn('API deleteInstallment failed, falling back to Supabase:', err)
+    const res = await fetch(`/api/installments?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+    if (!res.ok) {
+      throw new Error('Failed to delete installment schedule from database')
     }
+    return
   }
 
-  const supabase = createClient()
-  await supabase.from('installment_email_logs').delete().eq('schedule_id', id)
-  const { error } = await supabase
-    .from('installment_schedules')
-    .delete()
-    .eq('id', id)
-
-  if (error) {
-    throw new Error(error.message || 'Failed to delete installment schedule from database')
+  try {
+    await prisma.installmentEmailLog.deleteMany({ where: { scheduleId: id } })
+    await prisma.installmentSchedule.deleteMany({ where: { id } })
+  } catch (err) {
+    console.warn('MySQL deleteInstallment failed:', err)
   }
 }
 
-// Deprecated no-op for backward compatibility
 export async function syncLocalInstallmentsToSupabase(): Promise<{ syncedCount: number; error?: string }> {
   return { syncedCount: 0 }
 }

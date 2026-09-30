@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Template } from '@/lib/supabase/database.types'
+import { Template } from '@/types/database.types'
 import { getTemplateById, updateTemplate } from '@/lib/services/template.service'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {

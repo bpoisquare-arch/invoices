@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/client'
-import { Template } from '@/lib/supabase/database.types'
+import { prisma } from '@/lib/prisma'
+import { Template } from '@/types/database.types'
 
 export const FALLBACK_TEMPLATE: Template = {
   id: 'edlink-pk-template-id',
@@ -17,63 +17,6 @@ export const FALLBACK_TEMPLATE: Template = {
   layout_type: 'edlink_v1',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
-}
-
-function isValidUUID(str?: string | null): boolean {
-  if (!str) return false
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim())
-}
-
-// Clean up stale localStorage cache from previous versions
-if (typeof window !== 'undefined') {
-  try {
-    localStorage.removeItem('edlink_template_customizations')
-  } catch {
-    // Ignore
-  }
-}
-
-function normalizeTemplate<T extends Template>(t: T): T {
-  if (!t) return t
-  const companyName = t.company_name === 'EdLink Pakistan' ? 'EdLink Australia' : t.company_name
-  const name = t.name === 'EdLink Pakistan Standard Template' ? 'EdLink Australia Standard Template' : t.name
-  return {
-    ...t,
-    company_name: companyName,
-    name: name,
-  }
-}
-
-export async function getTemplates(): Promise<(Template & { companies?: { name: string; prefix: string } | null })[]> {
-  try {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('templates')
-      .select('*, companies(name, prefix)')
-      .order('created_at', { ascending: true })
-
-    if (!error && data && data.length > 0) {
-      const valid = data
-        .filter(
-          (t) =>
-            (t.company_name || '').toLowerCase() !== 'anonymous' &&
-            (t.companies?.name || '').toLowerCase() !== 'anonymous'
-        )
-        .map((t) => {
-          const normalized = normalizeTemplate(t)
-          if (normalized.companies && normalized.companies.name === 'EdLink Pakistan') {
-            normalized.companies.name = 'EdLink Australia'
-          }
-          return normalized
-        })
-
-      if (valid.length > 0) return valid
-    }
-  } catch (err) {
-    console.error('Error fetching templates:', err)
-  }
-
-  return [{ ...FALLBACK_TEMPLATE, companies: { name: FALLBACK_TEMPLATE.company_name || 'EdLink Australia', prefix: 'EDL' } }]
 }
 
 export const ANONYMOUS_TEMPLATE: Template = {
@@ -130,6 +73,63 @@ export const ISQUARE_TEMPLATE: Template = {
   updated_at: new Date().toISOString(),
 }
 
+function isValidUUID(str?: string | null): boolean {
+  if (!str) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim())
+}
+
+function prismaToTemplate(row: any): Template {
+  if (!row) return row
+  const companyName = row.companyName === 'EdLink Pakistan' ? 'EdLink Australia' : (row.companyName || '')
+  const name = row.name === 'EdLink Pakistan Standard Template' ? 'EdLink Australia Standard Template' : (row.name || '')
+  return {
+    id: row.id,
+    company_id: row.companyId,
+    name: name,
+    company_name: companyName,
+    address: row.address || null,
+    phone: row.phone || null,
+    email: row.email || null,
+    payment_details: row.paymentDetails || null,
+    bank_details: row.bankDetails || null,
+    currency: row.currency || 'AUD',
+    footer_terms: row.footerTerms || null,
+    primary_color: row.primaryColor || '#2563eb',
+    layout_type: row.layoutType || 'edlink_v1',
+    created_at: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
+    updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : new Date().toISOString(),
+  }
+}
+
+export async function getTemplates(): Promise<(Template & { companies?: { name: string; prefix: string } | null })[]> {
+  try {
+    const list = await prisma.template.findMany({
+      include: { company: true },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    if (list && list.length > 0) {
+      const valid = list
+        .filter(
+          (t) =>
+            (t.companyName || '').toLowerCase() !== 'anonymous' &&
+            (t.company?.name || '').toLowerCase() !== 'anonymous'
+        )
+        .map((t) => {
+          const norm = prismaToTemplate(t)
+          const comp = t.company ? { name: t.company.name === 'EdLink Pakistan' ? 'EdLink Australia' : t.company.name, prefix: t.company.prefix } : null
+          return { ...norm, companies: comp }
+        })
+
+      if (valid.length > 0) return valid
+    }
+  } catch (err) {
+    console.error('Error fetching templates:', err)
+  }
+
+  return [{ ...FALLBACK_TEMPLATE, companies: { name: FALLBACK_TEMPLATE.company_name || 'EdLink Australia', prefix: 'EDL' } }]
+}
+
 export async function getTemplateByCompanyId(companyId: string): Promise<Template | null> {
   const clean = (companyId || '').toLowerCase().trim()
   if (clean === 'anonymous-company-id' || clean === 'anonymous' || clean === 'ano' || clean === 'custom' || clean === 'edlink-pk') {
@@ -138,100 +138,67 @@ export async function getTemplateByCompanyId(companyId: string): Promise<Templat
 
   if (clean === 'nsc' || clean === 'nsc-company-id' || clean === 'nsc-template-id' || clean === 'neighbourhood-shine' || clean === 'neighbourhood shine' || clean === 'neighbourhood shine co.') {
     try {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('templates')
-        .select('*')
-        .or('name.ilike.%Neighbourhood%,company_name.ilike.%Neighbourhood%')
-        .limit(1)
-        .maybeSingle()
-      if (data) return normalizeTemplate({ ...data, layout_type: 'nsc_v1' })
-    } catch {
-      // Ignore
-    }
+      const row = await prisma.template.findFirst({
+        where: {
+          OR: [
+            { name: { contains: 'Neighbourhood' } },
+            { companyName: { contains: 'Neighbourhood' } },
+          ],
+        },
+      })
+      if (row) return { ...prismaToTemplate(row), layout_type: 'nsc_v1' }
+    } catch {}
     return NSC_TEMPLATE
   }
 
   if (clean === 'isq' || clean === 'isquare' || clean === 'isquare-bpo' || clean === 'isquare-bpo-company-id' || clean === 'isquare-bpo-template-id') {
     try {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('templates')
-        .select('*')
-        .or('name.ilike.%ISquare%,company_name.ilike.%ISquare%')
-        .limit(1)
-        .maybeSingle()
-      if (data) return normalizeTemplate(data)
-    } catch {
-      // Ignore
-    }
+      const row = await prisma.template.findFirst({
+        where: {
+          OR: [
+            { name: { contains: 'ISquare' } },
+            { companyName: { contains: 'ISquare' } },
+          ],
+        },
+      })
+      if (row) return prismaToTemplate(row)
+    } catch {}
     return ISQUARE_TEMPLATE
   }
 
   try {
-    const supabase = createClient()
     if (isValidUUID(companyId)) {
-      const { data, error } = await supabase
-        .from('templates')
-        .select('*')
-        .eq('company_id', companyId)
-        .single()
-
-      if (!error && data) {
-        return normalizeTemplate(data)
-      }
+      const row = await prisma.template.findFirst({
+        where: { companyId: companyId },
+      })
+      if (row) return prismaToTemplate(row)
     }
 
-    // Try finding template for non-anonymous company
-    const { data: list, error: listErr } = await supabase
-      .from('templates')
-      .select('*')
-      .order('created_at', { ascending: true })
-
-    if (!listErr && list && list.length > 0) {
+    const list = await prisma.template.findMany({ orderBy: { createdAt: 'asc' } })
+    if (list && list.length > 0) {
       const valid = list.find(
         (t) =>
-          (t.company_name || '').toLowerCase() !== 'anonymous' &&
+          (t.companyName || '').toLowerCase() !== 'anonymous' &&
           (t.name || '').toLowerCase() !== 'anonymous'
       )
-      if (valid) return normalizeTemplate(valid)
-      return normalizeTemplate(list[0])
+      if (valid) return prismaToTemplate(valid)
+      return prismaToTemplate(list[0])
     }
-  } catch (err) {
-    // Fallback below
-  }
+  } catch (err) {}
 
   return FALLBACK_TEMPLATE
 }
 
 export async function getTemplateById(id: string): Promise<Template | null> {
   try {
-    const supabase = createClient()
     if (isValidUUID(id)) {
-      const { data, error } = await supabase
-        .from('templates')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (!error && data) {
-        return normalizeTemplate(data)
-      }
+      const row = await prisma.template.findUnique({ where: { id } })
+      if (row) return prismaToTemplate(row)
     }
 
-    const { data, error } = await supabase
-      .from('templates')
-      .select('*')
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .single()
-
-    if (!error && data) {
-      return normalizeTemplate(data)
-    }
-  } catch (err) {
-    // Fallback below
-  }
+    const first = await prisma.template.findFirst({ orderBy: { createdAt: 'asc' } })
+    if (first) return prismaToTemplate(first)
+  } catch (err) {}
 
   return FALLBACK_TEMPLATE
 }
@@ -241,48 +208,45 @@ export async function updateTemplate(
   updates: Partial<Omit<Template, 'id' | 'company_id' | 'created_at'>>
 ): Promise<Template> {
   try {
-    const supabase = createClient()
     let targetId = id
 
     if (!isValidUUID(targetId)) {
-      const { data: first } = await supabase
-        .from('templates')
-        .select('id')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .single()
+      const first = await prisma.template.findFirst({ orderBy: { createdAt: 'asc' }, select: { id: true } })
       if (first) {
         targetId = first.id
       }
     }
 
     if (isValidUUID(targetId)) {
-      const { data, error } = await supabase
-        .from('templates')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', targetId)
-        .select()
-        .single()
+      const data: any = {}
+      if (updates.name !== undefined) data.name = updates.name
+      if (updates.company_name !== undefined) data.companyName = updates.company_name
+      if (updates.address !== undefined) data.address = updates.address
+      if (updates.phone !== undefined) data.phone = updates.phone
+      if (updates.email !== undefined) data.email = updates.email
+      if (updates.payment_details !== undefined) data.paymentDetails = updates.payment_details
+      if (updates.bank_details !== undefined) data.bankDetails = updates.bank_details
+      if (updates.currency !== undefined) data.currency = updates.currency
+      if (updates.footer_terms !== undefined) data.footerTerms = updates.footer_terms
+      if (updates.primary_color !== undefined) data.primaryColor = updates.primary_color
+      if (updates.layout_type !== undefined) data.layoutType = updates.layout_type
 
-      if (error || !data) {
-        throw new Error(error?.message || 'Failed to update template in database')
+      const updated = await prisma.template.update({
+        where: { id: targetId },
+        data,
+      })
+
+      if (updated.companyId && (updates.company_name || updates.currency)) {
+        const compData: any = {}
+        if (updates.company_name) compData.name = updates.company_name
+        if (updates.currency) compData.currency = updates.currency
+        await prisma.company.update({
+          where: { id: updated.companyId },
+          data: compData,
+        }).catch(() => {})
       }
 
-      // Also sync company name/currency with parent company record if exists
-      if (data.company_id && (updates.company_name || updates.currency)) {
-        await supabase
-          .from('companies')
-          .update({
-            ...(updates.company_name ? { name: updates.company_name } : {}),
-            ...(updates.currency ? { currency: updates.currency } : {}),
-          })
-          .eq('id', data.company_id)
-      }
-
-      return normalizeTemplate(data)
+      return prismaToTemplate(updated)
     }
   } catch (err: any) {
     throw new Error(err?.message || 'Failed to update template')
@@ -297,35 +261,27 @@ export async function duplicateTemplate(
   newTemplateName: string
 ): Promise<Template> {
   try {
-    const supabase = createClient()
-
     const original = await getTemplateById(templateId)
     const base = original || FALLBACK_TEMPLATE
 
-    const { data: copy, error: createErr } = await supabase
-      .from('templates')
-      .insert({
-        company_id: newCompanyId,
+    const created = await prisma.template.create({
+      data: {
+        companyId: newCompanyId,
         name: newTemplateName,
-        company_name: base.company_name,
+        companyName: base.company_name,
         address: base.address,
         phone: base.phone,
         email: base.email,
-        payment_details: base.payment_details,
-        bank_details: base.bank_details,
+        paymentDetails: base.payment_details,
+        bankDetails: base.bank_details,
         currency: base.currency,
-        footer_terms: base.footer_terms,
-        primary_color: base.primary_color,
-        layout_type: base.layout_type,
-      })
-      .select()
-      .single()
+        footerTerms: base.footer_terms,
+        primaryColor: base.primary_color,
+        layoutType: base.layout_type,
+      },
+    })
 
-    if (createErr || !copy) {
-      throw new Error(createErr?.message || 'Failed to duplicate template')
-    }
-
-    return copy
+    return prismaToTemplate(created)
   } catch (err) {
     return {
       ...FALLBACK_TEMPLATE,

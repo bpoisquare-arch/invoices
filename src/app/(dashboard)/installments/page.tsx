@@ -8,7 +8,6 @@ import {
   getInstallments,
   deleteInstallment,
   getAimtFixedInfo,
-  syncLocalInstallmentsToSupabase,
 } from '@/lib/services/installment.service'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'

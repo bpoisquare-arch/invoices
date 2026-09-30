@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { prisma } from '@/lib/prisma'
 
 export interface EdlinkPayslip {
   id: string
@@ -93,140 +93,91 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-/**
- * Sanitize frontend payload to match exact database columns
- */
-function toDbPayload(payslip: EdlinkPayslip) {
-  return {
-    id: payslip.id,
-    paid_by_name: payslip.paid_by_name,
-    paid_by_address_1: payslip.paid_by_address_1,
-    paid_by_address_2: payslip.paid_by_address_2,
-    paid_by_abn: payslip.paid_by_abn,
-    employee_name: payslip.employee_name,
-    address_line_1: payslip.address_line_1,
-    address_line_2: payslip.address_line_2,
-    pay_frequency: payslip.pay_frequency || 'Fortnightly',
-    annual_salary: payslip.show_annual_salary === false ? 0 : Number(payslip.annual_salary || 0),
-    employment_basis: payslip.employment_basis || 'Full-time employment',
-    pay_period_start: payslip.pay_period_start,
-    pay_period_end: payslip.pay_period_end,
-    payment_date: payslip.payment_date,
-    total_earnings: Number(payslip.total_earnings || 0),
-    net_pay: Number(payslip.net_pay || 0),
-    wages_description: payslip.wages_description || 'Ordinary Hours',
-    ordinary_hours: Number(payslip.ordinary_hours || 0),
-    hourly_rate: Number(payslip.hourly_rate || 0),
-    wages_amount: Number(payslip.wages_amount || 0),
-    wages_total: Number(payslip.wages_total || 0),
-    tax_description: payslip.tax_description || 'PAYG',
-    tax_amount: Number(payslip.tax_amount || 0),
-    tax_total: Number(payslip.tax_total || 0),
-    bank_account_masked: payslip.bank_account_masked || '',
-    account_name: payslip.account_name || '',
-    payment_reference: payslip.payment_reference || 'EdLink Pay',
-    payment_amount: Number(payslip.payment_amount || 0),
-    created_at: payslip.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
-}
-
 function fromDbRow(row: any): EdlinkPayslip {
-  const isOldDefaultName =
-    !row.paid_by_name ||
-    row.paid_by_name === 'EdLink Australia PTY Ltd' ||
-    row.paid_by_name === 'EdLink Australia'
-  const isOldDefaultAddr1 =
-    !row.paid_by_address_1 ||
-    row.paid_by_address_1 === 'Suite 3, Level 4' ||
-    row.paid_by_address_1 === 'Suit 3, Level 4'
-  const isOldDefaultAddr2 =
-    !row.paid_by_address_2 ||
-    row.paid_by_address_2 === '20 Collins Street, Melbourne VIC 3000' ||
-    row.paid_by_address_2 === '20 Collins Street, Melbourne 3000'
-
   return {
-    ...row,
-    paid_by_name: isOldDefaultName ? 'EdLink Education & Visa Services' : row.paid_by_name,
-    paid_by_address_1: isOldDefaultAddr1 ? 'Suit 3, Level 4/20' : row.paid_by_address_1,
-    paid_by_address_2: isOldDefaultAddr2 ? 'Collins Street, Melbourne 3000' : row.paid_by_address_2,
-    show_annual_salary: Number(row.annual_salary || 0) > 0,
+    id: row.id,
+    created_at: row.createdAt instanceof Date ? row.createdAt.toISOString() : (row.created_at || new Date().toISOString()),
+    updated_at: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : (row.updated_at || new Date().toISOString()),
+    paid_by_name: row.paidByName || row.paid_by_name || 'EdLink Education & Visa Services',
+    paid_by_address_1: row.paidByAddress1 || row.paid_by_address_1 || 'Suit 3, Level 4/20',
+    paid_by_address_2: row.paidByAddress2 || row.paid_by_address_2 || 'Collins Street, Melbourne 3000',
+    paid_by_abn: row.paidByAbn || row.paid_by_abn || '62 658 488 469',
+    employee_name: row.employeeName || row.employee_name || '',
+    address_line_1: row.addressLine1 || row.address_line_1 || '',
+    address_line_2: row.addressLine2 || row.address_line_2 || '',
+    pay_frequency: row.payFrequency || row.pay_frequency || 'Fortnightly',
+    show_annual_salary: Number(row.annualSalary ?? row.annual_salary ?? 0) > 0,
+    annual_salary: Number(row.annualSalary ?? row.annual_salary ?? 0),
+    employment_basis: row.employmentBasis || row.employment_basis || 'Full-time employment',
+    pay_period_start: row.payPeriodStart || row.pay_period_start || '',
+    pay_period_end: row.payPeriodEnd || row.pay_period_end || '',
+    payment_date: row.paymentDate || row.payment_date || '',
+    total_earnings: Number(row.totalEarnings ?? row.total_earnings ?? 0),
+    net_pay: Number(row.netPay ?? row.net_pay ?? 0),
+    wages_description: row.wagesDescription || row.wages_description || 'Ordinary Hours',
+    ordinary_hours: Number(row.ordinaryHours ?? row.ordinary_hours ?? 0),
+    hourly_rate: Number(row.hourlyRate ?? row.hourly_rate ?? 0),
+    wages_amount: Number(row.wagesAmount ?? row.wages_amount ?? 0),
+    wages_total: Number(row.wagesTotal ?? row.wages_total ?? 0),
+    tax_description: row.taxDescription || row.tax_description || 'PAYG',
+    tax_amount: Number(row.taxAmount ?? row.tax_amount ?? 0),
+    tax_total: Number(row.taxTotal ?? row.tax_total ?? 0),
+    bank_account_masked: row.bankAccountMasked || row.bank_account_masked || '',
+    account_name: row.accountName || row.account_name || '',
+    payment_reference: row.paymentReference || row.payment_reference || 'EdLink Pay',
+    payment_amount: Number(row.paymentAmount ?? row.payment_amount ?? 0),
   }
 }
 
 export const edlinkPayslipService = {
-  /**
-   * Fetch all EdLink payslips from the database in real-time.
-   */
   async getAll(): Promise<EdlinkPayslip[]> {
-    try {
-      const supabase = createClient()
-
-      // 1. Primary: Query dedicated edlink_payslips table
-      const { data, error } = await (supabase as any)
-        .from('edlink_payslips')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (!error && data) {
-        return (data as any[]).map(fromDbRow)
-      }
-
-      // 2. Fallback: Query aimt_payslips table filtered by EdLink identifier
-      if (error && (error.code === 'PGRST205' || error.message?.includes('edlink_payslips'))) {
-        const { data: fallbackData, error: fallbackError } = await (supabase as any)
-          .from('aimt_payslips')
-          .select('*')
-          .or('paid_by_name.ilike.%EdLink%,payment_reference.ilike.%EdLink%,id.ilike.edlink_%')
-          .order('created_at', { ascending: false })
-
-        if (!fallbackError && fallbackData) {
-          return (fallbackData as any[]).map(fromDbRow)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/edlink-payslips')
+        if (res.ok) {
+          const data = await res.json()
+          return data.map(fromDbRow)
         }
+      } catch (e) {
+        console.error('API fetch failed for edlink payslips:', e)
       }
-    } catch (e) {
-      console.error('Database fetch failed for edlink payslips:', e)
+      return []
     }
-    return []
-  },
 
-  /**
-   * Fetch a single EdLink payslip by ID directly from database.
-   */
-  async getById(id: string): Promise<EdlinkPayslip | null> {
     try {
-      const supabase = createClient()
-
-      // 1. Primary: Try edlink_payslips table
-      const { data, error } = await (supabase as any)
-        .from('edlink_payslips')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (!error && data) {
-        return fromDbRow(data)
-      }
-
-      // 2. Fallback: Try aimt_payslips table
-      const { data: fallbackData } = await (supabase as any)
-        .from('aimt_payslips')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (fallbackData) {
-        return fromDbRow(fallbackData)
-      }
+      const rows = await prisma.edlinkPayslip.findMany({
+        orderBy: { createdAt: 'desc' },
+      })
+      return rows.map(fromDbRow)
     } catch (e) {
-      console.error('Database fetchById failed for edlink payslip:', e)
+      console.error('Prisma fetch failed for edlink payslips:', e)
+      return []
     }
-    return null
   },
 
-  /**
-   * Save (Insert/Update) an EdLink payslip directly to the database in real-time.
-   */
+  async getById(id: string): Promise<EdlinkPayslip | null> {
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch(`/api/edlink-payslips?id=${encodeURIComponent(id)}`)
+        if (res.ok) {
+          const data = await res.json()
+          return fromDbRow(data)
+        }
+      } catch (e) {
+        console.error('API getById failed for edlink payslip:', e)
+      }
+      return null
+    }
+
+    try {
+      const row = await prisma.edlinkPayslip.findUnique({ where: { id } })
+      return row ? fromDbRow(row) : null
+    } catch (e) {
+      console.error('Prisma getById failed for edlink payslip:', e)
+      return null
+    }
+  },
+
   async save(
     payload: Omit<EdlinkPayslip, 'id' | 'created_at'> & { id?: string }
   ): Promise<{ success: boolean; data?: EdlinkPayslip; error?: string }> {
@@ -237,115 +188,121 @@ export const edlinkPayslipService = {
         ? `edlink_${crypto.randomUUID()}`
         : `edlink_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
-    const now = new Date().toISOString()
+    const body = { ...payload, id }
 
-    const payslip: EdlinkPayslip = {
-      ...payload,
-      id,
-      created_at: now,
-      updated_at: now,
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/edlink-payslips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          return { success: true, data: fromDbRow(data) }
+        }
+        const errJson = await res.json()
+        return { success: false, error: errJson.error || 'Failed to save payslip' }
+      } catch (e: any) {
+        return { success: false, error: e?.message || 'Network error' }
+      }
     }
-
-    const dbPayload = toDbPayload(payslip)
 
     try {
-      const supabase = createClient()
-
-      // 1. Primary: Try upsert into edlink_payslips table
-      const { data, error } = await (supabase as any)
-        .from('edlink_payslips')
-        .upsert(dbPayload)
-        .select()
-        .single()
-
-      if (!error && data) {
-        return { success: true, data: fromDbRow(data) }
-      }
-
-      // 2. Fallback: If table is not created yet, upsert into aimt_payslips
-      if (error && (error.code === 'PGRST205' || error.message?.includes('edlink_payslips'))) {
-        const { data: fallbackData, error: fallbackError } = await (supabase as any)
-          .from('aimt_payslips')
-          .upsert(dbPayload)
-          .select()
-          .single()
-
-        if (!fallbackError && fallbackData) {
-          return { success: true, data: fromDbRow(fallbackData) }
-        }
-
-        if (fallbackError) {
-          return { success: false, error: fallbackError.message }
-        }
-      }
-
-      if (error) {
-        return { success: false, error: error.message }
-      }
+      const row = await prisma.edlinkPayslip.upsert({
+        where: { id },
+        update: {
+          paidByName: payload.paid_by_name || 'EdLink Education & Visa Services',
+          paidByAddress1: payload.paid_by_address_1 || 'Suit 3, Level 4/20',
+          paidByAddress2: payload.paid_by_address_2 || 'Collins Street, Melbourne 3000',
+          paidByAbn: payload.paid_by_abn || '62 658 488 469',
+          employeeName: payload.employee_name || '',
+          addressLine1: payload.address_line_1 || '',
+          addressLine2: payload.address_line_2 || '',
+          payFrequency: payload.pay_frequency || 'Fortnightly',
+          annualSalary: payload.show_annual_salary === false ? 0 : Number(payload.annual_salary || 0),
+          employmentBasis: payload.employment_basis || 'Full-time employment',
+          payPeriodStart: payload.pay_period_start || '',
+          payPeriodEnd: payload.pay_period_end || '',
+          paymentDate: payload.payment_date || '',
+          totalEarnings: Number(payload.total_earnings || 0),
+          netPay: Number(payload.net_pay || 0),
+          wagesDescription: payload.wages_description || 'Ordinary Hours',
+          ordinaryHours: Number(payload.ordinary_hours || 0),
+          hourlyRate: Number(payload.hourly_rate || 0),
+          wagesAmount: Number(payload.wages_amount || 0),
+          wagesTotal: Number(payload.wages_total || 0),
+          taxDescription: payload.tax_description || 'PAYG',
+          taxAmount: Number(payload.tax_amount || 0),
+          taxTotal: Number(payload.tax_total || 0),
+          bankAccountMasked: payload.bank_account_masked || '',
+          accountName: payload.account_name || '',
+          paymentReference: payload.payment_reference || 'EdLink Pay',
+          paymentAmount: Number(payload.payment_amount || 0),
+        },
+        create: {
+          id,
+          paidByName: payload.paid_by_name || 'EdLink Education & Visa Services',
+          paidByAddress1: payload.paid_by_address_1 || 'Suit 3, Level 4/20',
+          paidByAddress2: payload.paid_by_address_2 || 'Collins Street, Melbourne 3000',
+          paidByAbn: payload.paid_by_abn || '62 658 488 469',
+          employeeName: payload.employee_name || '',
+          addressLine1: payload.address_line_1 || '',
+          addressLine2: payload.address_line_2 || '',
+          payFrequency: payload.pay_frequency || 'Fortnightly',
+          annualSalary: payload.show_annual_salary === false ? 0 : Number(payload.annual_salary || 0),
+          employmentBasis: payload.employment_basis || 'Full-time employment',
+          payPeriodStart: payload.pay_period_start || '',
+          payPeriodEnd: payload.pay_period_end || '',
+          paymentDate: payload.payment_date || '',
+          totalEarnings: Number(payload.total_earnings || 0),
+          netPay: Number(payload.net_pay || 0),
+          wagesDescription: payload.wages_description || 'Ordinary Hours',
+          ordinaryHours: Number(payload.ordinary_hours || 0),
+          hourlyRate: Number(payload.hourly_rate || 0),
+          wagesAmount: Number(payload.wages_amount || 0),
+          wagesTotal: Number(payload.wages_total || 0),
+          taxDescription: payload.tax_description || 'PAYG',
+          taxAmount: Number(payload.tax_amount || 0),
+          taxTotal: Number(payload.tax_total || 0),
+          bankAccountMasked: payload.bank_account_masked || '',
+          accountName: payload.account_name || '',
+          paymentReference: payload.payment_reference || 'EdLink Pay',
+          paymentAmount: Number(payload.payment_amount || 0),
+        },
+      })
+      return { success: true, data: fromDbRow(row) }
     } catch (e: any) {
-      console.error('Database save failed for edlink payslip:', e)
-      return { success: false, error: e?.message || 'Database error' }
+      return { success: false, error: e?.message || 'Prisma error' }
     }
-
-    return { success: true, data: payslip }
   },
 
-  /**
-   * Delete an EdLink payslip directly from the database in real-time.
-   */
   async delete(id: string): Promise<{ success: boolean; error?: string }> {
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch(`/api/edlink-payslips?id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        })
+        if (res.ok) {
+          return { success: true }
+        }
+        const errJson = await res.json()
+        return { success: false, error: errJson.error || 'Failed to delete payslip' }
+      } catch (e: any) {
+        return { success: false, error: e?.message || 'Network error' }
+      }
+    }
+
     try {
-      const supabase = createClient()
-
-      // 1. Delete from edlink_payslips
-      const { error } = await (supabase as any).from('edlink_payslips').delete().eq('id', id)
-      if (!error) {
-        return { success: true }
-      }
-
-      // 2. Fallback: Delete from aimt_payslips if applicable
-      const { error: fallbackError } = await (supabase as any)
-        .from('aimt_payslips')
-        .delete()
-        .eq('id', id)
-
-      if (!fallbackError) {
-        return { success: true }
-      }
-
-      return { success: false, error: fallbackError.message }
+      await prisma.edlinkPayslip.delete({ where: { id } })
+      return { success: true }
     } catch (e: any) {
-      console.error('Database delete failed for edlink payslip:', e)
-      return { success: false, error: e?.message || 'Database delete error' }
+      return { success: false, error: e?.message || 'Prisma error' }
     }
   },
 
-  /**
-   * Subscribe to real-time changes on payslip tables.
-   */
   subscribeToChanges(onUpdate: () => void) {
-    try {
-      const supabase = createClient()
-      const channel = supabase
-        .channel('edlink_payslips_realtime')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'edlink_payslips' },
-          () => onUpdate()
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'aimt_payslips' },
-          () => onUpdate()
-        )
-        .subscribe()
-
-      return () => {
-        supabase.removeChannel(channel)
-      }
-    } catch (e) {
-      console.warn('Realtime subscription not available:', e)
-      return () => {}
-    }
+    // No-op for standard API fetching
+    return () => {}
   },
 }

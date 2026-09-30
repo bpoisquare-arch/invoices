@@ -62,10 +62,10 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Inject Production-Grade Security Headers
+  // Inject Security Headers
   const headers = response.headers
-  headers.set('X-Frame-Options', 'DENY') // Prevent clickjacking
-  headers.set('X-Content-Type-Options', 'nosniff') // Prevent mime sniffing
+  headers.set('X-Frame-Options', 'DENY')
+  headers.set('X-Content-Type-Options', 'nosniff')
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()')
   headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
@@ -75,10 +75,10 @@ export async function updateSession(request: NextRequest) {
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://lh5.googleusercontent.com",
+    "img-src 'self' data: blob: https://lh3.googleusercontent.com https://lh5.googleusercontent.com",
     "font-src 'self' data: https://fonts.gstatic.com",
     "connect-src 'self' https://api.resend.com",
-    "frame-ancestors 'none'", // Clickjacking protection (CSP Level 2)
+    "frame-ancestors 'none'",
   ].join('; ')
 
   headers.set('Content-Security-Policy', csp)

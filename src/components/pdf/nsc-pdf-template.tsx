@@ -1,6 +1,6 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Image, Svg, Polygon } from '@react-pdf/renderer'
-import { InvoiceWithDetails, TemplateSnapshot } from '@/lib/supabase/database.types'
+import { InvoiceWithDetails, TemplateSnapshot } from '@/types/database.types'
 import { numberToWords } from '@/lib/utils/number-to-words'
 
 const styles = StyleSheet.create({

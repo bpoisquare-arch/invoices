@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Template } from '@/lib/supabase/database.types'
+import { Template } from '@/types/database.types'
 import { getTemplates, duplicateTemplate } from '@/lib/services/template.service'
 import { getCompanies } from '@/lib/services/company.service'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'

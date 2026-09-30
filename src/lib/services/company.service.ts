@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { createClient } from '@/lib/supabase/client'
-import { Company } from '@/lib/supabase/database.types'
+import { Company } from '@/types/database.types'
 
 export const FALLBACK_COMPANY: Company = {
   id: 'edlink-pk-id',
@@ -46,37 +45,39 @@ export const ISQUARE_COMPANY: Company = {
   updated_at: new Date().toISOString(),
 }
 
+function prismaToCompany(c: any): Company {
+  return {
+    id: c.id,
+    user_id: c.userId ?? null,
+    name: c.name === 'EdLink Pakistan' ? 'EdLink Australia' : c.name,
+    logo_url: c.logoUrl || (c.name === 'EdLink Pakistan' || c.name === 'EdLink Australia' ? '/edlink-logo.png' : null),
+    prefix: c.prefix,
+    currency: c.currency,
+    created_at: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString(),
+    updated_at: c.updatedAt ? new Date(c.updatedAt).toISOString() : new Date().toISOString(),
+  }
+}
+
 export async function getCompanies(includeAnonymous = false): Promise<Company[]> {
   try {
-    if (typeof window === 'undefined') {
-      const dbCompanies = await prisma.company.findMany({
-        orderBy: { createdAt: 'asc' },
-      })
+    const dbCompanies = await prisma.company.findMany({
+      orderBy: { createdAt: 'asc' },
+    })
 
-      if (dbCompanies && dbCompanies.length > 0) {
-        let result: Company[] = dbCompanies
-          .filter((c) => (c.name || '').toLowerCase() !== 'anonymous')
-          .map((c) => ({
-            id: c.id,
-            user_id: c.userId ?? null,
-            name: c.name === 'EdLink Pakistan' ? 'EdLink Australia' : c.name,
-            logo_url: c.logoUrl || (c.name === 'EdLink Pakistan' || c.name === 'EdLink Australia' ? '/edlink-logo.png' : null),
-            prefix: c.prefix,
-            currency: c.currency,
-            created_at: c.createdAt.toISOString(),
-            updated_at: c.updatedAt.toISOString(),
-          }))
+    if (dbCompanies && dbCompanies.length > 0) {
+      let result: Company[] = dbCompanies
+        .filter((c) => (c.name || '').toLowerCase() !== 'anonymous')
+        .map(prismaToCompany)
 
-        const hasNsc = result.some((c) => c.prefix === 'NSC')
-        if (!hasNsc) result.push(NSC_COMPANY)
-        const hasIsq = result.some((c) => c.prefix === 'ISQ')
-        if (!hasIsq) result.push(ISQUARE_COMPANY)
-        if (includeAnonymous) {
-          const hasAnon = result.some((c) => c.id === ANONYMOUS_COMPANY.id || c.prefix === 'ANO')
-          if (!hasAnon) result.push(ANONYMOUS_COMPANY)
-        }
-        return result
+      const hasNsc = result.some((c) => c.prefix === 'NSC')
+      if (!hasNsc) result.push(NSC_COMPANY)
+      const hasIsq = result.some((c) => c.prefix === 'ISQ')
+      if (!hasIsq) result.push(ISQUARE_COMPANY)
+      if (includeAnonymous) {
+        const hasAnon = result.some((c) => c.id === ANONYMOUS_COMPANY.id || c.prefix === 'ANO')
+        if (!hasAnon) result.push(ANONYMOUS_COMPANY)
       }
+      return result
     }
   } catch (err) {
     console.warn('MySQL getCompanies warning:', err)
@@ -100,104 +101,67 @@ export async function getCompanyById(id: string): Promise<Company | null> {
 
   if (clean === 'nsc' || clean === 'nsc-company-id' || clean === 'neighbourhood-shine' || clean === 'neighbourhood shine' || clean === 'neighbourhood shine co.') {
     try {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('companies')
-        .select('*')
-        .or('prefix.eq.NSC,name.ilike.%Neighbourhood%')
-        .limit(1)
-        .maybeSingle()
-      if (data) {
+      const dbNsc = await prisma.company.findFirst({
+        where: {
+          OR: [{ prefix: 'NSC' }, { name: { contains: 'Neighbourhood' } }],
+        },
+      })
+      if (dbNsc) {
         return {
-          ...data,
+          ...prismaToCompany(dbNsc),
           name: 'Neighbourhood Shine Co.',
-          logo_url: data.logo_url || '/Neighbourhood-Shine.png',
+          logo_url: dbNsc.logoUrl || '/Neighbourhood-Shine.png',
           prefix: 'NSC',
         }
       }
-    } catch {
-      // Ignore
-    }
+    } catch {}
     return NSC_COMPANY
   }
 
   if (clean === 'isq' || clean === 'isquare' || clean === 'isquare-bpo' || clean === 'isquare-bpo-company-id') {
     try {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('companies')
-        .select('*')
-        .or('prefix.eq.ISQ,name.ilike.%ISquare%')
-        .limit(1)
-        .maybeSingle()
-      if (data) {
+      const dbIsq = await prisma.company.findFirst({
+        where: {
+          OR: [{ prefix: 'ISQ' }, { name: { contains: 'ISquare' } }],
+        },
+      })
+      if (dbIsq) {
         return {
-          ...data,
+          ...prismaToCompany(dbIsq),
           name: 'ISquare BPO',
-          logo_url: data.logo_url || '/isquarebpo.png',
+          logo_url: dbIsq.logoUrl || '/isquarebpo.png',
           prefix: 'ISQ',
         }
       }
-    } catch {
-      // Ignore
-    }
+    } catch {}
     return ISQUARE_COMPANY
   }
 
   if (clean === 'edlink' || clean === 'edlink-australia' || clean === 'edlink-au' || clean === 'eda' || clean === 'edl' || clean === 'edlink-pk-id') {
     try {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('companies')
-        .select('*')
-        .or('prefix.eq.EDA,name.ilike.%Australia%')
-        .limit(1)
-        .maybeSingle()
-      if (data) {
+      const dbEdlink = await prisma.company.findFirst({
+        where: {
+          OR: [{ prefix: 'EDA' }, { name: { contains: 'Australia' } }, { prefix: 'EDL' }],
+        },
+      })
+      if (dbEdlink) {
         return {
-          ...data,
+          ...prismaToCompany(dbEdlink),
           name: 'EdLink Australia',
-          logo_url: data.logo_url || '/edlink-logo.png',
+          logo_url: dbEdlink.logoUrl || '/edlink-logo.png',
         }
       }
-    } catch {
-      // Ignore
-    }
+    } catch {}
     return FALLBACK_COMPANY
   }
 
   try {
-    const supabase = createClient()
     if (isValidUUID(id)) {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (!error && data) {
-        if (data.name === 'EdLink Pakistan') {
-          return {
-            ...data,
-            name: 'EdLink Australia',
-            logo_url: data.logo_url || '/edlink-logo.png',
-          }
-        }
-        return data
-      }
+      const dbCompany = await prisma.company.findUnique({ where: { id } })
+      if (dbCompany) return prismaToCompany(dbCompany)
     }
-    // If not a valid UUID or not found, try to return first company in DB
-    const { data: first } = await supabase.from('companies').select('*').limit(1).single()
-    if (first) {
-      if (first.name === 'EdLink Pakistan') {
-        return {
-          ...first,
-          name: 'EdLink Australia',
-          logo_url: first.logo_url || '/edlink-logo.png',
-        }
-      }
-      return first
-    }
+    const first = await prisma.company.findFirst({ orderBy: { createdAt: 'asc' } })
+    if (first) return prismaToCompany(first)
   } catch (err) {
     return FALLBACK_COMPANY
   }
@@ -223,44 +187,34 @@ export async function createCompany(params: {
   }
 }): Promise<Company> {
   try {
-    const supabase = createClient()
-
-    const { data: company, error: companyErr } = await supabase
-      .from('companies')
-      .insert({
+    const created = await prisma.company.create({
+      data: {
         name: params.name,
         prefix: params.prefix.toUpperCase(),
         currency: params.currency || 'AUD',
-        logo_url: params.logo_url || null,
-      })
-      .select()
-      .single()
-
-    if (companyErr || !company) {
-      return {
-        ...FALLBACK_COMPANY,
-        name: params.name,
-        prefix: params.prefix.toUpperCase(),
-      }
-    }
-
-    const templateData = params.template || {}
-    await supabase.from('templates').insert({
-      company_id: company.id,
-      name: templateData.name || `${company.name} Default Template`,
-      company_name: company.name,
-      address: templateData.address || '',
-      email: templateData.email || '',
-      phone: templateData.phone || '',
-      payment_details: templateData.payment_details || '',
-      bank_details: templateData.bank_details || '',
-      currency: company.currency,
-      footer_terms: templateData.footer_terms || 'Thank you for getting services from us',
-      primary_color: templateData.primary_color || '#2563eb',
-      layout_type: templateData.layout_type || 'edlink_v1',
+        logoUrl: params.logo_url || null,
+      },
     })
 
-    return company
+    const templateData = params.template || {}
+    await prisma.template.create({
+      data: {
+        companyId: created.id,
+        name: templateData.name || `${created.name} Default Template`,
+        companyName: created.name,
+        address: templateData.address || '',
+        email: templateData.email || '',
+        phone: templateData.phone || '',
+        paymentDetails: templateData.payment_details || '',
+        bankDetails: templateData.bank_details || '',
+        currency: created.currency,
+        footerTerms: templateData.footer_terms || 'Thank you for getting services from us',
+        primaryColor: templateData.primary_color || '#2563eb',
+        layoutType: templateData.layout_type || 'edlink_v1',
+      },
+    }).catch(() => {})
+
+    return prismaToCompany(created)
   } catch (err) {
     return FALLBACK_COMPANY
   }
@@ -276,30 +230,19 @@ export async function updateCompany(
   }
 ): Promise<Company> {
   try {
-    const supabase = createClient()
-    const updateData: any = { updated_at: new Date().toISOString() }
+    const updateData: any = {}
 
     if (params.name !== undefined) updateData.name = params.name
     if (params.prefix !== undefined) updateData.prefix = params.prefix.toUpperCase()
     if (params.currency !== undefined) updateData.currency = params.currency
-    if (params.logo_url !== undefined) updateData.logo_url = params.logo_url
+    if (params.logo_url !== undefined) updateData.logoUrl = params.logo_url
 
-    const { data, error } = await supabase
-      .from('companies')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single()
+    const updated = await prisma.company.update({
+      where: { id },
+      data: updateData,
+    })
 
-    if (error || !data) {
-      return {
-        ...FALLBACK_COMPANY,
-        ...params,
-        prefix: params.prefix ? params.prefix.toUpperCase() : FALLBACK_COMPANY.prefix,
-      }
-    }
-
-    return data
+    return prismaToCompany(updated)
   } catch (err) {
     return FALLBACK_COMPANY
   }
@@ -311,58 +254,38 @@ export async function duplicateCompany(
   newPrefix: string
 ): Promise<Company> {
   try {
-    const supabase = createClient()
+    const original = await prisma.company.findUnique({ where: { id: companyId } })
+    const originalTemplate = await prisma.template.findFirst({ where: { companyId } })
 
-    const { data: original } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', companyId)
-      .single()
-
-    const { data: originalTemplate } = await supabase
-      .from('templates')
-      .select('*')
-      .eq('company_id', companyId)
-      .single()
-
-    const { data: duplicatedCompany, error: createErr } = await supabase
-      .from('companies')
-      .insert({
+    const duplicatedCompany = await prisma.company.create({
+      data: {
         name: newName,
         prefix: newPrefix.toUpperCase(),
         currency: original?.currency || 'AUD',
-        logo_url: original?.logo_url || null,
-      })
-      .select()
-      .single()
-
-    if (createErr || !duplicatedCompany) {
-      return {
-        ...FALLBACK_COMPANY,
-        id: `dup-${Date.now()}`,
-        name: newName,
-        prefix: newPrefix.toUpperCase(),
-      }
-    }
+        logoUrl: original?.logoUrl || null,
+      },
+    })
 
     if (originalTemplate) {
-      await supabase.from('templates').insert({
-        company_id: duplicatedCompany.id,
-        name: `${newName} Template`,
-        company_name: newName,
-        address: originalTemplate.address,
-        phone: originalTemplate.phone,
-        email: originalTemplate.email,
-        payment_details: originalTemplate.payment_details,
-        bank_details: originalTemplate.bank_details,
-        currency: originalTemplate.currency,
-        footer_terms: originalTemplate.footer_terms,
-        primary_color: originalTemplate.primary_color,
-        layout_type: originalTemplate.layout_type,
-      })
+      await prisma.template.create({
+        data: {
+          companyId: duplicatedCompany.id,
+          name: `${newName} Template`,
+          companyName: newName,
+          address: originalTemplate.address,
+          phone: originalTemplate.phone,
+          email: originalTemplate.email,
+          paymentDetails: originalTemplate.paymentDetails,
+          bankDetails: originalTemplate.bankDetails,
+          currency: originalTemplate.currency,
+          footerTerms: originalTemplate.footerTerms,
+          primaryColor: originalTemplate.primaryColor,
+          layoutType: originalTemplate.layoutType,
+        },
+      }).catch(() => {})
     }
 
-    return duplicatedCompany
+    return prismaToCompany(duplicatedCompany)
   } catch (err) {
     return {
       ...FALLBACK_COMPANY,
@@ -375,8 +298,7 @@ export async function duplicateCompany(
 
 export async function deleteCompany(id: string): Promise<void> {
   try {
-    const supabase = createClient()
-    await supabase.from('companies').delete().eq('id', id)
+    await prisma.company.delete({ where: { id } })
   } catch (err) {
     // Silent catch
   }

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Company } from '@/lib/supabase/database.types'
+import { Company } from '@/types/database.types'
 import { deleteCompany } from '@/lib/services/company.service'
 import {
   Dialog,

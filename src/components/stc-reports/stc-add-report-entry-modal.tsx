@@ -34,7 +34,7 @@ import {
   BookOpen,
   MessageSquare,
 } from 'lucide-react'
-import type { StcReportRecord } from '@/lib/supabase/database.types'
+import type { StcReportRecord } from '@/types/database.types'
 
 export const STC_COURSES = [
   { name: 'Certificate IV in Automotive Mechanical Diagnosis', duration: '24 weeks' },

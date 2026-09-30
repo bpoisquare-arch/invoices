@@ -21,7 +21,7 @@ import {
   Loader2,
   Eye,
 } from 'lucide-react'
-import type { StcReportImport } from '@/lib/supabase/database.types'
+import type { StcReportImport } from '@/types/database.types'
 
 interface StcImportHistoryDrawerProps {
   isOpen: boolean

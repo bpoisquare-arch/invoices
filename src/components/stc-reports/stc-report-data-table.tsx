@@ -45,7 +45,7 @@ import {
   PlusCircle,
   UploadCloud,
 } from 'lucide-react'
-import type { StcReportRecord } from '@/lib/supabase/database.types'
+import type { StcReportRecord } from '@/types/database.types'
 import TablePagination from '@/components/ui/table-pagination'
 
 interface StcReportDataTableProps {

@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { prisma } from '@/lib/prisma'
 
 export interface EmployeeDeduction {
   id: string
@@ -45,57 +46,26 @@ export async function getAllDeductions(): Promise<EmployeeDeduction[]> {
   const fileDeductions = readDeductionsFile()
 
   try {
-    const { createClient } = await import('@/lib/supabase/server')
-    const supabase = await createClient()
+    const dbRows = await prisma.employeeDeduction.findMany()
 
-    // 1. Try dedicated employee_deductions table first
-    const { data: dbRows, error: tableError } = await supabase
-      .from('employee_deductions')
-      .select('*')
-
-    if (!tableError && Array.isArray(dbRows) && dbRows.length > 0) {
+    if (Array.isArray(dbRows) && dbRows.length > 0) {
       const map = new Map<string, EmployeeDeduction>()
       fileDeductions.forEach((d) => {
         const key = `${d.employee_id}_${d.month_year}`.toLowerCase()
         map.set(key, d)
       })
       dbRows.forEach((d: any) => {
-        const key = `${d.employee_id}_${d.month_year}`.toLowerCase()
+        const key = `${d.employeeId}_${d.monthYear}`.toLowerCase()
         map.set(key, {
           id: d.id,
-          employee_id: d.employee_id,
-          month_year: d.month_year,
+          employee_id: d.employeeId,
+          month_year: d.monthYear,
           amount: Number(d.amount) || 0,
-          note_type: d.note_type || d.notes || 'Other Deduction',
-          notes: d.notes || d.note_type || 'Other Deduction',
-          created_at: d.created_at,
-          updated_at: d.updated_at,
+          note_type: d.noteType || d.notes || 'Other Deduction',
+          notes: d.notes || d.noteType || 'Other Deduction',
+          created_at: d.createdAt instanceof Date ? d.createdAt.toISOString() : String(d.createdAt),
+          updated_at: d.updatedAt instanceof Date ? d.updatedAt.toISOString() : String(d.updatedAt),
         })
-      })
-      const merged = Array.from(map.values())
-      inMemoryDeductions = merged
-      return merged
-    }
-
-    // 2. Fallback to audit logs if table is empty
-    const { data, error } = await supabase
-      .from('attendance_audit_logs')
-      .select('details')
-      .eq('action', 'EMPLOYEE_DEDUCTIONS_STORE')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (data && data.details && Array.isArray(data.details)) {
-      const dbDeductions = data.details as unknown as EmployeeDeduction[]
-      const map = new Map<string, EmployeeDeduction>()
-      fileDeductions.forEach((d) => {
-        const key = `${d.employee_id}_${d.month_year}`.toLowerCase()
-        map.set(key, d)
-      })
-      dbDeductions.forEach((d) => {
-        const key = `${d.employee_id}_${d.month_year}`.toLowerCase()
-        map.set(key, d)
       })
       const merged = Array.from(map.values())
       inMemoryDeductions = merged
@@ -166,24 +136,27 @@ export async function setEmployeeDeduction(params: {
   inMemoryDeductions = deductions
   writeDeductionsFile(deductions)
 
-  // Persist to Supabase Database (both dedicated table and audit log)
   try {
-    const { createClient } = await import('@/lib/supabase/server')
-    const supabase = await createClient()
-
-    await supabase.from('employee_deductions').upsert({
-      id: result.id,
-      employee_id: result.employee_id,
-      month_year: result.month_year,
-      amount: result.amount,
-      note_type: result.note_type,
-      notes: result.notes || '',
-      updated_at: now,
-    }, { onConflict: 'employee_id,month_year' })
-
-    await supabase.from('attendance_audit_logs').insert({
-      action: 'EMPLOYEE_DEDUCTIONS_STORE',
-      details: deductions as any,
+    await prisma.employeeDeduction.upsert({
+      where: {
+        employeeId_monthYear: {
+          employeeId: result.employee_id,
+          monthYear: result.month_year,
+        },
+      },
+      update: {
+        amount: result.amount,
+        noteType: result.note_type,
+        notes: result.notes || '',
+      },
+      create: {
+        id: result.id,
+        employeeId: result.employee_id,
+        monthYear: result.month_year,
+        amount: result.amount,
+        noteType: result.note_type,
+        notes: result.notes || '',
+      },
     })
   } catch (err) {
     console.error('Error in setEmployeeDeduction db write:', err)
@@ -225,20 +198,12 @@ export async function deleteEmployeeDeduction(
   inMemoryDeductions = filtered
   writeDeductionsFile(filtered)
 
-  // Persist deletion to Supabase Database
   try {
-    const { createClient } = await import('@/lib/supabase/server')
-    const supabase = await createClient()
-
-    await supabase
-      .from('employee_deductions')
-      .delete()
-      .eq('employee_id', employeeId)
-      .eq('month_year', monthYear)
-
-    await supabase.from('attendance_audit_logs').insert({
-      action: 'EMPLOYEE_DEDUCTIONS_STORE',
-      details: filtered as any,
+    await prisma.employeeDeduction.deleteMany({
+      where: {
+        employeeId: employeeId,
+        monthYear: monthYear,
+      },
     })
   } catch (err) {
     console.error('Error in deleteEmployeeDeduction db write:', err)

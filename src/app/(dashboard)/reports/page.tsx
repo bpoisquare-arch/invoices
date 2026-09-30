@@ -16,7 +16,7 @@ import ReportDataTable from '@/components/reports/report-data-table'
 import ReportRecordDetailModal from '@/components/reports/report-record-detail-modal'
 import AddReportEntryModal from '@/components/reports/add-report-entry-modal'
 import UploadReportModal from '@/components/reports/upload-report-modal'
-import type { AimtReportRecord } from '@/lib/supabase/database.types'
+import type { AimtReportRecord } from '@/types/database.types'
 import { useAuthRole } from '@/lib/hooks/use-auth-role'
 
 export default function StudentReportsPage() {

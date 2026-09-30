@@ -15,7 +15,7 @@ import StcReportDataTable from '@/components/stc-reports/stc-report-data-table'
 import StcReportRecordDetailModal from '@/components/stc-reports/stc-report-record-detail-modal'
 import StcAddReportEntryModal from '@/components/stc-reports/stc-add-report-entry-modal'
 import StcUploadReportModal from '@/components/stc-reports/stc-upload-report-modal'
-import type { StcReportRecord, StcReportImport } from '@/lib/supabase/database.types'
+import type { StcReportRecord, StcReportImport } from '@/types/database.types'
 import { useAuthRole } from '@/lib/hooks/use-auth-role'
 
 export default function StcReportsPage() {

@@ -4,7 +4,7 @@ import React, { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Company, Template } from '@/lib/supabase/database.types'
+import { Company, Template } from '@/types/database.types'
 import { createCompany, updateCompany, duplicateCompany } from '@/lib/services/company.service'
 import { getTemplateByCompanyId, updateTemplate } from '@/lib/services/template.service'
 import {

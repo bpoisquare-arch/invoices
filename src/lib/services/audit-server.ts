@@ -1,4 +1,4 @@
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 
 export interface AuditEventInput {
   action: string
@@ -8,29 +8,19 @@ export interface AuditEventInput {
 }
 
 /**
- * Server-only logger that writes audit events directly to the database.
+ * Server-only logger that writes audit events directly to MySQL via Prisma.
  * Safe to import in Server Components, API Routes, and Server Actions.
  */
 export async function logAuditEventServer(input: AuditEventInput) {
   try {
-    const supabase = await createServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const { error } = await supabase.from('security_audit_logs').insert([
-      {
-        user_id: user?.id || null,
-        user_email: user?.email || 'anonymous',
+    await prisma.securityAuditLog.create({
+      data: {
         action: input.action,
         module: input.module,
-        record_id: input.record_id || null,
+        recordId: input.record_id || null,
         metadata: input.metadata || {},
       },
-    ])
-
-    if (error) {
-      console.warn('Direct database audit log write error:', error.message)
-      return { success: false, error: error.message }
-    }
+    })
 
     return { success: true }
   } catch (err: any) {

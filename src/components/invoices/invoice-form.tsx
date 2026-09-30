@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Company, Template, InvoiceWithDetails, TemplateSnapshot } from '@/lib/supabase/database.types'
+import { Company, Template, InvoiceWithDetails, TemplateSnapshot } from '@/types/database.types'
 import { createInvoice, updateInvoice, generateNextInvoiceNumber, InvoiceItemInput } from '@/lib/services/invoice.service'
 import { numberToWords } from '@/lib/utils/number-to-words'
 import { renderInvoiceWebPreview } from '@/lib/services/template-registry'

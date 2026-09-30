@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { parseStudentReportExcel, previewReportImport, saveReportImportToDatabase } from '@/lib/services/report.service'
-import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -20,7 +19,6 @@ export async function POST(request: NextRequest) {
     const fileName = file.name
     const fileSize = file.size
 
-    // Validate file extension
     const isExcelOrCsv =
       fileName.endsWith('.xlsx') ||
       fileName.endsWith('.xls') ||
@@ -36,11 +34,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Convert file to ArrayBuffer
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // 1. If this is a preview request, run preview and return match analysis
     if (isPreview) {
       const preview = await previewReportImport(buffer, fileName)
       return NextResponse.json({
@@ -52,7 +48,6 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 2. Otherwise parse and commit to live database
     const originalBase64 = buffer.toString('base64')
     const parseResult = parseStudentReportExcel(buffer, fileName)
 
@@ -63,19 +58,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get current user email if available
-    let userEmail = 'admin@isquarebpo.com'
-    try {
-      const supabase = await createClient()
-      const { data } = await supabase.auth.getUser()
-      if (data?.user?.email) {
-        userEmail = data.user.email
-      }
-    } catch {
-      // ignore
-    }
+    const userEmail = 'admin@isquarebpo.com'
 
-    // Save directly to Supabase Live Database
     const saved = await saveReportImportToDatabase({
       fileName,
       fileSize,

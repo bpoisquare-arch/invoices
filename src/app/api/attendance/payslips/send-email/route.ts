@@ -2,7 +2,7 @@ import React from 'react'
 import { NextRequest, NextResponse } from 'next/server'
 import { renderToStream } from '@react-pdf/renderer'
 import PayslipPDFTemplate, { PayslipData } from '@/components/pdf/payslip-pdf-template'
-import { Employee } from '@/lib/supabase/database.types'
+import { Employee } from '@/types/database.types'
 import { sendPayslipEmail, getEmailConfig } from '@/lib/services/payslip-email.service'
 
 export const dynamic = 'force-dynamic'

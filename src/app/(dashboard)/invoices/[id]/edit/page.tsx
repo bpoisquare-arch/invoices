@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Company, InvoiceWithDetails, Template } from '@/lib/supabase/database.types'
+import { Company, InvoiceWithDetails, Template } from '@/types/database.types'
 import { getInvoiceById } from '@/lib/services/invoice.service'
 import { getCompanyById } from '@/lib/services/company.service'
 import { getTemplateByCompanyId } from '@/lib/services/template.service'

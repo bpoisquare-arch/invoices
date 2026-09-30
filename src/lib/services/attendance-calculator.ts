@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { AttendanceSettings, Employee, RawPunch } from '@/lib/supabase/database.types'
+import { AttendanceSettings, Employee, RawPunch } from '@/types/database.types'
 
 export const DEFAULT_ATTENDANCE_SETTINGS: AttendanceSettings = {
   id: 'default',

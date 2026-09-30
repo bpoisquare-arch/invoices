@@ -3,12 +3,11 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { InvoiceWithDetails, Company } from '@/lib/supabase/database.types'
+import { InvoiceWithDetails, Company } from '@/types/database.types'
 import {
   getInvoices,
   duplicateInvoice,
   InvoiceFilterParams,
-  syncLocalInvoicesToSupabase,
   getInvoicePdfFilename,
 } from '@/lib/services/invoice.service'
 import { getCompanies } from '@/lib/services/company.service'

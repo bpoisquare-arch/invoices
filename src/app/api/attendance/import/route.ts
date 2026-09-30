@@ -10,22 +10,18 @@ import {
   parseExcelAttendanceWorkbook,
   ParsedAttendancePreviewItem,
 } from '@/lib/services/attendance-calculator'
-import { createClient } from '@/lib/supabase/server'
 import { logAuditEventServer } from '@/lib/services/audit-server'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    // Session Verification
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
     const devSessionVal = request.cookies.get('dev-auth-session')?.value
     const userRoleVal = request.cookies.get('user-role')?.value
     const devSession = !!devSessionVal && devSessionVal !== 'false'
-    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer' || user?.user_metadata?.role === 'viewer'
+    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer'
 
-    if ((!user && !devSession) || isViewer) {
+    if (!devSession || isViewer) {
       return NextResponse.json({ success: false, error: 'Unauthorized: Valid session required.' }, { status: 401 })
     }
 
@@ -40,7 +36,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'No Excel file provided.' }, { status: 400 })
       }
 
-      // Validate file extension
       const fileName = file.name || 'attendance.xlsx'
       const lowerName = fileName.toLowerCase()
       if (!lowerName.endsWith('.xlsx') && !lowerName.endsWith('.xls')) {
@@ -50,7 +45,6 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Limit file size (15MB)
       if (file.size > 15 * 1024 * 1024) {
         return NextResponse.json(
           { success: false, error: 'File size exceeds 15MB limit.' },
@@ -70,11 +64,9 @@ export async function POST(request: NextRequest) {
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
 
-      // Fetch existing employees & settings
       const employees = await getEmployees({ isActiveOnly: false })
       const settings = await getAttendanceSettings()
 
-      // Fetch existing attendance to detect duplicates
       const existingRes = await getAttendanceRecords({ pageSize: 10000 })
       const existingDatesByEmpId = new Map<string, Set<string>>()
       for (const rec of existingRes.records) {
@@ -96,7 +88,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(parseResult)
     }
 
-    // JSON Commit Action
     const body = await request.json()
     const { action, items, duplicateStrategy } = body
 
@@ -105,7 +96,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'No items to import.' }, { status: 400 })
       }
 
-      // Filter only items that have a valid resolved employee_id
       const saveItems: AttendanceImportSaveItem[] = []
       let skippedInvalidCount = 0
 

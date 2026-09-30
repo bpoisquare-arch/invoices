@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { createClient as createServerClient } from '@/lib/supabase/server'
-import { InvoiceWithDetails, TemplateSnapshot } from '@/lib/supabase/database.types'
+import { InvoiceWithDetails, TemplateSnapshot } from '@/types/database.types'
 import { subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from 'date-fns'
 import { numberToWords } from '@/lib/utils/number-to-words'
 import {
@@ -87,7 +86,6 @@ export function normalizeInvoice(inv: InvoiceWithDetails): InvoiceWithDetails {
 export async function generateNextInvoiceNumberServer(companyId: string, isAnonymous?: boolean): Promise<string> {
   let maxSeq = 1000
 
-  // 1. Identify target entity category
   let targetEntity: 'nsc' | 'isq' | 'edlink-pk' | 'edlink-au' = 'edlink-au'
   if (isAnonymous || companyId === 'anonymous-company-id') {
     targetEntity = 'edlink-pk'
@@ -114,7 +112,6 @@ export async function generateNextInvoiceNumberServer(companyId: string, isAnony
     } catch {}
   }
 
-  // 2. Query invoices from MySQL via Prisma (take top 150 recent invoices for sequence calculation)
   try {
     const existingInvoices = await prisma.invoice.findMany({
       take: 150,
@@ -168,7 +165,6 @@ export async function generateNextInvoiceNumberServer(companyId: string, isAnony
 export async function getInvoiceByIdServer(invoiceId: string): Promise<InvoiceWithDetails | null> {
   if (!isValidUUID(invoiceId)) return null
 
-  // 1. MySQL via Prisma
   try {
     const inv = await prisma.invoice.findUnique({
       where: { id: invoiceId },
@@ -181,22 +177,8 @@ export async function getInvoiceByIdServer(invoiceId: string): Promise<InvoiceWi
       return normalizeInvoice(toInvoiceWithDetails(inv))
     }
   } catch (err) {
-    console.warn('MySQL getInvoiceByIdServer warning, falling back to Supabase:', err)
+    console.warn('MySQL getInvoiceByIdServer warning:', err)
   }
-
-  // 2. Supabase fallback
-  try {
-    const supabase = await createServerClient()
-    const { data: invoice } = await supabase
-      .from('invoices')
-      .select('*, companies(*), invoice_items(*)')
-      .eq('id', invoiceId)
-      .maybeSingle()
-
-    if (invoice) {
-      return normalizeInvoice(invoice as InvoiceWithDetails)
-    }
-  } catch {}
 
   return null
 }
@@ -211,7 +193,6 @@ export async function getInvoicesServer(params: InvoiceFilterParams = {}): Promi
   const pageSize = params.pageSize && params.pageSize > 0 ? params.pageSize : 20
   const skip = (page - 1) * pageSize
 
-  // 1. Query MySQL via Prisma
   try {
     const where: any = {}
 
@@ -291,34 +272,6 @@ export async function getInvoicesServer(params: InvoiceFilterParams = {}): Promi
       pageSize,
     }
   } catch (err) {
-    console.warn('MySQL getInvoicesServer failed, falling back to Supabase:', err)
-  }
-
-  // 2. Supabase fallback
-  try {
-    const supabase = await createServerClient()
-    const from = skip
-    const to = from + pageSize - 1
-
-    let query = supabase
-      .from('invoices')
-      .select('*, companies(*), invoice_items(*)', { count: 'exact' })
-
-    if (params.companyId && params.companyId !== 'all' && isValidUUID(params.companyId)) {
-      query = query.eq('company_id', params.companyId)
-    }
-
-    query = query.range(from, to).order('created_at', { ascending: false })
-    const { data, count } = await query
-
-    const rawInvoices = ((data || []) as InvoiceWithDetails[]).map(normalizeInvoice)
-    return {
-      invoices: rawInvoices,
-      totalCount: count ?? rawInvoices.length,
-      page,
-      pageSize,
-    }
-  } catch (err) {
     console.error('getInvoicesServer error:', err)
     return { invoices: [], totalCount: 0, page, pageSize }
   }
@@ -355,7 +308,6 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
     footerTerms = 'Payment due within 15 days of invoice date.'
   }
 
-  // 1. Resolve Company ID to valid DB UUID
   let resolvedCompanyId = input.company_id
   try {
     if (isValidUUID(input.company_id)) {
@@ -448,85 +400,34 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
   templateSnapshot.amount_in_words = amountInWords
   templateSnapshot.includes_gst = gstRate > 0
 
-  let createdInvoice: any = null
-
-  // 1. Primary Create: Hostinger MySQL via Prisma
-  try {
-    createdInvoice = await prisma.invoice.create({
-      data: {
-        companyId: resolvedCompanyId,
-        templateId: validTemplateId,
-        templateSnapshot: templateSnapshot as any,
-        invoiceNumber,
-        customerName: input.customer_name,
-        referenceName: input.reference_name || null,
-        invoiceDate: new Date(input.invoice_date),
-        dueDate: new Date(input.due_date || input.invoice_date),
-        subtotal,
-        totalAmount,
-        items: {
-          create: preparedItems.map((it) => ({
-            description: it.description,
-            quantity: it.quantity,
-            amount: it.amount,
-            lineTotal: it.line_total,
-          })),
-        },
+  const createdInvoice = await prisma.invoice.create({
+    data: {
+      companyId: resolvedCompanyId,
+      templateId: validTemplateId,
+      templateSnapshot: templateSnapshot as any,
+      invoiceNumber,
+      customerName: input.customer_name,
+      referenceName: input.reference_name || null,
+      invoiceDate: new Date(input.invoice_date),
+      dueDate: new Date(input.due_date || input.invoice_date),
+      subtotal,
+      totalAmount,
+      items: {
+        create: preparedItems.map((it) => ({
+          description: it.description,
+          quantity: it.quantity,
+          amount: it.amount,
+          lineTotal: it.line_total,
+        })),
       },
-      include: {
-        company: true,
-        items: true,
-      },
-    })
-  } catch (mysqlErr) {
-    console.warn('MySQL createInvoiceServer warning:', mysqlErr)
-  }
+    },
+    include: {
+      company: true,
+      items: true,
+    },
+  })
 
-  // 2. Supabase fallback / sync
-  try {
-    const supabase = await createServerClient()
-    const { data: supaInv } = await supabase
-      .from('invoices')
-      .insert({
-        id: createdInvoice?.id,
-        company_id: resolvedCompanyId,
-        template_id: validTemplateId,
-        template_snapshot: templateSnapshot,
-        invoice_number: invoiceNumber,
-        customer_name: input.customer_name,
-        reference_name: input.reference_name || null,
-        invoice_date: input.invoice_date,
-        due_date: input.due_date || input.invoice_date,
-        subtotal,
-        total_amount: totalAmount,
-      })
-      .select('*, companies(*)')
-      .single()
-
-    if (supaInv && preparedItems.length > 0) {
-      await supabase.from('invoice_items').insert(
-        preparedItems.map((item) => ({
-          invoice_id: supaInv.id,
-          description: item.description,
-          quantity: item.quantity,
-          amount: item.amount,
-          line_total: item.line_total,
-        }))
-      )
-    }
-  } catch (supaErr) {
-    console.warn('Supabase sync createInvoiceServer warning:', supaErr)
-  }
-
-  if (createdInvoice) {
-    return normalizeInvoice(toInvoiceWithDetails(createdInvoice))
-  }
-
-  const fetched = await getInvoiceByIdServer(createdInvoice?.id)
-  if (!fetched) {
-    throw new Error('Failed to create and load invoice.')
-  }
-  return fetched
+  return normalizeInvoice(toInvoiceWithDetails(createdInvoice))
 }
 
 export async function updateInvoiceServer(
@@ -575,66 +476,33 @@ export async function updateInvoiceServer(
     includes_gst: gstRate > 0,
   }
 
-  // 1. Primary Update: Hostinger MySQL via Prisma
-  try {
-    await prisma.$transaction(async (tx) => {
-      await tx.invoice.update({
-        where: { id: invoiceId },
-        data: {
-          customerName: input.customer_name !== undefined ? input.customer_name : existing.customer_name,
-          referenceName: input.reference_name !== undefined ? input.reference_name : existing.reference_name,
-          invoiceDate: input.invoice_date ? new Date(input.invoice_date) : undefined,
-          dueDate: input.due_date ? new Date(input.due_date) : undefined,
-          subtotal,
-          totalAmount,
-          templateSnapshot: updatedSnapshot as any,
-        },
-      })
-
-      if (preparedItems) {
-        await tx.invoiceItem.deleteMany({ where: { invoiceId } })
-        await tx.invoiceItem.createMany({
-          data: preparedItems.map((it) => ({
-            invoiceId,
-            description: it.description,
-            quantity: it.quantity,
-            amount: it.amount,
-            lineTotal: it.lineTotal,
-          })),
-        })
-      }
+  await prisma.$transaction(async (tx) => {
+    await tx.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        customerName: input.customer_name !== undefined ? input.customer_name : existing.customer_name,
+        referenceName: input.reference_name !== undefined ? input.reference_name : existing.reference_name,
+        invoiceDate: input.invoice_date ? new Date(input.invoice_date) : undefined,
+        dueDate: input.due_date ? new Date(input.due_date) : undefined,
+        subtotal,
+        totalAmount,
+        templateSnapshot: updatedSnapshot as any,
+      },
     })
-  } catch (err) {
-    console.warn('MySQL updateInvoiceServer warning:', err)
-  }
 
-  // 2. Supabase fallback / sync
-  try {
-    const supabase = await createServerClient()
-    const updatePayload: any = {
-      customer_name: input.customer_name !== undefined ? input.customer_name : existing.customer_name,
-      reference_name: input.reference_name !== undefined ? input.reference_name : existing.reference_name,
-      invoice_date: input.invoice_date || existing.invoice_date,
-      due_date: input.due_date || existing.due_date,
-      subtotal,
-      total_amount: totalAmount,
-      template_snapshot: updatedSnapshot,
-      updated_at: new Date().toISOString(),
-    }
-    await supabase.from('invoices').update(updatePayload).eq('id', invoiceId)
     if (preparedItems) {
-      await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
-      await supabase.from('invoice_items').insert(
-        preparedItems.map((it) => ({
-          invoice_id: invoiceId,
+      await tx.invoiceItem.deleteMany({ where: { invoiceId } })
+      await tx.invoiceItem.createMany({
+        data: preparedItems.map((it) => ({
+          invoiceId,
           description: it.description,
           quantity: it.quantity,
           amount: it.amount,
-          line_total: it.lineTotal,
-        }))
-      )
+          lineTotal: it.lineTotal,
+        })),
+      })
     }
-  } catch {}
+  })
 
   const fetched = await getInvoiceByIdServer(invoiceId)
   if (!fetched) {
@@ -644,36 +512,13 @@ export async function updateInvoiceServer(
 }
 
 export async function deleteInvoiceServer(invoiceId: string): Promise<void> {
-  // 1. MySQL via Prisma
-  try {
-    await prisma.invoiceItem.deleteMany({ where: { invoiceId } })
-    await prisma.invoice.deleteMany({ where: { id: invoiceId } })
-  } catch (err) {
-    console.warn('MySQL deleteInvoiceServer warning:', err)
-  }
-
-  // 2. Supabase fallback
-  try {
-    const supabase = await createServerClient()
-    await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
-    await supabase.from('invoices').delete().eq('id', invoiceId)
-  } catch {}
+  await prisma.invoiceItem.deleteMany({ where: { invoiceId } })
+  await prisma.invoice.deleteMany({ where: { id: invoiceId } })
 }
 
 export async function renameInvoiceReferenceServer(invoiceId: string, referenceName: string): Promise<void> {
-  // 1. MySQL via Prisma
-  try {
-    await prisma.invoice.updateMany({
-      where: { id: invoiceId },
-      data: { referenceName },
-    })
-  } catch (err) {
-    console.warn('MySQL renameInvoiceReferenceServer warning:', err)
-  }
-
-  // 2. Supabase fallback
-  try {
-    const supabase = await createServerClient()
-    await supabase.from('invoices').update({ reference_name: referenceName }).eq('id', invoiceId)
-  } catch {}
+  await prisma.invoice.updateMany({
+    where: { id: invoiceId },
+    data: { referenceName },
+  })
 }

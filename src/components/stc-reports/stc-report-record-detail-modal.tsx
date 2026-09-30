@@ -30,7 +30,7 @@ import {
   Sparkles,
   MessageSquare,
 } from 'lucide-react'
-import type { StcReportRecord } from '@/lib/supabase/database.types'
+import type { StcReportRecord } from '@/types/database.types'
 
 interface StcReportRecordDetailModalProps {
   isOpen: boolean
