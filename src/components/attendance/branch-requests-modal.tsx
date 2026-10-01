@@ -12,25 +12,17 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   CheckCircle2,
   XCircle,
-  Clock,
   Calendar,
-  User,
   Building2,
   AlertCircle,
   FileText,
   Loader2,
   RefreshCw,
   Search,
-  Filter,
+  ChevronDown,
+  X,
 } from 'lucide-react'
 import { AttendanceRequestItem } from '@/lib/services/attendance-requests.service'
 
@@ -113,7 +105,6 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
       })
       const data = await res.json()
       if (data.success) {
-        // Update local state
         setRequests((prev) =>
           prev.map((item) => (item.id === req.id ? { ...item, status: 'APPROVED' as const, reviewed_by: 'Admin' } : item))
         )
@@ -146,7 +137,6 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
       })
       const data = await res.json()
       if (data.success) {
-        // Update local state
         setRequests((prev) =>
           prev.map((item) =>
             item.id === req.id
@@ -173,105 +163,125 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-2xl">
-        <DialogHeader className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xs">
-                <Building2 className="w-5 h-5" />
+      <DialogContent showCloseButton={false} className="max-w-4xl max-h-[88vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xl rounded-2xl font-sans">
+        {/* Header Section */}
+        <DialogHeader className="px-6 py-5 border-b border-slate-200/80 dark:border-slate-800 bg-gradient-to-r from-white via-slate-50/70 to-slate-50 dark:from-slate-900 dark:to-slate-900/90 space-y-0">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="size-11 rounded-2xl bg-gradient-to-br from-[#003D5C] to-[#002233] text-cyan-300 flex items-center justify-center shadow-md shadow-[#003D5C]/15 shrink-0 border border-cyan-500/20">
+                <Building2 className="size-5" />
               </div>
-              <div>
-                <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  Branch Attendance Requests
+              <div className="min-w-0">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <DialogTitle className="text-lg font-extrabold text-[#003D5C] dark:text-white tracking-tight font-['Geist']">
+                    Branch Attendance Requests
+                  </DialogTitle>
                   {pendingCount > 0 && (
-                    <Badge className="bg-amber-500 hover:bg-amber-600 text-white font-mono text-xs px-2 py-0.5 rounded-full">
+                    <Badge className="bg-amber-500 hover:bg-amber-600 text-white font-mono text-[11px] font-extrabold px-2.5 py-0.5 rounded-full shadow-2xs">
                       {pendingCount} Pending
                     </Badge>
                   )}
-                </DialogTitle>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Review and approve leave or timing regularization requests submitted by Lahore & Multan branch users
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium truncate">
+                  Review and approve leave or timing regularization requests submitted by branch users
                 </p>
               </div>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchRequests}
-              disabled={isLoading}
-              className="h-8 gap-1.5 text-xs text-slate-600 dark:text-slate-300"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+            {/* Top Right Action Group */}
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchRequests}
+                disabled={isLoading}
+                className="h-9 px-3.5 gap-2 text-xs font-bold text-slate-700 hover:text-slate-900 border-slate-300 bg-white hover:bg-slate-50 rounded-xl shadow-2xs cursor-pointer transition-all"
+              >
+                <RefreshCw className={`size-3.5 text-[#009D9E] ${isLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </Button>
+
+              <button
+                onClick={onClose}
+                className="size-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close modal"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
           </div>
 
-          {/* Filter Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-800">
-            {/* Search */}
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          {/* Filter Bar with Polished Padding & Sizing */}
+          <div className="bg-slate-100/80 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200/90 dark:border-slate-700/80 mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shadow-2xs">
+            {/* Search Input (Flexible space) */}
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#009D9E]" />
               <Input
                 placeholder="Search employee, batch, reason..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-8 text-xs pl-8 bg-white dark:bg-slate-800"
+                className="h-10 text-xs pl-10 pr-3.5 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs font-medium placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-[#009D9E]/30 focus-visible:border-[#009D9E]"
               />
             </div>
 
-            {/* Branch Filter */}
-            <Select value={selectedBranch} onValueChange={(val) => setSelectedBranch(val || 'all')}>
-              <SelectTrigger className="h-8 text-xs bg-white dark:bg-slate-800">
-                <SelectValue placeholder="All Branches" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Branches</SelectItem>
-                <SelectItem value="Lahore">Lahore Branch</SelectItem>
-                <SelectItem value="Multan">Multan Branch</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Branch Filter Dropdown (145px width for Lahore Branch / Branch: All) */}
+            <div className="relative w-full sm:w-[145px] shrink-0">
+              <select
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                className="w-full h-10 pl-3.5 pr-8 text-xs font-semibold rounded-xl appearance-none cursor-pointer border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 shadow-2xs transition-all"
+              >
+                <option value="all">Branch: All</option>
+                <option value="Lahore">Lahore Branch</option>
+                <option value="Multan">Multan Branch</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
+            </div>
 
-            {/* Status Filter */}
-            <Select value={selectedStatus} onValueChange={(val) => setSelectedStatus(val || 'all')}>
-              <SelectTrigger className="h-8 text-xs bg-white dark:bg-slate-800">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="PENDING">Pending Only</SelectItem>
-                <SelectItem value="APPROVED">Approved</SelectItem>
-                <SelectItem value="REJECTED">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Status Filter Dropdown (135px width for Pending Only / Status: All) */}
+            <div className="relative w-full sm:w-[135px] shrink-0">
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="w-full h-10 pl-3.5 pr-8 text-xs font-semibold rounded-xl appearance-none cursor-pointer border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 shadow-2xs transition-all"
+              >
+                <option value="all">Status: All</option>
+                <option value="PENDING">Pending Only</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
+            </div>
           </div>
         </DialogHeader>
 
-        {/* Requests List */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-3">
+        {/* Requests Scrollable List Container */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-3.5 bg-slate-50/40 dark:bg-slate-900/60">
           {error && (
-            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-3 shadow-2xs font-semibold">
+              <AlertCircle className="size-4 shrink-0 text-rose-500" />
               <span>{error}</span>
             </div>
           )}
 
           {isLoading ? (
-            <div className="py-16 flex flex-col items-center justify-center text-slate-400 gap-2">
-              <Loader2 className="w-7 h-7 animate-spin text-indigo-600" />
-              <p className="text-xs">Loading requests...</p>
+            <div className="py-20 flex flex-col items-center justify-center text-slate-400 gap-3">
+              <Loader2 className="size-8 animate-spin text-[#009D9E]" />
+              <p className="text-xs font-bold text-slate-500">Loading branch requests...</p>
             </div>
           ) : filteredRequests.length === 0 ? (
-            <div className="py-16 flex flex-col items-center justify-center text-center text-slate-400 gap-2">
-              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
-                <FileText className="w-6 h-6" />
+            <div className="py-16 px-6 bg-white dark:bg-slate-800/80 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center text-slate-400 gap-3 shadow-2xs">
+              <div className="size-14 rounded-2xl bg-cyan-50 dark:bg-slate-800 border border-cyan-200/80 flex items-center justify-center text-[#009D9E]">
+                <FileText className="size-7" />
               </div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">No requests found</p>
-              <p className="text-xs text-slate-400 max-w-sm">
-                {selectedStatus === 'PENDING'
-                  ? 'There are currently no pending requests from branch users.'
-                  : 'No requests match the selected branch and status filters.'}
-              </p>
+              <div className="space-y-1">
+                <p className="text-sm font-extrabold text-slate-800 dark:text-slate-200">No requests found</p>
+                <p className="text-xs text-slate-400 max-w-xs font-medium leading-relaxed">
+                  {selectedStatus === 'PENDING'
+                    ? 'There are currently no pending requests from branch users.'
+                    : 'No requests match the selected branch and status filters.'}
+                </p>
+              </div>
             </div>
           ) : (
             filteredRequests.map((req) => {
@@ -283,50 +293,50 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
               return (
                 <div
                   key={req.id}
-                  className={`p-4 rounded-xl border transition-all ${
+                  className={`p-4 sm:p-5 rounded-2xl border transition-all shadow-2xs hover:shadow-xs ${
                     isPending
-                      ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-900/50 shadow-xs'
+                      ? 'bg-gradient-to-r from-amber-50/80 via-white to-amber-50/20 border-amber-200/90 dark:bg-amber-950/20 dark:border-amber-900/50 border-l-4 border-l-amber-500'
                       : isApproved
-                      ? 'bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-200/60 dark:border-emerald-900/40'
-                      : 'bg-slate-50/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800'
+                      ? 'bg-gradient-to-r from-emerald-50/50 via-white to-white border-emerald-200/80 dark:bg-emerald-950/10 dark:border-emerald-900/40 border-l-4 border-l-emerald-500'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 border-l-4 border-l-slate-400'
                   }`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
                     {/* Left: Employee info & date */}
-                    <div className="space-y-1">
+                    <div className="space-y-1.5 min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm text-slate-900 dark:text-white">
+                        <span className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight">
                           {req.employee_name || 'Employee'}
                         </span>
                         {req.batch_id && (
-                          <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 h-4.5">
+                          <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0.2 rounded border-slate-200 bg-slate-50 text-slate-600 font-bold">
                             {req.batch_id}
                           </Badge>
                         )}
                         <Badge
-                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                          className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
                             req.branch.toLowerCase().includes('lahore')
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-purple-600 text-white'
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'bg-purple-600 text-white shadow-2xs'
                           }`}
                         >
                           {req.branch} Branch
                         </Badge>
-                        <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-slate-400" />
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                          <Calendar className="size-3 text-[#009D9E]" />
                           {req.attendance_date}
                         </span>
                       </div>
 
-                      {/* Request Details */}
-                      <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      {/* Request Details Pill */}
+                      <div className="flex items-center gap-2 pt-0.5 flex-wrap">
                         {req.request_type === 'LEAVE' && (
                           <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
-                            <span className="font-medium text-slate-500 dark:text-slate-400">Request:</span>
-                            <span className="bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 font-bold px-2 py-0.5 rounded text-[11px]">
+                            <span className="font-bold text-slate-500 dark:text-slate-400">Request:</span>
+                            <span className="bg-indigo-100 dark:bg-indigo-950 text-indigo-900 dark:text-indigo-300 font-extrabold px-2 py-0.5 rounded-md text-[11px] border border-indigo-200/80">
                               {req.leave_type || 'Leave'}
                             </span>
-                            <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold px-2 py-0.5 rounded text-[11px] border border-slate-200 dark:border-slate-700">
+                            <span className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-extrabold px-2 py-0.5 rounded-md text-[11px] border border-slate-200 dark:border-slate-700">
                               {req.leave_duration === 0.5 ? '0.5 (Half Day)' : '1.0 (Full Day)'}
                             </span>
                           </div>
@@ -334,8 +344,8 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
 
                         {req.request_type === 'MISSING_IN' && (
                           <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
-                            <span className="font-medium text-slate-500 dark:text-slate-400">Missing In Time:</span>
-                            <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold px-2 py-0.5 rounded text-[11px] font-mono">
+                            <span className="font-bold text-slate-500 dark:text-slate-400">Missing In Time:</span>
+                            <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 font-extrabold px-2 py-0.5 rounded-md text-[11px] font-mono border border-emerald-200/80">
                               {req.requested_in_time || '--'}
                             </span>
                           </div>
@@ -343,28 +353,28 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
 
                         {req.request_type === 'MISSING_OUT' && (
                           <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
-                            <span className="font-medium text-slate-500 dark:text-slate-400">Missing Out Time:</span>
-                            <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold px-2 py-0.5 rounded text-[11px] font-mono">
+                            <span className="font-bold text-slate-500 dark:text-slate-400">Missing Out Time:</span>
+                            <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 font-extrabold px-2 py-0.5 rounded-md text-[11px] font-mono border border-emerald-200/80">
                               {req.requested_out_time || '--'}
                             </span>
                           </div>
                         )}
 
                         {req.reason && (
-                          <span className="text-xs text-slate-600 dark:text-slate-400 italic">
+                          <span className="text-xs text-slate-600 dark:text-slate-300 italic font-medium">
                             &ldquo;{req.reason}&rdquo;
                           </span>
                         )}
                       </div>
 
-                      <div className="text-[11px] text-slate-400 pt-0.5 flex items-center gap-2">
-                        <span>Submitted by: {req.submitted_by || 'Branch'}</span>
+                      <div className="text-[11px] text-slate-400 font-medium pt-0.5 flex items-center gap-2">
+                        <span>Submitted by: <strong className="text-slate-600">{req.submitted_by || 'Branch User'}</strong></span>
                         <span>•</span>
                         <span>{new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                       </div>
                     </div>
 
-                    {/* Right: Actions or Status */}
+                    {/* Right: Actions or Status Badges */}
                     <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                       {isPending ? (
                         rejectingId === req.id ? (
@@ -373,7 +383,7 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
                               placeholder="Reason for rejection..."
                               value={rejectReason}
                               onChange={(e) => setRejectReason(e.target.value)}
-                              className="h-8 text-xs w-44"
+                              className="h-9.5 text-xs w-48 rounded-xl"
                               autoFocus
                             />
                             <Button
@@ -381,7 +391,7 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
                               variant="destructive"
                               onClick={() => handleReject(req)}
                               disabled={isProcessing}
-                              className="h-8 text-xs px-2.5"
+                              className="h-9.5 text-xs px-3.5 rounded-xl font-extrabold cursor-pointer"
                             >
                               Confirm
                             </Button>
@@ -392,7 +402,7 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
                                 setRejectingId(null)
                                 setRejectReason('')
                               }}
-                              className="h-8 text-xs px-2 text-slate-500"
+                              className="h-9.5 text-xs px-2.5 text-slate-500 rounded-xl cursor-pointer"
                             >
                               Cancel
                             </Button>
@@ -403,12 +413,12 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
                               size="sm"
                               onClick={() => handleApprove(req)}
                               disabled={isProcessing}
-                              className="h-8 text-xs px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs gap-1.5"
+                              className="h-9.5 text-xs px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all"
                             >
                               {isProcessing ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <Loader2 className="size-3.5 animate-spin" />
                               ) : (
-                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <CheckCircle2 className="size-3.5" />
                               )}
                               Approve
                             </Button>
@@ -417,26 +427,26 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
                               variant="outline"
                               onClick={() => setRejectingId(req.id)}
                               disabled={isProcessing}
-                              className="h-8 text-xs px-3 border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-950/50 font-medium gap-1.5"
+                              className="h-9.5 text-xs px-4 border-rose-300 text-rose-700 hover:bg-rose-50 font-extrabold rounded-xl gap-1.5 cursor-pointer transition-all"
                             >
-                              <XCircle className="w-3.5 h-3.5" />
+                              <XCircle className="size-3.5" />
                               Reject
                             </Button>
                           </div>
                         )
                       ) : isApproved ? (
-                        <Badge className="bg-emerald-600 text-white gap-1 px-2.5 py-1 text-xs font-semibold">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        <Badge className="bg-emerald-600 text-white gap-1.5 px-3 py-1 text-xs font-extrabold rounded-lg shadow-2xs">
+                          <CheckCircle2 className="size-3.5" />
                           Approved
                         </Badge>
                       ) : (
                         <div className="flex flex-col items-end gap-0.5">
-                          <Badge variant="destructive" className="gap-1 px-2.5 py-1 text-xs font-semibold">
-                            <XCircle className="w-3.5 h-3.5" />
+                          <Badge variant="destructive" className="gap-1.5 px-3 py-1 text-xs font-extrabold rounded-lg shadow-2xs">
+                            <XCircle className="size-3.5" />
                             Rejected
                           </Badge>
                           {req.review_notes && (
-                            <span className="text-[10px] text-slate-400 italic max-w-xs text-right">
+                            <span className="text-[10px] text-slate-500 italic max-w-xs text-right font-medium">
                               {req.review_notes}
                             </span>
                           )}
@@ -450,8 +460,17 @@ export function BranchRequestsModal({ isOpen, onClose, onRecordUpdated }: Branch
           )}
         </div>
 
-        <DialogFooter className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-          <Button variant="outline" size="sm" onClick={onClose} className="h-8 text-xs">
+        {/* Premium Dialog Footer */}
+        <DialogFooter className="px-6 py-4 border-t border-slate-200/90 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/90 flex flex-row items-center justify-between">
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-2">
+            <span className="size-2 rounded-full bg-[#009D9E]" />
+            <span>Showing {filteredRequests.length} request(s)</span>
+          </div>
+
+          <Button
+            onClick={onClose}
+            className="h-9.5 px-7 bg-gradient-to-r from-[#003D5C] to-[#002B40] hover:from-[#002B40] hover:to-[#001D2B] text-white font-extrabold text-xs rounded-xl shadow-xs border border-cyan-500/20 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
             Close
           </Button>
         </DialogFooter>

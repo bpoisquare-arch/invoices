@@ -180,12 +180,20 @@ export default function ReportDataTable({
 
     // 2. Student ID Status Filter
     if (selectedStatus !== 'all') {
-      list = list.filter((r) => r.status?.toLowerCase().trim() === selectedStatus.toLowerCase().trim())
+      const targetStatus = selectedStatus.toLowerCase().trim()
+      list = list.filter((r) => {
+        const normStatus = (r.status || '').toLowerCase().trim()
+        if (targetStatus === 'current') {
+          return normStatus === 'current' || ['invoice raised', 'need advise', 'course end'].includes(normStatus)
+        }
+        return normStatus === targetStatus
+      })
     }
 
     // 2b. Mark Status Filter (Invoice Raised / Need Advise / Course End)
     if (selectedMarkStatus !== 'all') {
-      list = list.filter((r) => r.status?.toLowerCase().trim() === selectedMarkStatus.toLowerCase().trim())
+      const targetMark = selectedMarkStatus.toLowerCase().trim()
+      list = list.filter((r) => (r.status || '').toLowerCase().trim() === targetMark)
     }
 
     // 3. Document Type Filter
