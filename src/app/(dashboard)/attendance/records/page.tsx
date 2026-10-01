@@ -23,6 +23,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Building2,
+  Bell,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -644,13 +645,63 @@ export default function AttendanceRecordsPage() {
   // Branch Attendance Requests Modal State & Pending Counter
   const [isBranchRequestsModalOpen, setIsBranchRequestsModalOpen] = useState(false)
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
+  const [newRequestNotification, setNewRequestNotification] = useState<string | null>(null)
+  const lastPendingCountRef = React.useRef<number | null>(null)
+
+  const playNotificationChime = () => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioContext) return
+      const ctx = new AudioContext()
+      if (ctx.state === 'suspended') {
+        ctx.resume()
+      }
+      const now = ctx.currentTime
+
+      // Loud & Crystal-Clear 3-Note Notification Chime (C5 -> G5 -> C6)
+      const notes = [
+        { freq: 523.25, start: 0, duration: 0.25, gain: 0.5 },    // C5
+        { freq: 783.99, start: 0.12, duration: 0.3, gain: 0.6 },  // G5
+        { freq: 1046.50, start: 0.25, duration: 0.65, gain: 0.75 }, // C6 (High clear chime)
+      ]
+
+      notes.forEach(({ freq, start, duration, gain }) => {
+        const osc = ctx.createOscillator()
+        const gainNode = ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, now + start)
+        
+        gainNode.gain.setValueAtTime(gain, now + start)
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + start + duration)
+
+        osc.connect(gainNode)
+        gainNode.connect(ctx.destination)
+
+        osc.start(now + start)
+        osc.stop(now + start + duration)
+      })
+    } catch (err) {
+      console.warn('Audio chime fallback:', err)
+    }
+  }
 
   const fetchPendingRequestsCount = async () => {
     try {
-      const res = await fetch('/api/attendance/requests?status=PENDING')
+      const res = await fetch(`/api/attendance/requests?status=PENDING&t=${Date.now()}`, {
+        cache: 'no-store',
+      })
       const data = await res.json()
       if (data.success && typeof data.pendingCount === 'number') {
-        setPendingRequestsCount(data.pendingCount)
+        const newCount = data.pendingCount
+        if (lastPendingCountRef.current !== null && newCount > lastPendingCountRef.current) {
+          // Play real-time notification chime & show toast
+          playNotificationChime()
+          const addedCount = newCount - lastPendingCountRef.current
+          setNewRequestNotification(`${addedCount} new leave/attendance request(s) received from branch user!`)
+          setTimeout(() => setNewRequestNotification(null), 8000)
+        }
+        lastPendingCountRef.current = newCount
+        setPendingRequestsCount(newCount)
       }
     } catch {}
   }
@@ -743,7 +794,7 @@ export default function AttendanceRecordsPage() {
     loadMeta()
     const timer = setInterval(() => {
       fetchPendingRequestsCount()
-    }, 20000)
+    }, 6000)
     return () => clearInterval(timer)
   }, [])
 
@@ -811,7 +862,9 @@ export default function AttendanceRecordsPage() {
   // Fetch Attendance Records
   const fetchRecords = async () => {
     try {
-      setIsLoading(true)
+      if (records.length === 0) {
+        setIsLoading(true)
+      }
       const params = new URLSearchParams()
       if (startDate) params.set('startDate', startDate)
       if (endDate) params.set('endDate', endDate)
@@ -1791,6 +1844,37 @@ export default function AttendanceRecordsPage() {
 
   return (
     <div className="space-y-5 max-w-full mx-auto font-sans pb-12">
+      {/* Real-time Notification Sound & Banner Alert */}
+      {newRequestNotification && (
+        <div className="fixed top-20 right-6 z-50 animate-in slide-in-from-top-3 fade-in duration-300">
+          <div className="bg-gradient-to-r from-[#003D5C] to-[#002B40] text-white p-4 rounded-2xl shadow-2xl border border-cyan-500/30 flex items-center gap-3.5 max-w-md">
+            <div className="size-10 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center shrink-0 animate-bounce">
+              <Bell className="size-5" />
+            </div>
+            <div className="flex-1">
+              <div className="font-extrabold text-[11px] text-cyan-300 uppercase tracking-wider">New Request Alert</div>
+              <p className="text-xs font-semibold text-slate-100 mt-0.5 leading-snug">{newRequestNotification}</p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                setNewRequestNotification(null)
+                setIsBranchRequestsModalOpen(true)
+              }}
+              className="h-8 text-[11px] font-extrabold bg-[#009D9E] hover:bg-[#008A8B] text-white rounded-xl px-3.5 shrink-0 cursor-pointer shadow-2xs"
+            >
+              View
+            </Button>
+            <button
+              onClick={() => setNewRequestNotification(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
