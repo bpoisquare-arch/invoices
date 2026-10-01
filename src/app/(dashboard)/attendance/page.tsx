@@ -63,6 +63,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
+import { SearchableCombobox } from '@/components/ui/combobox'
 import { Employee } from '@/types/database.types'
 
 const BRANCHES = ['Lahore', 'Multan', 'Onshore', 'AIMT']
@@ -1280,7 +1281,7 @@ export default function EmployeeOverviewPage() {
 
       {/* Edit Employee Modal */}
       <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
-        <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-2xl p-0 overflow-hidden flex flex-col font-sans">
+        <DialogContent className="w-[95vw] sm:max-w-2xl sm:w-[680px] max-h-[92vh] bg-white border border-slate-200 shadow-2xl rounded-2xl p-0 overflow-hidden flex flex-col font-sans">
           <DialogHeader className="p-4 sm:p-5 pb-3 sm:pb-3.5 shrink-0 border-b border-slate-100 bg-slate-50/60">
             <DialogTitle className="text-base font-bold text-[#003D5C] flex items-center gap-2">
               <Edit2 className="w-5 h-5 text-[#009D9E]" />
@@ -1318,21 +1319,22 @@ export default function EmployeeOverviewPage() {
                 <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Designation *
                 </Label>
-                <Select value={editDesignation} onValueChange={(val) => setEditDesignation(val || '')} required>
-                  <SelectTrigger className="text-sm border-slate-200 bg-white">
-                    <SelectValue placeholder="Select Designation..." />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {EMPLOYEE_DESIGNATIONS.map((desig) => (
-                      <SelectItem key={desig} value={desig}>
-                        {desig}
-                      </SelectItem>
-                    ))}
-                    {editDesignation && !EMPLOYEE_DESIGNATIONS.includes(editDesignation as any) && (
-                      <SelectItem value={editDesignation}>{editDesignation}</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <SearchableCombobox
+                  options={
+                    editDesignation && !EMPLOYEE_DESIGNATIONS.includes(editDesignation as any)
+                      ? [
+                          { value: editDesignation, label: editDesignation },
+                          ...EMPLOYEE_DESIGNATIONS.map((desig) => ({ value: desig, label: desig })),
+                        ]
+                      : EMPLOYEE_DESIGNATIONS.map((desig) => ({ value: desig, label: desig }))
+                  }
+                  value={editDesignation}
+                  onSelect={(val) => setEditDesignation(val)}
+                  placeholder="Select Designation..."
+                  searchPlaceholder="Search designation..."
+                  popoverWidth="w-[300px]"
+                  triggerClassName="bg-white h-9.5 text-xs text-slate-800 border-slate-200"
+                />
               </div>
             </div>
 
