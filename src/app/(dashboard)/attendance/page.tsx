@@ -1004,18 +1004,18 @@ export default function EmployeeOverviewPage() {
                 <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Designation *
                 </Label>
-                <Select value={newDesignation} onValueChange={(val) => setNewDesignation(val || '')} required>
-                  <SelectTrigger className="text-sm border-slate-200 bg-white">
-                    <SelectValue placeholder="Select Designation..." />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {EMPLOYEE_DESIGNATIONS.map((desig) => (
-                      <SelectItem key={desig} value={desig}>
-                        {desig}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableCombobox
+                  options={EMPLOYEE_DESIGNATIONS.map((desig) => ({
+                    value: desig,
+                    label: desig,
+                  }))}
+                  value={newDesignation}
+                  onSelect={(val) => setNewDesignation(val)}
+                  placeholder="Select Designation..."
+                  searchPlaceholder="Search designation..."
+                  popoverWidth="w-[280px]"
+                  triggerClassName="bg-white h-9.5 text-xs text-slate-800 border-slate-200 font-normal"
+                />
               </div>
             </div>
 

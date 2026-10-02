@@ -1947,7 +1947,7 @@ export default function AttendanceRecordsPage() {
                 <SearchableCombobox
                   options={MONTHS_LIST.map((m) => ({
                     value: m.value,
-                    label: `${m.label} (${m.value})`,
+                    label: m.label,
                   }))}
                   value={selectedQuickMonth}
                   onSelect={(val) => handleQuickMonthChange(val)}
