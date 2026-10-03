@@ -50,6 +50,8 @@ export async function POST(request: NextRequest) {
         'Email ID': r.email_id || '-',
         'Phone No': r.phone_no || '-',
         'Installment BreakUp': r.remarks || '-',
+        'Divided Month': (r as any).divided_month ?? (r.extra_data as any)?.divided_month ?? '-',
+        'Calculation BreakUp': (r as any).calculation_breakup || (r.extra_data as any)?.calculation_breakup || '-',
         'Follow-up': (r as any).follow_up || (r.extra_data as any)?.follow_up || '-',
       }
     })

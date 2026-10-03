@@ -289,6 +289,8 @@ function prismaAimtRecordToSnake(r: any): AimtReportRecord {
     email_id: r.emailId,
     phone_no: r.phoneNo,
     payment_status: r.paymentStatus,
+    divided_month: r.dividedMonth !== undefined && r.dividedMonth !== null ? Number(r.dividedMonth) : (extraData.divided_month !== undefined && extraData.divided_month !== null ? Number(extraData.divided_month) : null),
+    calculation_breakup: r.calculationBreakup || extraData.calculation_breakup || null,
     extra_data: extraData as any,
     created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt || new Date().toISOString()),
   }
@@ -832,6 +834,8 @@ export async function createReportRecord(params: {
   email_id?: string | null
   phone_no?: string | null
   payment_status?: string | null
+  divided_month?: number | string | null
+  calculation_breakup?: string | null
   extra_data?: Record<string, any>
 }): Promise<AimtReportRecord> {
   let targetImportId = params.importId
@@ -856,6 +860,10 @@ export async function createReportRecord(params: {
   const paidAmountNum = cleanNumber(params.paid_amount || params.initial_payment)
   const totalPaidNum = cleanNumber(params.total_paid)
   const followUpVal = cleanString(params.follow_up) || null
+  const dividedMonthVal = params.divided_month !== undefined && params.divided_month !== null && String(params.divided_month).trim() !== ''
+    ? cleanNumber(params.divided_month)
+    : null
+  const calculationBreakupVal = cleanString(params.calculation_breakup) || null
 
   let nextSrNo = 1
   try {
@@ -873,6 +881,8 @@ export async function createReportRecord(params: {
     total_paid: totalPaidNum,
     initial_payment: paidAmountNum,
     follow_up: followUpVal,
+    divided_month: dividedMonthVal,
+    calculation_breakup: calculationBreakupVal,
   }
 
   const importExists = await prisma.aimtReportImport.findUnique({ where: { id: targetImportId! } })
@@ -922,8 +932,10 @@ export async function createReportRecord(params: {
       emailId: cleanString(params.email_id) || null,
       phoneNo: cleanString(params.phone_no) || null,
       paymentStatus: cleanString(params.payment_status) || 'Pending',
+      dividedMonth: dividedMonthVal,
+      calculationBreakup: calculationBreakupVal,
       extraData: extraData as any,
-    },
+    } as any,
   })
 
   return prismaAimtRecordToSnake(mysqlRow)
@@ -962,6 +974,14 @@ export async function updateReportRecord(
   if (updates.email_id !== undefined) mysqlUpdate.emailId = cleanString(updates.email_id) || null
   if (updates.phone_no !== undefined) mysqlUpdate.phoneNo = cleanString(updates.phone_no) || null
   if (updates.payment_status !== undefined) mysqlUpdate.paymentStatus = cleanString(updates.payment_status) || null
+  if (updates.divided_month !== undefined) {
+    mysqlUpdate.dividedMonth = updates.divided_month !== null && String(updates.divided_month).trim() !== ''
+      ? cleanNumber(updates.divided_month)
+      : null
+  }
+  if (updates.calculation_breakup !== undefined) {
+    mysqlUpdate.calculationBreakup = cleanString(updates.calculation_breakup) || null
+  }
   if (updates.extra_data !== undefined) mysqlUpdate.extraData = updates.extra_data as any
 
   let mysqlRow: any = null

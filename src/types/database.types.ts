@@ -260,6 +260,8 @@ export interface AimtReportRecord {
   email_id: string | null
   phone_no: string | null
   payment_status: string | null
+  divided_month?: number | null
+  calculation_breakup?: string | null
   extra_data: Json
   created_at: string
 }

@@ -45,6 +45,62 @@ interface AddReportEntryModalProps {
   activeImportId?: string | null
 }
 
+/**
+ * Helper to compute yet_to_raised:
+ * total_fee - (total_paid + pending_amount)
+ */
+function computeYetToRaised(totFeeStr: string, totPaidStr: string, pendAmtStr: string): string {
+  const totFee = parseFloat(totFeeStr) || 0
+  const totPaid = parseFloat(totPaidStr) || 0
+  const pendAmt = parseFloat(pendAmtStr) || 0
+  if (totFee > 0) {
+    const diff = Math.max(0, totFee - (totPaid + pendAmt))
+    return String(Math.round(diff * 100) / 100)
+  }
+  return ''
+}
+
+/**
+ * Helper to compute the calculation breakup string:
+ * - Divides yet_to_raised by divided_month
+ * - If remainder is 0 (exact integer, e.g. 7000 / 4 = 1750):
+ *     `${N} installments ${divided_amount}` (e.g. "4 installments 1750")
+ * - If remainder is not 0 (has decimal, e.g. 5000 / 6 = 833.33...):
+ *     base = Math.floor(yet_to_raised / N) = 833
+ *     first (N-1) installments = 5 * 833 = 4165
+ *     last installment = 5000 - 4165 = 835
+ *     `${N - 1} installments ${base} - Last Installment ${last}` (e.g. "5 installments 833 - Last Installment 835")
+ */
+function computeCalculationBreakup(yetToRaisedStr: string, dividedMonthStr: string): string {
+  const Y = parseFloat(yetToRaisedStr) || 0
+  const N = parseInt(dividedMonthStr, 10) || 0
+
+  if (Y <= 0 || N <= 0 || !Number.isFinite(Y) || !Number.isFinite(N)) {
+    return ''
+  }
+
+  const roundedY = Math.round(Y)
+  if (N === 1) {
+    return `1 installment ${roundedY}`
+  }
+
+  // Exact division without decimals
+  if (roundedY % N === 0) {
+    const amount = roundedY / N
+    return `${N} installments ${amount}`
+  }
+
+  // If decimal / remainder:
+  // e.g. 6 divided month with 5000 -> 5000 / 6 = 833.33...
+  // 5 installments 833 - Last Installment 835
+  const baseAmount = Math.floor(roundedY / N)
+  const firstCount = N - 1
+  const firstSum = firstCount * baseAmount
+  const lastAmount = roundedY - firstSum
+
+  return `${firstCount} installments ${baseAmount} - Last Installment ${lastAmount}`
+}
+
 export default function AddReportEntryModal({
   isOpen,
   onClose,
@@ -54,7 +110,7 @@ export default function AddReportEntryModal({
 }: AddReportEntryModalProps) {
   const isEditMode = Boolean(editRecord)
 
-  // 24 Fields Form State
+  // 26 Fields Form State
   const [formData, setFormData] = useState({
     student_name: '',
     student_id: '',
@@ -81,6 +137,8 @@ export default function AddReportEntryModal({
     email_id: '',
     phone_no: '',
     payment_status: 'Pending',
+    divided_month: '',
+    calculation_breakup: '',
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -119,6 +177,18 @@ export default function AddReportEntryModal({
             ? String(rawRemarks)
             : ''
 
+        const rawDividedMonth = (editRecord as any).divided_month !== undefined && (editRecord as any).divided_month !== null
+          ? String((editRecord as any).divided_month)
+          : (editRecord.extra_data as any)?.divided_month !== undefined && (editRecord.extra_data as any)?.divided_month !== null
+          ? String((editRecord.extra_data as any).divided_month)
+          : ''
+
+        const rawCalcBreakup = (editRecord as any).calculation_breakup !== undefined && (editRecord as any).calculation_breakup !== null
+          ? String((editRecord as any).calculation_breakup)
+          : (editRecord.extra_data as any)?.calculation_breakup !== undefined && (editRecord.extra_data as any)?.calculation_breakup !== null
+          ? String((editRecord.extra_data as any).calculation_breakup)
+          : ''
+
         setFormData({
           student_name: editRecord.student_name || '',
           student_id: editRecord.student_id || '',
@@ -145,6 +215,8 @@ export default function AddReportEntryModal({
           email_id: editRecord.email_id || '',
           phone_no: editRecord.phone_no || '',
           payment_status: editRecord.payment_status || 'Pending',
+          divided_month: rawDividedMonth,
+          calculation_breakup: rawCalcBreakup,
         })
         setIsManualTotalFee(Boolean(editRecord.total_fee))
       } else {
@@ -174,6 +246,8 @@ export default function AddReportEntryModal({
           email_id: '',
           phone_no: '',
           payment_status: 'Pending',
+          divided_month: '',
+          calculation_breakup: '',
         })
         setIsManualTotalFee(false)
       }
@@ -194,12 +268,47 @@ export default function AddReportEntryModal({
 
     if (!isManualTotalFee) {
       updated.total_fee = sum > 0 ? String(sum) : ''
+      // Auto-recalculate yet_to_raised and calculation_breakup
+      const autoYet = computeYetToRaised(updated.total_fee, updated.total_paid, updated.pending_amount)
+      if (autoYet !== '') {
+        updated.yet_to_raised = autoYet
+        if (updated.divided_month) {
+          updated.calculation_breakup = computeCalculationBreakup(autoYet, updated.divided_month)
+        }
+      }
     }
     setFormData(updated)
   }
 
   const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+    setFormData((prev) => {
+      const updated = { ...prev, [field]: value }
+
+      // When total_fee, total_paid, or pending_amount change, auto-calculate yet_to_raised
+      if (field === 'total_fee' || field === 'total_paid' || field === 'pending_amount') {
+        const autoYet = computeYetToRaised(updated.total_fee, updated.total_paid, updated.pending_amount)
+        if (autoYet !== '') {
+          updated.yet_to_raised = autoYet
+          if (updated.divided_month) {
+            updated.calculation_breakup = computeCalculationBreakup(autoYet, updated.divided_month)
+          }
+        }
+      }
+
+      // If user directly edits yet_to_raised
+      if (field === 'yet_to_raised') {
+        if (updated.divided_month) {
+          updated.calculation_breakup = computeCalculationBreakup(value, updated.divided_month)
+        }
+      }
+
+      // If user edits divided_month
+      if (field === 'divided_month') {
+        updated.calculation_breakup = computeCalculationBreakup(updated.yet_to_raised, value)
+      }
+
+      return updated
+    })
   }
 
   // Validate email format
@@ -659,9 +768,51 @@ export default function AddReportEntryModal({
                       ))}
                     </div>
                   </div>
+
+                  {/* Divided Month */}
+                  <div className="pt-3 border-t border-slate-100 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <Calendar className="size-3.5 text-[#009D9E]" />
+                        <span>Divided Month</span>
+                      </Label>
+                      <span className="text-[10px] text-slate-400 font-medium">Installments count (e.g. 4)</span>
+                    </div>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={formData.divided_month}
+                      onChange={(e) => handleChange('divided_month', e.target.value)}
+                      placeholder="e.g. 4"
+                      className="h-9 text-xs bg-white border-slate-200 text-[#003D5C] font-extrabold rounded-xl font-mono shadow-2xs focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E]"
+                    />
+                  </div>
                 </div>
 
-                {/* 4. Installment BreakUp */}
+                {/* 4. Calculation BreakUp */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Calculator className="size-4 text-[#009D9E]" />
+                      <span>Calculation BreakUp</span>
+                    </Label>
+                    {formData.calculation_breakup && (
+                      <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200/60">
+                        Auto-Calculated
+                      </span>
+                    )}
+                  </div>
+                  <textarea
+                    value={formData.calculation_breakup}
+                    onChange={(e) => handleChange('calculation_breakup', e.target.value)}
+                    placeholder="Auto-calculated (e.g. 4 installments 1750 or 5 installments 833 - Last Installment 835)"
+                    rows={2}
+                    className="w-full text-xs p-3 bg-white border border-slate-200 text-[#003D5C] font-mono font-bold focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl resize-none shadow-2xs"
+                  />
+                </div>
+
+                {/* 5. Installment BreakUp */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
                   <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <FileText className="size-4 text-slate-500" />
@@ -676,7 +827,7 @@ export default function AddReportEntryModal({
                   />
                 </div>
 
-                {/* 5. Follow-up */}
+                {/* 6. Follow-up */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
                   <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <MessageSquare className="size-4 text-[#009D9E]" />

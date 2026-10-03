@@ -29,6 +29,7 @@ import {
   CreditCard,
   Sparkles,
   MessageSquare,
+  Calculator,
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/types/database.types'
 
@@ -272,6 +273,12 @@ export default function ReportRecordDetailModal({
                 <span className="text-amber-700 block text-[10.5px] font-bold uppercase">Pending Balance</span>
                 <span className="text-amber-700 font-extrabold font-mono text-sm">{formatAUD(record.pending_amount)}</span>
               </div>
+              <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/60">
+                <span className="text-slate-500 block text-[10.5px] font-semibold uppercase">Divided Month</span>
+                <span className="text-slate-900 font-bold font-mono text-sm">
+                  {(record as any).divided_month ?? (record.extra_data as any)?.divided_month ?? '-'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -306,6 +313,20 @@ export default function ReportRecordDetailModal({
               </div>
             </div>
           </div>
+
+          {/* Calculation BreakUp */}
+          {(() => {
+            const calcBreakup = (record as any).calculation_breakup || (record.extra_data as any)?.calculation_breakup
+            if (!calcBreakup) return null
+            return (
+              <div className="p-4.5 rounded-2xl bg-emerald-50/90 border border-emerald-200 text-xs text-emerald-950 space-y-1 shadow-2xs">
+                <span className="font-extrabold flex items-center gap-1.5 text-emerald-800">
+                  <Calculator className="size-4 text-emerald-600" /> Calculation BreakUp:
+                </span>
+                <p className="whitespace-pre-wrap font-bold font-mono text-emerald-900">{calcBreakup}</p>
+              </div>
+            )
+          })()}
 
           {/* Installment BreakUp */}
           {record.remarks && (

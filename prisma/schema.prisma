@@ -523,9 +523,11 @@ model AimtReportRecord {
   coeIssuedDate  String?  @map("coe_issued_date") @db.VarChar(100)
   emailId        String?  @map("email_id") @db.VarChar(255)
   phoneNo        String?  @map("phone_no") @db.VarChar(100)
-  paymentStatus  String?  @map("payment_status") @db.VarChar(100)
-  extraData      Json?    @map("extra_data")
-  createdAt      DateTime @default(now()) @map("created_at")
+  paymentStatus      String?  @map("payment_status") @db.VarChar(100)
+  dividedMonth       Int?     @map("divided_month")
+  calculationBreakup String?  @map("calculation_breakup") @db.Text
+  extraData          Json?    @map("extra_data")
+  createdAt          DateTime @default(now()) @map("created_at")
 
   import AimtReportImport @relation(fields: [importId], references: [id], onDelete: Cascade)
 
