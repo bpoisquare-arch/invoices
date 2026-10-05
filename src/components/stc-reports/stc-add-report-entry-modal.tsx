@@ -155,7 +155,7 @@ export default function StcAddReportEntryModal({
           phone_no: editRecord.phone_no || '',
           payment_status: editRecord.payment_status || 'Pending',
         })
-        setIsManualTotalFee(Boolean(editRecord.total_fee))
+        setIsManualTotalFee(false)
       } else {
         setFormData({
           student_name: '',
@@ -201,9 +201,8 @@ export default function StcAddReportEntryModal({
     const scholarship = parseFloat(updated.scholarship) || 0
     const sum = Math.max(0, admin + resource + tuition - scholarship)
 
-    if (!isManualTotalFee) {
-      updated.total_fee = sum > 0 ? String(sum) : ''
-    }
+    setIsManualTotalFee(false)
+    updated.total_fee = sum > 0 ? String(sum) : (sum === 0 && (admin > 0 || resource > 0 || tuition > 0 || scholarship > 0) ? '0' : '')
     setFormData(updated)
   }
 

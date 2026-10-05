@@ -218,7 +218,7 @@ export default function AddReportEntryModal({
           divided_month: rawDividedMonth,
           calculation_breakup: rawCalcBreakup,
         })
-        setIsManualTotalFee(Boolean(editRecord.total_fee))
+        setIsManualTotalFee(false)
       } else {
         setFormData({
           student_name: '',
@@ -266,15 +266,37 @@ export default function AddReportEntryModal({
     const scholarship = parseFloat(updated.scholarship) || 0
     const sum = Math.max(0, admin + resource + tuition - scholarship)
 
-    if (!isManualTotalFee) {
-      updated.total_fee = sum > 0 ? String(sum) : ''
-      // Auto-recalculate yet_to_raised and calculation_breakup
-      const autoYet = computeYetToRaised(updated.total_fee, updated.total_paid, updated.pending_amount)
-      if (autoYet !== '') {
-        updated.yet_to_raised = autoYet
-        if (updated.divided_month) {
-          updated.calculation_breakup = computeCalculationBreakup(autoYet, updated.divided_month)
-        }
+    setIsManualTotalFee(false)
+    updated.total_fee = sum > 0 ? String(sum) : (sum === 0 && (admin > 0 || resource > 0 || tuition > 0 || scholarship > 0) ? '0' : '')
+
+    // Auto-recalculate yet_to_raised and calculation_breakup
+    const autoYet = computeYetToRaised(updated.total_fee, updated.total_paid, updated.pending_amount)
+    if (autoYet !== '') {
+      updated.yet_to_raised = autoYet
+      if (updated.divided_month) {
+        updated.calculation_breakup = computeCalculationBreakup(autoYet, updated.divided_month)
+      }
+    }
+    setFormData(updated)
+  }
+
+  // Recalculate auto total fee on demand
+  const handleRecalculateTotalFee = () => {
+    const admin = parseFloat(formData.admin_fee) || 0
+    const resource = parseFloat(formData.resource_fee) || 0
+    const tuition = parseFloat(formData.tuition_fee) || 0
+    const scholarship = parseFloat(formData.scholarship) || 0
+    const sum = Math.max(0, admin + resource + tuition - scholarship)
+
+    setIsManualTotalFee(false)
+    const newTotal = sum > 0 ? String(sum) : '0'
+    const updated = { ...formData, total_fee: newTotal }
+
+    const autoYet = computeYetToRaised(newTotal, updated.total_paid, updated.pending_amount)
+    if (autoYet !== '') {
+      updated.yet_to_raised = autoYet
+      if (updated.divided_month) {
+        updated.calculation_breakup = computeCalculationBreakup(autoYet, updated.divided_month)
       }
     }
     setFormData(updated)
@@ -608,10 +630,15 @@ export default function AddReportEntryModal({
                       <DollarSign className="size-4 text-emerald-600" />
                       <span>3. Invoicing & Fee Breakdown</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[10.5px] text-[#003D5C] bg-cyan-50 px-2.5 py-0.5 rounded-lg font-bold border border-cyan-200">
+                    <button
+                      type="button"
+                      onClick={handleRecalculateTotalFee}
+                      title="Click to recalculate Total Fee from Admin, Resource, Tuition, and Scholarship"
+                      className="flex items-center gap-1.5 text-[10.5px] text-[#003D5C] bg-cyan-50 hover:bg-cyan-100 active:scale-95 px-2.5 py-1 rounded-lg font-bold border border-cyan-200 transition-all cursor-pointer shadow-2xs"
+                    >
                       <Calculator className="size-3 text-[#009D9E]" />
                       <span>Auto Total Fee</span>
-                    </div>
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
