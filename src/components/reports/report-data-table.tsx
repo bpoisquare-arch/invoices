@@ -192,10 +192,24 @@ export default function ReportDataTable({
       })
     }
 
-    // 2b. Mark Status Filter (Invoice Raised / Need Advise / Course End)
+    // 2b. Mark Status Filter (Invoice Raised / Need Advise / Course End / Blank)
     if (selectedMarkStatus !== 'all') {
-      const targetMark = selectedMarkStatus.toLowerCase().trim()
-      list = list.filter((r) => (r.status || '').toLowerCase().trim() === targetMark)
+      if (selectedMarkStatus === 'blank') {
+        list = list.filter((r) => {
+          const norm = (r.status || '').toLowerCase().trim()
+          return (
+            !norm.includes('invoice raised') &&
+            !norm.includes('need advise') &&
+            !norm.includes('course end')
+          )
+        })
+      } else {
+        const targetMark = selectedMarkStatus.toLowerCase().trim()
+        list = list.filter((r) => {
+          const norm = (r.status || '').toLowerCase().trim()
+          return norm === targetMark || norm.includes(targetMark)
+        })
+      }
     }
 
     // 3. Document Type Filter
@@ -356,6 +370,7 @@ export default function ReportDataTable({
               }`}
             >
               <option value="all">Mark Status: All</option>
+              <option value="blank">Blank</option>
               <option value="Invoice Raised">Invoice Raised</option>
               <option value="Need Advise">Need Advise</option>
               <option value="Course End">Course End</option>
