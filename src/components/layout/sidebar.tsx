@@ -75,7 +75,7 @@ const ENTITIES: EntityItem[] = [
     subtitle: 'Education & Visa (PK)',
     prefix: 'EDL',
     logo: '/edlink-logo.png',
-    route: '/invoices',
+    route: '/invoices?entity=edlink-pk',
     shortcut: '⌘1',
   },
   {
@@ -85,7 +85,7 @@ const ENTITIES: EntityItem[] = [
     subtitle: 'Education & Visa (AU)',
     prefix: 'EDA',
     logo: '/edlink-logo.png',
-    route: '/invoices',
+    route: '/invoices?entity=edlink-au',
     shortcut: '⌘2',
   },
   {
@@ -244,6 +244,7 @@ export default function AppSidebar() {
     setActiveEntity(entity.id)
     if (typeof window !== 'undefined') {
       localStorage.setItem('active_entity', entity.id)
+      window.dispatchEvent(new Event('active_entity_changed'))
     }
     setEntityMenuOpen(false)
     if (isMobile) setOpenMobile(false)
@@ -911,7 +912,7 @@ export default function AppSidebar() {
                                       ? '/invoices/new?company=isq'
                                       : isEdLinkAu
                                       ? '/invoices/new?company=edlink'
-                                      : '/invoices/new?company=anonymous'
+                                      : '/invoices/new?company=edlink-pk'
                                   }
                                   onClick={handleNavClick}
                                 />
@@ -934,7 +935,9 @@ export default function AppSidebar() {
                                       ? '/invoices?entity=nsc'
                                       : activeEntity === 'isquare-bpo'
                                       ? '/invoices?entity=isq'
-                                      : '/invoices'
+                                      : isEdLinkAu
+                                      ? '/invoices?entity=edlink-au'
+                                      : '/invoices?entity=edlink-pk'
                                   }
                                   onClick={handleNavClick}
                                 />

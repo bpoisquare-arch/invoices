@@ -12,12 +12,25 @@ import { Loader2 } from 'lucide-react'
 
 function CreateInvoiceContent() {
   const searchParams = useSearchParams()
-  const companyParam = searchParams.get('company') || searchParams.get('companyId') || 'edlink'
+  const rawParam = searchParams.get('company') || searchParams.get('companyId')
+  const [companyParam, setCompanyParam] = useState<string>(rawParam || 'edlink-pk')
   const router = useRouter()
 
   const [company, setCompany] = useState<Company | null>(null)
   const [template, setTemplate] = useState<Template | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    if (rawParam) {
+      setCompanyParam(rawParam)
+    } else if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('active_entity')
+      if (stored === 'nsc') setCompanyParam('nsc')
+      else if (stored === 'isquare-bpo') setCompanyParam('isq')
+      else if (stored === 'edlink-au') setCompanyParam('edlink')
+      else setCompanyParam('edlink-pk')
+    }
+  }, [rawParam])
 
   useEffect(() => {
     async function loadData() {

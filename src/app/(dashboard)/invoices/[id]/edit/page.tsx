@@ -41,8 +41,8 @@ export default function EditInvoicePage() {
           comp = {
             id: inv.company_id || 'edlink-pk-id',
             user_id: null,
-            name: inv.template_snapshot?.company_name || 'EdLink Australia',
-            prefix: 'EDL',
+            name: inv.template_snapshot?.company_name || 'EdLink Pakistan',
+            prefix: inv.template_snapshot?.company_name?.includes('Neighbourhood') ? 'NSC' : 'EDL',
             currency: inv.template_snapshot?.currency || 'AUD',
             logo_url: inv.template_snapshot?.logo_url || '/edlink-logo.png',
             created_at: new Date().toISOString(),

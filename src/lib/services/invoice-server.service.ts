@@ -59,28 +59,7 @@ export function toInvoiceWithDetails(inv: any): InvoiceWithDetails {
 
 export function normalizeInvoice(inv: InvoiceWithDetails): InvoiceWithDetails {
   if (!inv) return inv
-  const companyName = inv.template_snapshot?.company_name === 'EdLink Pakistan' ? 'EdLink Australia' : inv.template_snapshot?.company_name
-  const templateSnapshot = inv.template_snapshot
-    ? {
-        ...inv.template_snapshot,
-        company_name: companyName || inv.template_snapshot.company_name,
-        logo_url: inv.template_snapshot.logo_url || '/edlink-logo.png',
-      }
-    : inv.template_snapshot
-
-  const companies = inv.companies
-    ? {
-        ...inv.companies,
-        name: inv.companies.name === 'EdLink Pakistan' ? 'EdLink Australia' : inv.companies.name,
-        logo_url: inv.companies.logo_url || '/edlink-logo.png',
-      }
-    : inv.companies
-
-  return {
-    ...inv,
-    template_snapshot: templateSnapshot,
-    companies: companies,
-  }
+  return inv
 }
 
 export async function generateNextInvoiceNumberServer(companyId: string, isAnonymous?: boolean): Promise<string> {
@@ -195,48 +174,136 @@ export async function getInvoicesServer(params: InvoiceFilterParams = {}): Promi
 
   try {
     const where: any = {}
+    const conditions: any[] = []
+
+    // 1. Entity filter
+    if (params.entityType === 'nsc') {
+      conditions.push({
+        OR: [
+          { company: { prefix: 'NSC' } },
+          { company: { name: { contains: 'Neighbourhood' } } },
+          { templateSnapshot: { path: '$.company_name', string_contains: 'Neighbourhood' } },
+          { templateSnapshot: { path: '$.layout_type', equals: 'nsc_v1' } },
+        ],
+      })
+    } else if (params.entityType === 'isquare-bpo' || (params.entityType as any) === 'isq') {
+      conditions.push({
+        OR: [
+          { company: { prefix: 'ISQ' } },
+          { company: { name: { contains: 'ISquare' } } },
+          { templateSnapshot: { path: '$.company_name', string_contains: 'ISquare' } },
+        ],
+      })
+    } else if (params.entityType === 'edlink-au') {
+      conditions.push({
+        OR: [
+          { company: { prefix: 'EDA' } },
+          {
+            AND: [
+              { company: { name: { contains: 'Australia' } } },
+              { NOT: { company: { name: { contains: 'Pakistan' } } } },
+            ],
+          },
+          {
+            AND: [
+              { templateSnapshot: { path: '$.company_name', string_contains: 'Australia' } },
+              { NOT: { templateSnapshot: { path: '$.company_name', string_contains: 'Pakistan' } } },
+            ],
+          },
+        ],
+      })
+      conditions.push({
+        NOT: {
+          OR: [
+            { company: { prefix: 'NSC' } },
+            { company: { name: { contains: 'Neighbourhood' } } },
+            { templateSnapshot: { path: '$.company_name', string_contains: 'Neighbourhood' } },
+            { templateSnapshot: { path: '$.layout_type', equals: 'nsc_v1' } },
+            { company: { prefix: 'ISQ' } },
+            { company: { name: { contains: 'ISquare' } } },
+            { templateSnapshot: { path: '$.company_name', string_contains: 'ISquare' } },
+          ],
+        },
+      })
+    } else if (params.entityType === 'edlink-pk') {
+      conditions.push({
+        NOT: {
+          OR: [
+            { company: { prefix: 'NSC' } },
+            { company: { name: { contains: 'Neighbourhood' } } },
+            { templateSnapshot: { path: '$.company_name', string_contains: 'Neighbourhood' } },
+            { templateSnapshot: { path: '$.layout_type', equals: 'nsc_v1' } },
+            { company: { prefix: 'ISQ' } },
+            { company: { name: { contains: 'ISquare' } } },
+            { templateSnapshot: { path: '$.company_name', string_contains: 'ISquare' } },
+            { company: { prefix: 'EDA' } },
+            {
+              AND: [
+                { company: { name: { contains: 'Australia' } } },
+                { NOT: { company: { name: { contains: 'Pakistan' } } } },
+              ],
+            },
+            {
+              AND: [
+                { templateSnapshot: { path: '$.company_name', string_contains: 'Australia' } },
+                { NOT: { templateSnapshot: { path: '$.company_name', string_contains: 'Pakistan' } } },
+              ],
+            },
+          ],
+        },
+      })
+    }
 
     if (params.companyId && params.companyId !== 'all' && isValidUUID(params.companyId)) {
-      where.companyId = params.companyId
+      conditions.push({ companyId: params.companyId })
     }
 
     const now = new Date()
     const todayStr = now.toISOString().split('T')[0]
 
     if (params.dateFilter === 'today') {
-      where.invoiceDate = new Date(todayStr)
+      conditions.push({ invoiceDate: new Date(todayStr) })
     } else if (params.dateFilter === '7days') {
       const d = subDays(now, 7).toISOString().split('T')[0]
-      where.invoiceDate = { gte: new Date(d), lte: new Date(todayStr) }
+      conditions.push({ invoiceDate: { gte: new Date(d), lte: new Date(todayStr) } })
     } else if (params.dateFilter === '30days') {
       const d = subDays(now, 30).toISOString().split('T')[0]
-      where.invoiceDate = { gte: new Date(d), lte: new Date(todayStr) }
+      conditions.push({ invoiceDate: { gte: new Date(d), lte: new Date(todayStr) } })
     } else if (params.dateFilter === 'this_month') {
       const s = startOfMonth(now).toISOString().split('T')[0]
       const e = endOfMonth(now).toISOString().split('T')[0]
-      where.invoiceDate = { gte: new Date(s), lte: new Date(e) }
+      conditions.push({ invoiceDate: { gte: new Date(s), lte: new Date(e) } })
     } else if (params.dateFilter === 'last_month') {
       const lastMonth = subMonths(now, 1)
       const s = startOfMonth(lastMonth).toISOString().split('T')[0]
       const e = endOfMonth(lastMonth).toISOString().split('T')[0]
-      where.invoiceDate = { gte: new Date(s), lte: new Date(e) }
+      conditions.push({ invoiceDate: { gte: new Date(s), lte: new Date(e) } })
     } else if (params.dateFilter === 'this_year') {
       const s = startOfYear(now).toISOString().split('T')[0]
       const e = endOfYear(now).toISOString().split('T')[0]
-      where.invoiceDate = { gte: new Date(s), lte: new Date(e) }
+      conditions.push({ invoiceDate: { gte: new Date(s), lte: new Date(e) } })
     } else if (params.dateFilter === 'custom') {
-      where.invoiceDate = {}
-      if (params.startDate) where.invoiceDate.gte = new Date(params.startDate)
-      if (params.endDate) where.invoiceDate.lte = new Date(params.endDate)
+      const dateCond: any = {}
+      if (params.startDate) dateCond.gte = new Date(params.startDate)
+      if (params.endDate) dateCond.lte = new Date(params.endDate)
+      if (Object.keys(dateCond).length > 0) {
+        conditions.push({ invoiceDate: dateCond })
+      }
     }
 
     if (params.search && params.search.trim() !== '') {
       const s = params.search.trim()
-      where.OR = [
-        { invoiceNumber: { contains: s } },
-        { customerName: { contains: s } },
-        { referenceName: { contains: s } },
-      ]
+      conditions.push({
+        OR: [
+          { invoiceNumber: { contains: s } },
+          { customerName: { contains: s } },
+          { referenceName: { contains: s } },
+        ],
+      })
+    }
+
+    if (conditions.length > 0) {
+      where.AND = conditions
     }
 
     let orderBy: any = { createdAt: 'desc' }
@@ -278,7 +345,7 @@ export async function getInvoicesServer(params: InvoiceFilterParams = {}): Promi
 }
 
 export async function createInvoiceServer(input: CreateInvoiceInput): Promise<InvoiceWithDetails> {
-  let companyName = 'EdLink Australia'
+  let companyName = 'EdLink Pakistan'
   let address = 'Suit 3, Level 4/20 Collins Street, Melbourne 3000'
   let email = 'finance@edlink.com.au'
   let phone = '+61 432 536 123'
@@ -306,6 +373,16 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
     phone = '+92 51 111 222 333'
     paymentDetails = 'Account Name: iSquare BPO Solutions\nSWIFT: ISQBPOPK\nAccount No: 9876543210'
     footerTerms = 'Payment due within 15 days of invoice date.'
+  } else if (input.company_id === 'edlink-au' || input.company_id === 'edlink') {
+    companyName = 'EdLink Australia'
+    companyLogo = '/edlink-logo.png'
+    layoutType = 'default_v1'
+    primaryColor = '#0284c7'
+    address = 'Level 1, 100 Collins Street, Melbourne VIC 3000'
+    email = 'australia@edlink.com.au'
+    phone = '+61 3 9000 1234'
+    paymentDetails = 'Account Name: EdLink Australia PTY Ltd\nBSB: 063-000\nAccount No: 1234 5678'
+    footerTerms = 'Thank you for choosing EdLink Australia.'
   }
 
   let resolvedCompanyId = input.company_id
@@ -318,9 +395,35 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
         if (comp.logoUrl) companyLogo = comp.logoUrl
       }
     } else {
-      const firstCompany = await prisma.company.findFirst()
-      if (firstCompany) {
-        resolvedCompanyId = firstCompany.id
+      let matchedComp = null
+      if (input.company_id === 'nsc-company-id' || input.company_id === 'nsc') {
+        matchedComp = await prisma.company.findFirst({
+          where: { OR: [{ prefix: 'NSC' }, { name: { contains: 'Neighbourhood' } }] }
+        })
+      } else if (input.company_id === 'isquare-bpo-company-id' || input.company_id === 'isquare-bpo' || input.company_id === 'isq') {
+        matchedComp = await prisma.company.findFirst({
+          where: { OR: [{ prefix: 'ISQ' }, { name: { contains: 'ISquare' } }] }
+        })
+      } else if (input.company_id === 'edlink-au' || input.company_id === 'edlink') {
+        matchedComp = await prisma.company.findFirst({
+          where: { OR: [{ prefix: 'EDA' }, { AND: [{ name: { contains: 'Australia' } }, { NOT: { name: { contains: 'Pakistan' } } }] }] }
+        })
+      } else if (input.company_id === 'edlink-pk' || input.company_id === 'anonymous' || input.company_id === 'anonymous-company-id') {
+        matchedComp = await prisma.company.findFirst({
+          where: { OR: [{ prefix: 'EDL' }, { name: { contains: 'Pakistan' } }] }
+        })
+      }
+
+      if (matchedComp) {
+        resolvedCompanyId = matchedComp.id
+        if (!input.company_id?.includes('anonymous') && matchedComp.name) {
+          companyName = matchedComp.name
+        }
+      } else {
+        const firstCompany = await prisma.company.findFirst()
+        if (firstCompany) {
+          resolvedCompanyId = firstCompany.id
+        }
       }
     }
   } catch {}

@@ -81,18 +81,35 @@ export default function InvoicesPage() {
   const [activeEntity, setActiveEntity] = useState<string>('edlink-pk')
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search)
-      const entityParam = urlParams.get('entity') || urlParams.get('company')
-      let entity = localStorage.getItem('active_entity') || 'edlink-pk'
-      if (entityParam === 'nsc') entity = 'nsc'
-      else if (entityParam === 'isq' || entityParam === 'isquare-bpo') entity = 'isquare-bpo'
-      else if (entityParam === 'edlink' || entityParam === 'edlink-au') entity = 'edlink-au'
-      else if (entityParam === 'anonymous' || entityParam === 'edlink-pk') entity = 'edlink-pk'
-      setActiveEntity(entity)
-      localStorage.setItem('active_entity', entity)
+    function syncActiveEntity() {
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search)
+        const entityParam = urlParams.get('entity') || urlParams.get('company')
+        let entity = localStorage.getItem('active_entity') || 'edlink-pk'
+        if (entityParam === 'nsc') entity = 'nsc'
+        else if (entityParam === 'isq' || entityParam === 'isquare-bpo') entity = 'isquare-bpo'
+        else if (entityParam === 'edlink' || entityParam === 'edlink-au') entity = 'edlink-au'
+        else if (entityParam === 'anonymous' || entityParam === 'edlink-pk') entity = 'edlink-pk'
+        setActiveEntity(entity)
+        localStorage.setItem('active_entity', entity)
+      }
+    }
+
+    syncActiveEntity()
+    window.addEventListener('active_entity_changed', syncActiveEntity)
+    window.addEventListener('popstate', syncActiveEntity)
+    window.addEventListener('storage', syncActiveEntity)
+    return () => {
+      window.removeEventListener('active_entity_changed', syncActiveEntity)
+      window.removeEventListener('popstate', syncActiveEntity)
+      window.removeEventListener('storage', syncActiveEntity)
     }
   }, [])
+
+  useEffect(() => {
+    setSelectedCompany('all')
+    setPage(1)
+  }, [activeEntity])
 
   // Load companies dropdown
   useEffect(() => {
@@ -198,6 +215,8 @@ export default function InvoicesPage() {
 
   const isEdLinkAu = activeEntity === 'edlink-au'
   const isEdLinkPk = activeEntity === 'edlink-pk'
+  const isNsc = activeEntity === 'nsc'
+  const isIsq = activeEntity === 'isquare-bpo'
   const entityTitle =
     activeEntity === 'edlink-au'
       ? 'EdLink Australia'
@@ -217,7 +236,7 @@ export default function InvoicesPage() {
       ? '/invoices/new?company=isq'
       : isEdLinkAu
       ? '/invoices/new?company=edlink'
-      : '/invoices/new?company=anonymous'
+      : '/invoices/new?company=edlink-pk'
 
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 
@@ -256,9 +275,12 @@ export default function InvoicesPage() {
           <CardContent className="p-0">
             <div className="font-['Montserrat'] text-3xl sm:text-4xl font-extrabold text-slate-900">
               {companies.filter((c) => {
-                const isAnon = c.prefix === 'ANO' || c.name.toLowerCase() === 'anonymous'
-                if (isEdLinkPk) return isAnon
-                if (isEdLinkAu) return !isAnon
+                const nameLower = c.name.toLowerCase()
+                const isAnon = c.prefix === 'ANO' || nameLower === 'anonymous'
+                if (isEdLinkPk) return isAnon || c.prefix === 'EDL' || nameLower.includes('pakistan')
+                if (isEdLinkAu) return c.prefix === 'EDA' || (nameLower.includes('australia') && !nameLower.includes('pakistan'))
+                if (isNsc) return c.prefix === 'NSC' || nameLower.includes('neighbourhood')
+                if (isIsq) return c.prefix === 'ISQ' || nameLower.includes('isquare')
                 return true
               }).length}
             </div>
@@ -321,9 +343,12 @@ export default function InvoicesPage() {
                     <SelectItem value="all">All Companies</SelectItem>
                     {companies
                       .filter((c) => {
-                        const isAnon = c.prefix === 'ANO' || c.name.toLowerCase() === 'anonymous'
-                        if (isEdLinkPk) return isAnon
-                        if (isEdLinkAu) return !isAnon
+                        const nameLower = c.name.toLowerCase()
+                        const isAnon = c.prefix === 'ANO' || nameLower === 'anonymous'
+                        if (isEdLinkPk) return isAnon || c.prefix === 'EDL' || nameLower.includes('pakistan')
+                        if (isEdLinkAu) return c.prefix === 'EDA' || (nameLower.includes('australia') && !nameLower.includes('pakistan'))
+                        if (isNsc) return c.prefix === 'NSC' || nameLower.includes('neighbourhood')
+                        if (isIsq) return c.prefix === 'ISQ' || nameLower.includes('isquare')
                         return true
                       })
                       .map((c) => (
@@ -484,8 +509,8 @@ export default function InvoicesPage() {
                   <tbody className="divide-y divide-slate-100">
                     {invoices.map((inv) => {
                       const rawName = inv.template_snapshot?.company_name || inv.companies?.name || 'Company'
-                      const compName = rawName === 'EdLink Pakistan' ? 'EdLink Australia' : rawName
-                      const compLogo = inv.template_snapshot?.logo_url || inv.companies?.logo_url || (compName.toLowerCase().includes('edlink') || compName.toLowerCase().includes('australia') ? '/edlink-logo.png' : compName.toLowerCase().includes('aimt') ? '/aimt-logo.png' : null)
+                      const compName = rawName
+                      const compLogo = inv.template_snapshot?.logo_url || inv.companies?.logo_url || (compName.toLowerCase().includes('neighbourhood') || inv.companies?.prefix === 'NSC' ? '/Neighbourhood-Shine.png' : compName.toLowerCase().includes('isquare') || inv.companies?.prefix === 'ISQ' ? '/isquarebpo.png' : compName.toLowerCase().includes('aimt') ? '/aimt-logo.png' : '/edlink-logo.png')
                       const curr = inv.template_snapshot?.currency || inv.companies?.currency || 'AUD'
 
                       return (
@@ -606,8 +631,8 @@ export default function InvoicesPage() {
               <div className="block md:hidden divide-y divide-slate-100">
                 {invoices.map((inv) => {
                   const rawName = inv.template_snapshot?.company_name || inv.companies?.name || 'Company'
-                  const compName = rawName === 'EdLink Pakistan' ? 'EdLink Australia' : rawName
-                  const compLogo = inv.template_snapshot?.logo_url || inv.companies?.logo_url || (compName.toLowerCase().includes('edlink') || compName.toLowerCase().includes('australia') ? '/edlink-logo.png' : compName.toLowerCase().includes('aimt') ? '/aimt-logo.png' : null)
+                  const compName = rawName
+                  const compLogo = inv.template_snapshot?.logo_url || inv.companies?.logo_url || (compName.toLowerCase().includes('neighbourhood') || inv.companies?.prefix === 'NSC' ? '/Neighbourhood-Shine.png' : compName.toLowerCase().includes('isquare') || inv.companies?.prefix === 'ISQ' ? '/isquarebpo.png' : compName.toLowerCase().includes('aimt') ? '/aimt-logo.png' : '/edlink-logo.png')
                   const curr = inv.template_snapshot?.currency || inv.companies?.currency || 'AUD'
 
                   return (

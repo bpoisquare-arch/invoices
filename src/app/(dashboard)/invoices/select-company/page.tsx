@@ -39,13 +39,17 @@ export default function SelectCompanyPage() {
   }, [])
 
   function handleSelectCompany(company: Company) {
-    const isAnon = company.prefix === 'ANO' || company.name.toLowerCase() === 'anonymous'
-    const slug = isAnon ? 'anonymous' : 'edlink'
+    const nameLower = company.name.toLowerCase()
+    const isAnon = company.prefix === 'ANO' || nameLower === 'anonymous'
+    const isNsc = company.prefix === 'NSC' || nameLower.includes('neighbourhood')
+    const isIsq = company.prefix === 'ISQ' || nameLower.includes('isquare')
+    const isAu = company.prefix === 'EDA' || (nameLower.includes('australia') && !nameLower.includes('pakistan'))
+    const slug = isAnon ? 'anonymous' : isNsc ? 'nsc' : isIsq ? 'isq' : isAu ? 'edlink' : 'edlink-pk'
     router.push(`/invoices/new?company=${slug}`)
   }
 
   const isEdLinkAu = activeEntity === 'edlink-au'
-  const isEdLinkPk = !isEdLinkAu
+  const isEdLinkPk = activeEntity === 'edlink-pk'
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto py-4">
@@ -82,18 +86,24 @@ export default function SelectCompanyPage() {
             .filter((c) => {
               const nameLower = c.name.toLowerCase()
               const isAnon = c.prefix === 'ANO' || nameLower === 'anonymous'
-              if (isEdLinkPk) {
-                return isAnon
+              if (activeEntity === 'nsc') {
+                return c.prefix === 'NSC' || nameLower.includes('neighbourhood')
               }
-              if (isEdLinkAu) {
-                return !isAnon && (c.prefix === 'EDL' || nameLower.includes('edlink'))
+              if (activeEntity === 'isquare-bpo') {
+                return c.prefix === 'ISQ' || nameLower.includes('isquare')
+              }
+              if (activeEntity === 'edlink-au') {
+                return c.prefix === 'EDA' || (nameLower.includes('australia') && !nameLower.includes('pakistan'))
+              }
+              if (activeEntity === 'edlink-pk') {
+                return isAnon || c.prefix === 'EDL' || nameLower.includes('pakistan')
               }
               return true
             })
             .map((company) => {
               const isAnon = company.prefix === 'ANO' || company.name.toLowerCase() === 'anonymous'
-              const displayName = isAnon ? 'Anonymous / Custom' : 'EdLink Australia'
-              const logoSrc = isAnon ? '' : '/edlink-logo.png'
+              const displayName = isAnon ? 'Anonymous / Custom' : company.name
+              const logoSrc = isAnon ? '' : (company.logo_url || (company.prefix === 'NSC' ? '/Neighbourhood-Shine.png' : company.prefix === 'ISQ' ? '/isquarebpo.png' : '/edlink-logo.png'))
 
               return (
                 <Card

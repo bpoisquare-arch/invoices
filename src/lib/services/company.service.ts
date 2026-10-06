@@ -4,8 +4,19 @@ import { Company } from '@/types/database.types'
 export const FALLBACK_COMPANY: Company = {
   id: 'edlink-pk-id',
   user_id: null,
-  name: 'EdLink Australia',
+  name: 'EdLink Pakistan',
   prefix: 'EDL',
+  currency: 'AUD',
+  logo_url: '/edlink-logo.png',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
+
+export const EDLINK_AU_COMPANY: Company = {
+  id: 'edlink-au-id',
+  user_id: null,
+  name: 'EdLink Australia',
+  prefix: 'EDA',
   currency: 'AUD',
   logo_url: '/edlink-logo.png',
   created_at: new Date().toISOString(),
@@ -49,8 +60,8 @@ function prismaToCompany(c: any): Company {
   return {
     id: c.id,
     user_id: c.userId ?? null,
-    name: c.name === 'EdLink Pakistan' ? 'EdLink Australia' : c.name,
-    logo_url: c.logoUrl || (c.name === 'EdLink Pakistan' || c.name === 'EdLink Australia' ? '/edlink-logo.png' : null),
+    name: c.name,
+    logo_url: c.logoUrl || (c.prefix === 'NSC' ? '/Neighbourhood-Shine.png' : c.prefix === 'ISQ' ? '/isquarebpo.png' : '/edlink-logo.png'),
     prefix: c.prefix,
     currency: c.currency,
     created_at: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString(),
@@ -73,6 +84,10 @@ export async function getCompanies(includeAnonymous = false): Promise<Company[]>
       if (!hasNsc) result.push(NSC_COMPANY)
       const hasIsq = result.some((c) => c.prefix === 'ISQ')
       if (!hasIsq) result.push(ISQUARE_COMPANY)
+      const hasEdPk = result.some((c) => c.prefix === 'EDL' || c.name.toLowerCase().includes('pakistan'))
+      if (!hasEdPk) result.push(FALLBACK_COMPANY)
+      const hasEdAu = result.some((c) => c.prefix === 'EDA' || (c.name.toLowerCase().includes('australia') && !c.name.toLowerCase().includes('pakistan')))
+      if (!hasEdAu) result.push(EDLINK_AU_COMPANY)
       if (includeAnonymous) {
         const hasAnon = result.some((c) => c.id === ANONYMOUS_COMPANY.id || c.prefix === 'ANO')
         if (!hasAnon) result.push(ANONYMOUS_COMPANY)
@@ -83,7 +98,7 @@ export async function getCompanies(includeAnonymous = false): Promise<Company[]>
     console.warn('MySQL getCompanies warning:', err)
   }
 
-  const base = [FALLBACK_COMPANY, NSC_COMPANY, ISQUARE_COMPANY]
+  const base = [FALLBACK_COMPANY, EDLINK_AU_COMPANY, NSC_COMPANY, ISQUARE_COMPANY]
   if (includeAnonymous) base.push(ANONYMOUS_COMPANY)
   return base
 }
@@ -95,7 +110,7 @@ function isValidUUID(str?: string | null): boolean {
 
 export async function getCompanyById(id: string): Promise<Company | null> {
   const clean = (id || '').toLowerCase().trim()
-  if (clean === 'anonymous-company-id' || clean === 'anonymous' || clean === 'ano' || clean === 'custom' || clean === 'edlink-pk') {
+  if (clean === 'anonymous-company-id' || clean === 'anonymous' || clean === 'ano' || clean === 'custom') {
     return ANONYMOUS_COMPANY
   }
 
@@ -137,11 +152,11 @@ export async function getCompanyById(id: string): Promise<Company | null> {
     return ISQUARE_COMPANY
   }
 
-  if (clean === 'edlink' || clean === 'edlink-australia' || clean === 'edlink-au' || clean === 'eda' || clean === 'edl' || clean === 'edlink-pk-id') {
+  if (clean === 'edlink' || clean === 'edlink-australia' || clean === 'edlink-au' || clean === 'eda') {
     try {
       const dbEdlink = await prisma.company.findFirst({
         where: {
-          OR: [{ prefix: 'EDA' }, { name: { contains: 'Australia' } }, { prefix: 'EDL' }],
+          OR: [{ prefix: 'EDA' }, { AND: [{ name: { contains: 'Australia' } }, { NOT: { name: { contains: 'Pakistan' } } }] }],
         },
       })
       if (dbEdlink) {
@@ -149,6 +164,26 @@ export async function getCompanyById(id: string): Promise<Company | null> {
           ...prismaToCompany(dbEdlink),
           name: 'EdLink Australia',
           logo_url: dbEdlink.logoUrl || '/edlink-logo.png',
+          prefix: 'EDA',
+        }
+      }
+    } catch {}
+    return EDLINK_AU_COMPANY
+  }
+
+  if (clean === 'edlink-pk' || clean === 'edlink-pakistan' || clean === 'edl' || clean === 'edlink-pk-id') {
+    try {
+      const dbEdlinkPk = await prisma.company.findFirst({
+        where: {
+          OR: [{ prefix: 'EDL' }, { name: { contains: 'Pakistan' } }],
+        },
+      })
+      if (dbEdlinkPk) {
+        return {
+          ...prismaToCompany(dbEdlinkPk),
+          name: 'EdLink Pakistan',
+          logo_url: dbEdlinkPk.logoUrl || '/edlink-logo.png',
+          prefix: 'EDL',
         }
       }
     } catch {}

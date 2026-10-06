@@ -4,8 +4,8 @@ import { Template } from '@/types/database.types'
 export const FALLBACK_TEMPLATE: Template = {
   id: 'edlink-pk-template-id',
   company_id: 'edlink-pk-id',
-  name: 'EdLink Australia Standard Template',
-  company_name: 'EdLink Australia',
+  name: 'EdLink Pakistan Standard Template',
+  company_name: 'EdLink Pakistan',
   address: 'Suit 3, Level 4/20 Collins Street, Melbourne 3000',
   email: 'finance@edlink.com.au',
   phone: '+61 432 536 123',
@@ -15,6 +15,24 @@ export const FALLBACK_TEMPLATE: Template = {
   footer_terms: 'Thank you for getting services from us',
   primary_color: '#2563eb',
   layout_type: 'edlink_v1',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
+
+export const EDLINK_AU_TEMPLATE: Template = {
+  id: 'edlink-au-template-id',
+  company_id: 'edlink-au-id',
+  name: 'EdLink Australia Standard Template',
+  company_name: 'EdLink Australia',
+  address: 'Level 1, 100 Collins Street, Melbourne VIC 3000',
+  email: 'australia@edlink.com.au',
+  phone: '+61 3 9000 1234',
+  payment_details: 'Account Name: EdLink Australia PTY Ltd\nBSB: 063-000\nAccount No: 1234 5678',
+  bank_details: 'EdLink Australia PTY Ltd',
+  currency: 'AUD',
+  footer_terms: 'Thank you for choosing EdLink Australia.',
+  primary_color: '#0284c7',
+  layout_type: 'default_v1',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 }
@@ -80,8 +98,8 @@ function isValidUUID(str?: string | null): boolean {
 
 function prismaToTemplate(row: any): Template {
   if (!row) return row
-  const companyName = row.companyName === 'EdLink Pakistan' ? 'EdLink Australia' : (row.companyName || '')
-  const name = row.name === 'EdLink Pakistan Standard Template' ? 'EdLink Australia Standard Template' : (row.name || '')
+  const companyName = row.companyName || ''
+  const name = row.name || ''
   return {
     id: row.id,
     company_id: row.companyId,
@@ -117,7 +135,7 @@ export async function getTemplates(): Promise<(Template & { companies?: { name: 
         )
         .map((t) => {
           const norm = prismaToTemplate(t)
-          const comp = t.company ? { name: t.company.name === 'EdLink Pakistan' ? 'EdLink Australia' : t.company.name, prefix: t.company.prefix } : null
+          const comp = t.company ? { name: t.company.name, prefix: t.company.prefix } : null
           return { ...norm, companies: comp }
         })
 
@@ -127,12 +145,12 @@ export async function getTemplates(): Promise<(Template & { companies?: { name: 
     console.error('Error fetching templates:', err)
   }
 
-  return [{ ...FALLBACK_TEMPLATE, companies: { name: FALLBACK_TEMPLATE.company_name || 'EdLink Australia', prefix: 'EDL' } }]
+  return [{ ...FALLBACK_TEMPLATE, companies: { name: FALLBACK_TEMPLATE.company_name || 'EdLink Pakistan', prefix: 'EDL' } }]
 }
 
 export async function getTemplateByCompanyId(companyId: string): Promise<Template | null> {
   const clean = (companyId || '').toLowerCase().trim()
-  if (clean === 'anonymous-company-id' || clean === 'anonymous' || clean === 'ano' || clean === 'custom' || clean === 'edlink-pk') {
+  if (clean === 'anonymous-company-id' || clean === 'anonymous' || clean === 'ano' || clean === 'custom') {
     return ANONYMOUS_TEMPLATE
   }
 
@@ -161,9 +179,39 @@ export async function getTemplateByCompanyId(companyId: string): Promise<Templat
           ],
         },
       })
-      if (row) return prismaToTemplate(row)
+      if (row) return { ...prismaToTemplate(row), layout_type: 'default_v1' }
     } catch {}
     return ISQUARE_TEMPLATE
+  }
+
+  if (clean === 'edlink-pk' || clean === 'edlink-pk-id' || clean === 'edlink-pk-template-id' || clean === 'edl') {
+    try {
+      const row = await prisma.template.findFirst({
+        where: {
+          OR: [
+            { name: { contains: 'Pakistan' } },
+            { companyName: { contains: 'Pakistan' } },
+          ],
+        },
+      })
+      if (row) return prismaToTemplate(row)
+    } catch {}
+    return FALLBACK_TEMPLATE
+  }
+
+  if (clean === 'edlink' || clean === 'edlink-au' || clean === 'edlink-australia' || clean === 'eda') {
+    try {
+      const row = await prisma.template.findFirst({
+        where: {
+          OR: [
+            { AND: [{ name: { contains: 'Australia' } }, { NOT: { name: { contains: 'Pakistan' } } }] },
+            { AND: [{ companyName: { contains: 'Australia' } }, { NOT: { companyName: { contains: 'Pakistan' } } }] },
+          ],
+        },
+      })
+      if (row) return prismaToTemplate(row)
+    } catch {}
+    return EDLINK_AU_TEMPLATE
   }
 
   try {
