@@ -441,6 +441,8 @@ export async function saveStcReportImportToDatabase(params: {
           emailId: incoming.email_id || existing.email_id,
           phoneNo: incoming.phone_no || existing.phone_no,
           paymentStatus: incoming.payment_status || existing.payment_status,
+          dividedMonth: incoming.divided_month !== undefined ? incoming.divided_month : (existing as any).divided_month,
+          calculationBreakup: incoming.calculation_breakup !== undefined ? incoming.calculation_breakup : (existing as any).calculation_breakup,
           extraData: {
             ...((existing.extra_data as any) || {}),
             ...(incoming.extra_data || {}),
@@ -491,6 +493,8 @@ export async function saveStcReportImportToDatabase(params: {
       emailId: incoming.email_id || null,
       phoneNo: incoming.phone_no || null,
       paymentStatus: incoming.payment_status || 'Pending',
+      dividedMonth: incoming.divided_month || null,
+      calculationBreakup: incoming.calculation_breakup || null,
       extraData: {
         ...incoming.extra_data,
         total_paid: incoming.total_paid || incoming.paid_amount || 0,
@@ -958,8 +962,10 @@ export async function createStcReportRecord(params: {
       emailId: cleanString(params.email_id) || null,
       phoneNo: cleanString(params.phone_no) || null,
       paymentStatus: cleanString(params.payment_status) || 'Pending',
+      dividedMonth: dividedMonthVal,
+      calculationBreakup: calculationBreakupVal,
       extraData: extraData as any,
-    },
+    } as any,
   })
 
   return prismaStcRecordToSnake(mysqlRow)
@@ -998,6 +1004,15 @@ export async function updateStcReportRecord(
   if (updates.email_id !== undefined) mysqlUpdate.emailId = cleanString(updates.email_id) || null
   if (updates.phone_no !== undefined) mysqlUpdate.phoneNo = cleanString(updates.phone_no) || null
   if (updates.payment_status !== undefined) mysqlUpdate.paymentStatus = cleanString(updates.payment_status) || null
+  if (updates.divided_month !== undefined) {
+    mysqlUpdate.dividedMonth =
+      updates.divided_month !== null && String(updates.divided_month).trim() !== ''
+        ? cleanNumber(updates.divided_month)
+        : null
+  }
+  if (updates.calculation_breakup !== undefined) {
+    mysqlUpdate.calculationBreakup = cleanString(updates.calculation_breakup) || null
+  }
   if (updates.divided_month !== undefined || updates.calculation_breakup !== undefined || updates.extra_data !== undefined) {
     const current = await prisma.stcReportRecord.findUnique({ where: { id }, select: { extraData: true } })
     const existingExtra = (current?.extraData as Record<string, any>) || {}
