@@ -285,6 +285,7 @@ function prismaAimtRecordToSnake(r: any): AimtReportRecord {
     total_paid: Number(r.totalPaid ?? extraData.total_paid ?? r.paidAmount ?? 0),
     initial_payment: Number(r.paidAmount ?? 0),
     follow_up: safeFollowUp,
+    admin_comments: r.adminComments ?? extraData.admin_comments ?? null,
     coe_issued_date: r.coeIssuedDate,
     email_id: r.emailId,
     phone_no: r.phoneNo,
@@ -836,6 +837,7 @@ export async function createReportRecord(params: {
   payment_status?: string | null
   divided_month?: number | string | null
   calculation_breakup?: string | null
+  admin_comments?: string | null
   extra_data?: Record<string, any>
 }): Promise<AimtReportRecord> {
   let targetImportId = params.importId
@@ -864,6 +866,7 @@ export async function createReportRecord(params: {
     ? cleanNumber(params.divided_month)
     : null
   const calculationBreakupVal = cleanString(params.calculation_breakup) || null
+  const adminCommentsVal = cleanString(params.admin_comments) || null
 
   let nextSrNo = 1
   try {
@@ -883,6 +886,7 @@ export async function createReportRecord(params: {
     follow_up: followUpVal,
     divided_month: dividedMonthVal,
     calculation_breakup: calculationBreakupVal,
+    admin_comments: adminCommentsVal,
   }
 
   const importExists = await prisma.aimtReportImport.findUnique({ where: { id: targetImportId! } })
@@ -934,6 +938,7 @@ export async function createReportRecord(params: {
       paymentStatus: cleanString(params.payment_status) || 'Pending',
       dividedMonth: dividedMonthVal,
       calculationBreakup: calculationBreakupVal,
+      adminComments: adminCommentsVal,
       extraData: extraData as any,
     } as any,
   })
@@ -982,7 +987,15 @@ export async function updateReportRecord(
   if (updates.calculation_breakup !== undefined) {
     mysqlUpdate.calculationBreakup = cleanString(updates.calculation_breakup) || null
   }
-  if (updates.extra_data !== undefined) mysqlUpdate.extraData = updates.extra_data as any
+  if (updates.admin_comments !== undefined) {
+    mysqlUpdate.adminComments = cleanString(updates.admin_comments) || null
+  }
+  if (updates.extra_data !== undefined || updates.admin_comments !== undefined) {
+    mysqlUpdate.extraData = {
+      ...(updates.extra_data as any || {}),
+      ...(updates.admin_comments !== undefined ? { admin_comments: cleanString(updates.admin_comments) || null } : {}),
+    }
+  }
 
   let mysqlRow: any = null
   if (Object.keys(mysqlUpdate).length > 0) {

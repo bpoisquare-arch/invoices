@@ -34,7 +34,9 @@ import {
   Sparkles,
   BookOpen,
   MessageSquare,
+  MessageSquareQuote,
 } from 'lucide-react'
+import { useAuthRole } from '@/lib/hooks/use-auth-role'
 import type { AimtReportRecord } from '@/types/database.types'
 
 interface AddReportEntryModalProps {
@@ -108,9 +110,10 @@ export default function AddReportEntryModal({
   editRecord,
   activeImportId,
 }: AddReportEntryModalProps) {
+  const { isViewer } = useAuthRole()
   const isEditMode = Boolean(editRecord)
 
-  // 26 Fields Form State
+  // Form State
   const [formData, setFormData] = useState({
     student_name: '',
     student_id: '',
@@ -121,6 +124,7 @@ export default function AddReportEntryModal({
     yet_to_raised: '',
     remarks: '',
     follow_up: '',
+    admin_comments: '',
     dob: '',
     document: '',
     status: 'Current',
@@ -189,6 +193,18 @@ export default function AddReportEntryModal({
           ? String((editRecord.extra_data as any).calculation_breakup)
           : ''
 
+        const rawAdminComments = (editRecord as any).admin_comments !== undefined && (editRecord as any).admin_comments !== null
+          ? (editRecord as any).admin_comments
+          : (editRecord.extra_data as any)?.admin_comments
+
+        const adminCommentsVal =
+          rawAdminComments !== null &&
+          rawAdminComments !== undefined &&
+          String(rawAdminComments).trim() !== 'null' &&
+          String(rawAdminComments).trim() !== 'undefined'
+            ? String(rawAdminComments).trim()
+            : ''
+
         setFormData({
           student_name: editRecord.student_name || '',
           student_id: editRecord.student_id || '',
@@ -199,6 +215,7 @@ export default function AddReportEntryModal({
           yet_to_raised: editRecord.yet_to_raised || '',
           remarks: remarksVal,
           follow_up: followUpVal,
+          admin_comments: adminCommentsVal,
           dob: editRecord.dob || '',
           document: editRecord.document ? (editRecord.document.toLowerCase().includes('coe') ? 'CoE' : editRecord.document.toLowerCase().includes('voe') ? 'VoE' : editRecord.document.toLowerCase().includes('offer') ? 'Offer Letter' : editRecord.document) : '',
           status: editRecord.status || 'Current',
@@ -230,6 +247,7 @@ export default function AddReportEntryModal({
           yet_to_raised: '',
           remarks: '',
           follow_up: '',
+          admin_comments: '',
           dob: '',
           document: '',
           status: 'Current',
@@ -343,14 +361,19 @@ export default function AddReportEntryModal({
     e.preventDefault()
     setErrorMessage(null)
 
-    // Validation 1: Student Name is mandatory
-    if (!formData.student_name.trim()) {
+    if (isViewer && !isEditMode) {
+      setErrorMessage('Viewer accounts cannot create new entries.')
+      return
+    }
+
+    // Validation 1: Student Name is mandatory for admin
+    if (!isViewer && !formData.student_name.trim()) {
       setErrorMessage('Please enter the Student Name.')
       return
     }
 
     // Validation 2: Email format check
-    if (formData.email_id && !isValidEmail(formData.email_id)) {
+    if (!isViewer && formData.email_id && !isValidEmail(formData.email_id)) {
       setErrorMessage('Please enter a valid Email ID (e.g. student@example.com).')
       return
     }
@@ -359,14 +382,16 @@ export default function AddReportEntryModal({
 
     try {
       if (isEditMode && editRecord) {
+        // Viewers only update admin_comments
+        const updatePayload = isViewer
+          ? { id: editRecord.id, admin_comments: formData.admin_comments }
+          : { id: editRecord.id, ...formData }
+
         // Update existing record
         const res = await fetch('/api/reports/records', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: editRecord.id,
-            ...formData,
-          }),
+          body: JSON.stringify(updatePayload),
         })
 
         const data = await res.json()
@@ -377,7 +402,7 @@ export default function AddReportEntryModal({
         onSuccess(data.record, true)
         onClose()
       } else {
-        // Create new record
+        // Create new record (Admin only)
         const res = await fetch('/api/reports/records', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -419,10 +444,12 @@ export default function AddReportEntryModal({
             </div>
             <div>
               <DialogTitle className="text-lg sm:text-xl font-extrabold text-white tracking-tight font-['Montserrat']">
-                {isEditMode ? 'Edit Student Record' : 'Add New Student Entry'}
+                {isViewer ? 'Student Record & Comments' : isEditMode ? 'Edit Student Record' : 'Add New Student Entry'}
               </DialogTitle>
               <DialogDescription className="text-xs text-cyan-200/80 mt-0.5">
-                {isEditMode
+                {isViewer
+                  ? 'Viewer access: View full student information and edit Admin Comments below.'
+                  : isEditMode
                   ? 'Update details in database. Changes will reflect across all metrics and reports.'
                   : 'Add a new student invoice record directly to the database.'}
               </DialogDescription>
@@ -437,6 +464,16 @@ export default function AddReportEntryModal({
         {/* Modal Body Form: 2-Column Wide Grid on Desktop */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden bg-slate-50/50">
           <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+            {/* Viewer Mode Banner */}
+            {isViewer && (
+              <div className="p-3.5 rounded-xl bg-cyan-50 border border-cyan-200 text-[#003D5C] text-xs flex items-center gap-2.5 shadow-2xs font-medium">
+                <AlertCircle className="size-4.5 shrink-0 text-[#009D9E]" />
+                <span>
+                  <strong>Viewer Access Mode:</strong> You can view all student details and edit, update, or remove notes in the <strong>Admin Comments</strong> section. All other fields are read-only.
+                </span>
+              </div>
+            )}
+
             {/* Error banner */}
             {errorMessage && (
               <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2.5 shadow-2xs">
@@ -448,7 +485,7 @@ export default function AddReportEntryModal({
             {/* 2-Column Grid Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
               {/* LEFT COLUMN: Student, Personal, Course & Agency Info */}
-              <div className="space-y-4">
+              <fieldset disabled={isViewer} className="space-y-4 disabled:opacity-85">
                 {/* 1. Student & Personal Details */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3.5">
                   <div className="flex items-center gap-2 text-xs font-bold text-[#003D5C] uppercase tracking-wider border-b border-slate-100 pb-2.5">
@@ -505,6 +542,7 @@ export default function AddReportEntryModal({
                         value={formData.dob}
                         onChange={(val) => handleChange('dob', val)}
                         placeholder="DD/MM/YY"
+                        disabled={isViewer}
                       />
                     </div>
 
@@ -595,6 +633,7 @@ export default function AddReportEntryModal({
                         value={formData.intake}
                         onChange={(val) => handleChange('intake', val)}
                         placeholder="DD/MM/YY"
+                        disabled={isViewer}
                       />
                     </div>
 
@@ -605,6 +644,7 @@ export default function AddReportEntryModal({
                         value={formData.end_date}
                         onChange={(val) => handleChange('end_date', val)}
                         placeholder="DD/MM/YY"
+                        disabled={isViewer}
                       />
                     </div>
 
@@ -615,15 +655,17 @@ export default function AddReportEntryModal({
                         value={formData.coe_issued_date}
                         onChange={(val) => handleChange('coe_issued_date', val)}
                         placeholder="DD/MM/YY"
+                        disabled={isViewer}
                       />
                     </div>
                   </div>
                 </div>
-              </div>
+              </fieldset>
 
               {/* RIGHT COLUMN: Fees, Invoicing & Remarks */}
               <div className="space-y-4">
-                {/* 3. Invoicing, Fees & Financials */}
+                <fieldset disabled={isViewer} className="space-y-4 disabled:opacity-85">
+                  {/* 3. Invoicing, Fees & Financials */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3.5">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                     <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -868,45 +910,77 @@ export default function AddReportEntryModal({
                     className="w-full text-xs p-3 bg-white border border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl resize-none shadow-2xs font-medium"
                   />
                 </div>
+              </fieldset>
+
+              {/* 7. Admin Comments */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <MessageSquareQuote className="size-4 text-[#003D5C]" />
+                    <span>Admin Comments</span>
+                  </Label>
+                  {isViewer ? (
+                    <span className="text-[10px] text-cyan-800 bg-cyan-50 px-2.5 py-0.5 rounded-full font-bold border border-cyan-200 shadow-2xs">
+                      Editable by Viewer
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full font-bold border border-slate-200">
+                      Full Access
+                    </span>
+                  )}
+                </div>
+                <textarea
+                  value={formData.admin_comments}
+                  onChange={(e) => handleChange('admin_comments', e.target.value)}
+                  placeholder="Enter admin comments, review remarks, notes or instructions..."
+                  rows={3}
+                  className="w-full text-xs p-3 bg-white border border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl resize-none shadow-2xs font-medium"
+                />
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Modal Footer Actions */}
-          <div className="p-4.5 bg-white border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 h-10 px-5 rounded-xl text-xs font-bold cursor-pointer"
-            >
-              Cancel
-            </Button>
+        {/* Modal Footer Actions */}
+        <div className="p-4.5 bg-white border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 h-10 px-5 rounded-xl text-xs font-bold cursor-pointer"
+          >
+            Cancel
+          </Button>
 
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="bg-[#003D5C] hover:bg-[#002b42] text-white font-bold h-10 px-6 rounded-xl text-xs gap-2 shadow-sm transition-all cursor-pointer border border-cyan-500/20"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  <span>Saving to Database...</span>
-                </>
-              ) : isEditMode ? (
-                <>
-                  <Save className="size-4" />
-                  <span>Update Student Record</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="size-4" />
-                  <span>Save Student Entry</span>
-                </>
-              )}
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="bg-[#003D5C] hover:bg-[#002b42] text-white font-bold h-10 px-6 rounded-xl text-xs gap-2 shadow-sm transition-all cursor-pointer border border-cyan-500/20"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                <span>{isViewer ? 'Saving Comments...' : 'Saving to Database...'}</span>
+              </>
+            ) : isViewer ? (
+              <>
+                <Save className="size-4" />
+                <span>Save Admin Comments</span>
+              </>
+            ) : isEditMode ? (
+              <>
+                <Save className="size-4" />
+                <span>Update Student Record</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="size-4" />
+                <span>Save Student Entry</span>
+              </>
+            )}
+          </Button>
+        </div>
         </form>
       </DialogContent>
     </Dialog>

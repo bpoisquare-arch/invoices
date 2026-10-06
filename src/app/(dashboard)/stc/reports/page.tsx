@@ -350,62 +350,51 @@ export default function StcReportsPage() {
                 setIsAddEntryModalOpen(true)
               }
         }
-        onEditRecord={
-          isViewer
-            ? undefined
-            : (record) => {
-                setEditingRecord(record)
-                setIsAddEntryModalOpen(true)
-              }
-        }
+        onEditRecord={(record) => {
+          setEditingRecord(record)
+          setIsAddEntryModalOpen(true)
+        }}
         onDeleteRecord={isViewer ? undefined : handleDeleteRecord}
         onDeleteSelected={isViewer ? undefined : handleBulkDelete}
         availableAgents={availableAgents}
         availableIntakes={availableIntakes}
-        onExportFiltered={handleExportToExcel}
+        onExportFiltered={isViewer ? undefined : handleExportToExcel}
         onFilteredRecordsChange={setFilteredRecords}
         onStatusUpdate={handleStatusUpdate}
       />
 
       {/* 4. Modals */}
+      <StcAddReportEntryModal
+        isOpen={isAddEntryModalOpen}
+        onClose={() => {
+          setIsAddEntryModalOpen(false)
+          setEditingRecord(null)
+        }}
+        onSuccess={handleRecordSaved}
+        editRecord={editingRecord}
+        activeImportId={activeImportId}
+      />
+
       {!isViewer && (
-        <>
-          <StcAddReportEntryModal
-            isOpen={isAddEntryModalOpen}
-            onClose={() => {
-              setIsAddEntryModalOpen(false)
-              setEditingRecord(null)
-            }}
-            onSuccess={handleRecordSaved}
-            editRecord={editingRecord}
-            activeImportId={activeImportId}
-          />
-
-          <StcUploadReportModal
-            isOpen={isUploadModalOpen}
-            onClose={() => setIsUploadModalOpen(false)}
-            onUploadSuccess={async () => {
-              await fetchRecords(activeImportId)
-              await fetchImports()
-            }}
-          />
-
-        </>
+        <StcUploadReportModal
+          isOpen={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          onUploadSuccess={async () => {
+            await fetchRecords(activeImportId)
+            await fetchImports()
+          }}
+        />
       )}
 
       <StcReportRecordDetailModal
         isOpen={Boolean(detailModalRecord)}
         onClose={() => setDetailModalRecord(null)}
         record={detailModalRecord}
-        onEdit={
-          isViewer
-            ? undefined
-            : (record) => {
-                setDetailModalRecord(null)
-                setEditingRecord(record)
-                setIsAddEntryModalOpen(true)
-              }
-        }
+        onEdit={(record) => {
+          setDetailModalRecord(null)
+          setEditingRecord(record)
+          setIsAddEntryModalOpen(true)
+        }}
       />
     </div>
   )

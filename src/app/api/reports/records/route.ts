@@ -13,6 +13,17 @@ export const revalidate = 0
 // POST /api/reports/records - Create a new student report record
 export async function POST(request: NextRequest) {
   try {
+    const devSessionVal = request.cookies.get('dev-auth-session')?.value
+    const userRoleVal = request.cookies.get('user-role')?.value
+    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer'
+
+    if (isViewer) {
+      return NextResponse.json(
+        { success: false, error: 'Viewer role is not authorized to create records.' },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     if (!body.student_name || !body.student_name.trim()) {
       return NextResponse.json(
@@ -35,6 +46,10 @@ export async function POST(request: NextRequest) {
 // PUT /api/reports/records - Update an existing student report record
 export async function PUT(request: NextRequest) {
   try {
+    const devSessionVal = request.cookies.get('dev-auth-session')?.value
+    const userRoleVal = request.cookies.get('user-role')?.value
+    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer'
+
     const body = await request.json()
     const { id, ...updates } = body
 
@@ -45,7 +60,12 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const updatedRecord = await updateReportRecord(id, updates)
+    // Viewers can only edit/update admin_comments
+    const payload = isViewer
+      ? { admin_comments: updates.admin_comments }
+      : updates
+
+    const updatedRecord = await updateReportRecord(id, payload)
     if (!updatedRecord) {
       return NextResponse.json(
         { success: false, error: 'Record not found or failed to update.' },
@@ -66,6 +86,17 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/reports/records?id={id}&ids={id1,id2} - Delete single or multiple student report records
 export async function DELETE(request: NextRequest) {
   try {
+    const devSessionVal = request.cookies.get('dev-auth-session')?.value
+    const userRoleVal = request.cookies.get('user-role')?.value
+    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer'
+
+    if (isViewer) {
+      return NextResponse.json(
+        { success: false, error: 'Viewer role is not authorized to delete records.' },
+        { status: 403 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const singleId = searchParams.get('id')
     const idsParam = searchParams.get('ids')

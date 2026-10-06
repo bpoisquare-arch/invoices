@@ -3,6 +3,17 @@ import * as XLSX from 'xlsx'
 
 export async function POST(request: NextRequest) {
   try {
+    const devSessionVal = request.cookies.get('dev-auth-session')?.value
+    const userRoleVal = request.cookies.get('user-role')?.value
+    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer'
+
+    if (isViewer) {
+      return NextResponse.json(
+        { success: false, error: 'Viewer role is not authorized to export reports.' },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const { records } = body
 
@@ -40,6 +51,7 @@ export async function POST(request: NextRequest) {
         'Phone No': r.phone_no || '-',
         'Installment BreakUp': r.remarks || '-',
         'Follow-up': (r as any).follow_up || (r.extra_data as any)?.follow_up || '-',
+        'Admin Comments': (r as any).admin_comments || (r.extra_data as any)?.admin_comments || '-',
       }
     })
 

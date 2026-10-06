@@ -274,6 +274,13 @@ function prismaStcRecordToSnake(r: any): StcReportRecord {
       ? String(rawFollowUp).trim()
       : null
 
+  const rawAdminComments =
+    r.adminComments !== undefined && r.adminComments !== null ? r.adminComments : extraData.admin_comments
+  const safeAdminComments =
+    rawAdminComments && String(rawAdminComments).trim() !== 'null' && String(rawAdminComments).trim() !== 'undefined'
+      ? String(rawAdminComments).trim()
+      : null
+
   const rawDividedMonth =
     r.dividedMonth !== undefined && r.dividedMonth !== null
       ? r.dividedMonth
@@ -309,6 +316,7 @@ function prismaStcRecordToSnake(r: any): StcReportRecord {
     total_paid: Number(r.totalPaid ?? extraData.total_paid ?? r.paidAmount ?? 0),
     initial_payment: Number(r.paidAmount ?? 0),
     follow_up: safeFollowUp,
+    admin_comments: safeAdminComments,
     coe_issued_date: r.coeIssuedDate,
     email_id: r.emailId,
     phone_no: r.phoneNo,
@@ -865,6 +873,7 @@ export async function createStcReportRecord(params: {
   payment_status?: string | null
   divided_month?: number | string | null
   calculation_breakup?: string | null
+  admin_comments?: string | null
   extra_data?: Record<string, any>
 }): Promise<StcReportRecord> {
   let targetImportId = params.importId
@@ -894,6 +903,7 @@ export async function createStcReportRecord(params: {
       ? cleanNumber(params.divided_month)
       : null
   const calculationBreakupVal = cleanString(params.calculation_breakup) || null
+  const adminCommentsVal = cleanString(params.admin_comments) || null
 
   let nextSrNo = 1
   try {
@@ -911,11 +921,12 @@ export async function createStcReportRecord(params: {
     total_paid: totalPaidNum,
     initial_payment: paidAmountNum,
     follow_up: followUpVal,
+    admin_comments: adminCommentsVal,
     divided_month: dividedMonthVal,
     calculation_breakup: calculationBreakupVal,
   }
 
-  const importExists = await prisma.stcReportImport.findUnique({ where: { id: targetImportId! } })
+  const importExists = await prisma.stcReportImport.findUnique({ where: { id: targetImportId!} })
   if (!importExists) {
     await prisma.stcReportImport.create({
       data: {
@@ -946,6 +957,7 @@ export async function createStcReportRecord(params: {
       yetToRaised: yetToRaisedVal || null,
       remarks: cleanString(params.remarks) || null,
       followUp: followUpVal,
+      adminComments: adminCommentsVal,
       dob: cleanString(params.dob) || null,
       document: normalizeDocumentType(params.document) || null,
       status: cleanString(params.status) || 'Current',
@@ -986,6 +998,7 @@ export async function updateStcReportRecord(
   if (updates.yet_to_raised !== undefined) mysqlUpdate.yetToRaised = cleanString(updates.yet_to_raised) || null
   if (updates.remarks !== undefined) mysqlUpdate.remarks = cleanString(updates.remarks) || null
   if (updates.follow_up !== undefined) mysqlUpdate.followUp = cleanString(updates.follow_up) || null
+  if (updates.admin_comments !== undefined) mysqlUpdate.adminComments = cleanString(updates.admin_comments) || null
   if (updates.dob !== undefined) mysqlUpdate.dob = cleanString(updates.dob) || null
   if (updates.document !== undefined) mysqlUpdate.document = normalizeDocumentType(updates.document) || null
   if (updates.status !== undefined) mysqlUpdate.status = cleanString(updates.status) || null
@@ -1013,7 +1026,12 @@ export async function updateStcReportRecord(
   if (updates.calculation_breakup !== undefined) {
     mysqlUpdate.calculationBreakup = cleanString(updates.calculation_breakup) || null
   }
-  if (updates.divided_month !== undefined || updates.calculation_breakup !== undefined || updates.extra_data !== undefined) {
+  if (
+    updates.divided_month !== undefined ||
+    updates.calculation_breakup !== undefined ||
+    updates.admin_comments !== undefined ||
+    updates.extra_data !== undefined
+  ) {
     const current = await prisma.stcReportRecord.findUnique({ where: { id }, select: { extraData: true } })
     const existingExtra = (current?.extraData as Record<string, any>) || {}
     const passedExtra = typeof updates.extra_data === 'object' && updates.extra_data !== null ? (updates.extra_data as Record<string, any>) : {}
@@ -1029,6 +1047,9 @@ export async function updateStcReportRecord(
     }
     if (updates.calculation_breakup !== undefined) {
       newExtra.calculation_breakup = cleanString(updates.calculation_breakup) || null
+    }
+    if (updates.admin_comments !== undefined) {
+      newExtra.admin_comments = cleanString(updates.admin_comments) || null
     }
     mysqlUpdate.extraData = newExtra
   }

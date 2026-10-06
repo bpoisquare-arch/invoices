@@ -212,6 +212,7 @@ export interface StcReportRecord {
   payment_status: string | null
   divided_month?: number | string | null
   calculation_breakup?: string | null
+  admin_comments?: string | null
   extra_data: Json
   created_at: string
 }
@@ -264,6 +265,7 @@ export interface AimtReportRecord {
   payment_status: string | null
   divided_month?: number | null
   calculation_breakup?: string | null
+  admin_comments?: string | null
   extra_data: Json
   created_at: string
 }

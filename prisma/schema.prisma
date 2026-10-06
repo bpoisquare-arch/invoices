@@ -519,8 +519,9 @@ model AimtReportRecord {
   totalFee       Decimal? @default(0.00) @map("total_fee") @db.Decimal(14, 2)
   paidAmount     Decimal? @default(0.00) @map("paid_amount") @db.Decimal(14, 2)
   totalPaid      Decimal? @default(0.00) @map("total_paid") @db.Decimal(14, 2)
-  followUp       String?  @map("follow_up") @db.Text
-  coeIssuedDate  String?  @map("coe_issued_date") @db.VarChar(100)
+  followUp           String?  @map("follow_up") @db.Text
+  adminComments      String?  @map("admin_comments") @db.Text
+  coeIssuedDate      String?  @map("coe_issued_date") @db.VarChar(100)
   emailId        String?  @map("email_id") @db.VarChar(255)
   phoneNo        String?  @map("phone_no") @db.VarChar(100)
   paymentStatus      String?  @map("payment_status") @db.VarChar(100)
@@ -587,8 +588,9 @@ model StcReportRecord {
   totalFee       Decimal? @default(0.00) @map("total_fee") @db.Decimal(14, 2)
   paidAmount     Decimal? @default(0.00) @map("paid_amount") @db.Decimal(14, 2)
   totalPaid      Decimal? @default(0.00) @map("total_paid") @db.Decimal(14, 2)
-  followUp       String?  @map("follow_up") @db.Text
-  coeIssuedDate  String?  @map("coe_issued_date") @db.VarChar(100)
+  followUp           String?  @map("follow_up") @db.Text
+  adminComments      String?  @map("admin_comments") @db.Text
+  coeIssuedDate      String?  @map("coe_issued_date") @db.VarChar(100)
   emailId        String?  @map("email_id") @db.VarChar(255)
   phoneNo        String?  @map("phone_no") @db.VarChar(100)
   paymentStatus      String?  @map("payment_status") @db.VarChar(100)

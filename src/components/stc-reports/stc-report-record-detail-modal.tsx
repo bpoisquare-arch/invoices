@@ -358,6 +358,15 @@ export default function StcReportRecordDetailModal({
                   </p>
                 </div>
               )}
+
+              {(record.admin_comments || (record.extra_data as any)?.admin_comments) && (
+                <div>
+                  <span className="text-slate-400 text-[11px] block font-medium">Admin Comments</span>
+                  <p className="text-slate-800 font-medium whitespace-pre-wrap bg-teal-50/50 p-3 rounded-xl border border-teal-200/70 mt-1">
+                    {record.admin_comments || (record.extra_data as any)?.admin_comments}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

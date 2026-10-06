@@ -175,7 +175,9 @@ export default function ReportDataTable({
           ((r as any).calculation_breakup && String((r as any).calculation_breakup).toLowerCase().includes(q)) ||
           ((r.extra_data as any)?.calculation_breakup && String((r.extra_data as any).calculation_breakup).toLowerCase().includes(q)) ||
           ((r as any).follow_up && String((r as any).follow_up).toLowerCase().includes(q)) ||
-          ((r.extra_data as any)?.follow_up && String((r.extra_data as any).follow_up).toLowerCase().includes(q))
+          ((r.extra_data as any)?.follow_up && String((r.extra_data as any).follow_up).toLowerCase().includes(q)) ||
+          ((r as any).admin_comments && String((r as any).admin_comments).toLowerCase().includes(q)) ||
+          ((r.extra_data as any)?.admin_comments && String((r.extra_data as any).admin_comments).toLowerCase().includes(q))
         )
       })
     }
@@ -459,17 +461,19 @@ export default function ReportDataTable({
           )}
 
           {/* Export Filtered button in Table Controls */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onExportFiltered?.(filteredRecords)}
-            disabled={filteredRecords.length === 0}
-            className="border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 hover:from-emerald-100 hover:to-teal-100 hover:border-emerald-400 h-10 px-4 rounded-xl text-xs gap-2 shadow-2xs font-bold cursor-pointer shrink-0 transition-all"
-            title="Export filtered records to Excel"
-          >
-            <Download className="size-4 text-emerald-600" />
-            <span className="hidden sm:inline">Export Excel ({filteredRecords.length})</span>
-          </Button>
+          {onExportFiltered && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onExportFiltered?.(filteredRecords)}
+              disabled={filteredRecords.length === 0}
+              className="border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 hover:from-emerald-100 hover:to-teal-100 hover:border-emerald-400 h-10 px-4 rounded-xl text-xs gap-2 shadow-2xs font-bold cursor-pointer shrink-0 transition-all"
+              title="Export filtered records to Excel"
+            >
+              <Download className="size-4 text-emerald-600" />
+              <span className="hidden sm:inline">Export Excel ({filteredRecords.length})</span>
+            </Button>
+          )}
 
           {/* Import Excel Button in Table Controls - Temporarily Hidden */}
           {/* {onImportExcel && (

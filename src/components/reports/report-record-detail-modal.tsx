@@ -29,6 +29,7 @@ import {
   CreditCard,
   Sparkles,
   MessageSquare,
+  MessageSquareQuote,
   Calculator,
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/types/database.types'
@@ -352,6 +353,24 @@ export default function ReportRecordDetailModal({
                   <MessageSquare className="size-4" /> Follow-up:
                 </span>
                 <p className="whitespace-pre-wrap font-medium">{safeFollowUp}</p>
+              </div>
+            )
+          })()}
+
+          {/* Admin Comments */}
+          {(() => {
+            const rawAdminComments = (record as any).admin_comments ?? (record.extra_data as any)?.admin_comments
+            const safeAdminComments =
+              rawAdminComments && String(rawAdminComments).trim() !== 'null' && String(rawAdminComments).trim() !== 'undefined'
+                ? String(rawAdminComments).trim()
+                : null
+            if (!safeAdminComments) return null
+            return (
+              <div className="p-4.5 rounded-2xl bg-indigo-50/90 border border-indigo-200 text-xs text-indigo-950 space-y-1 shadow-2xs">
+                <span className="font-extrabold flex items-center gap-1.5 text-indigo-800">
+                  <MessageSquareQuote className="size-4 text-indigo-600" /> Admin Comments:
+                </span>
+                <p className="whitespace-pre-wrap font-medium">{safeAdminComments}</p>
               </div>
             )
           })()}

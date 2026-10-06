@@ -307,59 +307,49 @@ export default function StudentReportsPage() {
                 setIsAddEntryModalOpen(true)
               }
         }
-        onEditRecord={
-          isViewer
-            ? undefined
-            : (record) => {
-                setEditingRecord(record)
-                setIsAddEntryModalOpen(true)
-              }
-        }
+        onEditRecord={(record) => {
+          setEditingRecord(record)
+          setIsAddEntryModalOpen(true)
+        }}
         onDeleteRecord={isViewer ? undefined : handleDeleteRecord}
         onDeleteSelected={isViewer ? undefined : handleBulkDelete}
         availableAgents={availableAgents}
         availableIntakes={availableIntakes}
-        onExportFiltered={handleExportToExcel}
+        onExportFiltered={isViewer ? undefined : handleExportToExcel}
         onFilteredRecordsChange={setFilteredRecords}
         onStatusUpdate={handleStatusUpdate}
       />
 
       {/* 4. Modals */}
-      {!isViewer && (
-        <>
-          <AddReportEntryModal
-            isOpen={isAddEntryModalOpen}
-            onClose={() => {
-              setIsAddEntryModalOpen(false)
-              setEditingRecord(null)
-            }}
-            onSuccess={handleRecordSaved}
-            editRecord={editingRecord}
-          />
+      <AddReportEntryModal
+        isOpen={isAddEntryModalOpen}
+        onClose={() => {
+          setIsAddEntryModalOpen(false)
+          setEditingRecord(null)
+        }}
+        onSuccess={handleRecordSaved}
+        editRecord={editingRecord}
+      />
 
-          <UploadReportModal
-            isOpen={isUploadModalOpen}
-            onClose={() => setIsUploadModalOpen(false)}
-            onUploadSuccess={async () => {
-              await fetchRecords()
-            }}
-          />
-        </>
+      {!isViewer && (
+        <UploadReportModal
+          isOpen={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          onUploadSuccess={async () => {
+            await fetchRecords()
+          }}
+        />
       )}
 
       <ReportRecordDetailModal
         isOpen={Boolean(detailModalRecord)}
         onClose={() => setDetailModalRecord(null)}
         record={detailModalRecord}
-        onEdit={
-          isViewer
-            ? undefined
-            : (record) => {
-                setDetailModalRecord(null)
-                setEditingRecord(record)
-                setIsAddEntryModalOpen(true)
-              }
-        }
+        onEdit={(record) => {
+          setDetailModalRecord(null)
+          setEditingRecord(record)
+          setIsAddEntryModalOpen(true)
+        }}
       />
     </div>
   )
