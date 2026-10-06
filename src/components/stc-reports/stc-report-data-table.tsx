@@ -150,6 +150,8 @@ export default function StcReportDataTable({
           r.email_id?.toLowerCase().includes(q) ||
           r.phone_no?.toLowerCase().includes(q) ||
           r.remarks?.toLowerCase().includes(q) ||
+          ((r as any).calculation_breakup && String((r as any).calculation_breakup).toLowerCase().includes(q)) ||
+          ((r.extra_data as any)?.calculation_breakup && String((r.extra_data as any).calculation_breakup).toLowerCase().includes(q)) ||
           ((r as any).follow_up && String((r as any).follow_up).toLowerCase().includes(q)) ||
           ((r.extra_data as any)?.follow_up && String((r.extra_data as any).follow_up).toLowerCase().includes(q))
         )

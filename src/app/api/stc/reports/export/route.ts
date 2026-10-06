@@ -34,6 +34,8 @@ export async function POST(request: NextRequest) {
         'Pending Amount (AUD)': typeof r.pending_amount === 'number' ? r.pending_amount : (parseFloat(r.pending_amount) || 0),
         'Yet to Raised': r.yet_to_raised || '-',
         'Payment Plan Status': r.payment_status || 'Pending',
+        'Divided Month': (r as any).divided_month ?? (r.extra_data as any)?.divided_month ?? '-',
+        'Calculation BreakUp': (r as any).calculation_breakup || (r.extra_data as any)?.calculation_breakup || '-',
         'Email ID': r.email_id || '-',
         'Phone No': r.phone_no || '-',
         'Installment BreakUp': r.remarks || '-',

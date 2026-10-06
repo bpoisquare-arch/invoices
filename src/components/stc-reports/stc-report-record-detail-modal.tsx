@@ -29,6 +29,7 @@ import {
   CreditCard,
   Sparkles,
   MessageSquare,
+  Calculator,
 } from 'lucide-react'
 import type { StcReportRecord } from '@/types/database.types'
 
@@ -275,6 +276,13 @@ export default function StcReportRecordDetailModal({
                   {record.yet_to_raised ? `$${record.yet_to_raised}` : '-'}
                 </span>
               </div>
+
+              <div>
+                <span className="text-slate-400 text-[11px] block font-medium">Divided Month</span>
+                <span className="font-mono font-bold text-slate-800 mt-0.5 block">
+                  {(record as any).divided_month ?? (record.extra_data as any)?.divided_month ?? '-'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -310,6 +318,20 @@ export default function StcReportRecordDetailModal({
               </div>
             </div>
           </div>
+
+          {/* Calculation BreakUp */}
+          {(() => {
+            const calcBreakup = (record as any).calculation_breakup || (record.extra_data as any)?.calculation_breakup
+            if (!calcBreakup) return null
+            return (
+              <div className="p-4 rounded-xl bg-emerald-50/90 border border-emerald-200 text-xs text-emerald-950 space-y-1">
+                <span className="font-extrabold flex items-center gap-1.5 text-emerald-800">
+                  <Calculator className="size-4 text-emerald-600" /> Calculation BreakUp:
+                </span>
+                <p className="whitespace-pre-wrap font-bold font-mono text-emerald-900">{calcBreakup}</p>
+              </div>
+            )
+          })()}
 
           {/* Section 4: Remarks & Follow-Up Notes */}
           <div className="p-4 rounded-xl border border-slate-200/90 bg-white space-y-3">

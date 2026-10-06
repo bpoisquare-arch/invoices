@@ -89,6 +89,8 @@ export interface ParsedStcStudentRow {
   email_id: string
   phone_no: string
   payment_status: string
+  divided_month?: number | null
+  calculation_breakup?: string | null
   extra_data: Record<string, any>
 }
 
@@ -153,6 +155,8 @@ export function parseStcExcelBuffer(buffer: Buffer, _fileName?: string): {
   const idxEmailId = findColIndex(['email id', 'email', 'e-mail'])
   const idxPhoneNo = findColIndex(['phone no', 'phone', 'contact', 'mobile'])
   const idxPaymentStatus = findColIndex(['payment status', 'pay status'])
+  const idxDividedMonth = findColIndex(['divided month', 'divided months', 'dividedmonth', 'months divided'])
+  const idxCalculationBreakup = findColIndex(['calculation breakup', 'calculation break up', 'calc breakup', 'calculation'])
 
   const records: ParsedStcStudentRow[] = []
 
@@ -197,6 +201,8 @@ export function parseStcExcelBuffer(buffer: Buffer, _fileName?: string): {
     const emailId = idxEmailId !== -1 ? cleanString(row[idxEmailId]) : ''
     const phoneNo = idxPhoneNo !== -1 ? cleanString(row[idxPhoneNo]) : ''
     const paymentStatus = idxPaymentStatus !== -1 ? cleanString(row[idxPaymentStatus]) : (pendingAmount > 0 ? 'Pending' : 'Paid')
+    const dividedMonth = idxDividedMonth !== -1 ? (cleanNumber(row[idxDividedMonth]) || null) : null
+    const calculationBreakup = idxCalculationBreakup !== -1 ? cleanString(row[idxCalculationBreakup]) : ''
 
     const extra_data: Record<string, any> = {}
     headerRow.forEach((colName, cIdx) => {
@@ -204,6 +210,13 @@ export function parseStcExcelBuffer(buffer: Buffer, _fileName?: string): {
         extra_data[colName] = row[cIdx]
       }
     })
+
+    if (dividedMonth !== null && dividedMonth > 0) {
+      extra_data.divided_month = dividedMonth
+    }
+    if (calculationBreakup) {
+      extra_data.calculation_breakup = calculationBreakup
+    }
 
     records.push({
       sr_no: srNo,
@@ -233,6 +246,8 @@ export function parseStcExcelBuffer(buffer: Buffer, _fileName?: string): {
       email_id: emailId,
       phone_no: phoneNo,
       payment_status: paymentStatus,
+      divided_month: dividedMonth,
+      calculation_breakup: calculationBreakup || null,
       extra_data,
     })
   }
@@ -258,6 +273,15 @@ function prismaStcRecordToSnake(r: any): StcReportRecord {
     rawFollowUp && String(rawFollowUp).trim() !== 'null' && String(rawFollowUp).trim() !== 'undefined'
       ? String(rawFollowUp).trim()
       : null
+
+  const rawDividedMonth =
+    r.dividedMonth !== undefined && r.dividedMonth !== null
+      ? r.dividedMonth
+      : extraData.divided_month !== undefined && extraData.divided_month !== null
+      ? extraData.divided_month
+      : null
+
+  const rawCalcBreakup = r.calculationBreakup || extraData.calculation_breakup || null
 
   return {
     id: r.id,
@@ -289,6 +313,11 @@ function prismaStcRecordToSnake(r: any): StcReportRecord {
     email_id: r.emailId,
     phone_no: r.phoneNo,
     payment_status: r.paymentStatus,
+    divided_month:
+      rawDividedMonth !== null && String(rawDividedMonth).trim() !== ''
+        ? Number(rawDividedMonth)
+        : null,
+    calculation_breakup: rawCalcBreakup ? String(rawCalcBreakup) : null,
     extra_data: extraData as any,
     created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt || new Date().toISOString()),
   }
@@ -830,6 +859,8 @@ export async function createStcReportRecord(params: {
   email_id?: string | null
   phone_no?: string | null
   payment_status?: string | null
+  divided_month?: number | string | null
+  calculation_breakup?: string | null
   extra_data?: Record<string, any>
 }): Promise<StcReportRecord> {
   let targetImportId = params.importId
@@ -854,6 +885,11 @@ export async function createStcReportRecord(params: {
   const paidAmountNum = cleanNumber(params.paid_amount || params.initial_payment)
   const totalPaidNum = cleanNumber(params.total_paid)
   const followUpVal = cleanString(params.follow_up) || null
+  const dividedMonthVal =
+    params.divided_month !== undefined && params.divided_month !== null && String(params.divided_month).trim() !== ''
+      ? cleanNumber(params.divided_month)
+      : null
+  const calculationBreakupVal = cleanString(params.calculation_breakup) || null
 
   let nextSrNo = 1
   try {
@@ -871,6 +907,8 @@ export async function createStcReportRecord(params: {
     total_paid: totalPaidNum,
     initial_payment: paidAmountNum,
     follow_up: followUpVal,
+    divided_month: dividedMonthVal,
+    calculation_breakup: calculationBreakupVal,
   }
 
   const importExists = await prisma.stcReportImport.findUnique({ where: { id: targetImportId! } })
@@ -960,7 +998,25 @@ export async function updateStcReportRecord(
   if (updates.email_id !== undefined) mysqlUpdate.emailId = cleanString(updates.email_id) || null
   if (updates.phone_no !== undefined) mysqlUpdate.phoneNo = cleanString(updates.phone_no) || null
   if (updates.payment_status !== undefined) mysqlUpdate.paymentStatus = cleanString(updates.payment_status) || null
-  if (updates.extra_data !== undefined) mysqlUpdate.extraData = updates.extra_data as any
+  if (updates.divided_month !== undefined || updates.calculation_breakup !== undefined || updates.extra_data !== undefined) {
+    const current = await prisma.stcReportRecord.findUnique({ where: { id }, select: { extraData: true } })
+    const existingExtra = (current?.extraData as Record<string, any>) || {}
+    const passedExtra = typeof updates.extra_data === 'object' && updates.extra_data !== null ? (updates.extra_data as Record<string, any>) : {}
+    const newExtra = {
+      ...existingExtra,
+      ...passedExtra,
+    }
+    if (updates.divided_month !== undefined) {
+      newExtra.divided_month =
+        updates.divided_month !== null && String(updates.divided_month).trim() !== ''
+          ? cleanNumber(updates.divided_month)
+          : null
+    }
+    if (updates.calculation_breakup !== undefined) {
+      newExtra.calculation_breakup = cleanString(updates.calculation_breakup) || null
+    }
+    mysqlUpdate.extraData = newExtra
+  }
 
   let mysqlRow: any = null
   if (Object.keys(mysqlUpdate).length > 0) {
