@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { Company } from '@/types/database.types'
 
 export const FALLBACK_COMPANY: Company = {
-  id: 'edlink-pk-id',
+  id: 'c1111111-1111-1111-1111-111111111111',
   user_id: null,
   name: 'EdLink Pakistan',
   prefix: 'EDL',
@@ -13,7 +13,7 @@ export const FALLBACK_COMPANY: Company = {
 }
 
 export const EDLINK_AU_COMPANY: Company = {
-  id: 'edlink-au-id',
+  id: 'f48942dd-42ed-4507-8e1f-049cb3939a45',
   user_id: null,
   name: 'EdLink Australia',
   prefix: 'EDA',
@@ -35,7 +35,7 @@ export const ANONYMOUS_COMPANY: Company = {
 }
 
 export const NSC_COMPANY: Company = {
-  id: 'nsc-company-id',
+  id: 'bc8db5e8-27c7-4823-8343-59b05d889838',
   user_id: null,
   name: 'Neighbourhood Shine Co.',
   prefix: 'NSC',
@@ -46,7 +46,7 @@ export const NSC_COMPANY: Company = {
 }
 
 export const ISQUARE_COMPANY: Company = {
-  id: 'isquare-bpo-company-id',
+  id: '39e7212e-fde1-4a0b-8c2d-fe0988c94cf4',
   user_id: null,
   name: 'ISquare BPO',
   prefix: 'ISQ',

@@ -22,7 +22,11 @@ export default function AnonymousWebPreview({ invoice, snapshot }: AnonymousWebP
   const billToLabel = snapshot?.bill_to_label || 'ISSUED TO'
 
   const items = invoice.invoice_items || []
-  const totalAmount = invoice.total_amount || invoice.subtotal || 0
+  const calculatedSubtotal = items.reduce((sum, item) => sum + Number(item.line_total || item.amount * item.quantity || 0), 0)
+  const subtotal = Number(invoice.subtotal) > 0 ? Number(invoice.subtotal) : calculatedSubtotal
+  const gstRate = Number(snapshot?.gst_rate || 0)
+  const gstAmount = Number(snapshot?.gst_amount) > 0 ? Number(snapshot?.gst_amount) : Number(((subtotal * gstRate) / 100).toFixed(2))
+  const totalAmount = Number(invoice.total_amount) > 0 ? Number(invoice.total_amount) : (subtotal + gstAmount)
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return ''
@@ -181,17 +185,51 @@ export default function AnonymousWebPreview({ invoice, snapshot }: AnonymousWebP
         </div>
 
         {/* Footer Row inside Table */}
-        <div className="grid grid-cols-12 border-t border-slate-300 bg-white py-3 px-4 font-semibold text-slate-900">
-          <div className="col-span-7 text-slate-800 text-[13px] self-center">
-            {footerTerms}
+        {gstRate > 0 ? (
+          <div className="border-t border-slate-300 bg-white divide-y divide-slate-200">
+            <div className="grid grid-cols-12 py-2 px-4 text-xs">
+              <div className="col-span-7 text-slate-800 text-[12.5px] self-center">
+                {footerTerms}
+              </div>
+              <div className="col-span-2 text-right uppercase font-semibold text-slate-600 text-[12px] self-center border-r border-slate-300 pr-3">
+                SUBTOTAL
+              </div>
+              <div className="col-span-3 text-right font-bold text-[13px] text-slate-800 self-center">
+                {Number(subtotal).toFixed(2)} {currency}
+              </div>
+            </div>
+            <div className="grid grid-cols-12 py-2 px-4 text-xs bg-slate-50/50">
+              <div className="col-span-7"></div>
+              <div className="col-span-2 text-right uppercase font-semibold text-slate-600 text-[12px] self-center border-r border-slate-300 pr-3">
+                GST ({gstRate}%)
+              </div>
+              <div className="col-span-3 text-right font-bold text-[13px] text-slate-800 self-center">
+                {Number(gstAmount).toFixed(2)} {currency}
+              </div>
+            </div>
+            <div className="grid grid-cols-12 py-2.5 px-4 font-bold text-slate-900 bg-slate-100/70">
+              <div className="col-span-7"></div>
+              <div className="col-span-2 text-right uppercase font-extrabold text-slate-900 text-[13px] self-center border-r border-slate-300 pr-3">
+                TOTAL DUE
+              </div>
+              <div className="col-span-3 text-right font-extrabold text-[15px] text-slate-900 self-center">
+                {Number(totalAmount).toFixed(2)} {currency}
+              </div>
+            </div>
           </div>
-          <div className="col-span-2 text-right uppercase font-bold text-slate-900 text-[14px] self-center border-r border-slate-300 pr-3">
-            TOTAL DUE
+        ) : (
+          <div className="grid grid-cols-12 border-t border-slate-300 bg-white py-3 px-4 font-semibold text-slate-900">
+            <div className="col-span-7 text-slate-800 text-[13px] self-center">
+              {footerTerms}
+            </div>
+            <div className="col-span-2 text-right uppercase font-bold text-slate-900 text-[14px] self-center border-r border-slate-300 pr-3">
+              TOTAL DUE
+            </div>
+            <div className="col-span-3 text-right font-extrabold text-[15px] text-slate-900 self-center">
+              {Number(totalAmount).toFixed(2)} {currency}
+            </div>
           </div>
-          <div className="col-span-3 text-right font-extrabold text-[15px] text-slate-900 self-center">
-            {Number(totalAmount).toFixed(2)} {currency}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Payment Details Section (omitted if empty) */}

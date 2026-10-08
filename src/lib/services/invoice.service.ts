@@ -1,13 +1,4 @@
 import { InvoiceWithDetails } from '@/types/database.types'
-import {
-  generateNextInvoiceNumberServer,
-  getInvoiceByIdServer,
-  getInvoicesServer,
-  createInvoiceServer,
-  updateInvoiceServer,
-  deleteInvoiceServer,
-  renameInvoiceReferenceServer,
-} from './invoice-server.service'
 
 export interface InvoiceItemInput {
   description: string
@@ -80,8 +71,6 @@ export function getInvoicePdfFilename(invoice: Partial<InvoiceWithDetails>): str
   const isAnonymous = Boolean(
     invoice.template_snapshot?.is_anonymous ||
     invoice.template_snapshot?.layout_type === 'anonymous_v1' ||
-    invoice.companies?.prefix === 'ANO' ||
-    invoice.companies?.name?.toLowerCase() === 'anonymous' ||
     invoice.entity === 'edlink-pk'
   )
 
@@ -118,7 +107,9 @@ export async function generateNextInvoiceNumber(companyId: string, isAnonymous?:
         if (json.nextNumber) return json.nextNumber
       }
     } catch (err) {}
+    return '1001'
   }
+  const { generateNextInvoiceNumberServer } = await import('./invoice-server.service')
   return generateNextInvoiceNumberServer(companyId, isAnonymous, entityHint)
 }
 
@@ -129,10 +120,13 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceW
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     })
-    if (res.ok) {
-      return await res.json()
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null)
+      throw new Error(errData?.error || 'Failed to create invoice')
     }
+    return await res.json()
   }
+  const { createInvoiceServer } = await import('./invoice-server.service')
   return createInvoiceServer(input)
 }
 
@@ -146,10 +140,13 @@ export async function updateInvoice(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     })
-    if (res.ok) {
-      return await res.json()
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null)
+      throw new Error(errData?.error || 'Failed to update invoice')
     }
+    return await res.json()
   }
+  const { updateInvoiceServer } = await import('./invoice-server.service')
   return updateInvoiceServer(invoiceId, input)
 }
 
@@ -160,8 +157,13 @@ export async function renameInvoiceReference(invoiceId: string, referenceName: s
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ referenceName }),
     })
-    if (res.ok) return
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null)
+      throw new Error(errData?.error || 'Failed to rename invoice reference')
+    }
+    return
   }
+  const { renameInvoiceReferenceServer } = await import('./invoice-server.service')
   return renameInvoiceReferenceServer(invoiceId, referenceName)
 }
 
@@ -172,6 +174,7 @@ export async function duplicateInvoice(invoiceId: string): Promise<InvoiceWithDe
   const newInvoiceInput: CreateInvoiceInput = {
     company_id: original.company_id,
     template_id: original.template_id,
+    entity: original.entity,
     customer_name: original.customer_name || '',
     reference_name: original.reference_name ? `${original.reference_name} (Copy)` : 'Copied Invoice',
     invoice_date: new Date().toISOString().split('T')[0],
@@ -181,6 +184,9 @@ export async function duplicateInvoice(invoiceId: string): Promise<InvoiceWithDe
       quantity: item.quantity,
       amount: item.amount,
     })) || [{ description: '', quantity: 1, amount: 0 }],
+    currency: original.template_snapshot?.currency,
+    gst_rate: original.template_snapshot?.gst_rate,
+    gst_amount: original.template_snapshot?.gst_amount,
   }
 
   return createInvoice(newInvoiceInput)
@@ -191,8 +197,13 @@ export async function deleteInvoice(invoiceId: string): Promise<void> {
     const res = await fetch(`/api/invoices/${encodeURIComponent(invoiceId)}`, {
       method: 'DELETE',
     })
-    if (res.ok) return
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null)
+      throw new Error(errData?.error || 'Failed to delete invoice')
+    }
+    return
   }
+  const { deleteInvoiceServer } = await import('./invoice-server.service')
   return deleteInvoiceServer(invoiceId)
 }
 
@@ -205,7 +216,9 @@ export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithDeta
         if (json && json.id) return json
       }
     } catch (err) {}
+    return null
   }
+  const { getInvoiceByIdServer } = await import('./invoice-server.service')
   return getInvoiceByIdServer(invoiceId)
 }
 
@@ -236,7 +249,9 @@ export async function getInvoices(params: InvoiceFilterParams = {}): Promise<{
         }
       }
     } catch (err) {}
+    return { invoices: [], totalCount: 0, page: 1, pageSize: 20 }
   }
+  const { getInvoicesServer } = await import('./invoice-server.service')
   return getInvoicesServer(params)
 }
 

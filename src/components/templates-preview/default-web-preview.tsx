@@ -19,7 +19,11 @@ export default function DefaultWebPreview({ invoice, snapshot }: DefaultWebPrevi
   const paymentDetails = snapshot?.payment_details || invoice.templates?.payment_details || ''
 
   const items = invoice.invoice_items || []
-  const totalAmount = invoice.total_amount || invoice.subtotal || 0
+  const calculatedSubtotal = items.reduce((sum, item) => sum + Number(item.line_total || item.amount * item.quantity || 0), 0)
+  const subtotal = Number(invoice.subtotal) > 0 ? Number(invoice.subtotal) : calculatedSubtotal
+  const gstRate = Number(snapshot?.gst_rate || 0)
+  const gstAmount = Number(snapshot?.gst_amount) > 0 ? Number(snapshot?.gst_amount) : Number(((subtotal * gstRate) / 100).toFixed(2))
+  const totalAmount = Number(invoice.total_amount) > 0 ? Number(invoice.total_amount) : (subtotal + gstAmount)
 
   return (
     <div className="mx-auto w-full max-w-[850px] bg-white p-8 sm:p-12 shadow-sm font-sans text-slate-800 border border-slate-200 rounded-md">
@@ -104,11 +108,27 @@ export default function DefaultWebPreview({ invoice, snapshot }: DefaultWebPrevi
           <p className="italic">{footerTerms}</p>
         </div>
 
-        <div className="w-48 text-right bg-slate-50 p-4 border border-slate-200 rounded-md">
-          <span className="text-xs font-semibold text-slate-500 block uppercase">Total Amount</span>
-          <span className="text-2xl font-extrabold text-slate-900 block mt-1">
-            {Number(totalAmount).toFixed(2)} {currency}
-          </span>
+        <div className="w-56 text-right bg-slate-50 p-4 border border-slate-200 rounded-md space-y-1.5">
+          {gstRate > 0 && (
+            <>
+              <div className="flex justify-between items-center text-xs text-slate-600 pb-1 border-b border-slate-200">
+                <span className="font-semibold uppercase text-[11px]">Subtotal:</span>
+                <span className="font-bold text-slate-800">{Number(subtotal).toFixed(2)} {currency}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs text-slate-600 pb-1 border-b border-slate-200">
+                <span className="font-semibold uppercase text-[11px]">GST ({gstRate}%):</span>
+                <span className="font-bold text-slate-800">{Number(gstAmount).toFixed(2)} {currency}</span>
+              </div>
+            </>
+          )}
+          <div>
+            <span className="text-xs font-semibold text-slate-500 block uppercase">
+              {gstRate > 0 ? 'Total Due' : 'Total Amount'}
+            </span>
+            <span className="text-2xl font-extrabold text-slate-900 block mt-1">
+              {Number(totalAmount).toFixed(2)} {currency}
+            </span>
+          </div>
         </div>
       </div>
     </div>

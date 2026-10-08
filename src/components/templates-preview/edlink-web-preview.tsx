@@ -9,16 +9,33 @@ interface EdLinkWebPreviewProps {
 }
 
 export default function EdLinkWebPreview({ invoice, snapshot }: EdLinkWebPreviewProps) {
-  const companyName = snapshot?.company_name || invoice.companies?.name || 'EdLink Australia'
-  const address = snapshot?.address || invoice.templates?.address || 'Suit 3, Level 4/20 Collins Street, Melbourne 3000'
-  const email = snapshot?.email || invoice.templates?.email || 'finance@edlink.com.au'
-  const phone = snapshot?.phone || invoice.templates?.phone || '+61 432 536 123'
+  const companyName = snapshot?.company_name || invoice.companies?.name || 'Company Name'
+  const isEdlinkAu =
+    invoice.entity === 'edlink-au' ||
+    companyName.toLowerCase().includes('australia') ||
+    invoice.companies?.prefix === 'EDA'
+
+  const address = snapshot?.address !== undefined
+    ? snapshot.address
+    : (invoice.templates?.address || (isEdlinkAu ? 'Suit 3, Level 4/20 Collins Street, Melbourne 3000' : ''))
+  const email = snapshot?.email !== undefined
+    ? snapshot.email
+    : (invoice.templates?.email || (isEdlinkAu ? 'finance@edlink.com.au' : ''))
+  const phone = snapshot?.phone !== undefined
+    ? snapshot.phone
+    : (invoice.templates?.phone || (isEdlinkAu ? '+61 432 536 123' : ''))
   const currency = snapshot?.currency || invoice.companies?.currency || 'AUD'
   const footerTerms = snapshot?.footer_terms || invoice.templates?.footer_terms || 'Thank you for getting services from us'
-  const paymentDetails = snapshot?.payment_details || invoice.templates?.payment_details || `Account Name: Riaz & Sons PTY Ltd\nBSB: 083-543\nAccount No: 72-996-1834\nABN: 62 658 488 469`
+  const paymentDetails = snapshot?.payment_details !== undefined
+    ? snapshot.payment_details
+    : (invoice.templates?.payment_details || (isEdlinkAu ? `Account Name: Riaz & Sons PTY Ltd\nBSB: 083-543\nAccount No: 72-996-1834\nABN: 62 658 488 469` : ''))
 
   const items = invoice.invoice_items || []
-  const totalAmount = invoice.total_amount || invoice.subtotal || 0
+  const calculatedSubtotal = items.reduce((sum, item) => sum + Number(item.line_total || item.amount * item.quantity || 0), 0)
+  const subtotal = Number(invoice.subtotal) > 0 ? Number(invoice.subtotal) : calculatedSubtotal
+  const gstRate = Number(snapshot?.gst_rate || 0)
+  const gstAmount = Number(snapshot?.gst_amount) > 0 ? Number(snapshot?.gst_amount) : Number(((subtotal * gstRate) / 100).toFixed(2))
+  const totalAmount = Number(invoice.total_amount) > 0 ? Number(invoice.total_amount) : (subtotal + gstAmount)
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A'
@@ -28,6 +45,8 @@ export default function EdLinkWebPreview({ invoice, snapshot }: EdLinkWebPreview
     }
     return dateStr
   }
+
+  const hasContactInfo = Boolean(address || email || phone)
 
   return (
     <div className="mx-auto w-full max-w-[850px] bg-white p-4 sm:p-8 md:p-12 shadow-sm font-sans text-slate-800 border border-slate-200 rounded-md">
@@ -44,11 +63,13 @@ export default function EdLinkWebPreview({ invoice, snapshot }: EdLinkWebPreview
             />
           </div>
 
-          <div className="text-[11.5px] sm:text-[12.5px] leading-snug text-slate-800 space-y-0.5 pt-1">
-            <p><span className="font-bold text-slate-900">Add:</span> {address}</p>
-            <p><span className="font-bold text-slate-900">Email:</span> {email}</p>
-            <p><span className="font-bold text-slate-900">Phone:</span> {phone}</p>
-          </div>
+          {hasContactInfo ? (
+            <div className="text-[11.5px] sm:text-[12.5px] leading-snug text-slate-800 space-y-0.5 pt-1">
+              {address ? <p><span className="font-bold text-slate-900">Add:</span> {address}</p> : null}
+              {email ? <p><span className="font-bold text-slate-900">Email:</span> {email}</p> : null}
+              {phone ? <p><span className="font-bold text-slate-900">Phone:</span> {phone}</p> : null}
+            </div>
+          ) : null}
         </div>
 
         {/* Right Column: Title & Header Metadata Box */}
@@ -136,26 +157,62 @@ export default function EdLinkWebPreview({ invoice, snapshot }: EdLinkWebPreview
         </div>
 
         {/* Footer Row inside Table */}
-        <div className="grid grid-cols-12 border-t border-slate-300 bg-white py-2.5 sm:py-3 px-3 sm:px-4 font-semibold text-slate-900 gap-y-2">
-          <div className="col-span-12 sm:col-span-6 text-slate-800 text-[11px] sm:text-[13px] self-center">
-            {footerTerms}
+        {gstRate > 0 ? (
+          <div className="border-t border-slate-300 bg-white divide-y divide-slate-200">
+            <div className="grid grid-cols-12 py-2 px-3 sm:px-4 text-xs">
+              <div className="col-span-12 sm:col-span-6 text-slate-800 text-[11px] sm:text-[12.5px] self-center">
+                {footerTerms}
+              </div>
+              <div className="col-span-6 sm:col-span-3 text-left sm:text-right uppercase font-semibold text-slate-600 text-[11px] sm:text-[12px] self-center sm:border-r sm:border-slate-300 sm:pr-3">
+                SUBTOTAL
+              </div>
+              <div className="col-span-6 sm:col-span-3 text-right font-bold text-[12px] sm:text-[13px] text-slate-800 self-center">
+                {Number(subtotal).toFixed(2)} {currency}
+              </div>
+            </div>
+            <div className="grid grid-cols-12 py-2 px-3 sm:px-4 text-xs bg-slate-50/50">
+              <div className="col-span-12 sm:col-span-6"></div>
+              <div className="col-span-6 sm:col-span-3 text-left sm:text-right uppercase font-semibold text-slate-600 text-[11px] sm:text-[12px] self-center sm:border-r sm:border-slate-300 sm:pr-3">
+                GST ({gstRate}%)
+              </div>
+              <div className="col-span-6 sm:col-span-3 text-right font-bold text-[12px] sm:text-[13px] text-slate-800 self-center">
+                {Number(gstAmount).toFixed(2)} {currency}
+              </div>
+            </div>
+            <div className="grid grid-cols-12 py-2.5 sm:py-3 px-3 sm:px-4 font-bold text-slate-900 bg-slate-100/70">
+              <div className="col-span-12 sm:col-span-6"></div>
+              <div className="col-span-6 sm:col-span-3 text-left sm:text-right uppercase font-extrabold text-slate-900 text-[12px] sm:text-[13px] self-center sm:border-r sm:border-slate-300 sm:pr-3">
+                TOTAL DUE
+              </div>
+              <div className="col-span-6 sm:col-span-3 text-right font-extrabold text-[13px] sm:text-[15px] text-slate-900 self-center">
+                {Number(totalAmount).toFixed(2)} {currency}
+              </div>
+            </div>
           </div>
-          <div className="col-span-6 sm:col-span-3 text-left sm:text-right uppercase font-bold text-slate-900 text-[12px] sm:text-[14px] self-center sm:border-r sm:border-slate-300 sm:pr-3">
-            TOTAL DUE
+        ) : (
+          <div className="grid grid-cols-12 border-t border-slate-300 bg-white py-2.5 sm:py-3 px-3 sm:px-4 font-semibold text-slate-900 gap-y-2">
+            <div className="col-span-12 sm:col-span-6 text-slate-800 text-[11px] sm:text-[13px] self-center">
+              {footerTerms}
+            </div>
+            <div className="col-span-6 sm:col-span-3 text-left sm:text-right uppercase font-bold text-slate-900 text-[12px] sm:text-[14px] self-center sm:border-r sm:border-slate-300 sm:pr-3">
+              TOTAL DUE
+            </div>
+            <div className="col-span-6 sm:col-span-3 text-right font-extrabold text-[13px] sm:text-[15px] text-slate-900 self-center">
+              {Number(totalAmount).toFixed(2)} {currency}
+            </div>
           </div>
-          <div className="col-span-6 sm:col-span-3 text-right font-extrabold text-[13px] sm:text-[15px] text-slate-900 self-center">
-            {Number(totalAmount).toFixed(2)} {currency}
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Payment Details Section */}
-      <div className="mt-8 pt-4 text-xs text-slate-800">
-        <h3 className="font-bold underline text-slate-900 mb-1.5 text-[13px]">Payment Details</h3>
-        <div className="whitespace-pre-line leading-relaxed text-[12.5px] font-medium text-slate-800">
-          {paymentDetails}
+      {/* Payment Details Section (only if not empty) */}
+      {paymentDetails && paymentDetails.trim() ? (
+        <div className="mt-8 pt-4 text-xs text-slate-800">
+          <h3 className="font-bold underline text-slate-900 mb-1.5 text-[13px]">Payment Details</h3>
+          <div className="whitespace-pre-line leading-relaxed text-[12.5px] font-medium text-slate-800">
+            {paymentDetails}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }

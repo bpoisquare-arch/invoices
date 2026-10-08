@@ -67,7 +67,7 @@ model Invoice {
   entity           String?  @default("edlink-pk") @db.VarChar(50)
   templateId       String?  @map("template_id") @db.VarChar(36)
   templateSnapshot Json     @map("template_snapshot")
-  invoiceNumber    String   @unique(map: "unique_invoice_number") @map("invoice_number") @db.VarChar(50)
+  invoiceNumber    String   @map("invoice_number") @db.VarChar(50)
   referenceName    String?  @map("reference_name") @db.VarChar(255)
   customerName     String   @map("customer_name") @db.VarChar(255)
   invoiceDate      DateTime @map("invoice_date") @db.Date
@@ -81,6 +81,7 @@ model Invoice {
   template Template?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
   items    InvoiceItem[]
 
+  @@unique([entity, invoiceNumber], map: "unique_entity_invoice_number")
   @@index([companyId], map: "idx_invoices_company_id")
   @@index([entity], map: "idx_invoices_entity")
   @@index([customerName], map: "idx_invoices_customer_name")

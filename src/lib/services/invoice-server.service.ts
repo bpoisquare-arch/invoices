@@ -172,74 +172,13 @@ export async function getInvoicesServer(params: InvoiceFilterParams = {}): Promi
 
     // 1. Entity filter
     if (params.entityType === 'nsc') {
-      conditions.push({
-        OR: [
-          { entity: 'nsc' },
-          { company: { prefix: 'NSC' } },
-          { company: { name: { contains: 'Neighbourhood' } } },
-          { templateSnapshot: { path: '$.layout_type', equals: 'nsc_v1' } },
-        ],
-      })
+      conditions.push({ entity: 'nsc' })
     } else if (params.entityType === 'isquare-bpo' || (params.entityType as any) === 'isq') {
-      conditions.push({
-        OR: [
-          { entity: 'isquare-bpo' },
-          { entity: 'isq' },
-          { company: { prefix: 'ISQ' } },
-          { company: { name: { contains: 'ISquare' } } },
-          { templateSnapshot: { path: '$.company_name', string_contains: 'ISquare' } },
-        ],
-      })
+      conditions.push({ entity: { in: ['isquare-bpo', 'isq'] } })
     } else if (params.entityType === 'edlink-au') {
-      conditions.push({
-        OR: [
-          { entity: 'edlink-au' },
-          { company: { prefix: 'EDA' } },
-          {
-            AND: [
-              { company: { name: { contains: 'Australia' } } },
-              { NOT: { company: { name: { contains: 'Pakistan' } } } },
-            ],
-          },
-        ],
-      })
-      conditions.push({
-        NOT: {
-          OR: [
-            { entity: 'nsc' },
-            { entity: 'isquare-bpo' },
-            { entity: 'edlink-pk' },
-            { company: { prefix: 'NSC' } },
-            { company: { prefix: 'ISQ' } },
-            { company: { prefix: 'EDL' } },
-            { company: { prefix: 'ANO' } },
-          ],
-        },
-      })
+      conditions.push({ entity: 'edlink-au' })
     } else if (params.entityType === 'edlink-pk') {
-      conditions.push({
-        OR: [
-          { entity: 'edlink-pk' },
-          { company: { prefix: 'EDL' } },
-          { company: { prefix: 'ANO' } },
-          { company: { name: { contains: 'Pakistan' } } },
-          { company: { name: { contains: 'Anonymous' } } },
-          { templateSnapshot: { path: '$.layout_type', equals: 'anonymous_v1' } },
-          { templateSnapshot: { path: '$.is_anonymous', equals: true } },
-        ],
-      })
-      conditions.push({
-        NOT: {
-          OR: [
-            { entity: 'nsc' },
-            { entity: 'isquare-bpo' },
-            { entity: 'edlink-au' },
-            { company: { prefix: 'NSC' } },
-            { company: { prefix: 'ISQ' } },
-            { company: { prefix: 'EDA' } },
-          ],
-        },
-      })
+      conditions.push({ entity: 'edlink-pk' })
     }
 
     if (params.companyId && params.companyId !== 'all' && isValidUUID(params.companyId)) {
@@ -333,128 +272,89 @@ export async function getInvoicesServer(params: InvoiceFilterParams = {}): Promi
 }
 
 export async function createInvoiceServer(input: CreateInvoiceInput): Promise<InvoiceWithDetails> {
-  let companyName = 'EdLink Pakistan'
-  let address = 'Suit 3, Level 4/20 Collins Street, Melbourne 3000'
-  let email = 'finance@edlink.com.au'
-  let phone = '+61 432 536 123'
-  let paymentDetails = `Account Name: Riaz & Sons PTY Ltd\nBSB: 083-543\nAccount No: 72-996-1834\nABN: 62 658 488 469`
-  let companyLogo: string | null = '/edlink-logo.png'
-  let layoutType = 'edlink_v1'
-  let primaryColor = '#2563eb'
-  let footerTerms = 'Thank you for getting services from us'
-
-  if (input.company_id === 'nsc-company-id' || input.company_id === 'nsc') {
-    companyName = 'Neighbourhood Shine Co.'
-    companyLogo = '/Neighbourhood-Shine.png'
-    layoutType = 'nsc_v1'
-    primaryColor = '#8CB34E'
-    address = '22 Cheviot Avenue Berwick'
-    paymentDetails = `BANK ACCOUNT DETAILS\nBank Name: Common Wealth Bank\nAccount Name: Neighbourhood Shine Co\nAccount Number: 313369861\nBSB / IFSC: 083-004\n\nPAY ID DETAILS\nAccount Name: Neighbourhood Shine Co\nPAY ID: 0421 953 400`
-    footerTerms = `• Payment is required on arrival on the day of service.\n• The customer is responsible for arranging suitable parking for our service vehicle.\n• Access to electricity and running hot water must be available at the property.\n• While we make every effort, complete removal of pet hair cannot be guaranteed.\n• The property must be vacant at the time of cleaning.\n• Quoted pricing is based on properties in standard/normal condition. Heavily soiled properties may incur additional charges.\n• Ceilings and garage walls are excluded from the service.\n• Payment can be made via cash, bank transfer, or Pay ID.`
-  } else if (input.company_id === 'isquare-bpo-company-id' || input.company_id === 'isquare-bpo' || input.company_id === 'isq') {
-    companyName = 'ISquare BPO'
-    companyLogo = '/isquarebpo.png'
-    layoutType = 'edlink_v1'
-    primaryColor = '#003D5C'
-    address = 'Suite 500, Tech Park, Islamabad, Pakistan'
-    email = 'invoicing@isquarebpo.com'
-    phone = '+92 51 111 222 333'
-    paymentDetails = 'Account Name: iSquare BPO Solutions\nSWIFT: ISQBPOPK\nAccount No: 9876543210'
-    footerTerms = 'Payment due within 15 days of invoice date.'
-  } else if (input.company_id === 'edlink-au' || input.company_id === 'edlink') {
-    companyName = 'EdLink Australia'
-    companyLogo = '/edlink-logo.png'
-    layoutType = 'default_v1'
-    primaryColor = '#0284c7'
-    address = 'Level 1, 100 Collins Street, Melbourne VIC 3000'
-    email = 'australia@edlink.com.au'
-    phone = '+61 3 9000 1234'
-    paymentDetails = 'Account Name: EdLink Australia PTY Ltd\nBSB: 063-000\nAccount No: 1234 5678'
-    footerTerms = 'Thank you for choosing EdLink Australia.'
-  }
-
-  let resolvedCompanyId = input.company_id
-  try {
-    if (isValidUUID(input.company_id)) {
-      const comp = await prisma.company.findUnique({ where: { id: input.company_id } })
-      if (comp) {
-        companyName = comp.name
-        resolvedCompanyId = comp.id
-        if (comp.logoUrl) companyLogo = comp.logoUrl
-      }
-    } else {
-      let matchedComp = null
-      if (input.company_id === 'nsc-company-id' || input.company_id === 'nsc') {
-        matchedComp = await prisma.company.findFirst({
-          where: { OR: [{ prefix: 'NSC' }, { name: { contains: 'Neighbourhood' } }] }
-        })
-      } else if (input.company_id === 'isquare-bpo-company-id' || input.company_id === 'isquare-bpo' || input.company_id === 'isq') {
-        matchedComp = await prisma.company.findFirst({
-          where: { OR: [{ prefix: 'ISQ' }, { name: { contains: 'ISquare' } }] }
-        })
-      } else if (input.company_id === 'edlink-au' || input.company_id === 'edlink') {
-        matchedComp = await prisma.company.findFirst({
-          where: { OR: [{ prefix: 'EDA' }, { AND: [{ name: { contains: 'Australia' } }, { NOT: { name: { contains: 'Pakistan' } } }] }] }
-        })
-      } else if (input.company_id === 'edlink-pk' || input.company_id === 'anonymous' || input.company_id === 'anonymous-company-id') {
-        matchedComp = await prisma.company.findFirst({
-          where: { OR: [{ prefix: 'EDL' }, { name: { contains: 'Pakistan' } }] }
-        })
-      }
-
-      if (matchedComp) {
-        resolvedCompanyId = matchedComp.id
-        if (!input.company_id?.includes('anonymous') && matchedComp.name) {
-          companyName = matchedComp.name
-        }
-      } else {
-        const firstCompany = await prisma.company.findFirst()
-        if (firstCompany) {
-          resolvedCompanyId = firstCompany.id
-        }
-      }
-    }
-  } catch {}
-
-  let validTemplateId: string | null = null
-  if (isValidUUID(input.template_id)) {
-    validTemplateId = input.template_id!
-  }
-
   let resolvedEntity = input.entity || ''
   if (!resolvedEntity) {
     const cid = (input.company_id || '').toLowerCase()
-    const cnm = companyName.toLowerCase()
-    if (cid === 'nsc-company-id' || cid === 'nsc' || cnm.includes('neighbourhood')) {
+    if (cid === 'nsc' || cid === 'nsc-company-id' || cid === 'bc8db5e8-27c7-4823-8343-59b05d889838') {
       resolvedEntity = 'nsc'
-    } else if (cid === 'isquare-bpo-company-id' || cid === 'isquare-bpo' || cid === 'isq' || cnm.includes('isquare')) {
+    } else if (cid === 'isquare-bpo' || cid === 'isq' || cid === 'isquare-bpo-company-id' || cid === '39e7212e-fde1-4a0b-8c2d-fe0988c94cf4') {
       resolvedEntity = 'isquare-bpo'
-    } else if (cid === 'edlink-au' || cid === 'edlink' || (cnm.includes('australia') && !cnm.includes('pakistan'))) {
+    } else if (cid === 'edlink-au' || cid === 'edlink' || cid === 'f48942dd-42ed-4507-8e1f-049cb3939a45') {
       resolvedEntity = 'edlink-au'
     } else {
       resolvedEntity = 'edlink-pk'
     }
   }
 
-  const isAnonymous = Boolean(
-    input.is_anonymous ||
-    input.company_id === 'anonymous-company-id' ||
-    input.company_id === 'anonymous' ||
-    resolvedEntity === 'edlink-pk' ||
-    companyName.toLowerCase().includes('pakistan') ||
-    companyName.toLowerCase() === 'anonymous'
-  ) &&
-    resolvedEntity !== 'nsc' &&
-    resolvedEntity !== 'isquare-bpo' &&
-    resolvedEntity !== 'edlink-au' &&
-    input.company_id !== 'nsc-company-id' &&
-    input.company_id !== 'nsc' &&
-    input.company_id !== 'isquare-bpo-company-id' &&
-    input.company_id !== 'isquare-bpo' &&
-    input.company_id !== 'isq' &&
-    input.company_id !== 'edlink-au' &&
-    input.company_id !== 'edlink' &&
-    !companyName.toLowerCase().includes('australia')
+  let companyName = 'EdLink Pakistan'
+  let resolvedCompanyId = 'c1111111-1111-1111-1111-111111111111'
+  let companyLogo: string | null = '/edlink-logo.png'
+  let layoutType = 'anonymous_v1'
+  let primaryColor = '#2563eb'
+  let address = ''
+  let email = ''
+  let phone = ''
+  let paymentDetails = ''
+  let footerTerms = 'Thank you for getting services from us'
+
+  if (resolvedEntity === 'nsc') {
+    resolvedCompanyId = 'bc8db5e8-27c7-4823-8343-59b05d889838'
+    companyName = 'Neighbourhood Shine Co.'
+    companyLogo = '/Neighbourhood-Shine.png'
+    layoutType = 'nsc_v1'
+    primaryColor = '#8CB34E'
+    address = input.custom_address || '22 Cheviot Avenue Berwick'
+    email = input.custom_email || ''
+    phone = input.custom_phone || ''
+    paymentDetails = input.custom_payment_details || `BANK ACCOUNT DETAILS\nBank Name: Common Wealth Bank\nAccount Name: Neighbourhood Shine Co\nAccount Number: 313369861\nBSB / IFSC: 083-004\n\nPAY ID DETAILS\nAccount Name: Neighbourhood Shine Co\nPAY ID: 0421 953 400`
+    footerTerms = input.footer_terms || `• Payment is required on arrival on the day of service.\n• The customer is responsible for arranging suitable parking for our service vehicle.\n• Access to electricity and running hot water must be available at the property.\n• While we make every effort, complete removal of pet hair cannot be guaranteed.\n• The property must be vacant at the time of cleaning.\n• Quoted pricing is based on properties in standard/normal condition. Heavily soiled properties may incur additional charges.\n• Ceilings and garage walls are excluded from the service.\n• Payment can be made via cash, bank transfer, or Pay ID.`
+  } else if (resolvedEntity === 'isquare-bpo' || resolvedEntity === 'isq') {
+    resolvedCompanyId = '39e7212e-fde1-4a0b-8c2d-fe0988c94cf4'
+    companyName = 'ISquare BPO'
+    companyLogo = '/isquarebpo.png'
+    layoutType = 'edlink_v1'
+    primaryColor = '#003D5C'
+    address = input.custom_address || ''
+    email = input.custom_email || ''
+    phone = input.custom_phone || ''
+    paymentDetails = input.custom_payment_details || ''
+    footerTerms = input.footer_terms || 'Thank you for getting services from us'
+  } else if (resolvedEntity === 'edlink-au') {
+    resolvedCompanyId = 'f48942dd-42ed-4507-8e1f-049cb3939a45'
+    companyName = 'EdLink Australia'
+    companyLogo = '/edlink-logo.png'
+    layoutType = 'edlink_v1'
+    primaryColor = '#0284c7'
+    address = input.custom_address || 'Level 1, 100 Collins Street, Melbourne VIC 3000'
+    email = input.custom_email || 'australia@edlink.com.au'
+    phone = input.custom_phone || '+61 3 9000 1234'
+    paymentDetails = input.custom_payment_details || 'Account Name: EdLink Australia PTY Ltd\nBSB: 063-000\nAccount No: 1234 5678'
+    footerTerms = input.footer_terms || 'Thank you for choosing EdLink Australia.'
+  } else {
+    // edlink-pk
+    resolvedCompanyId = 'c1111111-1111-1111-1111-111111111111'
+    companyName = input.custom_company_name?.trim() || 'EdLink Pakistan'
+    companyLogo = input.custom_logo_url || '/edlink-logo.png'
+    layoutType = 'anonymous_v1'
+    primaryColor = '#2563eb'
+    address = input.custom_address || ''
+    email = input.custom_email || ''
+    phone = input.custom_phone || ''
+    paymentDetails = input.custom_payment_details || ''
+    footerTerms = input.footer_terms || 'Thank you for getting services from us'
+  }
+
+  let validTemplateId: string | null = null
+  if (isValidUUID(input.template_id)) {
+    validTemplateId = input.template_id!
+  } else {
+    if (resolvedEntity === 'nsc') validTemplateId = '153277ce-b994-4ee1-8d28-b8be68e737ab'
+    else if (resolvedEntity === 'isquare-bpo' || resolvedEntity === 'isq') validTemplateId = 'e7876f8b-5fe6-4ea5-a252-15031d981944'
+    else if (resolvedEntity === 'edlink-au') validTemplateId = 'ec5f245c-3faa-46da-af81-ea032b441f83'
+    else validTemplateId = '5be4b835-c912-448d-9cae-5f01b3876161'
+  }
+
+  const isAnonymous = (resolvedEntity === 'edlink-pk')
 
   const templateSnapshot: TemplateSnapshot = isAnonymous
     ? {
@@ -479,7 +379,7 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
         phone,
         email,
         payment_details: paymentDetails,
-        currency: input.currency || (input.company_id === 'isquare-bpo-company-id' || input.company_id === 'isq' ? 'USD' : 'AUD'),
+        currency: input.currency || (resolvedEntity === 'isquare-bpo' || resolvedEntity === 'isq' ? 'USD' : 'AUD'),
         footer_terms: input.footer_terms || footerTerms,
         primary_color: primaryColor,
         layout_type: layoutType,
@@ -489,7 +389,14 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
         is_anonymous: false,
       }
 
-  const invoiceNumber = input.invoice_number || (await generateNextInvoiceNumberServer(resolvedCompanyId, isAnonymous, resolvedEntity))
+  let invoiceNumber = input.invoice_number || (await generateNextInvoiceNumberServer(resolvedCompanyId, isAnonymous, resolvedEntity))
+  const existingWithSameNum = await prisma.invoice.findFirst({
+    where: { entity: resolvedEntity, invoiceNumber },
+    select: { id: true },
+  })
+  if (existingWithSameNum && !input.invoice_number) {
+    invoiceNumber = await generateNextInvoiceNumberServer(resolvedCompanyId, isAnonymous, resolvedEntity)
+  }
 
   const preparedItems = input.items.map((item) => {
     const qty = Number(item.quantity) || 0
@@ -515,33 +422,69 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
   templateSnapshot.amount_in_words = amountInWords
   templateSnapshot.includes_gst = gstRate > 0
 
-  const createdInvoice = await prisma.invoice.create({
-    data: {
-      companyId: resolvedCompanyId,
-      entity: resolvedEntity,
-      templateId: validTemplateId,
-      templateSnapshot: templateSnapshot as any,
-      invoiceNumber,
-      customerName: input.customer_name,
-      referenceName: input.reference_name || null,
-      invoiceDate: new Date(input.invoice_date),
-      dueDate: new Date(input.due_date || input.invoice_date),
-      subtotal,
-      totalAmount,
-      items: {
-        create: preparedItems.map((it) => ({
-          description: it.description,
-          quantity: it.quantity,
-          amount: it.amount,
-          lineTotal: it.line_total,
-        })),
+  let createdInvoice
+  try {
+    createdInvoice = await prisma.invoice.create({
+      data: {
+        companyId: resolvedCompanyId,
+        entity: resolvedEntity,
+        templateId: validTemplateId,
+        templateSnapshot: templateSnapshot as any,
+        invoiceNumber,
+        customerName: input.customer_name,
+        referenceName: input.reference_name || null,
+        invoiceDate: new Date(input.invoice_date),
+        dueDate: new Date(input.due_date || input.invoice_date),
+        subtotal,
+        totalAmount,
+        items: {
+          create: preparedItems.map((it) => ({
+            description: it.description,
+            quantity: it.quantity,
+            amount: it.amount,
+            lineTotal: it.line_total,
+          })),
+        },
       },
-    },
-    include: {
-      company: true,
-      items: true,
-    },
-  })
+      include: {
+        company: true,
+        items: true,
+      },
+    })
+  } catch (err: any) {
+    if (err?.code === 'P2002') {
+      const fallbackNum = await generateNextInvoiceNumberServer(resolvedCompanyId, isAnonymous, resolvedEntity)
+      createdInvoice = await prisma.invoice.create({
+        data: {
+          companyId: resolvedCompanyId,
+          entity: resolvedEntity,
+          templateId: validTemplateId,
+          templateSnapshot: templateSnapshot as any,
+          invoiceNumber: fallbackNum,
+          customerName: input.customer_name,
+          referenceName: input.reference_name || null,
+          invoiceDate: new Date(input.invoice_date),
+          dueDate: new Date(input.due_date || input.invoice_date),
+          subtotal,
+          totalAmount,
+          items: {
+            create: preparedItems.map((it) => ({
+              description: it.description,
+              quantity: it.quantity,
+              amount: it.amount,
+              lineTotal: it.line_total,
+            })),
+          },
+        },
+        include: {
+          company: true,
+          items: true,
+        },
+      })
+    } else {
+      throw err
+    }
+  }
 
   return normalizeInvoice(toInvoiceWithDetails(createdInvoice))
 }
@@ -584,15 +527,39 @@ export async function updateInvoiceServer(
   const currencyToUse = String(input.currency || existing?.template_snapshot?.currency || 'AUD')
   const amountInWords = numberToWords(totalAmount, currencyToUse)
 
+  const updatedEntity = input.entity || existing.entity || (existing.companies?.prefix === 'NSC' ? 'nsc' : existing.companies?.prefix === 'ISQ' ? 'isquare-bpo' : existing.companies?.prefix === 'EDA' ? 'edlink-au' : 'edlink-pk')
+
+  let cleanAddress = String((input.custom_address !== undefined ? input.custom_address : existing?.template_snapshot?.address) || '')
+  let cleanEmail = String((input.custom_email !== undefined ? input.custom_email : existing?.template_snapshot?.email) || '')
+  let cleanPhone = String((input.custom_phone !== undefined ? input.custom_phone : existing?.template_snapshot?.phone) || '')
+  let cleanPaymentDetails = String((input.custom_payment_details !== undefined ? input.custom_payment_details : existing?.template_snapshot?.payment_details) || '')
+
+  if (updatedEntity === 'isquare-bpo' || updatedEntity === 'isq') {
+    if (cleanAddress.includes('Collins Street') || cleanAddress.includes('Melbourne 3000')) cleanAddress = ''
+    if (cleanEmail.includes('edlink.com.au')) cleanEmail = ''
+    if (cleanPhone.includes('+61 432 536 123') || cleanPhone.includes('+61 3 9000 1234')) cleanPhone = ''
+    if (cleanPaymentDetails.includes('Riaz & Sons') || cleanPaymentDetails.includes('EdLink Australia')) cleanPaymentDetails = ''
+  }
+
   const updatedSnapshot: TemplateSnapshot = {
     ...(existing?.template_snapshot || {}),
+    address: cleanAddress,
+    email: cleanEmail,
+    phone: cleanPhone,
+    payment_details: cleanPaymentDetails,
     gst_rate: gstRate,
     gst_amount: gstAmount,
     amount_in_words: amountInWords,
     includes_gst: gstRate > 0,
+    ...(updatedEntity === 'isquare-bpo' || updatedEntity === 'isq'
+      ? {
+          company_name: 'ISquare BPO',
+          logo_url: '/isquarebpo.png',
+          primary_color: '#003D5C',
+          layout_type: 'edlink_v1',
+        }
+      : {}),
   }
-
-  const updatedEntity = input.entity || existing.entity || (existing.companies?.prefix === 'NSC' ? 'nsc' : existing.companies?.prefix === 'ISQ' ? 'isquare-bpo' : existing.companies?.prefix === 'EDA' ? 'edlink-au' : 'edlink-pk')
 
   await prisma.$transaction(async (tx) => {
     await tx.invoice.update({

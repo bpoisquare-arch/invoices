@@ -198,6 +198,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     alignItems: 'center',
   },
+  tableSubtotalRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#cbd5e1',
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+  },
+  tableGstRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+  },
   footerTermsCol: {
     width: '54%',
     fontSize: 10,
@@ -251,17 +265,35 @@ interface EdLinkPDFTemplateProps {
 }
 
 export default function EdLinkPDFTemplate({ invoice, snapshot, resolvedLogoUrl }: EdLinkPDFTemplateProps) {
-  const address = snapshot?.address || invoice.templates?.address || 'Suit 3, Level 4/20 Collins Street, Melbourne 3000'
-  const email = snapshot?.email || invoice.templates?.email || 'finance@edlink.com.au'
-  const phone = snapshot?.phone || invoice.templates?.phone || '+61 432 536 123'
+  const companyName = snapshot?.company_name || invoice.companies?.name || 'Company Name'
+  const isEdlinkAu =
+    invoice.entity === 'edlink-au' ||
+    companyName.toLowerCase().includes('australia') ||
+    invoice.companies?.prefix === 'EDA'
+
+  const address = snapshot?.address !== undefined
+    ? snapshot.address
+    : (invoice.templates?.address || (isEdlinkAu ? 'Suit 3, Level 4/20 Collins Street, Melbourne 3000' : ''))
+  const email = snapshot?.email !== undefined
+    ? snapshot.email
+    : (invoice.templates?.email || (isEdlinkAu ? 'finance@edlink.com.au' : ''))
+  const phone = snapshot?.phone !== undefined
+    ? snapshot.phone
+    : (invoice.templates?.phone || (isEdlinkAu ? '+61 432 536 123' : ''))
   const currency = snapshot?.currency || invoice.companies?.currency || 'AUD'
   const footerTerms = snapshot?.footer_terms || invoice.templates?.footer_terms || 'Thank you for getting services from us'
-  const paymentDetails = snapshot?.payment_details || invoice.templates?.payment_details || `Account Name: Riaz & Sons PTY Ltd\nBSB: 083-543\nAccount No: 72-996-1834\nABN: 62 658 488 469`
+  const paymentDetails = snapshot?.payment_details !== undefined
+    ? snapshot.payment_details
+    : (invoice.templates?.payment_details || (isEdlinkAu ? `Account Name: Riaz & Sons PTY Ltd\nBSB: 083-543\nAccount No: 72-996-1834\nABN: 62 658 488 469` : ''))
 
   const logoSrc = resolvedLogoUrl || snapshot?.logo_url || invoice.companies?.logo_url || '/edlink-logo.png'
 
   const items = invoice.invoice_items || []
-  const totalAmount = invoice.total_amount || invoice.subtotal || 0
+  const calculatedSubtotal = items.reduce((sum, item) => sum + Number(item.line_total || item.amount * item.quantity || 0), 0)
+  const subtotal = Number(invoice.subtotal) > 0 ? Number(invoice.subtotal) : calculatedSubtotal
+  const gstRate = Number(snapshot?.gst_rate || 0)
+  const gstAmount = Number(snapshot?.gst_amount) > 0 ? Number(snapshot?.gst_amount) : Number(((subtotal * gstRate) / 100).toFixed(2))
+  const totalAmount = Number(invoice.total_amount) > 0 ? Number(invoice.total_amount) : (subtotal + gstAmount)
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A'
@@ -271,6 +303,8 @@ export default function EdLinkPDFTemplate({ invoice, snapshot, resolvedLogoUrl }
     }
     return dateStr
   }
+
+  const hasContactInfo = Boolean(address || email || phone)
 
   return (
     <Document title={`Invoice-${invoice.invoice_number || 'EDL-000001'}`}>
@@ -282,15 +316,25 @@ export default function EdLinkPDFTemplate({ invoice, snapshot, resolvedLogoUrl }
             {logoSrc ? (
               <Image src={logoSrc} style={styles.logoImage} />
             ) : null}
-            <Text style={styles.companyInfoText}>
-              <Text style={styles.boldLabel}>Add: </Text>{address}
-            </Text>
-            <Text style={styles.companyInfoText}>
-              <Text style={styles.boldLabel}>Email: </Text>{email}
-            </Text>
-            <Text style={styles.companyInfoText}>
-              <Text style={styles.boldLabel}>Phone: </Text>{phone}
-            </Text>
+            {hasContactInfo ? (
+              <View>
+                {address ? (
+                  <Text style={styles.companyInfoText}>
+                    <Text style={styles.boldLabel}>Add: </Text>{address}
+                  </Text>
+                ) : null}
+                {email ? (
+                  <Text style={styles.companyInfoText}>
+                    <Text style={styles.boldLabel}>Email: </Text>{email}
+                  </Text>
+                ) : null}
+                {phone ? (
+                  <Text style={styles.companyInfoText}>
+                    <Text style={styles.boldLabel}>Phone: </Text>{phone}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
           </View>
 
           {/* Right Header Invoice Metadata */}
@@ -369,21 +413,49 @@ export default function EdLinkPDFTemplate({ invoice, snapshot, resolvedLogoUrl }
             </View>
           </View>
 
-          {/* Table Footer Total */}
-          <View style={styles.tableFooterRow}>
-            <Text style={styles.footerTermsCol}>{footerTerms}</Text>
-            <Text style={styles.totalLabelCol}>TOTAL DUE</Text>
-            <Text style={styles.totalValueCol}>
-              {Number(totalAmount).toFixed(2)} {currency}
-            </Text>
-          </View>
+          {/* Table Footer Total / GST Breakdown */}
+          {gstRate > 0 ? (
+            <View>
+              <View style={styles.tableSubtotalRow}>
+                <Text style={styles.footerTermsCol}>{footerTerms}</Text>
+                <Text style={[styles.totalLabelCol, { color: '#475569', fontSize: 10 }]}>SUBTOTAL</Text>
+                <Text style={[styles.totalValueCol, { fontSize: 10 }]}>
+                  {Number(subtotal).toFixed(2)} {currency}
+                </Text>
+              </View>
+              <View style={styles.tableGstRow}>
+                <Text style={styles.footerTermsCol}></Text>
+                <Text style={[styles.totalLabelCol, { color: '#475569', fontSize: 10 }]}>GST ({gstRate}%)</Text>
+                <Text style={[styles.totalValueCol, { fontSize: 10 }]}>
+                  {Number(gstAmount).toFixed(2)} {currency}
+                </Text>
+              </View>
+              <View style={[styles.tableFooterRow, { backgroundColor: '#f1f5f9' }]}>
+                <Text style={styles.footerTermsCol}></Text>
+                <Text style={styles.totalLabelCol}>TOTAL DUE</Text>
+                <Text style={styles.totalValueCol}>
+                  {Number(totalAmount).toFixed(2)} {currency}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.tableFooterRow}>
+              <Text style={styles.footerTermsCol}>{footerTerms}</Text>
+              <Text style={styles.totalLabelCol}>TOTAL DUE</Text>
+              <Text style={styles.totalValueCol}>
+                {Number(totalAmount).toFixed(2)} {currency}
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Payment Details */}
-        <View style={styles.paymentSection}>
-          <Text style={styles.paymentTitle}>Payment Details</Text>
-          <Text style={styles.paymentText}>{paymentDetails}</Text>
-        </View>
+        {/* Payment Details (only if not empty) */}
+        {paymentDetails && paymentDetails.trim() ? (
+          <View style={styles.paymentSection}>
+            <Text style={styles.paymentTitle}>Payment Details</Text>
+            <Text style={styles.paymentText}>{paymentDetails}</Text>
+          </View>
+        ) : null}
       </Page>
     </Document>
   )

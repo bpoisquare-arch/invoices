@@ -145,7 +145,11 @@ export default function DefaultPDFTemplate({ invoice, snapshot }: DefaultPDFTemp
   const paymentDetails = snapshot?.payment_details || invoice.templates?.payment_details || ''
 
   const items = invoice.invoice_items || []
-  const totalAmount = invoice.total_amount || invoice.subtotal || 0
+  const calculatedSubtotal = items.reduce((sum, item) => sum + Number(item.line_total || item.amount * item.quantity || 0), 0)
+  const subtotal = Number(invoice.subtotal) > 0 ? Number(invoice.subtotal) : calculatedSubtotal
+  const gstRate = Number(snapshot?.gst_rate || 0)
+  const gstAmount = Number(snapshot?.gst_amount) > 0 ? Number(snapshot?.gst_amount) : Number(((subtotal * gstRate) / 100).toFixed(2))
+  const totalAmount = Number(invoice.total_amount) > 0 ? Number(invoice.total_amount) : (subtotal + gstAmount)
 
   return (
     <Document title={`Invoice-${invoice.invoice_number || 'INV-000001'}`}>
@@ -203,7 +207,23 @@ export default function DefaultPDFTemplate({ invoice, snapshot }: DefaultPDFTemp
           </View>
 
           <View style={styles.totalBox}>
-            <Text style={styles.totalLabel}>TOTAL AMOUNT</Text>
+            {gstRate > 0 ? (
+              <View style={{ width: '100%', marginBottom: 6, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 8, color: '#64748b', textTransform: 'uppercase' }}>Subtotal:</Text>
+                  <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#1e293b' }}>
+                    {Number(subtotal).toFixed(2)} {currency}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 8, color: '#64748b', textTransform: 'uppercase' }}>GST ({gstRate}%):</Text>
+                  <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#1e293b' }}>
+                    {Number(gstAmount).toFixed(2)} {currency}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+            <Text style={styles.totalLabel}>{gstRate > 0 ? 'TOTAL DUE' : 'TOTAL AMOUNT'}</Text>
             <Text style={styles.totalValue}>
               {Number(totalAmount).toFixed(2)} {currency}
             </Text>

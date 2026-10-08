@@ -197,6 +197,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: 'center',
   },
+  tableSubtotalRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#cbd5e1',
+    backgroundColor: '#ffffff',
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  tableGstRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
   footerTermsCol: {
     width: '60%',
     fontSize: 9,
@@ -264,7 +282,11 @@ export default function AnonymousPDFTemplate({
   const billToLabel = snapshot?.bill_to_label || 'ISSUED TO'
 
   const items = invoice.invoice_items || []
-  const totalAmount = invoice.total_amount || invoice.subtotal || 0
+  const calculatedSubtotal = items.reduce((sum, item) => sum + Number(item.line_total || item.amount * item.quantity || 0), 0)
+  const subtotal = Number(invoice.subtotal) > 0 ? Number(invoice.subtotal) : calculatedSubtotal
+  const gstRate = Number(snapshot?.gst_rate || 0)
+  const gstAmount = Number(snapshot?.gst_amount) > 0 ? Number(snapshot?.gst_amount) : Number(((subtotal * gstRate) / 100).toFixed(2))
+  const totalAmount = Number(invoice.total_amount) > 0 ? Number(invoice.total_amount) : (subtotal + gstAmount)
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return ''
@@ -408,14 +430,40 @@ export default function AnonymousPDFTemplate({
             </View>
           </View>
 
-          {/* Table Footer Total */}
-          <View style={styles.tableFooterRow}>
-            <Text style={styles.footerTermsCol}>{footerTerms}</Text>
-            <Text style={styles.totalLabelCol}>TOTAL DUE</Text>
-            <Text style={styles.totalValueCol}>
-              {Number(totalAmount).toFixed(2)} {currency}
-            </Text>
-          </View>
+          {/* Table Footer Total / GST Breakdown */}
+          {gstRate > 0 ? (
+            <View>
+              <View style={styles.tableSubtotalRow}>
+                <Text style={styles.footerTermsCol}>{footerTerms}</Text>
+                <Text style={[styles.totalLabelCol, { color: '#475569', fontSize: 9 }]}>SUBTOTAL</Text>
+                <Text style={[styles.totalValueCol, { fontSize: 9.5 }]}>
+                  {Number(subtotal).toFixed(2)} {currency}
+                </Text>
+              </View>
+              <View style={styles.tableGstRow}>
+                <Text style={styles.footerTermsCol}></Text>
+                <Text style={[styles.totalLabelCol, { color: '#475569', fontSize: 9 }]}>GST ({gstRate}%)</Text>
+                <Text style={[styles.totalValueCol, { fontSize: 9.5 }]}>
+                  {Number(gstAmount).toFixed(2)} {currency}
+                </Text>
+              </View>
+              <View style={[styles.tableFooterRow, { backgroundColor: '#f1f5f9' }]}>
+                <Text style={styles.footerTermsCol}></Text>
+                <Text style={styles.totalLabelCol}>TOTAL DUE</Text>
+                <Text style={styles.totalValueCol}>
+                  {Number(totalAmount).toFixed(2)} {currency}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.tableFooterRow}>
+              <Text style={styles.footerTermsCol}>{footerTerms}</Text>
+              <Text style={styles.totalLabelCol}>TOTAL DUE</Text>
+              <Text style={styles.totalValueCol}>
+                {Number(totalAmount).toFixed(2)} {currency}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Payment Details (Omitted if empty) */}
