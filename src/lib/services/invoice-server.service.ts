@@ -106,7 +106,7 @@ export async function generateNextInvoiceNumberServer(companyId: string, isAnony
           ...(targetEntity === 'edlink-au' ? [{ company: { prefix: 'EDA' } }] : []),
           ...(targetEntity === 'edlink-pk' ? [{ company: { prefix: 'EDL' } }, { company: { prefix: 'ANO' } }] : []),
         ],
-      },
+      } as any,
       take: 200,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -391,7 +391,7 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
 
   let invoiceNumber = input.invoice_number || (await generateNextInvoiceNumberServer(resolvedCompanyId, isAnonymous, resolvedEntity))
   const existingWithSameNum = await prisma.invoice.findFirst({
-    where: { entity: resolvedEntity, invoiceNumber },
+    where: { entity: resolvedEntity, invoiceNumber } as any,
     select: { id: true },
   })
   if (existingWithSameNum && !input.invoice_number) {
@@ -445,7 +445,7 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
             lineTotal: it.line_total,
           })),
         },
-      },
+      } as any,
       include: {
         company: true,
         items: true,
@@ -475,7 +475,7 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
               lineTotal: it.line_total,
             })),
           },
-        },
+        } as any,
         include: {
           company: true,
           items: true,
@@ -573,7 +573,7 @@ export async function updateInvoiceServer(
         subtotal,
         totalAmount,
         templateSnapshot: updatedSnapshot as any,
-      },
+      } as any,
     })
 
     if (preparedItems) {
