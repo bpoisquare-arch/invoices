@@ -62,6 +62,7 @@ export interface Invoice {
   id: string
   user_id: string | null
   company_id: string
+  entity?: string | null
   template_id: string | null
   template_snapshot: TemplateSnapshot
   invoice_number: string

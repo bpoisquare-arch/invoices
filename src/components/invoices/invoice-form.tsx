@@ -56,9 +56,24 @@ export default function InvoiceForm({
     company.prefix === 'ANO' ||
       company.id === 'anonymous-company-id' ||
       company.name.toLowerCase() === 'anonymous' ||
+      company.prefix === 'EDL' ||
+      company.name.toLowerCase().includes('pakistan') ||
       template?.layout_type === 'anonymous_v1' ||
       existingInvoice?.template_snapshot?.is_anonymous
-  )
+  ) &&
+    company.prefix !== 'NSC' &&
+    company.prefix !== 'ISQ' &&
+    company.prefix !== 'EDA' &&
+    !company.name.toLowerCase().includes('australia')
+
+  const currentEntity =
+    company.prefix === 'NSC' || company.name.toLowerCase().includes('neighbourhood')
+      ? 'nsc'
+      : company.prefix === 'ISQ' || company.name.toLowerCase().includes('isquare')
+      ? 'isquare-bpo'
+      : company.prefix === 'EDA' || (company.name.toLowerCase().includes('australia') && !company.name.toLowerCase().includes('pakistan'))
+      ? 'edlink-au'
+      : 'edlink-pk'
 
   const todayStr = new Date().toISOString().split('T')[0]
   const dueStr = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0]
@@ -71,7 +86,7 @@ export default function InvoiceForm({
     existingInvoice?.template_snapshot?.logo_url || ''
   )
   const [customCompanyName, setCustomCompanyName] = useState<string>(
-    existingInvoice?.template_snapshot?.company_name || (isAnonymous ? '' : company.name)
+    existingInvoice?.template_snapshot?.company_name || (isAnonymous ? (company.prefix === 'EDL' ? 'EdLink Pakistan' : '') : company.name)
   )
   const [customAddress, setCustomAddress] = useState<string>(
     existingInvoice?.template_snapshot?.address || ''
@@ -113,11 +128,11 @@ export default function InvoiceForm({
 
   useEffect(() => {
     if (mode === 'create' && !existingInvoice) {
-      generateNextInvoiceNumber(company.id, isAnonymous).then((num) => {
+      generateNextInvoiceNumber(company.id, isAnonymous, currentEntity).then((num) => {
         setInvoiceNumberDisplay(num)
       })
     }
-  }, [mode, company.id, isAnonymous, existingInvoice])
+  }, [mode, company.id, isAnonymous, currentEntity, existingInvoice])
 
   const initialItems: InvoiceItemInput[] = existingInvoice?.invoice_items?.length
     ? existingInvoice.invoice_items.map((i) => ({
@@ -270,6 +285,7 @@ export default function InvoiceForm({
       if (mode === 'create') {
         const newInv = await createInvoice({
           company_id: company.id,
+          entity: currentEntity,
           template_id: template?.id,
           invoice_number: invoiceNumberDisplay !== 'Loading...' ? invoiceNumberDisplay : undefined,
           customer_name: customerName,
@@ -295,6 +311,7 @@ export default function InvoiceForm({
         router.push(`/invoices/${newInv.id}/preview`)
       } else if (mode === 'edit' && existingInvoice) {
         await updateInvoice(existingInvoice.id, {
+          entity: existingInvoice.entity || currentEntity,
           customer_name: customerName,
           reference_name: referenceAddress || null,
           invoice_date: invoiceDate,

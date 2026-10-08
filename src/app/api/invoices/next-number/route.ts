@@ -7,7 +7,9 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('companyId') || ''
     const isAnonymous = searchParams.get('isAnonymous') === 'true'
 
-    const nextNumber = await generateNextInvoiceNumberServer(companyId, isAnonymous)
+    const entity = searchParams.get('entity') || undefined
+
+    const nextNumber = await generateNextInvoiceNumberServer(companyId, isAnonymous, entity)
     return NextResponse.json({ nextNumber })
   } catch (error: any) {
     console.error('GET /api/invoices/next-number error:', error)

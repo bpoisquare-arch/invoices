@@ -4,17 +4,17 @@ import { Template } from '@/types/database.types'
 export const FALLBACK_TEMPLATE: Template = {
   id: 'edlink-pk-template-id',
   company_id: 'edlink-pk-id',
-  name: 'EdLink Pakistan Standard Template',
+  name: 'EdLink Pakistan Anonymous / Custom Template',
   company_name: 'EdLink Pakistan',
-  address: 'Suit 3, Level 4/20 Collins Street, Melbourne 3000',
-  email: 'finance@edlink.com.au',
-  phone: '+61 432 536 123',
-  payment_details: `Account Name: Riaz & Sons PTY Ltd\nBSB: 083-543\nAccount No: 72-996-1834\nABN: 62 658 488 469`,
-  bank_details: 'Riaz & Sons PTY Ltd (BSB: 083-543, Account: 72-996-1834)',
+  address: '',
+  email: '',
+  phone: '',
+  payment_details: '',
+  bank_details: '',
   currency: 'AUD',
   footer_terms: 'Thank you for getting services from us',
   primary_color: '#2563eb',
-  layout_type: 'edlink_v1',
+  layout_type: 'anonymous_v1',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 }
@@ -24,15 +24,15 @@ export const EDLINK_AU_TEMPLATE: Template = {
   company_id: 'edlink-au-id',
   name: 'EdLink Australia Standard Template',
   company_name: 'EdLink Australia',
-  address: 'Level 1, 100 Collins Street, Melbourne VIC 3000',
-  email: 'australia@edlink.com.au',
-  phone: '+61 3 9000 1234',
-  payment_details: 'Account Name: EdLink Australia PTY Ltd\nBSB: 063-000\nAccount No: 1234 5678',
-  bank_details: 'EdLink Australia PTY Ltd',
+  address: 'Suit 3, Level 4/20 Collins Street, Melbourne 3000',
+  email: 'finance@edlink.com.au',
+  phone: '+61 432 536 123',
+  payment_details: `Account Name: Riaz & Sons PTY Ltd\nBSB: 083-543\nAccount No: 72-996-1834\nABN: 62 658 488 469`,
+  bank_details: 'Riaz & Sons PTY Ltd (BSB: 083-543, Account: 72-996-1834)',
   currency: 'AUD',
   footer_terms: 'Thank you for choosing EdLink Australia.',
   primary_color: '#0284c7',
-  layout_type: 'default_v1',
+  layout_type: 'edlink_v1',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 }
@@ -184,32 +184,34 @@ export async function getTemplateByCompanyId(companyId: string): Promise<Templat
     return ISQUARE_TEMPLATE
   }
 
-  if (clean === 'edlink-pk' || clean === 'edlink-pk-id' || clean === 'edlink-pk-template-id' || clean === 'edl') {
+  if (clean === 'edlink-pk' || clean === 'edlink-pk-id' || clean === 'edlink-pk-template-id' || clean === 'edl' || clean === 'c1111111-1111-1111-1111-111111111111') {
     try {
       const row = await prisma.template.findFirst({
         where: {
           OR: [
+            { companyId: 'c1111111-1111-1111-1111-111111111111' },
             { name: { contains: 'Pakistan' } },
             { companyName: { contains: 'Pakistan' } },
           ],
         },
       })
-      if (row) return prismaToTemplate(row)
+      if (row) return { ...prismaToTemplate(row), layout_type: 'anonymous_v1' }
     } catch {}
     return FALLBACK_TEMPLATE
   }
 
-  if (clean === 'edlink' || clean === 'edlink-au' || clean === 'edlink-australia' || clean === 'eda') {
+  if (clean === 'edlink' || clean === 'edlink-au' || clean === 'edlink-australia' || clean === 'eda' || clean === 'f48942dd-42ed-4507-8e1f-049cb3939a45') {
     try {
       const row = await prisma.template.findFirst({
         where: {
           OR: [
+            { companyId: 'f48942dd-42ed-4507-8e1f-049cb3939a45' },
             { AND: [{ name: { contains: 'Australia' } }, { NOT: { name: { contains: 'Pakistan' } } }] },
             { AND: [{ companyName: { contains: 'Australia' } }, { NOT: { companyName: { contains: 'Pakistan' } } }] },
           ],
         },
       })
-      if (row) return prismaToTemplate(row)
+      if (row) return { ...prismaToTemplate(row), layout_type: 'edlink_v1' }
     } catch {}
     return EDLINK_AU_TEMPLATE
   }

@@ -41,7 +41,8 @@ function CreateInvoiceContent() {
         const comp = await getCompanyById(companyParam)
         if (comp) {
           setCompany(comp)
-          const target = comp.id === 'anonymous-company-id' || comp.name.toLowerCase() === 'anonymous' ? 'anonymous' : comp.id
+          const isEdlinkPk = comp.prefix === 'EDL' || comp.name.toLowerCase().includes('pakistan') || companyParam === 'edlink-pk' || companyParam === 'anonymous'
+          const target = (comp.id === 'anonymous-company-id' || comp.name.toLowerCase() === 'anonymous' || isEdlinkPk) ? 'anonymous' : comp.id
           const t = await getTemplateByCompanyId(target)
           setTemplate(t)
         }

@@ -483,7 +483,7 @@ export default function InvoicesPage() {
                   Clear Filters
                 </Button>
               ) : (
-                <Link href="/invoices/select-company">
+                <Link href={quickGenerateHref}>
                   <Button size="sm" className="bg-blue-600 text-white gap-2">
                     <FilePlus className="w-4 h-4" />
                     Generate First Invoice

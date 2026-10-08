@@ -106,13 +106,14 @@ export default function InvoicePreviewPage() {
             variant="outline"
             size="sm"
             onClick={() => {
+              const entity = invoice.entity
               const snap = invoice.template_snapshot as any
               const compName = (snap?.company_name || invoice.companies?.name || '').toLowerCase()
-              if (compName.includes('neighbourhood') || invoice.companies?.prefix === 'NSC') {
+              if (entity === 'nsc' || compName.includes('neighbourhood') || invoice.companies?.prefix === 'NSC') {
                 router.push('/invoices?entity=nsc')
-              } else if (compName.includes('isquare') || invoice.companies?.prefix === 'ISQ') {
+              } else if (entity === 'isquare-bpo' || compName.includes('isquare') || invoice.companies?.prefix === 'ISQ') {
                 router.push('/invoices?entity=isq')
-              } else if (compName.includes('australia') || invoice.companies?.prefix === 'EDA') {
+              } else if (entity === 'edlink-au' || compName.includes('australia') || invoice.companies?.prefix === 'EDA') {
                 router.push('/invoices?entity=edlink-au')
               } else {
                 router.push('/invoices?entity=edlink-pk')

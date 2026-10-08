@@ -18,6 +18,7 @@ export function toInvoiceWithDetails(inv: any): InvoiceWithDetails {
     id: inv.id,
     user_id: inv.userId ?? inv.user_id ?? null,
     company_id: inv.companyId ?? inv.company_id,
+    entity: inv.entity ?? null,
     template_id: inv.templateId ?? inv.template_id ?? null,
     template_snapshot: inv.templateSnapshot ?? inv.template_snapshot,
     invoice_number: inv.invoiceNumber ?? inv.invoice_number,
@@ -62,16 +63,18 @@ export function normalizeInvoice(inv: InvoiceWithDetails): InvoiceWithDetails {
   return inv
 }
 
-export async function generateNextInvoiceNumberServer(companyId: string, isAnonymous?: boolean): Promise<string> {
+export async function generateNextInvoiceNumberServer(companyId: string, isAnonymous?: boolean, entityHint?: string): Promise<string> {
   let maxSeq = 1000
 
   let targetEntity: 'nsc' | 'isq' | 'edlink-pk' | 'edlink-au' = 'edlink-au'
-  if (isAnonymous || companyId === 'anonymous-company-id') {
-    targetEntity = 'edlink-pk'
-  } else if (companyId === 'nsc-company-id' || companyId === 'nsc') {
+  if (entityHint === 'nsc' || companyId === 'nsc-company-id' || companyId === 'nsc') {
     targetEntity = 'nsc'
-  } else if (companyId === 'isquare-bpo-company-id' || companyId === 'isquare-bpo' || companyId === 'isq') {
+  } else if (entityHint === 'isquare-bpo' || entityHint === 'isq' || companyId === 'isquare-bpo-company-id' || companyId === 'isquare-bpo' || companyId === 'isq') {
     targetEntity = 'isq'
+  } else if (entityHint === 'edlink-au' || companyId === 'edlink-au' || companyId === 'edlink') {
+    targetEntity = 'edlink-au'
+  } else if (entityHint === 'edlink-pk' || isAnonymous || companyId === 'anonymous-company-id' || companyId === 'edlink-pk') {
+    targetEntity = 'edlink-pk'
   } else if (isValidUUID(companyId)) {
     try {
       const comp = await prisma.company.findUnique({
@@ -84,7 +87,9 @@ export async function generateNextInvoiceNumberServer(companyId: string, isAnony
           targetEntity = 'nsc'
         } else if (comp.prefix === 'ISQ' || cname.includes('isquare')) {
           targetEntity = 'isq'
-        } else if (comp.prefix === 'ANO' || cname.includes('anonymous')) {
+        } else if (comp.prefix === 'EDA' || (cname.includes('australia') && !cname.includes('pakistan'))) {
+          targetEntity = 'edlink-au'
+        } else {
           targetEntity = 'edlink-pk'
         }
       }
@@ -93,36 +98,25 @@ export async function generateNextInvoiceNumberServer(companyId: string, isAnony
 
   try {
     const existingInvoices = await prisma.invoice.findMany({
-      take: 150,
+      where: {
+        OR: [
+          { entity: targetEntity === 'isq' ? 'isquare-bpo' : targetEntity },
+          ...(targetEntity === 'isq' ? [{ entity: 'isq' }, { company: { prefix: 'ISQ' } }] : []),
+          ...(targetEntity === 'nsc' ? [{ company: { prefix: 'NSC' } }] : []),
+          ...(targetEntity === 'edlink-au' ? [{ company: { prefix: 'EDA' } }] : []),
+          ...(targetEntity === 'edlink-pk' ? [{ company: { prefix: 'EDL' } }, { company: { prefix: 'ANO' } }] : []),
+        ],
+      },
+      take: 200,
       orderBy: { createdAt: 'desc' },
       select: {
         invoiceNumber: true,
-        templateSnapshot: true,
-        company: {
-          select: { prefix: true, name: true },
-        },
       },
     })
 
     if (existingInvoices && existingInvoices.length > 0) {
       existingInvoices.forEach((inv: any) => {
-        const snap = inv.templateSnapshot as any
-        const compName = (snap?.company_name || inv.company?.name || '').toLowerCase()
-        const isAnon = Boolean(
-          snap?.is_anonymous ||
-          snap?.layout_type === 'anonymous_v1' ||
-          inv.company?.prefix === 'ANO' ||
-          inv.company?.name?.toLowerCase() === 'anonymous'
-        )
-        const isNsc = inv.company?.prefix === 'NSC' || snap?.layout_type === 'nsc_v1' || compName.includes('neighbourhood')
-        const isIsq = inv.company?.prefix === 'ISQ' || compName.includes('isquare')
-
-        let entity: 'nsc' | 'isq' | 'edlink-pk' | 'edlink-au' = 'edlink-au'
-        if (isNsc) entity = 'nsc'
-        else if (isIsq) entity = 'isq'
-        else if (isAnon || compName.includes('edlink pakistan')) entity = 'edlink-pk'
-
-        if (entity === targetEntity && inv.invoiceNumber) {
+        if (inv.invoiceNumber) {
           const match = inv.invoiceNumber.match(/\d+/)
           if (match) {
             const num = parseInt(match[0], 10)
@@ -180,15 +174,17 @@ export async function getInvoicesServer(params: InvoiceFilterParams = {}): Promi
     if (params.entityType === 'nsc') {
       conditions.push({
         OR: [
+          { entity: 'nsc' },
           { company: { prefix: 'NSC' } },
           { company: { name: { contains: 'Neighbourhood' } } },
-          { templateSnapshot: { path: '$.company_name', string_contains: 'Neighbourhood' } },
           { templateSnapshot: { path: '$.layout_type', equals: 'nsc_v1' } },
         ],
       })
     } else if (params.entityType === 'isquare-bpo' || (params.entityType as any) === 'isq') {
       conditions.push({
         OR: [
+          { entity: 'isquare-bpo' },
+          { entity: 'isq' },
           { company: { prefix: 'ISQ' } },
           { company: { name: { contains: 'ISquare' } } },
           { templateSnapshot: { path: '$.company_name', string_contains: 'ISquare' } },
@@ -197,6 +193,7 @@ export async function getInvoicesServer(params: InvoiceFilterParams = {}): Promi
     } else if (params.entityType === 'edlink-au') {
       conditions.push({
         OR: [
+          { entity: 'edlink-au' },
           { company: { prefix: 'EDA' } },
           {
             AND: [
@@ -204,51 +201,42 @@ export async function getInvoicesServer(params: InvoiceFilterParams = {}): Promi
               { NOT: { company: { name: { contains: 'Pakistan' } } } },
             ],
           },
-          {
-            AND: [
-              { templateSnapshot: { path: '$.company_name', string_contains: 'Australia' } },
-              { NOT: { templateSnapshot: { path: '$.company_name', string_contains: 'Pakistan' } } },
-            ],
-          },
         ],
       })
       conditions.push({
         NOT: {
           OR: [
+            { entity: 'nsc' },
+            { entity: 'isquare-bpo' },
+            { entity: 'edlink-pk' },
             { company: { prefix: 'NSC' } },
-            { company: { name: { contains: 'Neighbourhood' } } },
-            { templateSnapshot: { path: '$.company_name', string_contains: 'Neighbourhood' } },
-            { templateSnapshot: { path: '$.layout_type', equals: 'nsc_v1' } },
             { company: { prefix: 'ISQ' } },
-            { company: { name: { contains: 'ISquare' } } },
-            { templateSnapshot: { path: '$.company_name', string_contains: 'ISquare' } },
+            { company: { prefix: 'EDL' } },
+            { company: { prefix: 'ANO' } },
           ],
         },
       })
     } else if (params.entityType === 'edlink-pk') {
       conditions.push({
+        OR: [
+          { entity: 'edlink-pk' },
+          { company: { prefix: 'EDL' } },
+          { company: { prefix: 'ANO' } },
+          { company: { name: { contains: 'Pakistan' } } },
+          { company: { name: { contains: 'Anonymous' } } },
+          { templateSnapshot: { path: '$.layout_type', equals: 'anonymous_v1' } },
+          { templateSnapshot: { path: '$.is_anonymous', equals: true } },
+        ],
+      })
+      conditions.push({
         NOT: {
           OR: [
+            { entity: 'nsc' },
+            { entity: 'isquare-bpo' },
+            { entity: 'edlink-au' },
             { company: { prefix: 'NSC' } },
-            { company: { name: { contains: 'Neighbourhood' } } },
-            { templateSnapshot: { path: '$.company_name', string_contains: 'Neighbourhood' } },
-            { templateSnapshot: { path: '$.layout_type', equals: 'nsc_v1' } },
             { company: { prefix: 'ISQ' } },
-            { company: { name: { contains: 'ISquare' } } },
-            { templateSnapshot: { path: '$.company_name', string_contains: 'ISquare' } },
             { company: { prefix: 'EDA' } },
-            {
-              AND: [
-                { company: { name: { contains: 'Australia' } } },
-                { NOT: { company: { name: { contains: 'Pakistan' } } } },
-              ],
-            },
-            {
-              AND: [
-                { templateSnapshot: { path: '$.company_name', string_contains: 'Australia' } },
-                { NOT: { templateSnapshot: { path: '$.company_name', string_contains: 'Pakistan' } } },
-              ],
-            },
           ],
         },
       })
@@ -433,20 +421,44 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
     validTemplateId = input.template_id!
   }
 
+  let resolvedEntity = input.entity || ''
+  if (!resolvedEntity) {
+    const cid = (input.company_id || '').toLowerCase()
+    const cnm = companyName.toLowerCase()
+    if (cid === 'nsc-company-id' || cid === 'nsc' || cnm.includes('neighbourhood')) {
+      resolvedEntity = 'nsc'
+    } else if (cid === 'isquare-bpo-company-id' || cid === 'isquare-bpo' || cid === 'isq' || cnm.includes('isquare')) {
+      resolvedEntity = 'isquare-bpo'
+    } else if (cid === 'edlink-au' || cid === 'edlink' || (cnm.includes('australia') && !cnm.includes('pakistan'))) {
+      resolvedEntity = 'edlink-au'
+    } else {
+      resolvedEntity = 'edlink-pk'
+    }
+  }
+
   const isAnonymous = Boolean(
     input.is_anonymous ||
     input.company_id === 'anonymous-company-id' ||
+    input.company_id === 'anonymous' ||
+    resolvedEntity === 'edlink-pk' ||
+    companyName.toLowerCase().includes('pakistan') ||
     companyName.toLowerCase() === 'anonymous'
   ) &&
+    resolvedEntity !== 'nsc' &&
+    resolvedEntity !== 'isquare-bpo' &&
+    resolvedEntity !== 'edlink-au' &&
     input.company_id !== 'nsc-company-id' &&
     input.company_id !== 'nsc' &&
     input.company_id !== 'isquare-bpo-company-id' &&
     input.company_id !== 'isquare-bpo' &&
-    input.company_id !== 'isq'
+    input.company_id !== 'isq' &&
+    input.company_id !== 'edlink-au' &&
+    input.company_id !== 'edlink' &&
+    !companyName.toLowerCase().includes('australia')
 
   const templateSnapshot: TemplateSnapshot = isAnonymous
     ? {
-        company_name: input.custom_company_name?.trim() || 'Company Name',
+        company_name: input.custom_company_name?.trim() || companyName || 'EdLink Pakistan',
         address: input.custom_address || '',
         phone: input.custom_phone || '',
         email: input.custom_email || '',
@@ -477,7 +489,7 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
         is_anonymous: false,
       }
 
-  const invoiceNumber = input.invoice_number || (await generateNextInvoiceNumberServer(resolvedCompanyId, isAnonymous))
+  const invoiceNumber = input.invoice_number || (await generateNextInvoiceNumberServer(resolvedCompanyId, isAnonymous, resolvedEntity))
 
   const preparedItems = input.items.map((item) => {
     const qty = Number(item.quantity) || 0
@@ -506,6 +518,7 @@ export async function createInvoiceServer(input: CreateInvoiceInput): Promise<In
   const createdInvoice = await prisma.invoice.create({
     data: {
       companyId: resolvedCompanyId,
+      entity: resolvedEntity,
       templateId: validTemplateId,
       templateSnapshot: templateSnapshot as any,
       invoiceNumber,
@@ -579,10 +592,13 @@ export async function updateInvoiceServer(
     includes_gst: gstRate > 0,
   }
 
+  const updatedEntity = input.entity || existing.entity || (existing.companies?.prefix === 'NSC' ? 'nsc' : existing.companies?.prefix === 'ISQ' ? 'isquare-bpo' : existing.companies?.prefix === 'EDA' ? 'edlink-au' : 'edlink-pk')
+
   await prisma.$transaction(async (tx) => {
     await tx.invoice.update({
       where: { id: invoiceId },
       data: {
+        entity: updatedEntity,
         customerName: input.customer_name !== undefined ? input.customer_name : existing.customer_name,
         referenceName: input.reference_name !== undefined ? input.reference_name : existing.reference_name,
         invoiceDate: input.invoice_date ? new Date(input.invoice_date) : undefined,

@@ -42,7 +42,8 @@ export async function GET(
 
     const isAnonymous =
       invoice.template_snapshot?.is_anonymous ||
-      invoice.template_snapshot?.layout_type === 'anonymous_v1'
+      invoice.template_snapshot?.layout_type === 'anonymous_v1' ||
+      invoice.entity === 'edlink-pk'
     const headerMode =
       invoice.template_snapshot?.header_mode ||
       (invoice.template_snapshot?.logo_url ? 'logo' : 'text')

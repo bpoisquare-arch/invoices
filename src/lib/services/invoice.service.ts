@@ -17,6 +17,7 @@ export interface InvoiceItemInput {
 
 export interface CreateInvoiceInput {
   company_id: string
+  entity?: string | null
   template_id?: string | null
   invoice_number?: string
   customer_name: string
@@ -41,6 +42,7 @@ export interface CreateInvoiceInput {
 }
 
 export interface UpdateInvoiceInput {
+  entity?: string | null
   customer_name?: string
   reference_name?: string | null
   invoice_date?: string
@@ -79,30 +81,20 @@ export function getInvoicePdfFilename(invoice: Partial<InvoiceWithDetails>): str
     invoice.template_snapshot?.is_anonymous ||
     invoice.template_snapshot?.layout_type === 'anonymous_v1' ||
     invoice.companies?.prefix === 'ANO' ||
-    invoice.companies?.name?.toLowerCase() === 'anonymous'
+    invoice.companies?.name?.toLowerCase() === 'anonymous' ||
+    invoice.entity === 'edlink-pk'
   )
 
   const compName = (invoice.template_snapshot?.company_name || invoice.companies?.name || '').toLowerCase()
   let entityName = 'EdLink Australia'
-  if (isAnonymous) {
-    entityName = 'EdLink Pakistan'
-  } else if (
-    invoice.companies?.prefix === 'NSC' ||
-    invoice.template_snapshot?.layout_type === 'nsc_v1' ||
-    compName.includes('neighbourhood')
-  ) {
+  if (invoice.entity === 'nsc' || invoice.companies?.prefix === 'NSC' || invoice.template_snapshot?.layout_type === 'nsc_v1' || compName.includes('neighbourhood')) {
     entityName = 'Neighbourhood Shine'
-  } else if (
-    invoice.companies?.prefix === 'ISQ' ||
-    compName.includes('isquare')
-  ) {
-    entityName = 'Isquare BPO'
-  } else if (compName.includes('edlink')) {
+  } else if (invoice.entity === 'isquare-bpo' || invoice.entity === 'isq' || invoice.companies?.prefix === 'ISQ' || compName.includes('isquare')) {
+    entityName = 'ISquare BPO'
+  } else if (invoice.entity === 'edlink-pk' || isAnonymous) {
+    entityName = 'EdLink Pakistan'
+  } else {
     entityName = 'EdLink Australia'
-  } else if (invoice.template_snapshot?.company_name) {
-    entityName = invoice.template_snapshot.company_name
-  } else if (invoice.companies?.name) {
-    entityName = invoice.companies.name
   }
 
   const safeEntity = entityName.replace(/[/\\?%*:|"<>]/g, '').trim()
@@ -112,12 +104,13 @@ export function getInvoicePdfFilename(invoice: Partial<InvoiceWithDetails>): str
   return `${safeEntity}-${safeCustomer}-${safeNumber}.pdf`
 }
 
-export async function generateNextInvoiceNumber(companyId: string, isAnonymous?: boolean): Promise<string> {
+export async function generateNextInvoiceNumber(companyId: string, isAnonymous?: boolean, entityHint?: string): Promise<string> {
   if (typeof window !== 'undefined') {
     try {
       const q = new URLSearchParams({
         companyId: companyId || '',
         isAnonymous: isAnonymous ? 'true' : 'false',
+        ...(entityHint ? { entity: entityHint } : {}),
       })
       const res = await fetch(`/api/invoices/next-number?${q.toString()}`)
       if (res.ok) {
@@ -126,7 +119,7 @@ export async function generateNextInvoiceNumber(companyId: string, isAnonymous?:
       }
     } catch (err) {}
   }
-  return generateNextInvoiceNumberServer(companyId, isAnonymous)
+  return generateNextInvoiceNumberServer(companyId, isAnonymous, entityHint)
 }
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceWithDetails> {

@@ -64,6 +64,7 @@ model Invoice {
   id               String   @id @default(uuid()) @db.VarChar(36)
   userId           String?  @map("user_id") @db.VarChar(36)
   companyId        String   @map("company_id") @db.VarChar(36)
+  entity           String?  @default("edlink-pk") @db.VarChar(50)
   templateId       String?  @map("template_id") @db.VarChar(36)
   templateSnapshot Json     @map("template_snapshot")
   invoiceNumber    String   @unique(map: "unique_invoice_number") @map("invoice_number") @db.VarChar(50)
@@ -81,6 +82,7 @@ model Invoice {
   items    InvoiceItem[]
 
   @@index([companyId], map: "idx_invoices_company_id")
+  @@index([entity], map: "idx_invoices_entity")
   @@index([customerName], map: "idx_invoices_customer_name")
   @@index([createdAt], map: "idx_invoices_created_at")
   @@map("invoices")
