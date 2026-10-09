@@ -168,16 +168,18 @@ export default function InstallmentsPage() {
   const startIndex = (currentPage - 1) * pageSize
   const paginatedSchedules = filteredSchedules.slice(startIndex, startIndex + pageSize)
 
-  const formatDate = (dateStr?: string | null) => {
+  const formatDate = (dateStr?: string | null | Date) => {
     if (!dateStr) return 'N/A'
-    if (dateStr.includes('/')) return dateStr
-    const datePart = dateStr.split('T')[0]
+    const str = dateStr instanceof Date ? dateStr.toISOString() : String(dateStr)
+    if (str.includes('/')) return str
+    const datePart = str.split('T')[0]
     const parts = datePart.split('-')
     if (parts.length === 3) {
       return `${parts[2]}/${parts[1]}/${parts[0]}`
     }
-    return dateStr
+    return str
   }
+
 
   return (
     <div className="space-y-6 max-w-full mx-auto font-sans">

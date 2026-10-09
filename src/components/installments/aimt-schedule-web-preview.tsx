@@ -10,9 +10,14 @@ interface AimtScheduleWebPreviewProps {
 }
 
 export default function AimtScheduleWebPreview({ schedule, fixedInfo = DEFAULT_AIMT_FIXED_INFO, id = "aimt-schedule-web-preview" }: AimtScheduleWebPreviewProps) {
-  const formatDate = (dateStr?: string | null) => {
+  const formatDate = (dateStr?: string | null | Date) => {
     if (!dateStr) return 'N/A'
-    const clean = dateStr.split('T')[0].trim()
+    let clean: string
+    if (dateStr instanceof Date) {
+      clean = dateStr.toISOString().split('T')[0].trim()
+    } else {
+      clean = String(dateStr).split('T')[0].trim()
+    }
     if (clean.includes('/')) return clean
     const parts = clean.split('-')
     if (parts.length === 3) {
@@ -21,6 +26,7 @@ export default function AimtScheduleWebPreview({ schedule, fixedInfo = DEFAULT_A
     }
     return clean
   }
+
 
   const items = schedule.schedule_items || []
   const totalAmt = schedule.total_amount || 0

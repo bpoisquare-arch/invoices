@@ -22,6 +22,7 @@ export async function GET(
     const doc = React.createElement(AimtSchedulePDFTemplate, { schedule, fixedInfo })
     const stream = await renderToStream(doc as any)
 
+
     const studentNameStr = schedule.student_name
       ? schedule.student_name.trim().replace(/[/\\?%*:|"<>]/g, '').replace(/\s+/g, '-')
       : (schedule.student_id || 'AIMT')
@@ -31,14 +32,15 @@ export async function GET(
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${filename}"`,
+        'Content-Disposition': `attachment; filename="${filename}"`,
         'Cache-Control': 'no-cache',
       },
     })
   } catch (error: any) {
     console.error('Installment PDF Generation Error:', error)
-    return new NextResponse(`Error generating PDF: ${error?.message || 'Unknown error'}`, {
+    return new NextResponse(`Error generating PDF: ${error?.stack || error?.message || 'Unknown error'}`, {
       status: 500,
     })
   }
 }
+

@@ -217,9 +217,14 @@ export default function AimtSchedulePDFTemplate({
       ? fixedInfo.logo_url
       : AIMT_LOGO_BASE64
 
-  const formatDate = (dateStr?: string | null) => {
+  const formatDate = (dateStr?: string | null | Date) => {
     if (!dateStr) return 'N/A'
-    const clean = dateStr.split('T')[0].trim()
+    let clean: string
+    if (dateStr instanceof Date) {
+      clean = dateStr.toISOString().split('T')[0].trim()
+    } else {
+      clean = String(dateStr).split('T')[0].trim()
+    }
     if (clean.includes('/')) return clean
     const parts = clean.split('-')
     if (parts.length === 3) {
@@ -331,14 +336,15 @@ export default function AimtSchedulePDFTemplate({
               <Text style={[styles.boldLabel, { marginLeft: 6 }]}>RESOURCES FEE: </Text>
               <Text style={styles.underlineValue}>AUD {schedule.resources_fee ?? 0}</Text>
               {materialFeeVal > 0 ? (
-                <>
-                  <Text style={[styles.boldLabel, { marginLeft: 6 }]}>MATERIAL FEE: </Text>
-                  <Text style={styles.underlineValue}>AUD {Number(materialFeeVal).toLocaleString()}</Text>
-                </>
+                <Text style={[styles.boldLabel, { marginLeft: 6 }]}>MATERIAL FEE: </Text>
+              ) : null}
+              {materialFeeVal > 0 ? (
+                <Text style={styles.underlineValue}>AUD {Number(materialFeeVal).toLocaleString()}</Text>
               ) : null}
               <Text style={[styles.boldLabel, { marginLeft: 6 }]}>TUITION FEE: </Text>
               <Text style={styles.underlineValue}>AUD {Number(schedule.tuition_fee || 0).toLocaleString()}</Text>
             </View>
+
 
             {Number(schedule.scholarship || 0) > 0 ? (
               <View style={styles.metaRow}>

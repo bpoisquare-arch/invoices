@@ -406,7 +406,47 @@ export function getOrdinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0])
 }
 
-function mapDbRowToSchedule(row: any): STCStudentInstallmentSchedule {
+function mapDbRowToSchedule(rawRow: any): STCStudentInstallmentSchedule {
+  if (!rawRow) return rawRow
+
+  const toDateStr = (d: any) => {
+    if (!d) return ''
+    if (d instanceof Date) return d.toISOString().slice(0, 10)
+    return String(d).slice(0, 10)
+  }
+
+  const row = {
+    ...rawRow,
+    student_name: rawRow.student_name ?? rawRow.studentName ?? '',
+    student_id: rawRow.student_id ?? rawRow.studentId ?? '',
+    course_name: rawRow.course_name ?? rawRow.courseName ?? '',
+    duration: rawRow.duration ?? '',
+    date: toDateStr(rawRow.date),
+    start_date: toDateStr(rawRow.start_date ?? rawRow.startDate),
+    end_date: toDateStr(rawRow.end_date ?? rawRow.endDate),
+    start_month_year: rawRow.start_month_year ?? rawRow.startMonthYear ?? undefined,
+    end_month_offset: rawRow.end_month_offset ?? rawRow.endMonthOffset ?? 3,
+    admin_fee: Number(rawRow.admin_fee ?? rawRow.adminFee ?? 0),
+    resources_fee: Number(rawRow.resources_fee ?? rawRow.resourcesFee ?? 0),
+    material_fee: rawRow.material_fee !== undefined && rawRow.material_fee !== null
+      ? Number(rawRow.material_fee)
+      : (rawRow.materialFee !== undefined && rawRow.materialFee !== null ? Number(rawRow.materialFee) : undefined),
+    tuition_fee: Number(rawRow.tuition_fee ?? rawRow.tuitionFee ?? 0),
+    scholarship: Number(rawRow.scholarship ?? 0),
+    total_amount: Number(rawRow.total_amount ?? rawRow.totalAmount ?? 0),
+    first_installment_amount: Number(rawRow.first_installment_amount ?? rawRow.firstInstallmentAmount ?? 0),
+    schedule_items: rawRow.schedule_items ?? rawRow.scheduleItems ?? [],
+    agency: rawRow.agency ?? undefined,
+    recipient_email: rawRow.recipient_email ?? rawRow.recipientEmail ?? undefined,
+    from_email: rawRow.from_email ?? rawRow.fromEmail ?? undefined,
+    email_subject: rawRow.email_subject ?? rawRow.emailSubject ?? undefined,
+    email_message: rawRow.email_message ?? rawRow.emailMessage ?? undefined,
+    last_email_sent_at: rawRow.last_email_sent_at ?? rawRow.lastEmailSentAt ?? undefined,
+    last_email_status: rawRow.last_email_status ?? rawRow.lastEmailStatus ?? undefined,
+    created_at: rawRow.created_at instanceof Date ? rawRow.created_at.toISOString() : (rawRow.createdAt instanceof Date ? rawRow.createdAt.toISOString() : String(rawRow.created_at || rawRow.createdAt || '')),
+    updated_at: rawRow.updated_at instanceof Date ? rawRow.updated_at.toISOString() : (rawRow.updatedAt instanceof Date ? rawRow.updatedAt.toISOString() : String(rawRow.updated_at || rawRow.updatedAt || '')),
+  }
+
   let scheduleItems: InstallmentRow[] = []
   let extraMaterialFee: number | undefined = undefined
   let extraInitialFees: number[] | undefined = undefined
@@ -443,6 +483,7 @@ function mapDbRowToSchedule(row: any): STCStudentInstallmentSchedule {
   } else if (Array.isArray(row.schedule_items)) {
     scheduleItems = row.schedule_items
   }
+
 
   const admin = Number(row.admin_fee) || 0
   const resources = Number(row.resources_fee) || 0

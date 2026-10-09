@@ -221,9 +221,14 @@ export default function STCSchedulePDFTemplate({
       ? fixedInfo.logo_url
       : STC_LOGO_BASE64
 
-  const formatDate = (dateStr?: string | null) => {
+  const formatDate = (dateStr?: string | null | Date) => {
     if (!dateStr) return 'N/A'
-    const clean = dateStr.split('T')[0].trim()
+    let clean: string
+    if (dateStr instanceof Date) {
+      clean = dateStr.toISOString().split('T')[0].trim()
+    } else {
+      clean = String(dateStr).split('T')[0].trim()
+    }
     if (clean.includes('/')) return clean
     const parts = clean.split('-')
     if (parts.length === 3) {
@@ -232,6 +237,7 @@ export default function STCSchedulePDFTemplate({
     }
     return clean
   }
+
 
   const items = schedule.schedule_items || []
   const totalAmt = schedule.total_amount || 0
