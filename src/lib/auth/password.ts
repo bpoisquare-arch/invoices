@@ -7,11 +7,25 @@ export function hashPassword(password: string): string {
 }
 
 export function verifyPassword(password: string, storedHash: string): boolean {
-  if (!storedHash || !storedHash.includes(':')) {
-    // If it's a legacy plain-text fallback match during transition
-    return password === storedHash
+  if (!password || !storedHash || !storedHash.includes(':')) {
+    return false
   }
   const [salt, originalHash] = storedHash.split(':')
-  const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex')
-  return hash === originalHash
+  if (!salt || !originalHash) {
+    return false
+  }
+
+  try {
+    const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex')
+    const hashBuffer = Buffer.from(hash, 'hex')
+    const originalHashBuffer = Buffer.from(originalHash, 'hex')
+
+    if (hashBuffer.length !== originalHashBuffer.length) {
+      return false
+    }
+
+    return crypto.timingSafeEqual(hashBuffer, originalHashBuffer)
+  } catch {
+    return false
+  }
 }

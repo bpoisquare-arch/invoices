@@ -47,23 +47,6 @@ export function LoginForm({
 
     const cleanEmail = email.trim().toLowerCase()
 
-    // 1. Viewer Credentials Bypass for immediate login
-    if (cleanEmail === 'team@mis.isquarebpo.com' && password === 'Team@1230') {
-      document.cookie = 'dev-auth-session=viewer; path=/; max-age=86400; SameSite=Lax'
-      document.cookie = 'user-role=viewer; path=/; max-age=86400; SameSite=Lax'
-      router.push('/portal')
-      router.refresh()
-      return
-    }
-
-    // 2. Admin Credentials Bypass for immediate login
-    if (cleanEmail === 'admin@mis.isquarebpo.com' && password === 'admin123') {
-      document.cookie = 'dev-auth-session=admin; path=/; max-age=86400; SameSite=Lax'
-      document.cookie = 'user-role=admin; path=/; max-age=86400; SameSite=Lax'
-      router.push('/portal')
-      router.refresh()
-      return
-    }
 
     try {
       const res = await fetch('/api/auth/login', {

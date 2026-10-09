@@ -1,10 +1,25 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+async function checkAuthorized(request: NextRequest): Promise<boolean> {
+  const secret = process.env.SETUP_SECRET
+  const headerSecret = request.headers.get('x-setup-secret')
+  if (secret && headerSecret === secret) return true
+
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value
+  const session = await verifySessionToken(token)
+  return !!session && session.role === 'admin'
+}
+
+export async function GET(request: NextRequest) {
   try {
+    if (!(await checkAuthorized(request))) {
+      return NextResponse.json({ error: 'Unauthorized: Admin privileges required.' }, { status: 401 })
+    }
+
     const settings = await prisma.attendanceSetting.upsert({
       where: { id: 'default' },
       update: {},
@@ -30,6 +45,6 @@ export async function GET() {
   }
 }
 
-export async function POST() {
-  return GET()
+export async function POST(request: NextRequest) {
+  return GET(request)
 }

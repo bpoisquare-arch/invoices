@@ -13,6 +13,7 @@ import { Shield, Key, Save, Loader2, CheckCircle2, Lock, RefreshCw, KeyRound } f
 export default function SettingsPage() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null)
   const [role, setRole] = useState<string>('user')
+  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -44,8 +45,13 @@ export default function SettingsPage() {
 
   async function handlePasswordUpdate(e: React.FormEvent) {
     e.preventDefault()
+    if (!currentPassword) {
+      setMessage({ type: 'error', text: 'Please enter your current password.' })
+      return
+    }
+
     if (!newPassword) {
-      setMessage({ type: 'error', text: 'Password cannot be empty.' })
+      setMessage({ type: 'error', text: 'New password cannot be empty.' })
       return
     }
 
@@ -69,7 +75,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/auth/password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPassword }),
+        body: JSON.stringify({ currentPassword, newPassword }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -80,6 +86,7 @@ export default function SettingsPage() {
         module: 'settings',
       })
       setMessage({ type: 'success', text: 'Password updated successfully in MySQL!' })
+      setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
     } catch (err: any) {
@@ -192,6 +199,18 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handlePasswordUpdate} className="space-y-4">
+            <div className="max-w-md">
+              <Label className="text-xs font-bold text-slate-700">Current Password</Label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+                className="mt-1.5"
+              />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs font-bold text-slate-700">New Password</Label>
@@ -200,6 +219,7 @@ export default function SettingsPage() {
                   placeholder="••••••••"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
+                  required
                   className="mt-1.5"
                 />
               </div>
@@ -210,6 +230,7 @@ export default function SettingsPage() {
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
                   className="mt-1.5"
                 />
               </div>

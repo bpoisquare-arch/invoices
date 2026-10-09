@@ -4,11 +4,20 @@ import { renderToStream } from '@react-pdf/renderer'
 import PayslipPDFTemplate, { PayslipData } from '@/components/pdf/payslip-pdf-template'
 import { Employee } from '@/types/database.types'
 import { sendPayslipEmail, getEmailConfig } from '@/lib/services/payslip-email.service'
+import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
+    const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value
+    const session = await verifySessionToken(sessionToken)
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Admin privileges required to send payslip emails.' },
+        { status: 403 }
+      )
+    }
     const body = await request.json()
     const {
       employee,

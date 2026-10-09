@@ -17,18 +17,17 @@ import {
 } from '@/lib/services/installment-email.service'
 import { logAuditEventServer } from '@/lib/services/audit-server'
 import AimtSchedulePDFTemplate from '@/components/pdf/aimt-schedule-pdf-template'
+import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const devSessionVal = request.cookies.get('dev-auth-session')?.value
-    const userRoleVal = request.cookies.get('user-role')?.value
-    const devSession = !!devSessionVal && devSessionVal !== 'false'
-    const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer'
+    const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value
+    const session = await verifySessionToken(sessionToken)
     
-    if (!devSession || isViewer) {
-      return NextResponse.json({ success: false, error: 'Unauthorized: Valid session required.' }, { status: 401 })
+    if (!session || session.role === 'viewer') {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Admin privileges required.' }, { status: 401 })
     }
 
     const body = await request.json()
