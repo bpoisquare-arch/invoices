@@ -25,8 +25,24 @@ export async function updateSession(request: NextRequest) {
 
   // 2. Unauthenticated handling
   if (!isAuthenticated) {
-    // If it's an API route and not a public auth endpoint, return 401 JSON
-    if (pathname.startsWith('/api')) {
+    // Check for internal Machine-to-Machine (M2M) API key (e.g. Grocery Management)
+    const internalKey = request.headers.get('x-internal-key') || request.headers.get('x-api-key')
+    const expectedSecret =
+      process.env.INTERNAL_API_SECRET || 'isquare-internal-attendance-bridge-2026'
+    const isInternalService =
+      Boolean(internalKey) && internalKey === expectedSecret && pathname.startsWith('/api/attendance')
+
+    if (isInternalService) {
+      // Allow internal service access to attendance endpoints
+      // Mutating master records (PUT / DELETE) is strictly prohibited for external services
+      if (['DELETE', 'PUT'].includes(request.method) && !pathname.startsWith('/api/attendance/requests')) {
+        return NextResponse.json(
+          { error: 'Forbidden: Internal service key only has read-only permission for master attendance records.' },
+          { status: 403 }
+        )
+      }
+    } else if (pathname.startsWith('/api')) {
+      // If it's an API route and not a public auth endpoint, return 401 JSON
       if (!isPublicApiRoute) {
         return NextResponse.json(
           { error: 'Unauthorized: Valid authentication session required.' },
