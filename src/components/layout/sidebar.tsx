@@ -233,6 +233,33 @@ export default function AppSidebar() {
     router.refresh()
   }
 
+  useEffect(() => {
+    function handleActiveEntityChanged(e: Event) {
+      const customEvent = e as CustomEvent<{ entityId?: string }>
+      if (customEvent?.detail?.entityId) {
+        setActiveEntity(customEvent.detail.entityId)
+      } else if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search)
+        const entityParam = urlParams.get('entity') || urlParams.get('company')
+        if (entityParam === 'nsc') setActiveEntity('nsc')
+        else if (entityParam === 'isq' || entityParam === 'isquare-bpo') setActiveEntity('isquare-bpo')
+        else if (entityParam === 'edlink' || entityParam === 'edlink-au') setActiveEntity('edlink-au')
+        else if (entityParam === 'anonymous' || entityParam === 'edlink-pk') setActiveEntity('edlink-pk')
+        else {
+          const stored = localStorage.getItem('active_entity')
+          if (stored) setActiveEntity(stored)
+        }
+      }
+    }
+
+    window.addEventListener('active_entity_changed', handleActiveEntityChanged)
+    window.addEventListener('popstate', handleActiveEntityChanged)
+    return () => {
+      window.removeEventListener('active_entity_changed', handleActiveEntityChanged)
+      window.removeEventListener('popstate', handleActiveEntityChanged)
+    }
+  }, [])
+
   // Close mobile drawer when clicking any navigation link
   const handleNavClick = () => {
     if (isMobile) {
@@ -244,7 +271,11 @@ export default function AppSidebar() {
     setActiveEntity(entity.id)
     if (typeof window !== 'undefined') {
       localStorage.setItem('active_entity', entity.id)
-      window.dispatchEvent(new Event('active_entity_changed'))
+      window.dispatchEvent(
+        new CustomEvent('active_entity_changed', {
+          detail: { entityId: entity.id, route: entity.route },
+        })
+      )
     }
     setEntityMenuOpen(false)
     if (isMobile) setOpenMobile(false)

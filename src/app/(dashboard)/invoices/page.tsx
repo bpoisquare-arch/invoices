@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { InvoiceWithDetails, Company } from '@/types/database.types'
 import {
   getInvoices,
@@ -43,8 +43,24 @@ import {
 import RenameInvoiceDialog from '@/components/invoices/rename-invoice-dialog'
 import DeleteInvoiceDialog from '@/components/invoices/delete-invoice-dialog'
 
-export default function InvoicesPage() {
+function resolveEntityFromParam(param: string | null): string | null {
+  if (!param) return null
+  const p = param.toLowerCase().trim()
+  if (p === 'nsc') return 'nsc'
+  if (p === 'isq' || p === 'isquare-bpo') return 'isquare-bpo'
+  if (p === 'edlink' || p === 'edlink-au') return 'edlink-au'
+  if (p === 'anonymous' || p === 'edlink-pk') return 'edlink-pk'
+  if (p === 'stc') return 'stc'
+  if (p === 'aimt') return 'aimt'
+  return null
+}
+
+function InvoicesPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const rawEntityParam = searchParams.get('entity') || searchParams.get('company')
+  const paramEntity = resolveEntityFromParam(rawEntityParam)
 
   // State
   const [invoices, setInvoices] = useState<InvoiceWithDetails[]>([])
@@ -78,24 +94,48 @@ export default function InvoicesPage() {
     return () => clearTimeout(handler)
   }, [searchQuery])
 
-  const [activeEntity, setActiveEntity] = useState<string>('edlink-pk')
+  const [activeEntity, setActiveEntity] = useState<string>(() => {
+    if (paramEntity) return paramEntity
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('active_entity') || 'edlink-pk'
+    }
+    return 'edlink-pk'
+  })
 
+  // 1. Reactive URL Sync: Whenever searchParams changes (?entity=... or ?company=...), sync activeEntity instantly
   useEffect(() => {
-    function syncActiveEntity() {
+    if (paramEntity) {
+      setActiveEntity(paramEntity)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('active_entity', paramEntity)
+      }
+    } else if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('active_entity') || 'edlink-pk'
+      setActiveEntity(stored)
+    }
+  }, [paramEntity])
+
+  // 2. Event Sync: When sidebar triggers active_entity_changed, update activeEntity immediately
+  useEffect(() => {
+    function syncActiveEntity(e?: Event) {
+      const customEvent = e as CustomEvent<{ entityId?: string }>
+      if (customEvent?.detail?.entityId) {
+        setActiveEntity(customEvent.detail.entityId)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('active_entity', customEvent.detail.entityId)
+        }
+        return
+      }
+
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search)
-        const entityParam = urlParams.get('entity') || urlParams.get('company')
-        let entity = localStorage.getItem('active_entity') || 'edlink-pk'
-        if (entityParam === 'nsc') entity = 'nsc'
-        else if (entityParam === 'isq' || entityParam === 'isquare-bpo') entity = 'isquare-bpo'
-        else if (entityParam === 'edlink' || entityParam === 'edlink-au') entity = 'edlink-au'
-        else if (entityParam === 'anonymous' || entityParam === 'edlink-pk') entity = 'edlink-pk'
+        const ep = resolveEntityFromParam(urlParams.get('entity') || urlParams.get('company'))
+        const entity = ep || localStorage.getItem('active_entity') || 'edlink-pk'
         setActiveEntity(entity)
         localStorage.setItem('active_entity', entity)
       }
     }
 
-    syncActiveEntity()
     window.addEventListener('active_entity_changed', syncActiveEntity)
     window.addEventListener('popstate', syncActiveEntity)
     window.addEventListener('storage', syncActiveEntity)
@@ -120,7 +160,7 @@ export default function InvoicesPage() {
   async function loadInvoices() {
     try {
       setIsLoading(true)
-      const currentEntity = (typeof window !== 'undefined' ? localStorage.getItem('active_entity') : activeEntity) || 'edlink-pk'
+      const currentEntity = activeEntity || 'edlink-pk'
       const params: InvoiceFilterParams = {
         search: debouncedSearch,
         companyId: selectedCompany,
@@ -777,5 +817,20 @@ export default function InvoicesPage() {
         onSuccess={loadInvoices}
       />
     </div>
+  )
+}
+
+export default function InvoicesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-12 text-center text-slate-500 flex items-center justify-center gap-3">
+          <Loader2 className="w-6 h-6 animate-spin text-[#003D5C]" />
+          <span>Loading Invoices...</span>
+        </div>
+      }
+    >
+      <InvoicesPageContent />
+    </Suspense>
   )
 }

@@ -56,8 +56,8 @@ export default function StcReportsPage() {
       }
     }
 
-    const currentList = filteredRecords.length > 0 ? filteredRecords : records
-
+    const currentList = filteredRecords
+ 
     let totalPendingAmount = 0
     let pendingInvoicesCount = 0
     let totalYetToRaised = 0
@@ -69,13 +69,15 @@ export default function StcReportsPage() {
           : parseFloat(String(r.pending_amount || '0').replace(/[^0-9.-]+/g, '')) || 0
       totalPendingAmount += pAmt
 
+      // Pending invoices count: sum the numeric pending invoice value
       if (
         r.pending_invoice &&
         r.pending_invoice !== '-' &&
         r.pending_invoice !== '0' &&
         r.pending_invoice !== ''
       ) {
-        pendingInvoicesCount++
+        const parsedInv = parseFloat(String(r.pending_invoice).replace(/[^0-9.-]+/g, ''))
+        pendingInvoicesCount += (!isNaN(parsedInv) && parsedInv > 0) ? Math.round(parsedInv) : 1
       }
 
       const yAmt =
