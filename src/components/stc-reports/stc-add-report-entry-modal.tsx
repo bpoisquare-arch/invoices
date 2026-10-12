@@ -47,6 +47,32 @@ interface StcAddReportEntryModalProps {
 }
 
 /**
+ * Helper to safely extract scholarship amount as number, ignoring dates or non-monetary strings
+ */
+function cleanScholarshipNumber(val: any): number {
+  if (val === null || val === undefined || val === '' || val === '-') return 0
+  if (typeof val === 'number') {
+    if (isNaN(val) || val <= 0) return 0
+    return val
+  }
+  const str = String(val).trim()
+  if (!str) return 0
+  if (
+    str.includes('GMT') ||
+    str.includes('T00:00') ||
+    /^\d{4}-\d{2}-\d{2}/.test(str) ||
+    /^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(str)
+  ) {
+    return 0
+  }
+  const cleaned = str.replace(/[^0-9.-]/g, '')
+  const num = parseFloat(cleaned)
+  if (isNaN(num) || num <= 0) return 0
+  if (num > 100000) return 0
+  return num
+}
+
+/**
  * Helper to compute yet_to_raised:
  * total_fee - (total_paid + pending_amount)
  */
@@ -207,6 +233,40 @@ export default function StcAddReportEntryModal({
             ? String(rawAdminComments).trim()
             : ''
 
+        const rawAdmin = editRecord.admin_fee ? String(editRecord.admin_fee) : ''
+        const rawRes = editRecord.resource_fee ? String(editRecord.resource_fee) : ''
+        const rawTui = editRecord.tuition_fee ? String(editRecord.tuition_fee) : ''
+        const rawSch = editRecord.scholarship || ''
+
+        const adminNum = parseFloat(rawAdmin) || 0
+        const resNum = parseFloat(rawRes) || 0
+        const tuiNum = parseFloat(rawTui) || 0
+        const schNum = cleanScholarshipNumber(rawSch)
+        const grossFee = adminNum + resNum + tuiNum
+        const netFee = Math.max(0, grossFee - schNum)
+
+        let initialTotFee = editRecord.total_fee ? String(editRecord.total_fee) : ''
+        if (schNum > 0 && grossFee > 0) {
+          const parsedTot = parseFloat(initialTotFee) || 0
+          if (!initialTotFee || parsedTot === 0 || Math.abs(parsedTot - grossFee) < 0.01 || parsedTot > netFee) {
+            initialTotFee = String(netFee)
+          }
+        } else if (!initialTotFee && grossFee > 0) {
+          initialTotFee = String(grossFee)
+        }
+
+        let initialYetToRaised = editRecord.yet_to_raised || ''
+        if (initialTotFee) {
+          const autoYet = computeYetToRaised(initialTotFee, totalPaidVal, editRecord.pending_amount ? String(editRecord.pending_amount) : '0')
+          if (autoYet !== '') {
+            const parsedYet = parseFloat(initialYetToRaised) || 0
+            const oldGrossYet = Math.max(0, grossFee - (parseFloat(totalPaidVal) || 0) - (Number(editRecord.pending_amount) || 0))
+            if (!initialYetToRaised || (schNum > 0 && Math.abs(parsedYet - oldGrossYet) < 0.01)) {
+              initialYetToRaised = autoYet
+            }
+          }
+        }
+
         setFormData({
           student_name: editRecord.student_name || '',
           student_id: editRecord.student_id || '',
@@ -214,7 +274,7 @@ export default function StcAddReportEntryModal({
           scholarship: editRecord.scholarship || '',
           pending_invoice: editRecord.pending_invoice || '',
           pending_amount: editRecord.pending_amount ? String(editRecord.pending_amount) : '',
-          yet_to_raised: editRecord.yet_to_raised || '',
+          yet_to_raised: initialYetToRaised,
           remarks: remarksVal,
           follow_up: followUpVal,
           admin_comments: adminCommentsVal,
@@ -232,10 +292,10 @@ export default function StcAddReportEntryModal({
           intake: editRecord.intake || '',
           end_date: editRecord.end_date || '',
           course: editRecord.course || '',
-          admin_fee: editRecord.admin_fee ? String(editRecord.admin_fee) : '',
-          resource_fee: editRecord.resource_fee ? String(editRecord.resource_fee) : '',
-          tuition_fee: editRecord.tuition_fee ? String(editRecord.tuition_fee) : '',
-          total_fee: editRecord.total_fee ? String(editRecord.total_fee) : '',
+          admin_fee: rawAdmin,
+          resource_fee: rawRes,
+          tuition_fee: rawTui,
+          total_fee: initialTotFee,
           paid_amount: editRecord.paid_amount ? String(editRecord.paid_amount) : '',
           total_paid: totalPaidVal,
           coe_issued_date: editRecord.coe_issued_date || '',
@@ -291,7 +351,7 @@ export default function StcAddReportEntryModal({
     const admin = parseFloat(updated.admin_fee) || 0
     const resource = parseFloat(updated.resource_fee) || 0
     const tuition = parseFloat(updated.tuition_fee) || 0
-    const scholarship = parseFloat(updated.scholarship) || 0
+    const scholarship = cleanScholarshipNumber(updated.scholarship)
     const sum = Math.max(0, admin + resource + tuition - scholarship)
 
     setIsManualTotalFee(false)
@@ -313,7 +373,7 @@ export default function StcAddReportEntryModal({
     const admin = parseFloat(formData.admin_fee) || 0
     const resource = parseFloat(formData.resource_fee) || 0
     const tuition = parseFloat(formData.tuition_fee) || 0
-    const scholarship = parseFloat(formData.scholarship) || 0
+    const scholarship = cleanScholarshipNumber(formData.scholarship)
     const sum = Math.max(0, admin + resource + tuition - scholarship)
 
     setIsManualTotalFee(false)
@@ -390,12 +450,34 @@ export default function StcAddReportEntryModal({
 
     setIsSubmitting(true)
 
+    // Ensure scholarship is properly applied to total_fee and yet_to_raised
+    const submitData = { ...formData }
+    const aNum = parseFloat(submitData.admin_fee) || 0
+    const rNum = parseFloat(submitData.resource_fee) || 0
+    const tNum = parseFloat(submitData.tuition_fee) || 0
+    const sNum = cleanScholarshipNumber(submitData.scholarship)
+    const grossNum = aNum + rNum + tNum
+    if (sNum > 0 && grossNum > 0) {
+      const netNum = Math.max(0, grossNum - sNum)
+      const currentTot = parseFloat(submitData.total_fee) || 0
+      if (!submitData.total_fee || currentTot === 0 || Math.abs(currentTot - grossNum) < 0.01 || currentTot > netNum) {
+        submitData.total_fee = String(netNum)
+        const autoYet = computeYetToRaised(String(netNum), submitData.total_paid, submitData.pending_amount)
+        if (autoYet !== '') {
+          submitData.yet_to_raised = autoYet
+          if (submitData.divided_month) {
+            submitData.calculation_breakup = computeCalculationBreakup(autoYet, submitData.divided_month)
+          }
+        }
+      }
+    }
+
     try {
       if (isEditMode && editRecord) {
         // Viewers only update admin_comments
         const updatePayload = isViewer
-          ? { id: editRecord.id, admin_comments: formData.admin_comments }
-          : { id: editRecord.id, ...formData }
+          ? { id: editRecord.id, admin_comments: submitData.admin_comments }
+          : { id: editRecord.id, ...submitData }
 
         // Update existing record in STC database
         const res = await fetch('/api/stc/reports/records', {
@@ -418,7 +500,7 @@ export default function StcAddReportEntryModal({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             importId: activeImportId,
-            ...formData,
+            ...submitData,
           }),
         })
 

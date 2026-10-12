@@ -19,6 +19,31 @@ function cleanNumber(val: any): number {
   return isNaN(num) ? 0 : num
 }
 
+// Clean and parse scholarship values safely, rejecting dates or non-monetary strings
+export function cleanScholarshipNumber(val: any): number {
+  if (val === null || val === undefined || val === '' || val === '-') return 0
+  if (typeof val === 'number') {
+    if (isNaN(val) || val <= 0) return 0
+    return val
+  }
+  const str = String(val).trim()
+  if (!str) return 0
+  // Reject date strings (e.g. containing GMT, T00:00, or matching date regex)
+  if (
+    str.includes('GMT') ||
+    str.includes('T00:00') ||
+    /^\d{4}-\d{2}-\d{2}/.test(str) ||
+    /^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(str)
+  ) {
+    return 0
+  }
+  const cleaned = str.replace(/[^0-9.-]/g, '')
+  const num = parseFloat(cleaned)
+  if (isNaN(num) || num <= 0) return 0
+  if (num > 100000) return 0 // Outlier / corrupted date serial numbers
+  return num
+}
+
 // Format dates from Excel serial or string
 function formatExcelDate(val: any): string {
   if (!val && val !== 0) return ''
@@ -47,11 +72,17 @@ function formatExcelDate(val: any): string {
   return str
 }
 
-function normalizeDocumentType(doc?: string | null): string {
-  if (!doc) return 'Passport'
-  const d = doc.trim().toLowerCase()
+function normalizeDocumentType(doc?: string | null): string | null {
+  if (!doc) return null
+  const trimmed = doc.trim()
+  if (!trimmed) return null
+  const d = trimmed.toLowerCase()
   if (d.includes('cnic') || d.includes('nic') || d.includes('national id')) return 'CNIC'
-  return 'Passport'
+  if (d.includes('coe')) return 'CoE'
+  if (d.includes('voe')) return 'VoE'
+  if (d.includes('offer')) return 'Offer Letter'
+  if (d.includes('passport')) return 'Passport'
+  return trimmed
 }
 
 function generateId(): string {
@@ -175,10 +206,10 @@ export function parseStcExcelBuffer(buffer: Buffer, _fileName?: string): {
     const scholarship = idxScholarship !== -1 ? cleanString(row[idxScholarship]) : ''
     const pendingInvoice = idxPendingInvoice !== -1 ? cleanString(row[idxPendingInvoice]) : ''
     const pendingAmount = idxPendingAmount !== -1 ? cleanNumber(row[idxPendingAmount]) : 0
-    const yetToRaised = idxYetToRaised !== -1 ? cleanString(row[idxYetToRaised]) : ''
+    let yetToRaised = idxYetToRaised !== -1 ? cleanString(row[idxYetToRaised]) : ''
     const remarks = idxRemarks !== -1 ? cleanString(row[idxRemarks]) : ''
     const dob = idxDob !== -1 ? formatExcelDate(row[idxDob]) : ''
-    const document = idxDocument !== -1 ? normalizeDocumentType(cleanString(row[idxDocument])) : 'Passport'
+    const document = idxDocument !== -1 ? (normalizeDocumentType(cleanString(row[idxDocument])) || '') : ''
     const status = idxStatus !== -1 ? (cleanString(row[idxStatus]) || 'Current') : 'Current'
     const intake = idxIntake !== -1 ? cleanString(row[idxIntake]) : ''
     const endDate = idxEndDate !== -1 ? formatExcelDate(row[idxEndDate]) : ''
@@ -187,15 +218,34 @@ export function parseStcExcelBuffer(buffer: Buffer, _fileName?: string): {
     const adminFee = idxAdminFee !== -1 ? cleanNumber(row[idxAdminFee]) : 0
     const resourceFee = idxResourceFee !== -1 ? cleanNumber(row[idxResourceFee]) : 0
     const tuitionFee = idxTuitionFee !== -1 ? cleanNumber(row[idxTuitionFee]) : 0
+    const grossFee = adminFee + resourceFee + tuitionFee
+    const scholarshipNum = cleanScholarshipNumber(scholarship)
     
     let totalFee = idxTotalFee !== -1 ? cleanNumber(row[idxTotalFee]) : 0
-    if (totalFee === 0 && (adminFee > 0 || resourceFee > 0 || tuitionFee > 0)) {
-      totalFee = adminFee + resourceFee + tuitionFee - cleanNumber(scholarship)
-      if (totalFee < 0) totalFee = 0
+    if (scholarshipNum > 0) {
+      if (grossFee > 0) {
+        const netFee = Math.max(0, grossFee - scholarshipNum)
+        // If totalFee in Excel was gross, 0, or higher than net: apply scholarship!
+        if (totalFee === 0 || Math.abs(totalFee - grossFee) < 1 || totalFee > netFee) {
+          totalFee = netFee
+        }
+      } else if (totalFee > 0) {
+        totalFee = Math.max(0, totalFee - scholarshipNum)
+      }
+    } else {
+      if (totalFee === 0 && grossFee > 0) {
+        totalFee = grossFee
+      }
     }
 
     const paidAmount = idxPaidAmount !== -1 ? cleanNumber(row[idxPaidAmount]) : 0
     const totalPaid = idxTotalPaid !== -1 ? cleanNumber(row[idxTotalPaid]) : paidAmount
+    if (totalFee > 0) {
+      const computedYet = Math.max(0, Math.round((totalFee - (totalPaid + pendingAmount)) * 100) / 100)
+      if (!yetToRaised || (scholarshipNum > 0 && Math.abs(cleanNumber(yetToRaised) - (grossFee - (totalPaid + pendingAmount))) < 1)) {
+        yetToRaised = String(computedYet)
+      }
+    }
     const followUp = idxFollowUp !== -1 ? cleanString(row[idxFollowUp]) : ''
     const coeIssuedDate = idxCoeIssuedDate !== -1 ? formatExcelDate(row[idxCoeIssuedDate]) : ''
     const emailId = idxEmailId !== -1 ? cleanString(row[idxEmailId]) : ''
@@ -290,6 +340,38 @@ function prismaStcRecordToSnake(r: any): StcReportRecord {
 
   const rawCalcBreakup = r.calculationBreakup || extraData.calculation_breakup || null
 
+  const adminFee = Number(r.adminFee ?? 0)
+  const resourceFee = Number(r.resourceFee ?? 0)
+  const tuitionFee = Number(r.tuitionFee ?? 0)
+  const grossFee = adminFee + resourceFee + tuitionFee
+  const scholarshipNum = cleanScholarshipNumber(r.scholarship)
+  let totalFee = Number(r.totalFee ?? 0)
+
+  // Ensure scholarship is properly applied to total fee if available
+  if (scholarshipNum > 0) {
+    if (grossFee > 0) {
+      const netFee = Math.max(0, grossFee - scholarshipNum)
+      if (totalFee === 0 || Math.abs(totalFee - grossFee) < 0.01 || totalFee > netFee) {
+        totalFee = netFee
+      }
+    } else if (totalFee > scholarshipNum) {
+      totalFee = Math.max(0, totalFee - scholarshipNum)
+    }
+  } else if (totalFee === 0 && grossFee > 0) {
+    totalFee = grossFee
+  }
+
+  const paidAmount = Number(r.paidAmount ?? 0)
+  const totalPaid = Number(r.totalPaid ?? extraData.total_paid ?? r.paidAmount ?? 0)
+  const pendingAmount = Number(r.pendingAmount ?? 0)
+  let yetToRaised = r.yetToRaised
+  if (totalFee > 0) {
+    const computedYet = Math.max(0, Math.round((totalFee - (totalPaid + pendingAmount)) * 100) / 100)
+    if (!yetToRaised || (scholarshipNum > 0 && Math.abs(cleanNumber(yetToRaised) - (grossFee - (totalPaid + pendingAmount))) < 0.01)) {
+      yetToRaised = String(computedYet)
+    }
+  }
+
   return {
     id: r.id,
     import_id: r.importId,
@@ -299,8 +381,8 @@ function prismaStcRecordToSnake(r: any): StcReportRecord {
     agent: r.agent,
     scholarship: r.scholarship,
     pending_invoice: r.pendingInvoice,
-    pending_amount: Number(r.pendingAmount ?? 0),
-    yet_to_raised: r.yetToRaised,
+    pending_amount: pendingAmount,
+    yet_to_raised: yetToRaised,
     remarks: r.remarks,
     dob: r.dob,
     document: r.document,
@@ -308,13 +390,13 @@ function prismaStcRecordToSnake(r: any): StcReportRecord {
     intake: r.intake,
     end_date: r.endDate,
     course: r.course,
-    admin_fee: Number(r.adminFee ?? 0),
-    resource_fee: Number(r.resourceFee ?? 0),
-    tuition_fee: Number(r.tuitionFee ?? 0),
-    total_fee: Number(r.totalFee ?? 0),
-    paid_amount: Number(r.paidAmount ?? 0),
-    total_paid: Number(r.totalPaid ?? extraData.total_paid ?? r.paidAmount ?? 0),
-    initial_payment: Number(r.paidAmount ?? 0),
+    admin_fee: adminFee,
+    resource_fee: resourceFee,
+    tuition_fee: tuitionFee,
+    total_fee: totalFee,
+    paid_amount: paidAmount,
+    total_paid: totalPaid,
+    initial_payment: paidAmount,
     follow_up: safeFollowUp,
     admin_comments: safeAdminComments,
     coe_issued_date: r.coeIssuedDate,
@@ -433,7 +515,7 @@ export async function saveStcReportImportToDatabase(params: {
           yetToRaised: incoming.yet_to_raised,
           remarks: incoming.remarks || existing.remarks,
           dob: incoming.dob || existing.dob,
-          document: normalizeDocumentType(incoming.document || existing.document),
+          document: normalizeDocumentType(incoming.document || existing.document) || null,
           status: incoming.status || existing.status,
           intake: incoming.intake || existing.intake,
           endDate: incoming.end_date || existing.end_date,
@@ -886,17 +968,34 @@ export async function createStcReportRecord(params: {
   const newId = generateId()
 
   const pendingAmountNum = cleanNumber(params.pending_amount)
-  const yetToRaisedVal = cleanString(params.yet_to_raised)
   const adminFeeNum = cleanNumber(params.admin_fee)
   const resourceFeeNum = cleanNumber(params.resource_fee)
   const tuitionFeeNum = cleanNumber(params.tuition_fee)
+  const grossFee = adminFeeNum + resourceFeeNum + tuitionFeeNum
+  const scholarshipNum = cleanScholarshipNumber(params.scholarship)
+  const netFee = Math.max(0, grossFee - scholarshipNum)
   
-  const totalFeeNum = params.total_fee !== undefined && params.total_fee !== null && params.total_fee !== ''
-    ? cleanNumber(params.total_fee)
-    : Math.max(0, adminFeeNum + resourceFeeNum + tuitionFeeNum - (cleanNumber(params.scholarship)))
+  let totalFeeNum: number
+  if (params.total_fee !== undefined && params.total_fee !== null && params.total_fee !== '') {
+    const rawTot = cleanNumber(params.total_fee)
+    if (scholarshipNum > 0 && grossFee > 0 && (Math.abs(rawTot - grossFee) < 1 || rawTot > netFee)) {
+      totalFeeNum = netFee
+    } else {
+      totalFeeNum = rawTot
+    }
+  } else {
+    totalFeeNum = scholarshipNum > 0 && grossFee > 0 ? netFee : grossFee
+  }
 
   const paidAmountNum = cleanNumber(params.paid_amount || params.initial_payment)
   const totalPaidNum = cleanNumber(params.total_paid)
+  let yetToRaisedVal = cleanString(params.yet_to_raised)
+  if (totalFeeNum > 0) {
+    const computedYet = Math.max(0, Math.round((totalFeeNum - (totalPaidNum + pendingAmountNum)) * 100) / 100)
+    if (!yetToRaisedVal || (scholarshipNum > 0 && Math.abs(cleanNumber(yetToRaisedVal) - (grossFee - (totalPaidNum + pendingAmountNum))) < 1)) {
+      yetToRaisedVal = String(computedYet)
+    }
+  }
   const followUpVal = cleanString(params.follow_up) || null
   const dividedMonthVal =
     params.divided_month !== undefined && params.divided_month !== null && String(params.divided_month).trim() !== ''
@@ -988,6 +1087,9 @@ export async function updateStcReportRecord(
   id: string,
   updates: Partial<StcReportRecord>
 ): Promise<StcReportRecord | null> {
+  const existingRecord = await prisma.stcReportRecord.findUnique({ where: { id } })
+  if (!existingRecord) return null
+
   const mysqlUpdate: any = {}
   if (updates.student_name !== undefined) mysqlUpdate.studentName = cleanString(updates.student_name) || undefined
   if (updates.student_id !== undefined) mysqlUpdate.studentId = cleanString(updates.student_id) || null
@@ -995,7 +1097,6 @@ export async function updateStcReportRecord(
   if (updates.scholarship !== undefined) mysqlUpdate.scholarship = cleanString(updates.scholarship) || null
   if (updates.pending_invoice !== undefined) mysqlUpdate.pendingInvoice = cleanString(updates.pending_invoice) || null
   if (updates.pending_amount !== undefined) mysqlUpdate.pendingAmount = cleanNumber(updates.pending_amount)
-  if (updates.yet_to_raised !== undefined) mysqlUpdate.yetToRaised = cleanString(updates.yet_to_raised) || null
   if (updates.remarks !== undefined) mysqlUpdate.remarks = cleanString(updates.remarks) || null
   if (updates.follow_up !== undefined) mysqlUpdate.followUp = cleanString(updates.follow_up) || null
   if (updates.admin_comments !== undefined) mysqlUpdate.adminComments = cleanString(updates.admin_comments) || null
@@ -1008,11 +1109,57 @@ export async function updateStcReportRecord(
   if (updates.admin_fee !== undefined) mysqlUpdate.adminFee = cleanNumber(updates.admin_fee)
   if (updates.resource_fee !== undefined) mysqlUpdate.resourceFee = cleanNumber(updates.resource_fee)
   if (updates.tuition_fee !== undefined) mysqlUpdate.tuitionFee = cleanNumber(updates.tuition_fee)
-  if (updates.total_fee !== undefined) mysqlUpdate.totalFee = cleanNumber(updates.total_fee)
+
+  // Determine current financial totals
+  const curAdmin = mysqlUpdate.adminFee !== undefined ? mysqlUpdate.adminFee : Number(existingRecord.adminFee ?? 0)
+  const curRes = mysqlUpdate.resourceFee !== undefined ? mysqlUpdate.resourceFee : Number(existingRecord.resourceFee ?? 0)
+  const curTui = mysqlUpdate.tuitionFee !== undefined ? mysqlUpdate.tuitionFee : Number(existingRecord.tuitionFee ?? 0)
+  const curGross = curAdmin + curRes + curTui
+  const curSchRaw = mysqlUpdate.scholarship !== undefined ? mysqlUpdate.scholarship : (existingRecord.scholarship || '')
+  const curSchNum = cleanScholarshipNumber(curSchRaw)
+  const curNet = Math.max(0, curGross - curSchNum)
+
+  let finalTotalFee = Number(existingRecord.totalFee ?? 0)
+  if (updates.total_fee !== undefined) {
+    const rawTot = cleanNumber(updates.total_fee)
+    if (curSchNum > 0 && curGross > 0 && (Math.abs(rawTot - curGross) < 1 || rawTot > curNet)) {
+      finalTotalFee = curNet
+    } else {
+      finalTotalFee = rawTot
+    }
+    mysqlUpdate.totalFee = finalTotalFee
+  } else if (
+    updates.admin_fee !== undefined ||
+    updates.resource_fee !== undefined ||
+    updates.tuition_fee !== undefined ||
+    updates.scholarship !== undefined
+  ) {
+    finalTotalFee = curSchNum > 0 && curGross > 0 ? curNet : curGross
+    mysqlUpdate.totalFee = finalTotalFee
+  }
+
   if (updates.paid_amount !== undefined || (updates as any).initial_payment !== undefined) {
     mysqlUpdate.paidAmount = cleanNumber(updates.paid_amount ?? (updates as any).initial_payment)
   }
   if (updates.total_paid !== undefined) mysqlUpdate.totalPaid = cleanNumber(updates.total_paid)
+
+  const curPaid = mysqlUpdate.totalPaid !== undefined ? mysqlUpdate.totalPaid : Number(existingRecord.totalPaid ?? 0)
+  const curPend = mysqlUpdate.pendingAmount !== undefined ? mysqlUpdate.pendingAmount : Number(existingRecord.pendingAmount ?? 0)
+  const computedYet = Math.max(0, Math.round((finalTotalFee - (curPaid + curPend)) * 100) / 100)
+
+  if (updates.yet_to_raised !== undefined) {
+    const rawYet = cleanString(updates.yet_to_raised)
+    if (curSchNum > 0 && curGross > 0 && Math.abs(cleanNumber(rawYet) - (curGross - (curPaid + curPend))) < 1) {
+      mysqlUpdate.yetToRaised = String(computedYet)
+    } else {
+      mysqlUpdate.yetToRaised = rawYet || null
+    }
+  } else if (mysqlUpdate.totalFee !== undefined || updates.total_paid !== undefined || updates.pending_amount !== undefined) {
+    if (existingRecord.yetToRaised !== null && existingRecord.yetToRaised !== undefined) {
+      mysqlUpdate.yetToRaised = String(computedYet)
+    }
+  }
+
   if (updates.coe_issued_date !== undefined) mysqlUpdate.coeIssuedDate = cleanString(updates.coe_issued_date) || null
   if (updates.email_id !== undefined) mysqlUpdate.emailId = cleanString(updates.email_id) || null
   if (updates.phone_no !== undefined) mysqlUpdate.phoneNo = cleanString(updates.phone_no) || null
@@ -1032,8 +1179,7 @@ export async function updateStcReportRecord(
     updates.admin_comments !== undefined ||
     updates.extra_data !== undefined
   ) {
-    const current = await prisma.stcReportRecord.findUnique({ where: { id }, select: { extraData: true } })
-    const existingExtra = (current?.extraData as Record<string, any>) || {}
+    const existingExtra = (existingRecord.extraData as Record<string, any>) || {}
     const passedExtra = typeof updates.extra_data === 'object' && updates.extra_data !== null ? (updates.extra_data as Record<string, any>) : {}
     const newExtra = {
       ...existingExtra,
@@ -1058,7 +1204,7 @@ export async function updateStcReportRecord(
   if (Object.keys(mysqlUpdate).length > 0) {
     mysqlRow = await prisma.stcReportRecord.update({ where: { id }, data: mysqlUpdate })
   } else {
-    mysqlRow = await prisma.stcReportRecord.findUnique({ where: { id } })
+    mysqlRow = existingRecord
   }
 
   return mysqlRow ? prismaStcRecordToSnake(mysqlRow) : null

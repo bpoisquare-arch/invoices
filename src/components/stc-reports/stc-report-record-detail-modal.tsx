@@ -190,9 +190,13 @@ export default function StcReportRecordDetailModal({
 
               <div>
                 <span className="text-slate-400 text-[11px] block font-medium">Document Type</span>
-                <Badge variant="outline" className="mt-0.5 font-bold border-emerald-300 bg-emerald-50 text-emerald-800">
-                  {record.document || 'Not Uploaded'}
-                </Badge>
+                {record.document ? (
+                  <Badge variant="outline" className="mt-0.5 font-bold border-emerald-300 bg-emerald-50 text-emerald-800">
+                    {record.document}
+                  </Badge>
+                ) : (
+                  <span className="font-semibold text-slate-800 mt-0.5 block">-</span>
+                )}
               </div>
 
               <div>
