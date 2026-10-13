@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { format } from 'date-fns'
 import {
   Dialog,
   DialogContent,
@@ -140,35 +141,38 @@ export default function AddReportEntryModal({
   const isEditMode = Boolean(editRecord)
 
   // Form State
-  const [formData, setFormData] = useState({
-    student_name: '',
-    student_id: '',
-    agent: '',
-    scholarship: '',
-    pending_invoice: '',
-    pending_amount: '',
-    yet_to_raised: '',
-    remarks: '',
-    follow_up: '',
-    admin_comments: '',
-    dob: '',
-    document: '',
-    status: 'Current',
-    intake: '',
-    end_date: '',
-    course: '',
-    admin_fee: '',
-    resource_fee: '',
-    tuition_fee: '',
-    total_fee: '',
-    paid_amount: '',
-    total_paid: '',
-    coe_issued_date: '',
-    email_id: '',
-    phone_no: '',
-    payment_status: 'Pending',
-    divided_month: '',
-    calculation_breakup: '',
+  const [formData, setFormData] = useState(() => {
+    const today = new Date().toISOString().split('T')[0]
+    return {
+      student_name: '',
+      student_id: '',
+      agent: '',
+      scholarship: '',
+      pending_invoice: '',
+      pending_amount: '',
+      yet_to_raised: '',
+      remarks: '',
+      follow_up: '',
+      admin_comments: '',
+      dob: today,
+      document: '',
+      status: 'Current',
+      intake: today,
+      end_date: today,
+      course: '',
+      admin_fee: '',
+      resource_fee: '',
+      tuition_fee: '',
+      total_fee: '',
+      paid_amount: '',
+      total_paid: '',
+      coe_issued_date: today,
+      email_id: '',
+      phone_no: '',
+      payment_status: 'Pending',
+      divided_month: '',
+      calculation_breakup: '',
+    }
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -297,6 +301,7 @@ export default function AddReportEntryModal({
         })
         setIsManualTotalFee(false)
       } else {
+        const today = new Date().toISOString().split('T')[0]
         setFormData({
           student_name: '',
           student_id: '',
@@ -308,11 +313,11 @@ export default function AddReportEntryModal({
           remarks: '',
           follow_up: '',
           admin_comments: '',
-          dob: '',
+          dob: today,
           document: '',
           status: 'Current',
-          intake: '',
-          end_date: '',
+          intake: today,
+          end_date: today,
           course: '',
           admin_fee: '',
           resource_fee: '',
@@ -320,7 +325,7 @@ export default function AddReportEntryModal({
           total_fee: '',
           paid_amount: '',
           total_paid: '',
-          coe_issued_date: '',
+          coe_issued_date: today,
           email_id: '',
           phone_no: '',
           payment_status: 'Pending',

@@ -40,6 +40,15 @@ interface StcReportRecordDetailModalProps {
   onEdit?: (record: StcReportRecord) => void
 }
 
+function formatDisplayDate(val?: string | null): string {
+  if (!val || val === '-') return '-'
+  if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
+    const parts = val.split('T')[0].split('-')
+    return `${parts[2]}/${parts[1]}/${parts[0]}`
+  }
+  return val
+}
+
 export default function StcReportRecordDetailModal({
   isOpen,
   onClose,
@@ -177,14 +186,14 @@ export default function StcReportRecordDetailModal({
               <div>
                 <span className="text-slate-400 text-[11px] block font-medium">Intake Date</span>
                 <span className="font-semibold text-slate-800 mt-0.5 block">
-                  {record.intake || '-'}
+                  {formatDisplayDate(record.intake)}
                 </span>
               </div>
 
               <div>
                 <span className="text-slate-400 text-[11px] block font-medium">Course End Date</span>
                 <span className="font-semibold text-slate-800 mt-0.5 block">
-                  {record.end_date || '-'}
+                  {formatDisplayDate(record.end_date)}
                 </span>
               </div>
 
@@ -202,7 +211,7 @@ export default function StcReportRecordDetailModal({
               <div>
                 <span className="text-slate-400 text-[11px] block font-medium">COE Issued Date</span>
                 <span className="font-semibold text-slate-800 mt-0.5 block">
-                  {record.coe_issued_date || '-'}
+                  {formatDisplayDate(record.coe_issued_date)}
                 </span>
               </div>
 
@@ -303,7 +312,7 @@ export default function StcReportRecordDetailModal({
               <div>
                 <span className="text-slate-400 text-[11px] block font-medium">Date of Birth (DOB)</span>
                 <span className="font-semibold text-slate-800 mt-0.5 block">
-                  {record.dob || '-'}
+                  {formatDisplayDate(record.dob)}
                 </span>
               </div>
 

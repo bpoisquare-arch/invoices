@@ -41,6 +41,15 @@ interface ReportRecordDetailModalProps {
   onEdit?: (record: AimtReportRecord) => void
 }
 
+function formatDisplayDate(val?: string | null): string {
+  if (!val || val === '-') return '-'
+  if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
+    const parts = val.split('T')[0].split('-')
+    return `${parts[2]}/${parts[1]}/${parts[0]}`
+  }
+  return val
+}
+
 export default function ReportRecordDetailModal({
   isOpen,
   onClose,
@@ -204,13 +213,13 @@ export default function ReportRecordDetailModal({
               <div>
                 <span className="text-slate-400 block font-semibold text-[11px]">Intake Date</span>
                 <span className="text-slate-800 font-bold block mt-0.5 font-mono">
-                  {record.intake || '-'}
+                  {formatDisplayDate(record.intake)}
                 </span>
               </div>
               <div>
                 <span className="text-slate-400 block font-semibold text-[11px]">Course End Date</span>
                 <span className="text-slate-800 font-bold block mt-0.5 font-mono">
-                  {record.end_date || '-'}
+                  {formatDisplayDate(record.end_date)}
                 </span>
               </div>
               <div>
@@ -222,7 +231,7 @@ export default function ReportRecordDetailModal({
               <div>
                 <span className="text-slate-400 block font-semibold text-[11px]">COE Issue Date</span>
                 <span className="text-slate-800 font-bold block mt-0.5 font-mono">
-                  {record.coe_issued_date || '-'}
+                  {formatDisplayDate(record.coe_issued_date)}
                 </span>
               </div>
             </div>
@@ -309,7 +318,7 @@ export default function ReportRecordDetailModal({
                 <Calendar className="size-4 text-slate-400 shrink-0" />
                 <div className="min-w-0">
                   <span className="text-[10px] text-slate-400 block uppercase font-bold">Date of Birth</span>
-                  <span className="text-slate-900 font-semibold font-mono">{record.dob || '-'}</span>
+                  <span className="text-slate-900 font-semibold font-mono">{formatDisplayDate(record.dob)}</span>
                 </div>
               </div>
             </div>
