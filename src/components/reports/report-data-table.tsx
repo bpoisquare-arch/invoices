@@ -424,8 +424,6 @@ export default function ReportDataTable({
               <option value="Cancelled">Status: Cancelled</option>
               <option value="Completed">Status: Completed</option>
               <option value="Deferred">Status: Deferred</option>
-              <option value="Payment Received">Status: Payment Received</option>
-              <option value="Defaulter">Status: Defaulter</option>
             </select>
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
           </div>

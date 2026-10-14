@@ -129,6 +129,8 @@ function computeCalculationBreakup(yetToRaisedStr: string, dividedMonthStr: stri
   return `${firstCount} installments ${baseAmount} - Last Installment ${lastAmount}`
 }
 
+const MARK_STATUS_KEYS = ['invoice raised', 'need advise', 'need advice', 'course end', 'payment received', 'defaulter']
+
 export default function StcAddReportEntryModal({
   isOpen,
   onClose,
@@ -177,11 +179,13 @@ export default function StcAddReportEntryModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isManualTotalFee, setIsManualTotalFee] = useState(false)
+  const [statusModified, setStatusModified] = useState(false)
 
   // Populate or reset form when modal opens
   useEffect(() => {
     if (isOpen) {
       setErrorMessage(null)
+      setStatusModified(false)
       if (editRecord) {
         const totalPaidVal =
           (editRecord as any).total_paid !== undefined && (editRecord as any).total_paid !== null
@@ -292,7 +296,7 @@ export default function StcAddReportEntryModal({
               ? 'Offer Letter'
               : editRecord.document
             : '',
-          status: editRecord.status || 'Current',
+          status: MARK_STATUS_KEYS.includes((editRecord.status || '').toLowerCase().trim()) ? 'Current' : (editRecord.status || 'Current'),
           intake: editRecord.intake || '',
           end_date: editRecord.end_date || '',
           course: editRecord.course || '',
@@ -396,6 +400,9 @@ export default function StcAddReportEntryModal({
   }
 
   const handleChange = (field: string, value: string) => {
+    if (field === 'status') {
+      setStatusModified(true)
+    }
     setFormData((prev) => {
       const updated = { ...prev, [field]: value }
 
@@ -475,6 +482,13 @@ export default function StcAddReportEntryModal({
           }
         }
       }
+    }
+
+    // If the record originally had a mark status (like 'Invoice Raised') and user didn't explicitly touch the status dropdown, preserve the mark status
+    const rawEditStatus = editRecord?.status || 'Current'
+    const hadMarkStatus = MARK_STATUS_KEYS.includes(rawEditStatus.toLowerCase().trim())
+    if (isEditMode && editRecord && hadMarkStatus && !statusModified) {
+      submitData.status = editRecord.status || 'Current'
     }
 
     try {
@@ -629,11 +643,6 @@ export default function StcAddReportEntryModal({
                         <option value="Cancelled">Cancelled</option>
                         <option value="Completed">Completed</option>
                         <option value="Deferred">Deferred</option>
-                        <option value="Invoice Raised">Invoice Raised</option>
-                        <option value="Need Advise">Need Advise</option>
-                        <option value="Course End">Course End</option>
-                        <option value="Payment Received">Payment Received</option>
-                        <option value="Defaulter">Defaulter</option>
                       </select>
                     </div>
 
