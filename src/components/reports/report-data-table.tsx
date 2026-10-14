@@ -48,6 +48,7 @@ import {
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/types/database.types'
 import TablePagination from '@/components/ui/table-pagination'
+import { formatToDDMMYY } from '@/lib/utils'
 
 interface ReportDataTableProps {
   records: AimtReportRecord[]
@@ -907,7 +908,7 @@ export default function ReportDataTable({
                         {record.intake && record.intake !== '-' ? (
                           <span className="inline-flex items-center gap-1.5 font-mono text-slate-700 font-bold text-xs bg-slate-200/60 px-2 py-0.5 rounded border border-slate-300/60">
                             <Calendar className="size-3 text-[#009D9E] shrink-0" />
-                            <span>{record.intake}</span>
+                            <span>{formatToDDMMYY(record.intake)}</span>
                           </span>
                         ) : (
                           <span className="text-slate-400 font-normal">-</span>
@@ -919,7 +920,7 @@ export default function ReportDataTable({
                         {record.end_date && record.end_date !== '-' ? (
                           <span className="inline-flex items-center gap-1.5 font-mono text-slate-700 font-bold text-xs bg-slate-200/60 px-2 py-0.5 rounded border border-slate-300/60">
                             <Calendar className="size-3 text-amber-600 shrink-0" />
-                            <span>{record.end_date}</span>
+                            <span>{formatToDDMMYY(record.end_date)}</span>
                           </span>
                         ) : (
                           <span className="text-slate-400 font-normal">-</span>

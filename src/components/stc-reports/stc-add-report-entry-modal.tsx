@@ -143,7 +143,11 @@ export default function StcAddReportEntryModal({
 
   // Form State matching STC database
   const [formData, setFormData] = useState(() => {
-    const today = new Date().toISOString().split('T')[0]
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    const nextYear = new Date(now)
+    nextYear.setFullYear(now.getFullYear() + 1)
+    const defaultEndDate = nextYear.toISOString().split('T')[0]
     return {
       student_name: '',
       student_id: '',
@@ -159,7 +163,7 @@ export default function StcAddReportEntryModal({
       document: '',
       status: 'Current',
       intake: today,
-      end_date: today,
+      end_date: defaultEndDate,
       course: '',
       admin_fee: '',
       resource_fee: '',
@@ -315,7 +319,11 @@ export default function StcAddReportEntryModal({
         })
         setIsManualTotalFee(false)
       } else {
-        const today = new Date().toISOString().split('T')[0]
+        const now = new Date()
+        const today = now.toISOString().split('T')[0]
+        const nextYear = new Date(now)
+        nextYear.setFullYear(now.getFullYear() + 1)
+        const defaultEndDate = nextYear.toISOString().split('T')[0]
         setFormData({
           student_name: '',
           student_id: '',
@@ -331,7 +339,7 @@ export default function StcAddReportEntryModal({
           document: '',
           status: 'Current',
           intake: today,
-          end_date: today,
+          end_date: defaultEndDate,
           course: '',
           admin_fee: '',
           resource_fee: '',

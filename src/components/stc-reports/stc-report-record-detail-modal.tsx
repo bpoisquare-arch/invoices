@@ -32,6 +32,7 @@ import {
   Calculator,
 } from 'lucide-react'
 import type { StcReportRecord } from '@/types/database.types'
+import { formatToDDMMYY } from '@/lib/utils'
 
 interface StcReportRecordDetailModalProps {
   isOpen: boolean
@@ -41,12 +42,7 @@ interface StcReportRecordDetailModalProps {
 }
 
 function formatDisplayDate(val?: string | null): string {
-  if (!val || val === '-') return '-'
-  if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
-    const parts = val.split('T')[0].split('-')
-    return `${parts[2]}/${parts[1]}/${parts[0]}`
-  }
-  return val
+  return formatToDDMMYY(val)
 }
 
 export default function StcReportRecordDetailModal({

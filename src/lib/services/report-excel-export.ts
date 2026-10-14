@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs'
+import { formatToDDMMYY } from '@/lib/utils'
 
 const MARK_MAP: Record<string, string> = {
   'invoice raised': 'Invoice Raised',
@@ -240,10 +241,10 @@ export async function generateStyledReportExcel({
       document: r.document || '-',
       course: r.course || '-',
       agent: r.agent || '-',
-      intake: r.intake || '-',
-      end_date: r.end_date || '-',
-      coe_issued_date: r.coe_issued_date || '-',
-      dob: r.dob || '-',
+      intake: formatToDDMMYY(r.intake),
+      end_date: formatToDDMMYY(r.end_date),
+      coe_issued_date: formatToDDMMYY(r.coe_issued_date),
+      dob: formatToDDMMYY(r.dob),
       admin_fee: parseNum(r.admin_fee),
       resource_fee: parseNum(r.resource_fee),
       tuition_fee: parseNum(r.tuition_fee),

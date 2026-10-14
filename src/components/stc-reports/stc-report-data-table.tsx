@@ -47,6 +47,7 @@ import {
 } from 'lucide-react'
 import type { StcReportRecord } from '@/types/database.types'
 import TablePagination from '@/components/ui/table-pagination'
+import { formatToDDMMYY } from '@/lib/utils'
 
 interface StcReportDataTableProps {
   records: StcReportRecord[]
@@ -860,13 +861,13 @@ export default function StcReportDataTable({
                       </td>
 
                       {/* 6. Intake Date */}
-                      <td className="p-3.5 text-slate-700 font-medium">
-                        {record.intake || '-'}
+                      <td className="p-3.5 text-slate-700 font-medium font-mono text-xs">
+                        {formatToDDMMYY(record.intake)}
                       </td>
 
                       {/* 7. Course End Date */}
-                      <td className="p-3.5 text-slate-700 font-medium">
-                        {record.end_date || '-'}
+                      <td className="p-3.5 text-slate-700 font-medium font-mono text-xs">
+                        {formatToDDMMYY(record.end_date)}
                       </td>
 
                       {/* Actions */}
