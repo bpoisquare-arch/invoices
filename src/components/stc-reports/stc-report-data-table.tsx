@@ -59,6 +59,7 @@ interface StcReportDataTableProps {
   onEditRecord?: (record: StcReportRecord) => void
   onDeleteRecord?: (record: StcReportRecord) => Promise<void>
   onDeleteSelected?: (ids: string[]) => Promise<void>
+  onClearStatusSelected?: (ids: string[]) => Promise<void>
   availableAgents?: string[]
   availableIntakes?: string[]
   onExportFiltered?: (exportRows: StcReportRecord[]) => void
@@ -105,6 +106,7 @@ export default function StcReportDataTable({
   onEditRecord,
   onDeleteRecord,
   onDeleteSelected,
+  onClearStatusSelected,
   onExportFiltered,
   onFilteredRecordsChange,
   onStatusUpdate,
@@ -125,6 +127,9 @@ export default function StcReportDataTable({
 
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+
+  const [isBulkClearStatusOpen, setIsBulkClearStatusOpen] = useState(false)
+  const [isBulkClearingStatus, setIsBulkClearingStatus] = useState(false)
 
   const formatAUD = (amount: number | null | undefined) => {
     return new Intl.NumberFormat('en-AU', {
@@ -165,7 +170,7 @@ export default function StcReportDataTable({
       list = list.filter((r) => {
         const normStatus = (r.status || '').toLowerCase().trim()
         if (targetStatus === 'current') {
-          return normStatus === 'current' || ['invoice raised', 'need advise', 'course end'].includes(normStatus)
+          return normStatus === 'current' || ['invoice raised', 'need advise', 'need advice', 'course end', 'payment received', 'defaulter'].includes(normStatus)
         }
         return normStatus === targetStatus
       })
@@ -178,7 +183,10 @@ export default function StcReportDataTable({
           return (
             !norm.includes('invoice raised') &&
             !norm.includes('need advise') &&
-            !norm.includes('course end')
+            !norm.includes('need advice') &&
+            !norm.includes('course end') &&
+            !norm.includes('payment received') &&
+            !norm.includes('defaulter')
           )
         })
       } else {
@@ -306,6 +314,19 @@ export default function StcReportDataTable({
     }
   }
 
+  const handleConfirmBulkClearStatus = async () => {
+    if (selectedIds.length === 0 || !onClearStatusSelected) return
+    setIsBulkClearingStatus(true)
+    try {
+      await onClearStatusSelected(selectedIds)
+      setIsBulkClearStatusOpen(false)
+    } catch (err: any) {
+      alert(err.message || 'Failed to clear status for selected records.')
+    } finally {
+      setIsBulkClearingStatus(false)
+    }
+  }
+
   const hasActiveFilters = Boolean(searchTerm.trim() || selectedStatus !== 'all' || selectedMarkStatus !== 'all' || selectedDocument !== 'all')
 
   return (
@@ -347,6 +368,8 @@ export default function StcReportDataTable({
               <option value="Invoice Raised">Invoice Raised</option>
               <option value="Need Advise">Need Advise</option>
               <option value="Course End">Course End</option>
+              <option value="Payment Received">Payment Received</option>
+              <option value="Defaulter">Defaulter</option>
             </select>
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
           </div>
@@ -371,6 +394,8 @@ export default function StcReportDataTable({
               <option value="Cancelled">Status: Cancelled</option>
               <option value="Completed">Status: Completed</option>
               <option value="Deferred">Status: Deferred</option>
+              <option value="Payment Received">Status: Payment Received</option>
+              <option value="Defaulter">Status: Defaulter</option>
             </select>
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
           </div>
@@ -414,6 +439,20 @@ export default function StcReportDataTable({
             >
               <RotateCcw className="size-3.5 mr-1 text-rose-500" />
               <span>Reset</span>
+            </Button>
+          )}
+
+          {/* Bulk Clear Status Button */}
+          {selectedIds.length > 0 && onClearStatusSelected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsBulkClearStatusOpen(true)}
+              className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:border-amber-400 h-10 px-3.5 rounded-xl text-xs gap-1.5 shadow-2xs font-bold cursor-pointer shrink-0 animate-in fade-in"
+              title="Remove monthly status marks from selected records"
+            >
+              <RotateCcw className="size-3.5 text-amber-600" />
+              <span>Clear Status ({selectedIds.length})</span>
             </Button>
           )}
 
@@ -502,6 +541,17 @@ export default function StcReportDataTable({
             >
               Clear selection
             </button>
+            {onClearStatusSelected && (
+              <Button
+                size="sm"
+                onClick={() => setIsBulkClearStatusOpen(true)}
+                className="h-8 px-3.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-xl gap-1.5 shadow-2xs cursor-pointer transition-all border border-amber-600/20"
+                title="Remove monthly status from selected entries"
+              >
+                <RotateCcw className="size-3.5" />
+                <span>Clear Status ({selectedIds.length})</span>
+              </Button>
+            )}
             {onDeleteSelected && (
               <Button
                 size="sm"
@@ -698,18 +748,13 @@ export default function StcReportDataTable({
               ) : (
                 paginatedRecords.map((record, index) => {
                   const isSelected = selectedIds.includes(record.id)
-
                   const normStatus = record.status?.trim() || ''
-                  let rowColorClass = index % 2 === 1 ? 'bg-slate-50/60 hover:bg-emerald-50/40' : 'bg-white hover:bg-emerald-50/40'
-                  if (isSelected) {
-                    rowColorClass = 'bg-emerald-100/80 hover:bg-emerald-100 text-slate-900'
-                  } else if (normStatus === 'Invoice Raised') {
-                    rowColorClass = 'bg-emerald-100/70 text-emerald-950 hover:bg-emerald-100 border-l-4 border-l-emerald-500'
-                  } else if (normStatus === 'Need Advise') {
-                    rowColorClass = 'bg-sky-100/70 text-sky-950 hover:bg-sky-100 border-l-4 border-l-sky-500'
-                  } else if (normStatus === 'Course End') {
-                    rowColorClass = 'bg-rose-100/70 text-rose-950 hover:bg-rose-100 border-l-4 border-l-rose-500'
-                  }
+
+                  const rowColorClass = isSelected
+                    ? 'bg-emerald-100/80 hover:bg-emerald-100 text-slate-900'
+                    : index % 2 === 1
+                    ? 'bg-slate-50/60 hover:bg-emerald-50/40'
+                    : 'bg-white hover:bg-emerald-50/40'
 
                   return (
                     <tr
@@ -746,11 +791,15 @@ export default function StcReportDataTable({
                               {record.status && (
                                 <span className={`text-[9.5px] font-extrabold uppercase px-1.5 py-0.2 rounded ${
                                   record.status === 'Invoice Raised'
-                                    ? 'bg-emerald-600 text-white shadow-2xs'
-                                    : record.status === 'Need Advise'
-                                    ? 'bg-sky-600 text-white shadow-2xs'
+                                    ? 'bg-[#2563EB] text-white shadow-2xs'
+                                    : record.status === 'Need Advise' || record.status === 'Need Advice'
+                                    ? 'bg-[#D97706] text-white shadow-2xs'
                                     : record.status === 'Course End'
-                                    ? 'bg-rose-600 text-white shadow-2xs'
+                                    ? 'bg-[#9333EA] text-white shadow-2xs'
+                                    : record.status === 'Payment Received'
+                                    ? 'bg-[#059669] text-white shadow-2xs'
+                                    : record.status === 'Defaulter'
+                                    ? 'bg-[#DC2626] text-white shadow-2xs'
                                     : record.status.toLowerCase() === 'current'
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                     : record.status.toLowerCase() === 'future'
@@ -865,27 +914,55 @@ export default function StcReportDataTable({
                                 <DropdownMenuCheckboxItem
                                   checked={normStatus === 'Invoice Raised'}
                                   onCheckedChange={() => onStatusUpdate(record, normStatus === 'Invoice Raised' ? 'Current' : 'Invoice Raised')}
-                                  className="gap-2 cursor-pointer text-emerald-800 focus:bg-emerald-50 focus:text-emerald-900 font-semibold"
+                                  className="gap-2 cursor-pointer text-blue-700 focus:bg-blue-50 focus:text-blue-900 font-semibold"
                                 >
-                                  <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
+                                  <span className="size-2 rounded-full bg-[#2563EB] shrink-0" />
                                   <span>1 Invoice Raised</span>
                                 </DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem
-                                  checked={normStatus === 'Need Advise'}
-                                  onCheckedChange={() => onStatusUpdate(record, normStatus === 'Need Advise' ? 'Current' : 'Need Advise')}
-                                  className="gap-2 cursor-pointer text-sky-800 focus:bg-sky-50 focus:text-sky-900 font-semibold"
+                                  checked={normStatus === 'Need Advise' || normStatus === 'Need Advice'}
+                                  onCheckedChange={() => onStatusUpdate(record, (normStatus === 'Need Advise' || normStatus === 'Need Advice') ? 'Current' : 'Need Advise')}
+                                  className="gap-2 cursor-pointer text-amber-700 focus:bg-amber-50 focus:text-amber-900 font-semibold"
                                 >
-                                  <span className="size-2 rounded-full bg-sky-500 shrink-0" />
+                                  <span className="size-2 rounded-full bg-[#D97706] shrink-0" />
                                   <span>2 Need Advise</span>
                                 </DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem
                                   checked={normStatus === 'Course End'}
                                   onCheckedChange={() => onStatusUpdate(record, normStatus === 'Course End' ? 'Current' : 'Course End')}
-                                  className="gap-2 cursor-pointer text-rose-800 focus:bg-rose-50 focus:text-rose-900 font-semibold"
+                                  className="gap-2 cursor-pointer text-purple-700 focus:bg-purple-50 focus:text-purple-900 font-semibold"
                                 >
-                                  <span className="size-2 rounded-full bg-rose-500 shrink-0" />
+                                  <span className="size-2 rounded-full bg-[#9333EA] shrink-0" />
                                   <span>3 Course End</span>
                                 </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
+                                  checked={normStatus === 'Payment Received'}
+                                  onCheckedChange={() => onStatusUpdate(record, normStatus === 'Payment Received' ? 'Current' : 'Payment Received')}
+                                  className="gap-2 cursor-pointer text-emerald-700 focus:bg-emerald-50 focus:text-emerald-900 font-semibold"
+                                >
+                                  <span className="size-2 rounded-full bg-[#059669] shrink-0" />
+                                  <span>4 Payment Received</span>
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
+                                  checked={normStatus === 'Defaulter'}
+                                  onCheckedChange={() => onStatusUpdate(record, normStatus === 'Defaulter' ? 'Current' : 'Defaulter')}
+                                  className="gap-2 cursor-pointer text-red-700 focus:bg-red-50 focus:text-red-900 font-semibold"
+                                >
+                                  <span className="size-2 rounded-full bg-[#DC2626] shrink-0" />
+                                  <span>5 Defaulter</span>
+                                </DropdownMenuCheckboxItem>
+                                {normStatus && normStatus.toLowerCase() !== 'current' && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => onStatusUpdate(record, 'Current')}
+                                      className="gap-2 text-amber-700 focus:text-amber-800 focus:bg-amber-50 cursor-pointer py-1.5 font-semibold text-xs"
+                                    >
+                                      <RotateCcw className="size-3.5 text-amber-500" />
+                                      <span>Clear / Remove Status</span>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </>
                             )}
 
@@ -928,11 +1005,61 @@ export default function StcReportDataTable({
                 setPageSize(newSize)
                 setCurrentPage(1)
               }}
-              pageSizeOptions={[10, 25, 50, 100]}
+              pageSizeOptions={[10, 25, 50, 100, 125, 150, 175, 200, 300, 500]}
             />
           </div>
         )}
       </div>
+
+      {/* Clear Status Confirmation Dialog */}
+      <Dialog
+        open={isBulkClearStatusOpen}
+        onOpenChange={(open) => !open && !isBulkClearingStatus && setIsBulkClearStatusOpen(false)}
+      >
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white border border-slate-200 shadow-2xl">
+          <DialogHeader>
+            <div className="size-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-2">
+              <RotateCcw className="size-5" />
+            </div>
+            <DialogTitle className="text-base font-extrabold text-slate-900">
+              Clear Status for {selectedIds.length} Student Record(s)?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 mt-1 leading-relaxed">
+              Selected student entries will have their monthly status marks removed and set back to <strong>Current</strong>.
+              This allows you to mark new statuses freshly for the upcoming month.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isBulkClearingStatus}
+              onClick={() => setIsBulkClearStatusOpen(false)}
+              className="border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={isBulkClearingStatus}
+              onClick={handleConfirmBulkClearStatus}
+              className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold gap-1.5 cursor-pointer shadow-sm"
+            >
+              {isBulkClearingStatus ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  <span>Clearing...</span>
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="size-3.5" />
+                  <span>Yes, Clear Status</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Single Confirmation Dialog */}
       <Dialog open={Boolean(recordToDelete)} onOpenChange={(open) => !open && !isDeleting && setRecordToDelete(null)}>

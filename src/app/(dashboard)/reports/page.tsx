@@ -98,7 +98,7 @@ export default function StudentReportsPage() {
   const fetchRecords = useCallback(async () => {
     setIsLoadingRecords(true)
     try {
-      const res = await fetch(`/api/reports?pageSize=1000&t=${Date.now()}`, {
+      const res = await fetch(`/api/reports?pageSize=5000&t=${Date.now()}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' },
       })
@@ -182,6 +182,31 @@ export default function StudentReportsPage() {
     setSelectedIds([])
     // Refresh active data from live database
     await fetchRecords()
+  }
+
+  // Handle Bulk Clear Status for selected records (Reset back to Current for new month)
+  const handleBulkStatusClear = async (ids: string[]) => {
+    if (ids.length === 0) return
+    try {
+      const res = await fetch('/api/reports/records', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, status: 'Current' }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to clear status for selected records.')
+      }
+
+      // Optimistically update local records state
+      setRecords((prev) =>
+        prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'Current' } : r))
+      )
+      setSelectedIds([])
+    } catch (err: any) {
+      console.error('Failed to clear status:', err)
+      alert(err.message || 'Failed to clear status.')
+    }
   }
 
   // Handle Export to Excel (exports selected rows, or current filtered view, or all records)
@@ -314,6 +339,7 @@ export default function StudentReportsPage() {
         }}
         onDeleteRecord={isViewer ? undefined : handleDeleteRecord}
         onDeleteSelected={isViewer ? undefined : handleBulkDelete}
+        onClearStatusSelected={isViewer ? undefined : handleBulkStatusClear}
         availableAgents={availableAgents}
         availableIntakes={availableIntakes}
         onExportFiltered={isViewer ? undefined : handleExportToExcel}

@@ -100,7 +100,7 @@ export default function StcReportsPage() {
     setIsLoadingRecords(true)
     try {
       const filterParam = importIdFilter ? `&importId=${importIdFilter}` : ''
-      const res = await fetch(`/api/stc/reports?pageSize=1000${filterParam}&t=${Date.now()}`, {
+      const res = await fetch(`/api/stc/reports?pageSize=5000${filterParam}&t=${Date.now()}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' },
       })
@@ -198,6 +198,30 @@ export default function StcReportsPage() {
     }
     setSelectedIds([])
     await fetchRecords(activeImportId)
+  }
+
+  // Bulk Clear Status for selected STC records (Reset back to Current for new month)
+  const handleBulkStatusClear = async (ids: string[]) => {
+    if (ids.length === 0) return
+    try {
+      const res = await fetch('/api/stc/reports/records', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, status: 'Current' }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to clear status for selected records.')
+      }
+
+      setRecords((prev) =>
+        prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'Current' } : r))
+      )
+      setSelectedIds([])
+    } catch (err: any) {
+      console.error('Failed to clear status:', err)
+      alert(err.message || 'Failed to clear status.')
+    }
   }
 
   // Delete Import Batch
@@ -358,6 +382,7 @@ export default function StcReportsPage() {
         }}
         onDeleteRecord={isViewer ? undefined : handleDeleteRecord}
         onDeleteSelected={isViewer ? undefined : handleBulkDelete}
+        onClearStatusSelected={isViewer ? undefined : handleBulkStatusClear}
         availableAgents={availableAgents}
         availableIntakes={availableIntakes}
         onExportFiltered={isViewer ? undefined : handleExportToExcel}

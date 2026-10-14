@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   createStcReportRecord,
   updateStcReportRecord,
+  updateStcReportRecordsStatus,
   deleteStcReportRecord,
   deleteStcReportRecords,
 } from '@/lib/services/stc-report.service'
@@ -51,6 +52,19 @@ export async function PUT(request: NextRequest) {
     const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer'
 
     const body = await request.json()
+
+    // Support Bulk Status Update
+    if (Array.isArray(body.ids) && body.ids.length > 0) {
+      if (isViewer) {
+        return NextResponse.json(
+          { success: false, error: 'Viewer role is not authorized to update records.' },
+          { status: 403 }
+        )
+      }
+      const count = await updateStcReportRecordsStatus(body.ids, body.status || 'Current')
+      return NextResponse.json({ success: true, count })
+    }
+
     const { id, ...updates } = body
 
     if (!id) {

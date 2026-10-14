@@ -101,11 +101,15 @@ export default function StcReportRecordDetailModal({
                   <span>Status:</span>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
                     record.status === 'Invoice Raised'
-                      ? 'bg-emerald-500 text-white shadow-2xs'
-                      : record.status === 'Need Advise'
-                      ? 'bg-sky-500 text-white shadow-2xs'
+                      ? 'bg-[#2563EB] text-white shadow-2xs'
+                      : record.status === 'Need Advise' || record.status === 'Need Advice'
+                      ? 'bg-[#D97706] text-white shadow-2xs'
                       : record.status === 'Course End'
-                      ? 'bg-rose-500 text-white shadow-2xs'
+                      ? 'bg-[#9333EA] text-white shadow-2xs'
+                      : record.status === 'Payment Received'
+                      ? 'bg-[#059669] text-white shadow-2xs'
+                      : record.status === 'Defaulter'
+                      ? 'bg-[#DC2626] text-white shadow-2xs'
                       : 'bg-white/20 text-emerald-200'
                   }`}>
                     {record.status || 'Current'}

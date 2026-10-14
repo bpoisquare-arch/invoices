@@ -1228,3 +1228,14 @@ export async function deleteStcReportRecords(ids: string[]): Promise<number> {
   await prisma.stcReportRecord.deleteMany({ where: { id: { in: ids } } })
   return ids.length
 }
+
+// Bulk update status of STC student records
+export async function updateStcReportRecordsStatus(ids: string[], status: string): Promise<number> {
+  if (!ids || ids.length === 0) return 0
+  const result = await prisma.stcReportRecord.updateMany({
+    where: { id: { in: ids } },
+    data: { status: cleanString(status) || 'Current' },
+  })
+  return result.count
+}
+

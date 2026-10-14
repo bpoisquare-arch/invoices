@@ -25,7 +25,7 @@ export default function TablePagination({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  pageSizeOptions = [10, 25, 50, 100, 125, 150, 175, 200],
+  pageSizeOptions = [10, 25, 50, 100, 125, 150, 175, 200, 300, 500],
   theme = 'light',
   className = '',
 }: TablePaginationProps) {

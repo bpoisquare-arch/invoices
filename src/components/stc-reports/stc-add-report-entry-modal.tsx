@@ -629,6 +629,11 @@ export default function StcAddReportEntryModal({
                         <option value="Cancelled">Cancelled</option>
                         <option value="Completed">Completed</option>
                         <option value="Deferred">Deferred</option>
+                        <option value="Invoice Raised">Invoice Raised</option>
+                        <option value="Need Advise">Need Advise</option>
+                        <option value="Course End">Course End</option>
+                        <option value="Payment Received">Payment Received</option>
+                        <option value="Defaulter">Defaulter</option>
                       </select>
                     </div>
 

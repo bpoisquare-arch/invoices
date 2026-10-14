@@ -1172,3 +1172,14 @@ export async function deleteReportRecords(ids: string[]): Promise<number> {
   await prisma.aimtReportRecord.deleteMany({ where: { id: { in: ids } } })
   return ids.length
 }
+
+// Bulk update status of AIMT student records
+export async function updateReportRecordsStatus(ids: string[], status: string): Promise<number> {
+  if (!ids || ids.length === 0) return 0
+  const result = await prisma.aimtReportRecord.updateMany({
+    where: { id: { in: ids } },
+    data: { status: cleanString(status) || 'Current' },
+  })
+  return result.count
+}
+
