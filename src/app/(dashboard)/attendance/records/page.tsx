@@ -24,6 +24,12 @@ import {
   AlertTriangle,
   Building2,
   Bell,
+  Users,
+  LogOut,
+  UserX,
+  CalendarDays,
+  ArrowUpRight,
+  ArrowDownRight,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -460,6 +466,136 @@ function getRecordStatusFlags(
     isWfh: false,
     isPresent: false,
     statusLabel: '',
+  }
+}
+
+// Mini Area Chart / Sparkline with Smooth Cubic Bezier Curves and Dual Layered Waves
+function SparklineChart({
+  data,
+  strokeColor,
+  gradientId,
+}: {
+  data: number[]
+  strokeColor: string
+  gradientId: string
+}) {
+  let safeData = data
+  if (!safeData || safeData.length === 0) {
+    safeData = [0, 0]
+  } else if (safeData.length === 1) {
+    safeData = [safeData[0], safeData[0]]
+  }
+
+  const min = Math.min(...safeData)
+  const max = Math.max(...safeData)
+  const range = max - min
+
+  // Map to SVG coordinates: width 120, height 36
+  const points = safeData.map((val, i) => {
+    const x = (i / Math.max(safeData.length - 1, 1)) * 120
+    const normalized = range === 0 ? (max === 0 ? 0.08 : 0.5) : (val - min) / range
+    const y = 30 - normalized * 22
+    return { x, y }
+  })
+
+  // Generate primary smooth cubic bezier path
+  let primaryPath = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`
+  for (let i = 1; i < points.length; i++) {
+    const p0 = points[i - 1]
+    const p1 = points[i]
+    const mx = (p0.x + p1.x) / 2
+    primaryPath += ` C ${mx.toFixed(1)} ${p0.y.toFixed(1)}, ${mx.toFixed(1)} ${p1.y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`
+  }
+
+  // Generate secondary layered wave (softer moving average)
+  const secPoints = points.map((p, i) => {
+    const prevY = i > 0 ? points[i - 1].y : p.y
+    const nextY = i < points.length - 1 ? points[i + 1].y : p.y
+    const smoothedY = (prevY + p.y * 2 + nextY) / 4
+    return {
+      x: p.x,
+      y: Math.min(34, smoothedY + 3.5),
+    }
+  })
+
+  let secPath = `M ${secPoints[0].x.toFixed(1)} ${secPoints[0].y.toFixed(1)}`
+  for (let i = 1; i < secPoints.length; i++) {
+    const p0 = secPoints[i - 1]
+    const p1 = secPoints[i]
+    const mx = (p0.x + p1.x) / 2
+    secPath += ` C ${mx.toFixed(1)} ${p0.y.toFixed(1)}, ${mx.toFixed(1)} ${p1.y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`
+  }
+
+  const primaryArea = `${primaryPath} L 120 36 L 0 36 Z`
+  const secArea = `${secPath} L 120 36 L 0 36 Z`
+
+  return (
+    <svg
+      viewBox="0 0 120 36"
+      preserveAspectRatio="none"
+      className="w-full h-11 block pointer-events-none"
+    >
+      <defs>
+        <linearGradient id={`grad-prim-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity="0.0" />
+        </linearGradient>
+        <linearGradient id={`grad-sec-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.12" />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity="0.0" />
+        </linearGradient>
+      </defs>
+
+      {/* Secondary Layered Area & Stroke */}
+      <path d={secArea} fill={`url(#grad-sec-${gradientId})`} />
+      <path
+        d={secPath}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth="1.2"
+        strokeOpacity="0.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* Primary Area & Stroke */}
+      <path d={primaryArea} fill={`url(#grad-prim-${gradientId})`} />
+      <path
+        d={primaryPath}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function computeTrend(series: number[]): { text: string; isPositive: boolean } {
+  if (!series || series.length < 2) {
+    return { text: '+0%', isPositive: true }
+  }
+  const mid = Math.floor(series.length / 2)
+  const firstHalf = series.slice(0, mid)
+  const secondHalf = series.slice(mid)
+  const sum1 = firstHalf.reduce((a, b) => a + b, 0)
+  const sum2 = secondHalf.reduce((a, b) => a + b, 0)
+
+  if (sum1 === 0 && sum2 === 0) {
+    return { text: '+0%', isPositive: true }
+  }
+  if (sum1 === 0) {
+    return { text: '+100%', isPositive: true }
+  }
+  const diff = sum2 - sum1
+  const pct = Math.round((diff / sum1) * 100)
+  if (pct > 0) {
+    return { text: `+${pct}%`, isPositive: true }
+  } else if (pct < 0) {
+    return { text: `${pct}%`, isPositive: false }
+  } else {
+    return { text: '+0%', isPositive: true }
   }
 }
 
@@ -1148,7 +1284,7 @@ export default function AttendanceRecordsPage() {
     maxUploadedDate,
   ])
 
-  // Dynamically calculate KPI summary stats across grid matrix
+  // Dynamically calculate KPI summary stats & time-series for sparklines across grid matrix
   const kpiStats = useMemo(() => {
     let onTimeArrivals = 0
     let lateArrivals = 0
@@ -1156,6 +1292,25 @@ export default function AttendanceRecordsPage() {
     let earlyDepartures = 0
     let totalAbsent = 0
     let totalLeaves = 0
+
+    // Per-date breakdown for sparklines
+    const dateStatsMap = new Map<string, {
+      lateArrivals: number
+      earlyDepartures: number
+      totalAbsent: number
+      totalLeaves: number
+      presentCount: number
+    }>()
+
+    dateColumns.forEach((d) => {
+      dateStatsMap.set(d, {
+        lateArrivals: 0,
+        earlyDepartures: 0,
+        totalAbsent: 0,
+        totalLeaves: 0,
+        presentCount: 0,
+      })
+    })
 
     const todayStr = formatDate(new Date())
 
@@ -1174,6 +1329,7 @@ export default function AttendanceRecordsPage() {
 
         if (maxUploadedDate && date > maxUploadedDate) return // Dates after maxUploadedDate are not un-uploaded absent days
 
+        const dStat = dateStatsMap.get(date)
         const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
         const isFuture = date > todayStr
         const isToday = date === todayStr
@@ -1193,25 +1349,55 @@ export default function AttendanceRecordsPage() {
 
           if (isLeave) {
             totalLeaves++
+            if (dStat) dStat.totalLeaves++
           } else if (isAbsent) {
-            if (!isFuture) totalAbsent++
+            if (!isFuture) {
+              totalAbsent++
+              if (dStat) dStat.totalAbsent++
+            }
           } else {
             if (rec.arrival_status === 'On Time Arrival') onTimeArrivals++
-            if (rec.arrival_status === 'Late Arrival') lateArrivals++
+            if (rec.arrival_status === 'Late Arrival') {
+              lateArrivals++
+              if (dStat) dStat.lateArrivals++
+            }
             if (rec.departure_status === 'On Time Departure') onTimeDepartures++
-            if (rec.departure_status === 'Early Departure') earlyDepartures++
+            if (rec.departure_status === 'Early Departure') {
+              earlyDepartures++
+              if (dStat) dStat.earlyDepartures++
+            }
+            if (dStat) dStat.presentCount++
           }
         } else {
           // No record exists
           if (isPast) {
             totalAbsent++
+            if (dStat) dStat.totalAbsent++
           } else if (isToday) {
             if (hasOfficeInTimePassed(date, settings)) {
               totalAbsent++
+              if (dStat) dStat.totalAbsent++
             }
           }
         }
       })
+    })
+
+    // Filter to active working dates for natural sparkline trends (exclude non-working Sundays & Gazetted holidays)
+    const activeDates = dateColumns.filter((d) => {
+      const day = getDayName(d)
+      const isGazettedHoliday = Boolean(holidays[d]) && getPresentEmployeesCountOnDate(d) === 0
+      return day !== 'Sunday' && !isGazettedHoliday
+    })
+    const targetDates = activeDates.length > 0 ? activeDates : dateColumns
+
+    const lateSeries = targetDates.map((d) => dateStatsMap.get(d)?.lateArrivals || 0)
+    const earlySeries = targetDates.map((d) => dateStatsMap.get(d)?.earlyDepartures || 0)
+    const absentSeries = targetDates.map((d) => dateStatsMap.get(d)?.totalAbsent || 0)
+    const leaveSeries = targetDates.map((d) => dateStatsMap.get(d)?.totalLeaves || 0)
+    const empSeries = targetDates.map((d) => {
+      const stat = dateStatsMap.get(d)
+      return stat && stat.presentCount > 0 ? stat.presentCount : filteredEmployees.length
     })
 
     return {
@@ -1222,6 +1408,13 @@ export default function AttendanceRecordsPage() {
       earlyDepartures,
       totalAbsent,
       totalLeaves,
+      series: {
+        totalEmployees: empSeries,
+        lateArrivals: lateSeries,
+        earlyDepartures: earlySeries,
+        totalAbsent: absentSeries,
+        totalLeaves: leaveSeries,
+      },
     }
   }, [filteredEmployees, dateColumns, recordMatrixMap, settings, holidays, maxUploadedDate])
 
@@ -1933,6 +2126,239 @@ export default function AttendanceRecordsPage() {
         </div>
       </div>
 
+      {/* KPI Summary Cards Grid (5 Cards - Premium UI with Real Data Sparklines & Geist Font) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        {/* Card 1: Total Employees */}
+        {(() => {
+          const trend = computeTrend(kpiStats.series.totalEmployees)
+          return (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col justify-between pt-3.5">
+              <div className="px-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50/90 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                    <Users className="w-[18px] h-[18px]" />
+                  </div>
+                  <span className="font-['Geist'] text-xs font-semibold text-slate-500 truncate">
+                    Total Employees
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between mt-3 px-0.5">
+                  <span className="font-['Geist'] text-2xl font-extrabold text-[#003D5C] tracking-tight">
+                    {kpiStats.totalEmployees}
+                  </span>
+                  <div
+                    className={cn(
+                      "flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold font-['Geist'] border",
+                      trend.isPositive
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-200/60"
+                        : "bg-rose-50 text-rose-500 border-rose-200/60"
+                    )}
+                  >
+                    {trend.isPositive ? (
+                      <ArrowUpRight className="size-3 stroke-[2.5]" />
+                    ) : (
+                      <ArrowDownRight className="size-3 stroke-[2.5]" />
+                    )}
+                    <span>{trend.text}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="w-full overflow-hidden mt-1 leading-none">
+                <SparklineChart
+                  data={kpiStats.series.totalEmployees}
+                  strokeColor="#3B82F6"
+                  gradientId="total-employees"
+                />
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Card 2: Late Arrival */}
+        {(() => {
+          const trend = computeTrend(kpiStats.series.lateArrivals)
+          return (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col justify-between pt-3.5">
+              <div className="px-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50/90 text-amber-500 border border-amber-100 flex items-center justify-center shrink-0">
+                    <Clock className="w-[18px] h-[18px]" />
+                  </div>
+                  <span className="font-['Geist'] text-xs font-semibold text-slate-500 truncate">
+                    Late Arrival
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between mt-3 px-0.5">
+                  <span className="font-['Geist'] text-2xl font-extrabold text-[#003D5C] tracking-tight">
+                    {kpiStats.lateArrivals}
+                  </span>
+                  <div
+                    className={cn(
+                      "flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold font-['Geist'] border",
+                      trend.isPositive
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-200/60"
+                        : "bg-rose-50 text-rose-500 border-rose-200/60"
+                    )}
+                  >
+                    {trend.isPositive ? (
+                      <ArrowUpRight className="size-3 stroke-[2.5]" />
+                    ) : (
+                      <ArrowDownRight className="size-3 stroke-[2.5]" />
+                    )}
+                    <span>{trend.text}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="w-full overflow-hidden mt-1 leading-none">
+                <SparklineChart
+                  data={kpiStats.series.lateArrivals}
+                  strokeColor="#F59E0B"
+                  gradientId="late-arrivals"
+                />
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Card 3: Early Departure */}
+        {(() => {
+          const trend = computeTrend(kpiStats.series.earlyDepartures)
+          return (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col justify-between pt-3.5">
+              <div className="px-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-rose-50/90 text-rose-500 border border-rose-100 flex items-center justify-center shrink-0">
+                    <LogOut className="w-[18px] h-[18px]" />
+                  </div>
+                  <span className="font-['Geist'] text-xs font-semibold text-slate-500 truncate">
+                    Early Departure
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between mt-3 px-0.5">
+                  <span className="font-['Geist'] text-2xl font-extrabold text-[#003D5C] tracking-tight">
+                    {kpiStats.earlyDepartures}
+                  </span>
+                  <div
+                    className={cn(
+                      "flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold font-['Geist'] border",
+                      trend.isPositive
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-200/60"
+                        : "bg-rose-50 text-rose-500 border-rose-200/60"
+                    )}
+                  >
+                    {trend.isPositive ? (
+                      <ArrowUpRight className="size-3 stroke-[2.5]" />
+                    ) : (
+                      <ArrowDownRight className="size-3 stroke-[2.5]" />
+                    )}
+                    <span>{trend.text}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="w-full overflow-hidden mt-1 leading-none">
+                <SparklineChart
+                  data={kpiStats.series.earlyDepartures}
+                  strokeColor="#F43F5E"
+                  gradientId="early-departures"
+                />
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Card 4: Absent */}
+        {(() => {
+          const trend = computeTrend(kpiStats.series.totalAbsent)
+          return (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col justify-between pt-3.5">
+              <div className="px-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-purple-50/90 text-purple-600 border border-purple-100 flex items-center justify-center shrink-0">
+                    <UserX className="w-[18px] h-[18px]" />
+                  </div>
+                  <span className="font-['Geist'] text-xs font-semibold text-slate-500 truncate">
+                    Absent
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between mt-3 px-0.5">
+                  <span className="font-['Geist'] text-2xl font-extrabold text-[#003D5C] tracking-tight">
+                    {kpiStats.totalAbsent}
+                  </span>
+                  <div
+                    className={cn(
+                      "flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold font-['Geist'] border",
+                      trend.isPositive
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-200/60"
+                        : "bg-rose-50 text-rose-500 border-rose-200/60"
+                    )}
+                  >
+                    {trend.isPositive ? (
+                      <ArrowUpRight className="size-3 stroke-[2.5]" />
+                    ) : (
+                      <ArrowDownRight className="size-3 stroke-[2.5]" />
+                    )}
+                    <span>{trend.text}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="w-full overflow-hidden mt-1 leading-none">
+                <SparklineChart
+                  data={kpiStats.series.totalAbsent}
+                  strokeColor="#A855F7"
+                  gradientId="total-absent"
+                />
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Card 5: Leave */}
+        {(() => {
+          const trend = computeTrend(kpiStats.series.totalLeaves)
+          return (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col justify-between pt-3.5">
+              <div className="px-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50/90 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
+                    <CalendarDays className="w-[18px] h-[18px]" />
+                  </div>
+                  <span className="font-['Geist'] text-xs font-semibold text-slate-500 truncate">
+                    Leave
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between mt-3 px-0.5">
+                  <span className="font-['Geist'] text-2xl font-extrabold text-[#003D5C] tracking-tight">
+                    {kpiStats.totalLeaves}
+                  </span>
+                  <div
+                    className={cn(
+                      "flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold font-['Geist'] border",
+                      trend.isPositive
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-200/60"
+                        : "bg-rose-50 text-rose-500 border-rose-200/60"
+                    )}
+                  >
+                    {trend.isPositive ? (
+                      <ArrowUpRight className="size-3 stroke-[2.5]" />
+                    ) : (
+                      <ArrowDownRight className="size-3 stroke-[2.5]" />
+                    )}
+                    <span>{trend.text}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="w-full overflow-hidden mt-1 leading-none">
+                <SparklineChart
+                  data={kpiStats.series.totalLeaves}
+                  strokeColor="#6366F1"
+                  gradientId="total-leaves"
+                />
+              </div>
+            </div>
+          )
+        })()}
+      </div>
+
       {/* Top Unified Filter Bar with DateRangePicker, Quick Month/Year, Designation, Branch, Search & Status Checkbox Filters */}
       <Card className="p-4 shadow-xs border-slate-200/90 space-y-3.5 bg-white">
         <div className="flex flex-wrap items-end gap-3">
@@ -2157,38 +2583,6 @@ export default function AttendanceRecordsPage() {
           </div>
         </div>
       </Card>
-
-      {/* Summary KPI Counters (7 cards) using Shadcn Card */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
-        <Card className="p-3 shadow-2xs border-slate-200">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Employees</p>
-          <p className="text-lg font-extrabold text-[#003D5C] mt-0.5">{kpiStats.totalEmployees}</p>
-        </Card>
-        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-emerald-500">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">On Time Arrival</p>
-          <p className="text-lg font-extrabold text-emerald-600 mt-0.5">{kpiStats.onTimeArrivals}</p>
-        </Card>
-        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-amber-500">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Late Arrival</p>
-          <p className="text-lg font-extrabold text-amber-600 mt-0.5">{kpiStats.lateArrivals}</p>
-        </Card>
-        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-teal-500">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">On Time Departure</p>
-          <p className="text-lg font-extrabold text-teal-600 mt-0.5">{kpiStats.onTimeDepartures}</p>
-        </Card>
-        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-rose-400">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Early Departure</p>
-          <p className="text-lg font-extrabold text-rose-500 mt-0.5">{kpiStats.earlyDepartures}</p>
-        </Card>
-        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-rose-600">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Absent</p>
-          <p className="text-lg font-extrabold text-rose-600 mt-0.5">{kpiStats.totalAbsent}</p>
-        </Card>
-        <Card className="p-3 shadow-2xs border-slate-200 border-l-4 border-l-indigo-600">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Leave</p>
-          <p className="text-lg font-extrabold text-indigo-600 mt-0.5">{kpiStats.totalLeaves}</p>
-        </Card>
-      </div>
 
       {/* MATRIX / GRID TIMESHEET */}
       <div className="bg-white border border-slate-300 rounded-xl shadow-xs overflow-hidden">
