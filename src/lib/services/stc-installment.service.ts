@@ -12,6 +12,7 @@ export interface STCFixedInfo {
   website?: string
   logo_url: string
   bank?: string
+  account_name?: string
   bsb?: string
   account_no?: string
   swift_code?: string
@@ -27,9 +28,10 @@ export const DEFAULT_STC_FIXED_INFO: STCFixedInfo = {
   email: 'admissions@states.edu.au',
   website: 'www.states.edu.au',
   logo_url: '/STC-logo.png',
-  bank: 'Commonwealth Bank of Australia',
-  bsb: '063-010',
-  account_no: '1508 2685',
+  bank: 'National Australia Bank (NAB)',
+  account_name: 'States College Australia',
+  bsb: '083004',
+  account_no: '713463224',
   swift_code: 'CTBAAU2S',
 }
 
@@ -107,13 +109,32 @@ export function getSTCFixedInfo(): STCFixedInfo {
     const raw = localStorage.getItem(STC_FIXED_INFO_KEY)
     if (!raw) return DEFAULT_STC_FIXED_INFO
     const parsed = JSON.parse(raw)
-    // Auto-migrate if previous placeholder values were cached or bank details are missing
-    if (!parsed.bank || parsed.address === 'Carving Your Pathways' || parsed.rto === '45678') {
-      const merged = { ...DEFAULT_STC_FIXED_INFO, ...parsed, ...DEFAULT_STC_FIXED_INFO }
+    // Auto-migrate if previous placeholder values were cached or bank details are missing/outdated
+    if (
+      !parsed.bank ||
+      parsed.bank === 'Commonwealth Bank of Australia' ||
+      parsed.account_no === '1508 2685' ||
+      parsed.bsb === '063-010' ||
+      parsed.address === 'Carving Your Pathways' ||
+      parsed.rto === '45678'
+    ) {
+      const merged: STCFixedInfo = {
+        ...DEFAULT_STC_FIXED_INFO,
+        ...parsed,
+        bank: DEFAULT_STC_FIXED_INFO.bank,
+        account_name: DEFAULT_STC_FIXED_INFO.account_name,
+        bsb: DEFAULT_STC_FIXED_INFO.bsb,
+        account_no: DEFAULT_STC_FIXED_INFO.account_no,
+        swift_code: DEFAULT_STC_FIXED_INFO.swift_code,
+      }
       localStorage.setItem(STC_FIXED_INFO_KEY, JSON.stringify(merged))
       return merged
     }
-    return { ...DEFAULT_STC_FIXED_INFO, ...parsed }
+    return {
+      ...DEFAULT_STC_FIXED_INFO,
+      ...parsed,
+      account_name: parsed.account_name || DEFAULT_STC_FIXED_INFO.account_name,
+    }
   } catch {
     return DEFAULT_STC_FIXED_INFO
   }

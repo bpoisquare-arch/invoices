@@ -280,10 +280,10 @@ export default function STCScheduleWebPreview({
 
             {/* Right Values */}
             <div className="font-medium text-slate-800 space-y-1 whitespace-nowrap">
-              <div>{fixedInfo.bank || 'Commonwealth Bank of Australia'}</div>
-              <div>{fixedInfo.college_name || 'States College Australia Pty Ltd'}</div>
-              <div>{fixedInfo.bsb || '063-010'}</div>
-              <div>{fixedInfo.account_no || '1508 2685'}</div>
+              <div>{fixedInfo.bank || 'National Australia Bank (NAB)'}</div>
+              <div>{fixedInfo.account_name || 'States College Australia'}</div>
+              <div>{fixedInfo.bsb || '083004'}</div>
+              <div>{fixedInfo.account_no || '713463224'}</div>
               <div>{fixedInfo.swift_code || 'CTBAAU2S'}</div>
             </div>
           </div>

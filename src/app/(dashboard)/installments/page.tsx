@@ -38,6 +38,29 @@ export default function InstallmentsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('aimt_installments_page_size')
+      if (saved) {
+        const parsed = parseInt(saved, 10)
+        if (parsed > 0 && !isNaN(parsed)) {
+          setPageSize(parsed)
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize)
+    try {
+      localStorage.setItem('aimt_installments_page_size', String(newSize))
+    } catch {
+      // ignore
+    }
+  }
+
   // Date Filtering State
   const [datePreset, setDatePreset] = useState<'all' | 'today' | '7days' | '30days' | 'thisMonth' | 'custom'>('all')
   const [startDateFilter, setStartDateFilter] = useState('')
@@ -493,7 +516,8 @@ export default function InstallmentsPage() {
             currentPage={currentPage}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
-            onPageSizeChange={setPageSize}
+            onPageSizeChange={handlePageSizeChange}
+            storageKey="aimt_installments_page_size"
             theme="light"
           />
         )}

@@ -17,6 +17,7 @@ export interface TablePaginationProps {
   pageSizeOptions?: number[]
   theme?: 'light' | 'dark'
   className?: string
+  storageKey?: string
 }
 
 export default function TablePagination({
@@ -28,7 +29,23 @@ export default function TablePagination({
   pageSizeOptions = [10, 25, 50, 100, 125, 150, 175, 200, 300, 500],
   theme = 'light',
   className = '',
+  storageKey,
 }: TablePaginationProps) {
+  // Synchronize with localStorage on mount if storageKey is provided
+  React.useEffect(() => {
+    if (!storageKey) return
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        const parsed = parseInt(saved, 10)
+        if (parsed > 0 && !isNaN(parsed) && parsed !== pageSize) {
+          onPageSizeChange(parsed)
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [storageKey])
   const totalPages = Math.max(1, Math.ceil(totalEntries / pageSize))
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
 
@@ -62,6 +79,13 @@ export default function TablePagination({
               value={pageSize}
               onChange={(e) => {
                 const newSize = Number(e.target.value)
+                if (storageKey) {
+                  try {
+                    localStorage.setItem(storageKey, String(newSize))
+                  } catch {
+                    // ignore
+                  }
+                }
                 onPageSizeChange(newSize)
                 onPageChange(1)
               }}

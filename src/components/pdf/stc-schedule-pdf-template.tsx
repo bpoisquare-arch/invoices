@@ -391,7 +391,7 @@ export default function STCSchedulePDFTemplate({
               alignItems: 'flex-end',
             }}
           >
-            <View style={{ width: 260 }}>
+            <View style={{ width: 280 }}>
               <Text
                 style={{
                   fontSize: 12,
@@ -436,18 +436,18 @@ export default function STCSchedulePDFTemplate({
                 />
 
                 {/* Right Values Column */}
-                <View style={{ width: 155 }}>
+                <View style={{ width: 175 }}>
                   <Text style={{ fontSize: 8.8, color: '#0f172a', marginBottom: 3.5 }}>
-                    {fixedInfo.bank || 'Commonwealth Bank of Australia'}
+                    {fixedInfo.bank || 'National Australia Bank (NAB)'}
                   </Text>
                   <Text style={{ fontSize: 8.8, color: '#0f172a', marginBottom: 3.5 }}>
-                    {fixedInfo.college_name || 'States College Australia Pty Ltd'}
+                    {fixedInfo.account_name || 'States College Australia'}
                   </Text>
                   <Text style={{ fontSize: 8.8, color: '#0f172a', marginBottom: 3.5 }}>
-                    {fixedInfo.bsb || '063-010'}
+                    {fixedInfo.bsb || '083004'}
                   </Text>
                   <Text style={{ fontSize: 8.8, color: '#0f172a', marginBottom: 3.5 }}>
-                    {fixedInfo.account_no || '1508 2685'}
+                    {fixedInfo.account_no || '713463224'}
                   </Text>
                   <Text style={{ fontSize: 8.8, color: '#0f172a', marginBottom: 0 }}>
                     {fixedInfo.swift_code || 'CTBAAU2S'}

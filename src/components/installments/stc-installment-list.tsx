@@ -60,6 +60,29 @@ export default function STCInstallmentList() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('stc_installments_page_size')
+      if (saved) {
+        const parsed = parseInt(saved, 10)
+        if (parsed > 0 && !isNaN(parsed)) {
+          setPageSize(parsed)
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize)
+    try {
+      localStorage.setItem('stc_installments_page_size', String(newSize))
+    } catch {
+      // ignore
+    }
+  }
+
   // Sync to Cloud State
   const [syncing, setSyncing] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -596,7 +619,8 @@ export default function STCInstallmentList() {
             currentPage={currentPage}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
-            onPageSizeChange={setPageSize}
+            onPageSizeChange={handlePageSizeChange}
+            storageKey="stc_installments_page_size"
             theme="light"
           />
         )}
