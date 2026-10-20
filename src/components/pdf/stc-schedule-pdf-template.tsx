@@ -450,7 +450,7 @@ export default function STCSchedulePDFTemplate({
                     {fixedInfo.account_no || '713463224'}
                   </Text>
                   <Text style={{ fontSize: 8.8, color: '#0f172a', marginBottom: 0 }}>
-                    {fixedInfo.swift_code || 'CTBAAU2S'}
+                    {fixedInfo.swift_code || 'NATAAU3303M'}
                   </Text>
                 </View>
               </View>

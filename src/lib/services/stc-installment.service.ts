@@ -32,7 +32,7 @@ export const DEFAULT_STC_FIXED_INFO: STCFixedInfo = {
   account_name: 'States College Australia',
   bsb: '083004',
   account_no: '713463224',
-  swift_code: 'CTBAAU2S',
+  swift_code: 'NATAAU3303M',
 }
 
 export interface CourseOption {
@@ -116,7 +116,8 @@ export function getSTCFixedInfo(): STCFixedInfo {
       parsed.account_no === '1508 2685' ||
       parsed.bsb === '063-010' ||
       parsed.address === 'Carving Your Pathways' ||
-      parsed.rto === '45678'
+      parsed.rto === '45678' ||
+      parsed.swift_code === 'CTBAAU2S'
     ) {
       const merged: STCFixedInfo = {
         ...DEFAULT_STC_FIXED_INFO,
@@ -134,6 +135,7 @@ export function getSTCFixedInfo(): STCFixedInfo {
       ...DEFAULT_STC_FIXED_INFO,
       ...parsed,
       account_name: parsed.account_name || DEFAULT_STC_FIXED_INFO.account_name,
+      swift_code: parsed.swift_code === 'CTBAAU2S' ? DEFAULT_STC_FIXED_INFO.swift_code : (parsed.swift_code || DEFAULT_STC_FIXED_INFO.swift_code),
     }
   } catch {
     return DEFAULT_STC_FIXED_INFO

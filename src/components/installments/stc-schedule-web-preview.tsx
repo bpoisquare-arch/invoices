@@ -284,7 +284,7 @@ export default function STCScheduleWebPreview({
               <div>{fixedInfo.account_name || 'States College Australia'}</div>
               <div>{fixedInfo.bsb || '083004'}</div>
               <div>{fixedInfo.account_no || '713463224'}</div>
-              <div>{fixedInfo.swift_code || 'CTBAAU2S'}</div>
+              <div>{fixedInfo.swift_code || 'NATAAU3303M'}</div>
             </div>
           </div>
         </div>
