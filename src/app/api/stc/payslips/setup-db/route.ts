@@ -33,6 +33,7 @@ export async function GET() {
         \`tax_description\` VARCHAR(100) NOT NULL,
         \`tax_amount\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
         \`tax_total\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+        \`include_superannuation\` TINYINT(1) NOT NULL DEFAULT 0,
         \`superannuation_description\` VARCHAR(255) NULL DEFAULT '',
         \`superannuation_amount\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
         \`superannuation_total\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,

@@ -292,7 +292,11 @@ export default function STCPayslipPDFTemplate({ payslip }: STCPayslipPDFTemplate
         </View>
 
         {/* 5b. SUPERANNUATION Section (Optional) */}
-        {(payslip.include_superannuation || Number(payslip.superannuation_amount || 0) > 0) && (
+        {Boolean(
+          payslip.include_superannuation &&
+          ((payslip.superannuation_description && payslip.superannuation_description.trim() !== '') ||
+            Number(payslip.superannuation_amount || 0) > 0)
+        ) && (
           <View style={styles.sectionContainer}>
             <View style={styles.tableHeaderRow}>
               <Text style={styles.colTaxDesc}>SUPERANNUATION</Text>
@@ -301,7 +305,7 @@ export default function STCPayslipPDFTemplate({ payslip }: STCPayslipPDFTemplate
 
             <View style={styles.tableDataRow}>
               <Text style={styles.colTaxDesc}>
-                {payslip.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122'}
+                {payslip.superannuation_description || ''}
               </Text>
               <Text style={styles.colTaxAmount}>
                 {formatCurrency(payslip.superannuation_amount || 0)}

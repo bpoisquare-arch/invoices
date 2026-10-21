@@ -93,13 +93,23 @@ function calculateAnnualSalary(wages: number, frequency: string): number {
 
 export default function STCPayslipForm({ initialData, isEditing = false }: STCPayslipFormProps) {
   const router = useRouter()
-  const [formData, setFormData] = useState<STCPayslip>(
-    initialData || {
-      id: '',
-      created_at: '',
-      ...DEFAULT_STC_PAYSLIP,
+  const [formData, setFormData] = useState<STCPayslip>(() => {
+    if (!initialData) {
+      return {
+        id: '',
+        created_at: '',
+        ...DEFAULT_STC_PAYSLIP,
+      }
     }
-  )
+    const isSuper = Boolean(initialData.include_superannuation)
+    return {
+      ...initialData,
+      include_superannuation: isSuper,
+      superannuation_description: isSuper ? (initialData.superannuation_description || '').trim() : '',
+      superannuation_amount: isSuper ? Number(initialData.superannuation_amount || 0) : 0,
+      superannuation_total: isSuper ? Number(initialData.superannuation_total || initialData.superannuation_amount || 0) : 0,
+    }
+  })
 
   const [saving, setSaving] = useState(false)
   const [downloading, setDownloading] = useState(false)
@@ -192,13 +202,16 @@ export default function STCPayslipForm({ initialData, isEditing = false }: STCPa
   }
 
   const handleSuperannuationToggle = (enabled: boolean) => {
-    const defaultDesc =
-      formData.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122'
-
     setFormData((prev) => ({
       ...prev,
       include_superannuation: enabled,
-      superannuation_description: defaultDesc,
+      superannuation_description: enabled
+        ? (prev.superannuation_description && prev.superannuation_description.trim() !== ''
+            ? prev.superannuation_description
+            : 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122')
+        : '',
+      superannuation_amount: enabled ? prev.superannuation_amount : 0,
+      superannuation_total: enabled ? prev.superannuation_total : 0,
     }))
   }
 
@@ -229,7 +242,15 @@ export default function STCPayslipForm({ initialData, isEditing = false }: STCPa
     setSaving(true)
     setSaveSuccess(false)
     try {
-      const res = await stcPayslipService.save(formData)
+      const isSuper = Boolean(formData.include_superannuation)
+      const dataToSave: STCPayslip = {
+        ...formData,
+        include_superannuation: isSuper,
+        superannuation_description: isSuper ? (formData.superannuation_description || '').trim() : '',
+        superannuation_amount: isSuper ? Number(formData.superannuation_amount || 0) : 0,
+        superannuation_total: isSuper ? Number(formData.superannuation_total || formData.superannuation_amount || 0) : 0,
+      }
+      const res = await stcPayslipService.save(dataToSave)
       if (res.success && res.data) {
         setFormData(res.data)
         setHasSaved(true)
@@ -257,13 +278,22 @@ export default function STCPayslipForm({ initialData, isEditing = false }: STCPa
       .replace(/\s+/g, '_')
     const fileName = `STC_Payslip_${safeName}.pdf`
 
+    const isSuper = Boolean(formData.include_superannuation)
+    const payloadForPdf: STCPayslip = {
+      ...formData,
+      include_superannuation: isSuper,
+      superannuation_description: isSuper ? (formData.superannuation_description || '').trim() : '',
+      superannuation_amount: isSuper ? Number(formData.superannuation_amount || 0) : 0,
+      superannuation_total: isSuper ? Number(formData.superannuation_total || formData.superannuation_amount || 0) : 0,
+    }
+
     try {
       // 1. Primary & Fastest: Server streaming endpoint
       try {
         const res = await fetch('/api/stc/payslips-pdf', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(payloadForPdf),
         })
 
         if (res.ok) {
@@ -283,7 +313,7 @@ export default function STCPayslipForm({ initialData, isEditing = false }: STCPa
       }
 
       // 2. Fallback: Client-side @react-pdf/renderer with timeout
-      const doc = <STCPayslipPDFTemplate payslip={formData} />
+      const doc = <STCPayslipPDFTemplate payslip={payloadForPdf} />
       const blobPromise = pdf(doc).toBlob()
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('PDF generation timed out')), 4000)
@@ -744,10 +774,7 @@ export default function STCPayslipForm({ initialData, isEditing = false }: STCPa
               <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-200">
                 <input
                   type="checkbox"
-                  checked={
-                    formData.include_superannuation ||
-                    Number(formData.superannuation_amount || 0) > 0
-                  }
+                  checked={Boolean(formData.include_superannuation)}
                   onChange={(e) => handleSuperannuationToggle(e.target.checked)}
                   className="size-4 rounded accent-[#00BF8F] cursor-pointer"
                 />
@@ -755,8 +782,7 @@ export default function STCPayslipForm({ initialData, isEditing = false }: STCPa
               </label>
             </div>
 
-            {(formData.include_superannuation ||
-              Number(formData.superannuation_amount || 0) > 0) && (
+            {Boolean(formData.include_superannuation) && (
               <div className="space-y-3 text-xs sm:text-sm">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1 text-xs">

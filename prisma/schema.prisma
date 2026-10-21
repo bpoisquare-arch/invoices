@@ -501,6 +501,7 @@ model StcPayslip {
   taxDescription            String   @map("tax_description") @db.VarChar(100)
   taxAmount                 Decimal  @default(0.00) @map("tax_amount") @db.Decimal(12, 2)
   taxTotal                  Decimal  @default(0.00) @map("tax_total") @db.Decimal(12, 2)
+  includeSuperannuation     Boolean  @default(false) @map("include_superannuation")
   superannuationDescription String?  @default("") @map("superannuation_description") @db.VarChar(255)
   superannuationAmount      Decimal  @default(0.00) @map("superannuation_amount") @db.Decimal(12, 2)
   superannuationTotal       Decimal  @default(0.00) @map("superannuation_total") @db.Decimal(12, 2)

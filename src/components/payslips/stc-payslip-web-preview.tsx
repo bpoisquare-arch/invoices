@@ -157,7 +157,11 @@ export default function STCPayslipWebPreview({ payslip }: STCPayslipWebPreviewPr
         </div>
 
         {/* 5b. Superannuation Section (Optional) */}
-        {(payslip.include_superannuation || Number(payslip.superannuation_amount || 0) > 0) && (
+        {Boolean(
+          payslip.include_superannuation &&
+          ((payslip.superannuation_description && payslip.superannuation_description.trim() !== '') ||
+            Number(payslip.superannuation_amount || 0) > 0)
+        ) && (
           <div className="mb-6">
             <table className="w-full text-left text-xs sm:text-[13px] border-collapse">
               <thead>
@@ -169,8 +173,7 @@ export default function STCPayslipWebPreview({ payslip }: STCPayslipWebPreviewPr
               <tbody>
                 <tr className="text-slate-800">
                   <td className="py-3 px-1 font-medium">
-                    {payslip.superannuation_description ||
-                      'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122'}
+                    {payslip.superannuation_description || ''}
                   </td>
                   <td className="py-3 px-1 text-right">
                     {formatCurrency(payslip.superannuation_amount || 0)}

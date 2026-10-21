@@ -84,7 +84,7 @@ export const DEFAULT_STC_PAYSLIP: Omit<STCPayslip, 'id' | 'created_at'> = {
   tax_amount: 928.0,
   tax_total: 928.0,
   include_superannuation: false,
-  superannuation_description: 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122',
+  superannuation_description: '',
   superannuation_amount: 0.0,
   superannuation_total: 0.0,
   bank_account_masked: '(013-481)*****6474',
@@ -107,10 +107,16 @@ export function formatCurrency(amount: number): string {
 
 function fromDbRow(row: any): STCPayslip {
   const hasSuper = Boolean(
-    Number(row.superannuationAmount ?? row.superannuation_amount ?? 0) > 0 ||
-    (row.superannuationDescription && row.superannuationDescription.trim() !== '') ||
-    (row.superannuation_description && row.superannuation_description.trim() !== '')
+    row.includeSuperannuation === true ||
+    row.include_superannuation === 1 ||
+    row.include_superannuation === true ||
+    row.include_superannuation === '1'
   )
+  const superDesc = hasSuper
+    ? (row.superannuationDescription || row.superannuation_description || '').trim()
+    : ''
+  const superAmt = hasSuper ? Number(row.superannuationAmount ?? row.superannuation_amount ?? 0) : 0
+  const superTot = hasSuper ? Number(row.superannuationTotal ?? row.superannuation_total ?? superAmt) : 0
 
   return {
     id: row.id,
@@ -141,10 +147,9 @@ function fromDbRow(row: any): STCPayslip {
     tax_amount: Number(row.taxAmount ?? row.tax_amount ?? 0),
     tax_total: Number(row.taxTotal ?? row.tax_total ?? 0),
     include_superannuation: hasSuper,
-    superannuation_description:
-      row.superannuationDescription || row.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122',
-    superannuation_amount: Number(row.superannuationAmount ?? row.superannuation_amount ?? 0),
-    superannuation_total: Number(row.superannuationTotal ?? row.superannuation_total ?? row.superannuationAmount ?? 0),
+    superannuation_description: hasSuper ? superDesc : '',
+    superannuation_amount: hasSuper ? superAmt : 0,
+    superannuation_total: hasSuper ? Number(row.superannuationTotal ?? row.superannuation_total ?? superAmt) : 0,
     bank_account_masked: row.bankAccountMasked || row.bank_account_masked || '',
     account_name: row.accountName || row.account_name || '',
     payment_reference: row.paymentReference || row.payment_reference || 'STC Pay',
@@ -231,9 +236,18 @@ export const stcPayslipService = {
     const id = payload.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `stc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`)
     const now = new Date().toISOString()
 
+    const isSuper = Boolean(payload.include_superannuation)
+    const superDesc = isSuper ? (payload.superannuation_description || '').trim() : ''
+    const superAmt = isSuper ? Number(payload.superannuation_amount || 0) : 0
+    const superTot = isSuper ? Number(payload.superannuation_total || payload.superannuation_amount || 0) : 0
+
     const payslip: STCPayslip = {
       ...payload,
       id,
+      include_superannuation: isSuper,
+      superannuation_description: superDesc,
+      superannuation_amount: superAmt,
+      superannuation_total: superTot,
       created_at: now,
       updated_at: now,
     }
@@ -293,9 +307,9 @@ export const stcPayslipService = {
           taxDescription: payload.tax_description || 'PAYG',
           taxAmount: Number(payload.tax_amount || 0),
           taxTotal: Number(payload.tax_total || 0),
-          superannuationDescription: payload.superannuation_description || '',
-          superannuationAmount: Number(payload.superannuation_amount || 0),
-          superannuationTotal: Number(payload.superannuation_total || payload.superannuation_amount || 0),
+          superannuationDescription: superDesc,
+          superannuationAmount: superAmt,
+          superannuationTotal: superTot,
           bankAccountMasked: payload.bank_account_masked || '',
           accountName: payload.account_name || '',
           paymentReference: payload.payment_reference || 'STC Pay',
@@ -326,9 +340,9 @@ export const stcPayslipService = {
           taxDescription: payload.tax_description || 'PAYG',
           taxAmount: Number(payload.tax_amount || 0),
           taxTotal: Number(payload.tax_total || 0),
-          superannuationDescription: payload.superannuation_description || '',
-          superannuationAmount: Number(payload.superannuation_amount || 0),
-          superannuationTotal: Number(payload.superannuation_total || payload.superannuation_amount || 0),
+          superannuationDescription: superDesc,
+          superannuationAmount: superAmt,
+          superannuationTotal: superTot,
           bankAccountMasked: payload.bank_account_masked || '',
           accountName: payload.account_name || '',
           paymentReference: payload.payment_reference || 'STC Pay',

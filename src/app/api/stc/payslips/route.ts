@@ -8,10 +8,17 @@ function fromDbRow(row: any) {
   if (!row) return null
 
   const hasSuper = Boolean(
-    Number(row.superannuationAmount ?? row.superannuation_amount ?? 0) > 0 ||
-    (row.superannuationDescription && row.superannuationDescription.trim() !== '') ||
-    (row.superannuation_description && row.superannuation_description.trim() !== '')
+    row.includeSuperannuation === true ||
+    row.include_superannuation === 1 ||
+    row.include_superannuation === true ||
+    row.include_superannuation === '1'
   )
+
+  const superDesc = hasSuper
+    ? (row.superannuationDescription || row.superannuation_description || '').trim()
+    : ''
+  const superAmt = hasSuper ? Number(row.superannuationAmount ?? row.superannuation_amount ?? 0) : 0
+  const superTot = hasSuper ? Number(row.superannuationTotal ?? row.superannuation_total ?? superAmt) : 0
 
   return {
     id: row.id,
@@ -42,9 +49,9 @@ function fromDbRow(row: any) {
     tax_amount: Number(row.taxAmount ?? row.tax_amount ?? 0),
     tax_total: Number(row.taxTotal ?? row.tax_total ?? 0),
     include_superannuation: hasSuper,
-    superannuation_description: row.superannuationDescription || row.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122',
-    superannuation_amount: Number(row.superannuationAmount ?? row.superannuation_amount ?? 0),
-    superannuation_total: Number(row.superannuationTotal ?? row.superannuation_total ?? row.superannuationAmount ?? 0),
+    superannuation_description: superDesc,
+    superannuation_amount: superAmt,
+    superannuation_total: superTot,
     bank_account_masked: row.bankAccountMasked || row.bank_account_masked || '',
     account_name: row.accountName || row.account_name || '',
     payment_reference: row.paymentReference || row.payment_reference || 'STC Pay',
@@ -82,6 +89,7 @@ async function ensureTableExists() {
         \`tax_description\` VARCHAR(100) NOT NULL,
         \`tax_amount\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
         \`tax_total\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+        \`include_superannuation\` TINYINT(1) NOT NULL DEFAULT 0,
         \`superannuation_description\` VARCHAR(255) NULL DEFAULT '',
         \`superannuation_amount\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
         \`superannuation_total\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
@@ -152,6 +160,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const id = body.id || `stc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
+    const isSuper = Boolean(body.include_superannuation)
+    const superDesc = isSuper ? (body.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122').trim() : ''
+    const superAmt = isSuper ? Number(body.superannuation_amount || 0) : 0
+    const superTot = isSuper ? Number(body.superannuation_total || body.superannuation_amount || 0) : 0
+
     const payload = {
       id,
       paidByName: body.paid_by_name || DEFAULT_STC_PAID_BY.paid_by_name,
@@ -177,9 +190,10 @@ export async function POST(request: NextRequest) {
       taxDescription: body.tax_description || 'PAYG',
       taxAmount: Number(body.tax_amount || 0),
       taxTotal: Number(body.tax_total || 0),
-      superannuationDescription: body.superannuation_description || '',
-      superannuationAmount: Number(body.superannuation_amount || 0),
-      superannuationTotal: Number(body.superannuation_total || body.superannuation_amount || 0),
+      includeSuperannuation: isSuper,
+      superannuationDescription: superDesc,
+      superannuationAmount: superAmt,
+      superannuationTotal: superTot,
       bankAccountMasked: body.bank_account_masked || '',
       accountName: body.account_name || '',
       paymentReference: body.payment_reference || 'STC Pay',
@@ -209,7 +223,7 @@ export async function POST(request: NextRequest) {
         \`payment_date\`, \`total_earnings\`, \`net_pay\`, \`wages_description\`,
         \`ordinary_hours\`, \`hourly_rate\`, \`wages_amount\`, \`wages_total\`,
         \`tax_description\`, \`tax_amount\`, \`tax_total\`,
-        \`superannuation_description\`, \`superannuation_amount\`, \`superannuation_total\`,
+        \`include_superannuation\`, \`superannuation_description\`, \`superannuation_amount\`, \`superannuation_total\`,
         \`bank_account_masked\`, \`account_name\`, \`payment_reference\`, \`payment_amount\`,
         \`created_at\`, \`updated_at\`
       ) VALUES (
@@ -219,7 +233,7 @@ export async function POST(request: NextRequest) {
         ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?,
-        ?, ?, ?,
+        ?, ?, ?, ?,
         ?, ?, ?, ?,
         NOW(3), NOW(3)
       ) ON DUPLICATE KEY UPDATE
@@ -246,6 +260,7 @@ export async function POST(request: NextRequest) {
         \`tax_description\` = VALUES(\`tax_description\`),
         \`tax_amount\` = VALUES(\`tax_amount\`),
         \`tax_total\` = VALUES(\`tax_total\`),
+        \`include_superannuation\` = VALUES(\`include_superannuation\`),
         \`superannuation_description\` = VALUES(\`superannuation_description\`),
         \`superannuation_amount\` = VALUES(\`superannuation_amount\`),
         \`superannuation_total\` = VALUES(\`superannuation_total\`),
@@ -279,6 +294,7 @@ export async function POST(request: NextRequest) {
       payload.taxDescription,
       payload.taxAmount,
       payload.taxTotal,
+      isSuper ? 1 : 0,
       payload.superannuationDescription,
       payload.superannuationAmount,
       payload.superannuationTotal,
