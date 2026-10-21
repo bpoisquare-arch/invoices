@@ -110,7 +110,7 @@ export async function updateSession(request: NextRequest) {
 
   // Inject Security Headers
   const headers = response.headers
-  headers.set('X-Frame-Options', 'DENY')
+  headers.set('X-Frame-Options', 'SAMEORIGIN')
   headers.set('X-Content-Type-Options', 'nosniff')
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()')
@@ -120,11 +120,14 @@ export async function updateSession(request: NextRequest) {
   const csp = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "worker-src 'self' blob:",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https://lh3.googleusercontent.com https://lh5.googleusercontent.com",
     "font-src 'self' data: https://fonts.gstatic.com",
-    "connect-src 'self' https://api.resend.com",
-    "frame-ancestors 'none'",
+    "connect-src 'self' https://api.resend.com blob: data:",
+    "frame-src 'self' blob: data:",
+    "object-src 'self' blob: data:",
+    "frame-ancestors 'self'",
   ].join('; ')
 
   headers.set('Content-Security-Policy', csp)
