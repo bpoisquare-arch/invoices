@@ -189,3 +189,59 @@ export async function createReportSlipFromClipboardBlob(
     uploadedAt: now,
   }
 }
+
+/**
+ * Robustly convert a ReportSlip's base64 data to a same-origin Blob URL.
+ */
+export function createBlobUrlFromSlip(slip: ReportSlip): string {
+  try {
+    const parts = slip.data.split(',')
+    const mime =
+      parts[0].match(/:(.*?);/)?.[1] ||
+      (slip.type === 'pdf' ? 'application/pdf' : 'image/jpeg')
+    const bstr = atob(parts[1] || '')
+    let n = bstr.length
+    const u8arr = new Uint8Array(n)
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n)
+    }
+    const blob = new Blob([u8arr], { type: mime })
+    return URL.createObjectURL(blob)
+  } catch (err) {
+    console.error('Failed to create Blob URL:', err)
+    return slip.data
+  }
+}
+
+/**
+ * Robustly trigger a file download for a ReportSlip using binary Blob conversion.
+ * Avoids browser data: URL download blocking and ensures 100% binary integrity.
+ */
+export function downloadReportSlip(slip: ReportSlip): void {
+  try {
+    const blobUrl = createBlobUrlFromSlip(slip)
+    const ext = slip.type === 'pdf' ? '.pdf' : '.jpg'
+    const hasExt =
+      slip.name.toLowerCase().endsWith('.pdf') ||
+      slip.name.toLowerCase().endsWith('.jpg') ||
+      slip.name.toLowerCase().endsWith('.jpeg') ||
+      slip.name.toLowerCase().endsWith('.png') ||
+      slip.name.toLowerCase().endsWith('.webp')
+    const fileName = hasExt ? slip.name : `${slip.name}${ext}`
+
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+
+    setTimeout(() => {
+      try {
+        URL.revokeObjectURL(blobUrl)
+      } catch {}
+    }, 2000)
+  } catch (err) {
+    console.error('Download error:', err)
+  }
+}

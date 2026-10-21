@@ -18,7 +18,12 @@ import {
   FileCheck,
 } from 'lucide-react'
 import type { ReportSlip } from '@/types/report-slip.types'
-import { formatFileSize } from '@/lib/utils/slip-compression'
+import {
+  formatFileSize,
+  downloadReportSlip,
+  createBlobUrlFromSlip,
+} from '@/lib/utils/slip-compression'
+import PdfSlipPreview from './pdf-slip-preview'
 
 interface SlipsPreviewModalProps {
   isOpen: boolean
@@ -54,17 +59,7 @@ export default function SlipsPreviewModal({
 
   const handleOpenInNewTab = () => {
     try {
-      // For base64 Data URLs, converting to Blob URL provides the most reliable new tab display across browsers
-      const parts = currentSlip.data.split(',')
-      const mime = parts[0].match(/:(.*?);/)?.[1] || (isCurrentPdf ? 'application/pdf' : 'image/jpeg')
-      const bstr = atob(parts[1])
-      let n = bstr.length
-      const u8arr = new Uint8Array(n)
-      while (n--) {
-        u8arr[n] = bstr.charCodeAt(n)
-      }
-      const blob = new Blob([u8arr], { type: mime })
-      const blobUrl = URL.createObjectURL(blob)
+      const blobUrl = createBlobUrlFromSlip(currentSlip)
       window.open(blobUrl, '_blank')
     } catch {
       window.open(currentSlip.data, '_blank')
@@ -72,16 +67,7 @@ export default function SlipsPreviewModal({
   }
 
   const handleDownload = () => {
-    const a = document.createElement('a')
-    a.href = currentSlip.data
-    const ext = isCurrentPdf ? '.pdf' : '.jpg'
-    const cleanName = currentSlip.name.endsWith('.pdf') || currentSlip.name.endsWith('.jpg') || currentSlip.name.endsWith('.png')
-      ? currentSlip.name
-      : `${currentSlip.name}${ext}`
-    a.download = cleanName
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+    downloadReportSlip(currentSlip)
   }
 
   return (
@@ -107,10 +93,11 @@ export default function SlipsPreviewModal({
           {/* Document Content View */}
           <div className="w-full bg-slate-100 flex items-center justify-center min-h-[350px] sm:min-h-[500px] max-h-[560px] overflow-auto p-2 sm:p-4">
             {isCurrentPdf ? (
-              <iframe
-                src={`${currentSlip.data}#toolbar=0`}
-                className="w-full h-[350px] sm:h-[500px] bg-white rounded-xl shadow-xs border border-slate-200"
-                title={currentSlip.name}
+              <PdfSlipPreview
+                dataUrl={currentSlip.data}
+                fileName={currentSlip.name}
+                onOpenNewTab={handleOpenInNewTab}
+                onDownload={handleDownload}
               />
             ) : (
               <div className="flex flex-col items-center justify-center p-2">
