@@ -181,8 +181,12 @@ export interface StcReportImport {
   updated_at: string
 }
 
+import type { ReportSlip } from './report-slip.types'
+export type { ReportSlip }
+
 export interface StcReportRecord {
   id: string
+  slips?: ReportSlip[]
   import_id: string
   sr_no: number | null
   student_name: string
@@ -236,6 +240,7 @@ export interface AimtReportImport {
 
 export interface AimtReportRecord {
   id: string
+  slips?: ReportSlip[]
   import_id: string
   sr_no: number | null
   student_name: string

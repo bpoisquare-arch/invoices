@@ -34,6 +34,7 @@ import {
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/types/database.types'
 import { formatToDDMMYY } from '@/lib/utils'
+import SupportingSlipsViewer from '@/components/reports/supporting-slips-viewer'
 
 interface ReportRecordDetailModalProps {
   isOpen: boolean
@@ -382,6 +383,17 @@ export default function ReportRecordDetailModal({
                 <p className="whitespace-pre-wrap font-medium">{safeAdminComments}</p>
               </div>
             )
+          })()}
+
+          {/* Supporting Slips / Receipts (Attachment 2) */}
+          {(() => {
+            const slips = Array.isArray(record.slips)
+              ? record.slips
+              : Array.isArray((record.extra_data as any)?.slips)
+              ? (record.extra_data as any).slips
+              : []
+            if (slips.length === 0) return null
+            return <SupportingSlipsViewer slips={slips} title="AIMT Supporting Slips / Receipts" />
           })()}
         </div>
 

@@ -408,6 +408,7 @@ function prismaStcRecordToSnake(r: any): StcReportRecord {
         ? Number(rawDividedMonth)
         : null,
     calculation_breakup: rawCalcBreakup ? String(rawCalcBreakup) : null,
+    slips: Array.isArray(extraData.slips) ? extraData.slips : [],
     extra_data: extraData as any,
     created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt || new Date().toISOString()),
   }
@@ -1015,6 +1016,10 @@ export async function createStcReportRecord(params: {
     }
   } catch {}
 
+  const slipsVal = Array.isArray((params as any).slips)
+    ? (params as any).slips
+    : ((params.extra_data as any)?.slips || [])
+
   const extraData = {
     ...(params.extra_data || {}),
     total_paid: totalPaidNum,
@@ -1023,6 +1028,7 @@ export async function createStcReportRecord(params: {
     admin_comments: adminCommentsVal,
     divided_month: dividedMonthVal,
     calculation_breakup: calculationBreakupVal,
+    slips: slipsVal,
   }
 
   const importExists = await prisma.stcReportImport.findUnique({ where: { id: targetImportId!} })
@@ -1177,13 +1183,15 @@ export async function updateStcReportRecord(
     updates.divided_month !== undefined ||
     updates.calculation_breakup !== undefined ||
     updates.admin_comments !== undefined ||
-    updates.extra_data !== undefined
+    updates.extra_data !== undefined ||
+    (updates as any).slips !== undefined
   ) {
     const existingExtra = (existingRecord.extraData as Record<string, any>) || {}
     const passedExtra = typeof updates.extra_data === 'object' && updates.extra_data !== null ? (updates.extra_data as Record<string, any>) : {}
-    const newExtra = {
+    const newExtra: Record<string, any> = {
       ...existingExtra,
       ...passedExtra,
+      ...((updates as any).slips !== undefined ? { slips: (updates as any).slips } : {}),
     }
     if (updates.divided_month !== undefined) {
       newExtra.divided_month =

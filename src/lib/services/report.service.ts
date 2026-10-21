@@ -374,6 +374,7 @@ function prismaAimtRecordToSnake(r: any): AimtReportRecord {
     payment_status: r.paymentStatus,
     divided_month: r.dividedMonth !== undefined && r.dividedMonth !== null ? Number(r.dividedMonth) : (extraData.divided_month !== undefined && extraData.divided_month !== null ? Number(extraData.divided_month) : null),
     calculation_breakup: r.calculationBreakup || extraData.calculation_breakup || null,
+    slips: Array.isArray(extraData.slips) ? extraData.slips : [],
     extra_data: extraData as any,
     created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt || new Date().toISOString()),
   }
@@ -978,6 +979,10 @@ export async function createReportRecord(params: {
     }
   } catch {}
 
+  const slipsVal = Array.isArray((params as any).slips)
+    ? (params as any).slips
+    : ((params.extra_data as any)?.slips || [])
+
   const extraData = {
     ...(params.extra_data || {}),
     total_paid: totalPaidNum,
@@ -986,6 +991,7 @@ export async function createReportRecord(params: {
     divided_month: dividedMonthVal,
     calculation_breakup: calculationBreakupVal,
     admin_comments: adminCommentsVal,
+    slips: slipsVal,
   }
 
   const importExists = await prisma.aimtReportImport.findUnique({ where: { id: targetImportId! } })
@@ -1137,9 +1143,13 @@ export async function updateReportRecord(
   if (updates.admin_comments !== undefined) {
     mysqlUpdate.adminComments = cleanString(updates.admin_comments) || null
   }
-  if (updates.extra_data !== undefined || updates.admin_comments !== undefined) {
+  if (updates.extra_data !== undefined || updates.admin_comments !== undefined || (updates as any).slips !== undefined) {
+    const currentExtra = (existingRecord.extraData as any) || {}
+    const newSlips = (updates as any).slips !== undefined ? (updates as any).slips : currentExtra.slips
     mysqlUpdate.extraData = {
+      ...currentExtra,
       ...(updates.extra_data as any || {}),
+      ...(newSlips !== undefined ? { slips: newSlips } : {}),
       ...(updates.admin_comments !== undefined ? { admin_comments: cleanString(updates.admin_comments) || null } : {}),
     }
   }

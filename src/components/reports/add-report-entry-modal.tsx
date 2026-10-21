@@ -39,6 +39,8 @@ import {
 } from 'lucide-react'
 import { useAuthRole } from '@/lib/hooks/use-auth-role'
 import type { AimtReportRecord } from '@/types/database.types'
+import type { ReportSlip } from '@/types/report-slip.types'
+import ManageSlipsSection from '@/components/reports/manage-slips-section'
 
 interface AddReportEntryModalProps {
   isOpen: boolean
@@ -181,6 +183,7 @@ export default function AddReportEntryModal({
     }
   })
 
+  const [slips, setSlips] = useState<ReportSlip[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isManualTotalFee, setIsManualTotalFee] = useState(false)
@@ -192,6 +195,13 @@ export default function AddReportEntryModal({
       setErrorMessage(null)
       setStatusModified(false)
       if (editRecord) {
+        const rawSlips = Array.isArray(editRecord.slips)
+          ? editRecord.slips
+          : Array.isArray((editRecord.extra_data as any)?.slips)
+          ? (editRecord.extra_data as any).slips
+          : []
+        setSlips(rawSlips)
+
         const totalPaidVal = (editRecord as any).total_paid !== undefined && (editRecord as any).total_paid !== null
           ? String((editRecord as any).total_paid)
           : (editRecord.extra_data as any)?.total_paid !== undefined
@@ -344,6 +354,7 @@ export default function AddReportEntryModal({
           divided_month: '',
           calculation_breakup: '',
         })
+        setSlips([])
         setIsManualTotalFee(false)
       }
     }
@@ -494,7 +505,7 @@ export default function AddReportEntryModal({
         // Viewers only update admin_comments
         const updatePayload = isViewer
           ? { id: editRecord.id, admin_comments: submitData.admin_comments }
-          : { id: editRecord.id, ...submitData }
+          : { id: editRecord.id, ...submitData, slips }
 
         // Update existing record
         const res = await fetch('/api/reports/records', {
@@ -518,6 +529,7 @@ export default function AddReportEntryModal({
           body: JSON.stringify({
             importId: activeImportId,
             ...submitData,
+            slips,
           }),
         })
 
@@ -768,6 +780,17 @@ export default function AddReportEntryModal({
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* 2b. Supporting Slips & Receipts Upload Section (Attachment 1 / 3) */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+                  <ManageSlipsSection
+                    slips={slips}
+                    onChange={setSlips}
+                    maxSlips={10}
+                    disabled={isViewer}
+                    entityLabel="AIMT"
+                  />
                 </div>
               </fieldset>
 
