@@ -58,7 +58,7 @@ export const DEFAULT_STC_PAID_BY = {
   paid_by_name: 'States College Australia Pty Ltd',
   paid_by_address_1: 'Level 3, 301/620 Bourke Street',
   paid_by_address_2: 'Melbourne VIC 3000',
-  paid_by_abn: '41 645 842 590',
+  paid_by_abn: '70 657 669 531',
 }
 
 export const DEFAULT_STC_PAYSLIP: Omit<STCPayslip, 'id' | 'created_at'> = {
