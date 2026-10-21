@@ -270,3 +270,41 @@ export interface AimtReportRecord {
   extra_data: Json
   created_at: string
 }
+
+export interface StcPayslip {
+  id: string
+  user_id?: string | null
+  paid_by_name: string
+  paid_by_address_1: string
+  paid_by_address_2: string
+  paid_by_abn: string
+  employee_name: string
+  address_line_1: string
+  address_line_2: string
+  pay_frequency: string
+  annual_salary: number
+  employment_basis: string
+  pay_period_start: string
+  pay_period_end: string
+  payment_date: string
+  total_earnings: number
+  net_pay: number
+  wages_description: string
+  ordinary_hours: number
+  hourly_rate: number
+  wages_amount: number
+  wages_total: number
+  tax_description: string
+  tax_amount: number
+  tax_total: number
+  superannuation_description?: string | null
+  superannuation_amount?: number
+  superannuation_total?: number
+  bank_account_masked: string
+  account_name: string
+  payment_reference: string
+  payment_amount: number
+  created_at: string
+  updated_at?: string
+}
+

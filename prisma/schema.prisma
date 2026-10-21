@@ -474,6 +474,49 @@ model EdlinkPayslip {
   @@map("edlink_payslips")
 }
 
+// 22. STC PAYSLIPS
+model StcPayslip {
+  id                        String   @id @db.VarChar(255)
+  userId                    String?  @map("user_id") @db.VarChar(36)
+  paidByName                String   @map("paid_by_name") @db.VarChar(255)
+  paidByAddress1            String   @map("paid_by_address_1") @db.VarChar(255)
+  paidByAddress2            String   @map("paid_by_address_2") @db.VarChar(255)
+  paidByAbn                 String   @map("paid_by_abn") @db.VarChar(100)
+  employeeName              String   @map("employee_name") @db.VarChar(255)
+  addressLine1              String   @map("address_line_1") @db.VarChar(255)
+  addressLine2              String   @map("address_line_2") @db.VarChar(255)
+  payFrequency              String   @map("pay_frequency") @db.VarChar(100)
+  annualSalary              Decimal  @default(0.00) @map("annual_salary") @db.Decimal(12, 2)
+  employmentBasis           String   @map("employment_basis") @db.VarChar(100)
+  payPeriodStart            String   @map("pay_period_start") @db.VarChar(50)
+  payPeriodEnd              String   @map("pay_period_end") @db.VarChar(50)
+  paymentDate               String   @map("payment_date") @db.VarChar(50)
+  totalEarnings             Decimal  @default(0.00) @map("total_earnings") @db.Decimal(12, 2)
+  netPay                    Decimal  @default(0.00) @map("net_pay") @db.Decimal(12, 2)
+  wagesDescription          String   @map("wages_description") @db.VarChar(255)
+  ordinaryHours             Decimal  @default(0.00) @map("ordinary_hours") @db.Decimal(10, 2)
+  hourlyRate                Decimal  @default(0.0000) @map("hourly_rate") @db.Decimal(10, 4)
+  wagesAmount               Decimal  @default(0.00) @map("wages_amount") @db.Decimal(12, 2)
+  wagesTotal                Decimal  @default(0.00) @map("wages_total") @db.Decimal(12, 2)
+  taxDescription            String   @map("tax_description") @db.VarChar(100)
+  taxAmount                 Decimal  @default(0.00) @map("tax_amount") @db.Decimal(12, 2)
+  taxTotal                  Decimal  @default(0.00) @map("tax_total") @db.Decimal(12, 2)
+  superannuationDescription String?  @default("") @map("superannuation_description") @db.VarChar(255)
+  superannuationAmount      Decimal  @default(0.00) @map("superannuation_amount") @db.Decimal(12, 2)
+  superannuationTotal       Decimal  @default(0.00) @map("superannuation_total") @db.Decimal(12, 2)
+  bankAccountMasked         String   @map("bank_account_masked") @db.VarChar(100)
+  accountName               String   @map("account_name") @db.VarChar(255)
+  paymentReference          String   @map("payment_reference") @db.VarChar(255)
+  paymentAmount             Decimal  @default(0.00) @map("payment_amount") @db.Decimal(12, 2)
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([employeeName], map: "idx_stc_payslips_employee_name")
+  @@index([createdAt], map: "idx_stc_payslips_created_at")
+  @@map("stc_payslips")
+}
+
+
 // 22. AIMT REPORT IMPORTS
 model AimtReportImport {
   id                 String   @id @default(uuid()) @db.VarChar(36)
