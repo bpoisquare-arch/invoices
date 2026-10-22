@@ -23,7 +23,7 @@ import {
   downloadReportSlip,
   createBlobUrlFromSlip,
 } from '@/lib/utils/slip-compression'
-import PdfSlipPreview from './pdf-slip-preview'
+
 
 interface SlipsPreviewModalProps {
   isOpen: boolean
@@ -88,71 +88,54 @@ export default function SlipsPreviewModal({
           </span>
         </div>
 
-        {/* 2. Main Large Preview Viewer Box */}
-        <div className="mt-4 border border-slate-200/90 bg-slate-50/60 rounded-2xl overflow-hidden shadow-xs">
-          {/* Document Content View */}
-          <div className="w-full bg-slate-100 flex items-center justify-center min-h-[350px] sm:min-h-[500px] max-h-[560px] overflow-auto p-2 sm:p-4">
+        {/* 2. Selected Slip Action Toolbar */}
+        <div className="mt-4 border border-slate-200/90 bg-slate-50/70 rounded-2xl p-3.5 sm:p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 text-xs font-bold text-slate-700 min-w-0">
             {isCurrentPdf ? (
-              <PdfSlipPreview
-                dataUrl={currentSlip.data}
-                fileName={currentSlip.name}
-                onOpenNewTab={handleOpenInNewTab}
-                onDownload={handleDownload}
-              />
+              <div className="flex items-center gap-2 text-rose-600 min-w-0">
+                <span className="bg-rose-100 text-rose-700 size-6 rounded-lg flex items-center justify-center font-extrabold text-[10px] shrink-0">
+                  PDF
+                </span>
+                <span className="truncate">
+                  PDF Slip #{selectedIndex + 1} of {slips.length}
+                  {currentSlip.name ? ` • ${currentSlip.name}` : ''}
+                </span>
+              </div>
             ) : (
-              <div className="flex flex-col items-center justify-center p-2">
-                <img
-                  src={currentSlip.data}
-                  alt={currentSlip.name}
-                  className="max-h-[480px] w-auto max-w-full rounded-xl shadow-md border border-slate-200/80 object-contain bg-white"
-                />
+              <div className="flex items-center gap-2 text-emerald-700 min-w-0">
+                <span className="bg-emerald-100 text-emerald-700 size-6 rounded-lg flex items-center justify-center font-extrabold text-[10px] shrink-0">
+                  IMG
+                </span>
+                <span className="truncate">
+                  Image Slip #{selectedIndex + 1} of {slips.length}
+                  {currentSlip.name ? ` • ${currentSlip.name}` : ''}
+                </span>
               </div>
             )}
+            <span className="text-slate-400 font-normal shrink-0">
+              • {formatFileSize(currentSlip.compressedSize || currentSlip.originalSize || (currentSlip as any).fileSize || 0)}
+            </span>
           </div>
 
-          {/* Action Toolbar Below Preview */}
-          <div className="bg-white p-3.5 sm:p-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-              {isCurrentPdf ? (
-                <div className="flex items-center gap-2 text-rose-600">
-                  <span className="bg-rose-100 text-rose-700 size-6 rounded-lg flex items-center justify-center font-extrabold text-[10px]">
-                    PDF
-                  </span>
-                  <span>PDF Slip #{selectedIndex + 1} of {slips.length}</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <span className="bg-emerald-100 text-emerald-700 size-6 rounded-lg flex items-center justify-center font-extrabold text-[10px]">
-                    IMG
-                  </span>
-                  <span>Image Slip #{selectedIndex + 1} of {slips.length}</span>
-                </div>
-              )}
-              <span className="text-slate-400 font-normal">
-                • {formatFileSize(currentSlip.compressedSize || currentSlip.originalSize || (currentSlip as any).fileSize || 0)}
-              </span>
-            </div>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <Button
+              type="button"
+              onClick={handleOpenInNewTab}
+              className="bg-[#00BF8F] hover:bg-[#00A87D] text-white font-bold text-xs h-9 px-4 rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <ExternalLink className="size-3.5" />
+              <span>Open {isCurrentPdf ? 'PDF' : 'Image'} in New Tab</span>
+            </Button>
 
-            <div className="flex items-center gap-2.5">
-              <Button
-                type="button"
-                onClick={handleOpenInNewTab}
-                className="bg-[#00BF8F] hover:bg-[#00A87D] text-white font-bold text-xs h-9 px-4 rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all active:scale-95"
-              >
-                <ExternalLink className="size-3.5" />
-                <span>Open {isCurrentPdf ? 'PDF' : 'Image'} in New Tab</span>
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleDownload}
-                className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs h-9 px-4 rounded-xl shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all"
-              >
-                <Download className="size-3.5 text-slate-600" />
-                <span>Download</span>
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDownload}
+              className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs h-9 px-4 rounded-xl shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all"
+            >
+              <Download className="size-3.5 text-slate-600" />
+              <span>Download</span>
+            </Button>
           </div>
         </div>
 
