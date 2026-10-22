@@ -13,6 +13,7 @@ export interface SendPayslipEmailParams {
   netPay: number
   pdfBuffer: Buffer
   customMessage?: string
+  templateType?: 'edlink' | 'aimt'
 }
 
 export interface SendPayslipEmailResult {
@@ -56,7 +57,10 @@ export async function sendPayslipEmail(params: SendPayslipEmailParams): Promise<
     netPay,
     pdfBuffer,
     customMessage,
+    templateType = 'edlink',
   } = params
+
+  const isAimt = templateType === 'aimt'
 
   if (!to || !to.includes('@')) {
     throw new Error(`Invalid recipient email address: "${to}"`)
@@ -84,9 +88,13 @@ export async function sendPayslipEmail(params: SendPayslipEmailParams): Promise<
 
   const safeEmpName = (employeeName || 'Employee').trim().replace(/[/\\?%*:|"<>]/g, '').replace(/\s+/g, '_')
   const cleanMonth = monthLabel.replace(/[/\\?%*:|"<>]/g, '').replace(/\s+/g, '_')
-  const attachmentFilename = `Payslip_${safeEmpName}_${cleanMonth}.pdf`
+  const attachmentFilename = isAimt
+    ? `Payslip_AIMT_${safeEmpName}_${cleanMonth}.pdf`
+    : `Payslip_${safeEmpName}_${cleanMonth}.pdf`
 
-  const subject = `Employee Payslip - ${monthLabel} | ${employeeName}`
+  const subject = isAimt
+    ? `Australian Institute of Management & Technology - Employee Payslip - ${monthLabel} | ${employeeName}`
+    : `Employee Payslip - ${monthLabel} | ${employeeName}`
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -214,8 +222,8 @@ export async function sendPayslipEmail(params: SendPayslipEmailParams): Promise<
 </head>
 <body>
   <div class="email-container">
-    <div class="header">
-      <h1>EdLink Education &amp; Visa Services</h1>
+    <div class="header" ${isAimt ? 'style="background: linear-gradient(135deg, #0F3A7E 0%, #009D9E 100%);"' : ''}>
+      <h1>${isAimt ? 'Australian Institute of Management &amp; Technology' : 'EdLink Education &amp; Visa Services'}</h1>
       <p>Official Monthly Employee Payslip</p>
     </div>
 
@@ -272,12 +280,21 @@ export async function sendPayslipEmail(params: SendPayslipEmailParams): Promise<
     </div>
 
     <div class="footer">
-      <p><strong>EdLink Education &amp; Visa Services</strong></p>
+      ${
+        isAimt
+          ? `<p><strong>Australian Institute of Management &amp; Technology</strong></p>
+      <p>84 Buckley Street, Footscray, VIC 3011, Australia</p>
+      <p>Phone: 0311 1100696 | Email: accounts@aimtedu.com.au</p>
+      <p style="margin-top: 10px; font-size: 11px; color: #94a3b8;">
+        This is an automated system generated email. If you have any questions regarding your salary, please contact the accounts department (accounts@aimtedu.com.au).
+      </p>`
+          : `<p><strong>EdLink Education &amp; Visa Services</strong></p>
       <p>38A 1st Floor DHA Phase 3 XX Block, Lahore, Pakistan, 54000</p>
       <p>Phone: 0311 1100696 | Email: connect@edlinkservices.info</p>
       <p style="margin-top: 10px; font-size: 11px; color: #94a3b8;">
         This is an automated system generated email. If you have any questions regarding your salary, please contact the accounts/HR department.
-      </p>
+      </p>`
+      }
     </div>
   </div>
 </body>
@@ -285,7 +302,10 @@ export async function sendPayslipEmail(params: SendPayslipEmailParams): Promise<
   `
 
   const mailOptions: any = {
-    from: `"${config.fromName}" <${config.user}>`,
+    from: isAimt
+      ? `"Australian Institute of Management & Technology" <${config.user}>`
+      : `"${config.fromName}" <${config.user}>`,
+    replyTo: isAimt ? 'accounts@aimtedu.com.au' : 'connect@edlinkservices.info',
     to,
     subject,
     html: htmlContent,

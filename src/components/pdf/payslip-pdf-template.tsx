@@ -2,6 +2,7 @@ import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer'
 import { Employee } from '@/types/database.types'
 import { EDLINK_LOGO_BASE64 } from '@/lib/constants/edlink-assets'
+import { AIMT_LOGO_BASE64 } from '@/lib/constants/aimt-assets'
 
 // Register Geist Font Family
 Font.register({
@@ -232,6 +233,7 @@ interface PayslipPDFTemplateProps {
   payslipData: PayslipData
   payPeriod: string
   logoUrl?: string
+  templateType?: 'edlink' | 'aimt'
 }
 
 export default function PayslipPDFTemplate({
@@ -239,34 +241,54 @@ export default function PayslipPDFTemplate({
   payslipData,
   payPeriod,
   logoUrl,
+  templateType = 'edlink',
 }: PayslipPDFTemplateProps) {
   const safeEmpName = (employee.name || employee.employee_id || 'Staff')
     .trim()
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .replace(/_+/g, '_')
 
-  const resolvedLogo = logoUrl || EDLINK_LOGO_BASE64
+  const isAimt = templateType === 'aimt'
+  const resolvedLogo = logoUrl || (isAimt ? AIMT_LOGO_BASE64 : EDLINK_LOGO_BASE64)
 
   return (
-    <Document title={`Payslip_${safeEmpName}`}>
+    <Document title={`Payslip_${isAimt ? 'AIMT_' : ''}${safeEmpName}`}>
       <Page size="A4" style={styles.page}>
         {/* 1. Header with Logo, Address & Title (Centered) */}
         <View style={styles.headerContainer}>
-          <Image src={resolvedLogo} style={styles.logo} />
+          <Image src={resolvedLogo} style={isAimt ? [styles.logo, { height: 50, width: 200 }] : styles.logo} />
           <View style={styles.companyInfoContainer}>
-            <Text style={styles.companyInfoRow}>
-              <Text style={styles.companyInfoBold}>Add: </Text>
-              38A 1st Floor DHA Phase 3 XX Block , Lahore, Pakistan, 54000
-            </Text>
-            <Text style={styles.companyInfoRow}>
-              <Text style={styles.companyInfoBold}>Ph: </Text>
-              0311 1100696
-              <Text style={{ color: '#94a3b8' }}>   |   </Text>
-              <Text style={styles.companyInfoBold}>Email: </Text>
-              connect@edlinkservices.info
-            </Text>
+            {isAimt ? (
+              <>
+                <Text style={styles.companyInfoRow}>
+                  <Text style={styles.companyInfoBold}>Add: </Text>
+                  84 Buckley Street, Footscray, VIC 3011, Australia
+                </Text>
+                <Text style={styles.companyInfoRow}>
+                  <Text style={styles.companyInfoBold}>Ph: </Text>
+                  0311 1100696
+                  <Text style={{ color: '#94a3b8' }}>   |   </Text>
+                  <Text style={styles.companyInfoBold}>Email: </Text>
+                  accounts@aimtedu.com.au
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.companyInfoRow}>
+                  <Text style={styles.companyInfoBold}>Add: </Text>
+                  38A 1st Floor DHA Phase 3 XX Block , Lahore, Pakistan, 54000
+                </Text>
+                <Text style={styles.companyInfoRow}>
+                  <Text style={styles.companyInfoBold}>Ph: </Text>
+                  0311 1100696
+                  <Text style={{ color: '#94a3b8' }}>   |   </Text>
+                  <Text style={styles.companyInfoBold}>Email: </Text>
+                  connect@edlinkservices.info
+                </Text>
+              </>
+            )}
           </View>
-          <Text style={styles.headerTitle}>EMPLOYEE PAYSLIP</Text>
+          <Text style={[styles.headerTitle, isAimt ? { color: '#0F3A7E' } : {}]}>EMPLOYEE PAYSLIP</Text>
         </View>
 
         {/* 2. Top Info Grid */}
@@ -299,7 +321,7 @@ export default function PayslipPDFTemplate({
         </View>
 
         {/* 3. ATTENDANCE Section */}
-        <Text style={styles.sectionTitle}>ATTENDANCE</Text>
+        <Text style={[styles.sectionTitle, isAimt ? { color: '#0F3A7E' } : {}]}>ATTENDANCE</Text>
         <View style={styles.table}>
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Total Working Days</Text>
@@ -351,7 +373,7 @@ export default function PayslipPDFTemplate({
         </View>
 
         {/* 4. EARNINGS Section */}
-        <Text style={styles.sectionTitle}>EARNINGS</Text>
+        <Text style={[styles.sectionTitle, isAimt ? { color: '#0F3A7E' } : {}]}>EARNINGS</Text>
         <View style={styles.table}>
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Basic Pay</Text>
@@ -380,7 +402,7 @@ export default function PayslipPDFTemplate({
         </View>
 
         {/* 5. DEDUCTIONS Section */}
-        <Text style={styles.sectionTitle}>DEDUCTIONS</Text>
+        <Text style={[styles.sectionTitle, isAimt ? { color: '#0F3A7E' } : {}]}>DEDUCTIONS</Text>
         <View style={styles.table}>
           <View style={styles.tableRowEven}>
             <Text style={styles.rowLabel}>Unpaid Days</Text>

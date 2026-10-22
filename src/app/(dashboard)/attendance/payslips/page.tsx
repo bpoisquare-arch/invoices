@@ -171,8 +171,9 @@ export default function PayslipsPage() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [pageSize, setPageSize] = useState<number | 'all'>('all')
 
-  // Selected Employee for View Modal
+  // Selected Employee for View Modal & Template Choice (EdLink vs AIMT)
   const [selectedPayslipEmployee, setSelectedPayslipEmployee] = useState<Employee | null>(null)
+  const [selectedTemplate, setSelectedTemplate] = useState<'edlink' | 'aimt'>('edlink')
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
 
   // Email Payslip State
@@ -671,7 +672,7 @@ export default function PayslipsPage() {
   }
 
   // Handle PDF Download directly using @react-pdf/renderer
-  const handleDownloadPdf = async (emp: Employee) => {
+  const handleDownloadPdf = async (emp: Employee, template: 'edlink' | 'aimt' = selectedTemplate) => {
     try {
       setIsGeneratingPdf(true)
       const data = getPayslipData(emp)
@@ -682,6 +683,7 @@ export default function PayslipsPage() {
           employee={emp}
           payslipData={data}
           payPeriod={payPeriod}
+          templateType={template}
         />
       )
 
@@ -693,7 +695,8 @@ export default function PayslipsPage() {
         .trim()
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_')
-      a.download = `Payslip_${safeEmpName}_${monthLabel.replace(/\s+/g, '_')}.pdf`
+      const prefix = template === 'aimt' ? 'Payslip_AIMT_' : 'Payslip_'
+      a.download = `${prefix}${safeEmpName}_${monthLabel.replace(/\s+/g, '_')}.pdf`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -705,8 +708,9 @@ export default function PayslipsPage() {
     }
   }
 
-  const handleOpenEmailModal = (emp: Employee) => {
+  const handleOpenEmailModal = (emp: Employee, template: 'edlink' | 'aimt' = selectedTemplate) => {
     setSelectedEmailEmployee(emp)
+    setSelectedTemplate(template)
     setRecipientEmail(emp.email || '')
     setCcEmail('fazail@edlinkservices.info')
     setEmailMessage('')
@@ -744,6 +748,7 @@ export default function PayslipsPage() {
           recipientEmail: emailToSend,
           cc: ccEmail.trim(),
           customMessage: emailMessage.trim() || undefined,
+          templateType: selectedTemplate,
         }),
       })
 
@@ -754,7 +759,7 @@ export default function PayslipsPage() {
 
       setEmailStatus({
         type: 'success',
-        message: result.message || `Payslip email with PDF attachment was successfully sent to ${emailToSend}!`,
+        message: result.message || `Payslip email (${selectedTemplate === 'aimt' ? 'AIMT' : 'EdLink'} format) with PDF attachment was successfully sent to ${emailToSend}!`,
       })
     } catch (err: any) {
       setEmailStatus({
@@ -1077,15 +1082,23 @@ export default function PayslipsPage() {
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
-                              onClick={() => handleDownloadPdf(emp)}
-                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer font-medium transition-colors"
+                              onClick={() => handleDownloadPdf(emp, 'edlink')}
+                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer font-medium transition-colors"
                             >
-                              <Download className="w-3.5 h-3.5 text-blue-600" />
-                              <span>Download PDF</span>
+                              <Download className="w-3.5 h-3.5 text-[#009D9E]" />
+                              <span>Download PDF (EdLink)</span>
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
-                              onClick={() => handleOpenEmailModal(emp)}
+                              onClick={() => handleDownloadPdf(emp, 'aimt')}
+                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer font-medium transition-colors"
+                            >
+                              <Download className="w-3.5 h-3.5 text-[#0F3A7E]" />
+                              <span>Download PDF (AIMT)</span>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={() => handleOpenEmailModal(emp, selectedTemplate)}
                               className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-slate-700 hover:bg-purple-50 hover:text-purple-700 cursor-pointer font-medium transition-colors"
                             >
                               <Mail className="w-3.5 h-3.5 text-purple-600" />
@@ -1138,28 +1151,84 @@ export default function PayslipsPage() {
               <div
                 className="bg-white p-6 sm:p-8 md:p-10 max-w-2xl mx-auto space-y-6 text-slate-900 border border-slate-200/80 shadow-md rounded-xl font-sans"
               >
-                {/* 1. Header with Logo, Address & Title */}
-                <div className="text-center pt-2">
-                  <img
-                    src="/edlink-logo.png"
-                    alt="EdLink"
-                    className="h-20 w-auto object-contain mx-auto mb-3"
-                  />
-                  <div className="text-center text-xs text-slate-600 font-medium space-y-0.5 mb-6">
-                    <p>
-                      <span className="font-semibold text-slate-800">Add:</span> 38A 1st Floor DHA Phase 3 XX Block , Lahore, Pakistan, 54000
-                    </p>
-                    <p className="flex items-center justify-center gap-2.5 text-[11.5px]">
-                      <span>
-                        <span className="font-semibold text-slate-800">Ph:</span> 0311 1100696
-                      </span>
-                      <span className="text-slate-300">|</span>
-                      <span>
-                        <span className="font-semibold text-slate-800">Email:</span> connect@edlinkservices.info
-                      </span>
-                    </p>
+                {/* 2 Tabs: EdLink & AIMT - User Marked Location */}
+                <div className="flex justify-center pt-1 pb-3">
+                  <div className="inline-flex p-1 bg-slate-100/90 border border-slate-200 rounded-xl shadow-2xs gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTemplate('edlink')}
+                      className={`px-5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
+                        selectedTemplate === 'edlink'
+                          ? 'bg-[#009D9E] text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${selectedTemplate === 'edlink' ? 'bg-white' : 'bg-[#009D9E]'}`} />
+                      EdLink
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTemplate('aimt')}
+                      className={`px-5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
+                        selectedTemplate === 'aimt'
+                          ? 'bg-[#0F3A7E] text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${selectedTemplate === 'aimt' ? 'bg-white' : 'bg-[#38BDF8]'}`} />
+                      AIMT
+                    </button>
                   </div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#007A78] tracking-tight uppercase mb-3">
+                </div>
+
+                {/* 1. Header with Logo, Address & Title */}
+                <div className="text-center pt-1">
+                  {selectedTemplate === 'aimt' ? (
+                    <>
+                      <img
+                        src="/aimt-logo.png"
+                        alt="AIMT"
+                        className="h-16 w-auto object-contain mx-auto mb-3"
+                      />
+                      <div className="text-center text-xs text-slate-600 font-medium space-y-0.5 mb-6">
+                        <p>
+                          <span className="font-semibold text-slate-800">Add:</span> 84 Buckley Street, Footscray, VIC 3011, Australia
+                        </p>
+                        <p className="flex items-center justify-center gap-2.5 text-[11.5px]">
+                          <span>
+                            <span className="font-semibold text-slate-800">Ph:</span> 0311 1100696
+                          </span>
+                          <span className="text-slate-300">|</span>
+                          <span>
+                            <span className="font-semibold text-slate-800">Email:</span> accounts@aimtedu.com.au
+                          </span>
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <img
+                        src="/edlink-logo.png"
+                        alt="EdLink"
+                        className="h-20 w-auto object-contain mx-auto mb-3"
+                      />
+                      <div className="text-center text-xs text-slate-600 font-medium space-y-0.5 mb-6">
+                        <p>
+                          <span className="font-semibold text-slate-800">Add:</span> 38A 1st Floor DHA Phase 3 XX Block , Lahore, Pakistan, 54000
+                        </p>
+                        <p className="flex items-center justify-center gap-2.5 text-[11.5px]">
+                          <span>
+                            <span className="font-semibold text-slate-800">Ph:</span> 0311 1100696
+                          </span>
+                          <span className="text-slate-300">|</span>
+                          <span>
+                            <span className="font-semibold text-slate-800">Email:</span> connect@edlinkservices.info
+                          </span>
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  <h1 className={`text-2xl sm:text-3xl font-extrabold tracking-tight uppercase mb-3 ${selectedTemplate === 'aimt' ? 'text-[#0F3A7E]' : 'text-[#007A78]'}`}>
                     EMPLOYEE PAYSLIP
                   </h1>
                 </div>
@@ -1197,7 +1266,7 @@ export default function PayslipsPage() {
 
                 {/* 3. ATTENDANCE Section */}
                 <div className="space-y-1.5">
-                  <h2 className="text-base font-bold text-[#007A78] uppercase tracking-wide">
+                  <h2 className={`text-base font-bold uppercase tracking-wide ${selectedTemplate === 'aimt' ? 'text-[#0F3A7E]' : 'text-[#007A78]'}`}>
                     ATTENDANCE
                   </h2>
                   <div className="border border-slate-200 overflow-hidden rounded-xs text-xs">
@@ -1255,7 +1324,7 @@ export default function PayslipsPage() {
 
                 {/* 4. EARNINGS Section */}
                 <div className="space-y-1.5">
-                  <h2 className="text-base font-bold text-[#007A78] uppercase tracking-wide">
+                  <h2 className={`text-base font-bold uppercase tracking-wide ${selectedTemplate === 'aimt' ? 'text-[#0F3A7E]' : 'text-[#007A78]'}`}>
                     EARNINGS
                   </h2>
                   <div className="border border-slate-200 overflow-hidden rounded-xs text-xs">
@@ -1288,7 +1357,7 @@ export default function PayslipsPage() {
 
                 {/* 5. DEDUCTIONS Section */}
                 <div className="space-y-1.5">
-                  <h2 className="text-base font-bold text-[#007A78] uppercase tracking-wide">
+                  <h2 className={`text-base font-bold uppercase tracking-wide ${selectedTemplate === 'aimt' ? 'text-[#0F3A7E]' : 'text-[#007A78]'}`}>
                     DEDUCTIONS
                   </h2>
                   <div className="border border-slate-200 overflow-hidden rounded-xs text-xs">
@@ -1352,17 +1421,17 @@ export default function PayslipsPage() {
                   variant="outline"
                   onClick={() => {
                     if (selectedPayslipEmployee) {
-                      handleOpenEmailModal(selectedPayslipEmployee)
+                      handleOpenEmailModal(selectedPayslipEmployee, selectedTemplate)
                     }
                   }}
                   className="h-10 px-5 text-xs sm:text-sm font-semibold rounded-xl border-purple-200 bg-purple-50/40 text-purple-700 hover:bg-purple-100 hover:border-purple-300 gap-2 shadow-2xs transition-all flex-1 sm:flex-none justify-center"
                 >
                   <Mail className="w-4 h-4 text-purple-600" />
-                  Send Email
+                  Send Email ({selectedTemplate === 'aimt' ? 'AIMT' : 'EdLink'})
                 </Button>
                 <Button
                   disabled={isGeneratingPdf}
-                  onClick={() => handleDownloadPdf(selectedPayslipEmployee)}
+                  onClick={() => handleDownloadPdf(selectedPayslipEmployee, selectedTemplate)}
                   className="h-10 px-6 bg-[#009D9E] hover:bg-[#007A7A] text-white text-xs sm:text-sm font-semibold rounded-xl gap-2 shadow-sm transition-all flex-1 sm:flex-none justify-center"
                 >
                   {isGeneratingPdf ? (
@@ -1370,7 +1439,7 @@ export default function PayslipsPage() {
                   ) : (
                     <Download className="w-4 h-4" />
                   )}
-                  Download PDF
+                  Download PDF ({selectedTemplate === 'aimt' ? 'AIMT' : 'EdLink'})
                 </Button>
               </div>
             </DialogFooter>
@@ -1381,9 +1450,9 @@ export default function PayslipsPage() {
       {/* Send Email Modal Dialog */}
       {selectedEmailEmployee && (
         <Dialog open={isEmailModalOpen} onOpenChange={(open) => !open && setIsEmailModalOpen(false)}>
-          <DialogContent className="sm:max-w-md bg-white border border-slate-200 shadow-2xl rounded-2xl p-6">
+          <DialogContent className="max-w-3xl w-[96vw] sm:w-[780px] md:w-[820px] bg-white border border-slate-200 shadow-2xl rounded-2xl p-5 sm:p-7 overflow-hidden flex flex-col">
             <DialogHeader className="border-b border-slate-100 pb-3">
-              <DialogTitle className="text-lg font-bold text-[#003D5C] flex items-center gap-2">
+              <DialogTitle className="text-base sm:text-lg font-bold text-[#003D5C] flex items-center gap-2">
                 <Mail className="w-5 h-5 text-[#009D9E]" />
                 Send Payslip Email
               </DialogTitle>
@@ -1393,44 +1462,19 @@ export default function PayslipsPage() {
             </DialogHeader>
 
             <div className="space-y-4 py-3 text-xs">
-              {/* Employee & Payslip Summary Card */}
-              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900 text-sm">
-                    {selectedEmailEmployee.name}
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-                    {selectedEmailEmployee.employee_id || 'N/A'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-slate-600 pt-1 text-[11.5px]">
-                  <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Month</span>
-                    <span className="font-semibold text-slate-800">{monthLabel}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Net Salary</span>
-                    <span className="font-mono font-bold text-emerald-700">
-                      PKR {Math.round(getPayslipData(selectedEmailEmployee).netPay).toLocaleString('en-US')}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
               {/* Status Banner */}
               {emailStatus.type === 'success' && (
-                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl flex items-start gap-2 text-xs">
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl flex items-start gap-2.5 text-xs">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold">Email Sent!</p>
+                    <p className="font-bold">Email Sent Successfully!</p>
                     <p className="text-[11.5px] text-emerald-700 mt-0.5">{emailStatus.message}</p>
                   </div>
                 </div>
               )}
 
               {emailStatus.type === 'error' && (
-                <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl flex items-start gap-2 text-xs">
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl flex items-start gap-2.5 text-xs">
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                   <div>
                     <p className="font-bold">Sending Failed</p>
@@ -1439,66 +1483,152 @@ export default function PayslipsPage() {
                 </div>
               )}
 
-              {/* Recipient Email Field */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                  Recipient Email Address *
-                </label>
-                <Input
-                  type="email"
-                  placeholder="employee@example.com"
-                  value={recipientEmail}
-                  onChange={(e) => setRecipientEmail(e.target.value)}
-                  className="text-xs h-9.5 border-slate-200 font-medium"
-                />
-                <p className="text-[10px] text-slate-400">
-                  Pre-filled from employee record. You can change or enter a recipient email here.
-                </p>
-              </div>
+              {/* Employee & Payslip Summary Strip */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-slate-50 to-slate-100/70 border border-slate-200/80 rounded-xl p-3.5 sm:px-4.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#009D9E] to-[#007A78] text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                    {selectedEmailEmployee.name?.charAt(0) || 'E'}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-slate-900 text-sm sm:text-base truncate">
+                        {selectedEmailEmployee.name}
+                      </span>
+                      <span className="font-mono text-[10.5px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                        {selectedEmailEmployee.employee_id || 'N/A'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate">
+                      {selectedEmailEmployee.designation || 'Staff'} • <span className="font-medium text-slate-700">{monthLabel}</span>
+                    </p>
+                  </div>
+                </div>
 
-              {/* CC Recipient Field (Auto-filled & Editable) */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                    CC Email Address
-                  </label>
-                  <span className="text-[10px] font-semibold text-[#009D9E] bg-[#009D9E]/10 px-1.5 py-0.5 rounded">
-                    Pre-filled / Editable
+                <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200/60 shrink-0">
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Net Payable Salary</span>
+                  <span className="font-mono font-bold text-emerald-700 text-base sm:text-lg">
+                    PKR {Math.round(getPayslipData(selectedEmailEmployee).netPay).toLocaleString('en-US')}
                   </span>
                 </div>
-                <Input
-                  type="text"
-                  placeholder="e.g. fazail@edlinkservices.info, accounts@example.com"
-                  value={ccEmail}
-                  onChange={(e) => setCcEmail(e.target.value)}
-                  className="text-xs h-9.5 border-slate-200 font-medium"
-                />
-                <p className="text-[10px] text-slate-400">
-                  Pre-filled with fazail@edlinkservices.info. You can modify, remove, or add multiple comma-separated emails.
-                </p>
               </div>
 
-              {/* Custom Message Note (Optional) */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                  Custom Note / Message (Optional)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Please find attached your payslip for this month."
-                  value={emailMessage}
-                  onChange={(e) => setEmailMessage(e.target.value)}
-                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 focus:border-[#009D9E] resize-none"
-                />
+              {/* Responsive Template Selection Bar */}
+              <div className="space-y-1.5 bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-1">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                    Payslip Template &amp; Format
+                  </label>
+                  <span className="text-[11.5px] font-semibold">
+                    {selectedTemplate === 'aimt' ? (
+                      <span className="text-[#0F3A7E]">
+                        <strong>Header:</strong> Australian Institute of Management &amp; Technology
+                      </span>
+                    ) : (
+                      <span className="text-[#007A78]">
+                        <strong>Header:</strong> EdLink Education &amp; Visa Services
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5 p-1 bg-slate-200/60 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTemplate('edlink')}
+                    className={`py-2 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      selectedTemplate === 'edlink'
+                        ? 'bg-[#009D9E] text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${selectedTemplate === 'edlink' ? 'bg-white' : 'bg-[#009D9E]'}`} />
+                    EdLink Format
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTemplate('aimt')}
+                    className={`py-2 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      selectedTemplate === 'aimt'
+                        ? 'bg-[#0F3A7E] text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${selectedTemplate === 'aimt' ? 'bg-white' : 'bg-[#38BDF8]'}`} />
+                    AIMT Format
+                  </button>
+                </div>
               </div>
 
-              <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-[11px] text-slate-500 flex items-center gap-2">
-                <span>📎</span>
-                <span>The complete PDF payslip will be attached automatically.</span>
+              {/* Responsive 2-Column Inputs Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                {/* Column 1: Recipient Email & CC Email */}
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                      Recipient Email Address *
+                    </label>
+                    <Input
+                      type="email"
+                      placeholder="employee@example.com"
+                      value={recipientEmail}
+                      onChange={(e) => setRecipientEmail(e.target.value)}
+                      className="text-xs h-9.5 border-slate-200 font-medium"
+                    />
+                    <p className="text-[10px] text-slate-400">Pre-filled from employee record.</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                        CC Email Address
+                      </label>
+                      <span className="text-[9.5px] font-semibold text-[#009D9E] bg-[#009D9E]/10 px-1.5 py-0.5 rounded">
+                        Pre-filled / Editable
+                      </span>
+                    </div>
+                    <Input
+                      type="text"
+                      placeholder="e.g. fazail@edlinkservices.info"
+                      value={ccEmail}
+                      onChange={(e) => setCcEmail(e.target.value)}
+                      className="text-xs h-9.5 border-slate-200 font-medium"
+                    />
+                    <p className="text-[10px] text-slate-400">Pre-filled with fazail@edlinkservices.info</p>
+                  </div>
+                </div>
+
+                {/* Column 2: Custom Message Note */}
+                <div className="flex flex-col space-y-1">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                    Custom Message Note <span className="text-slate-400 lowercase font-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    rows={4}
+                    placeholder="e.g. Please find attached your official salary payslip for this month."
+                    value={emailMessage}
+                    onChange={(e) => setEmailMessage(e.target.value)}
+                    className="flex-1 w-full text-xs p-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 focus:border-[#009D9E] resize-none min-h-[92px]"
+                  />
+                </div>
+              </div>
+
+              {/* Bottom PDF Attachment Note */}
+              <div className="bg-slate-50 border border-slate-200/70 rounded-xl px-3.5 py-2.5 text-xs text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-base shrink-0">📎</span>
+                  <div className="min-w-0">
+                    <span className="text-slate-500">PDF Attachment: </span>
+                    <strong className="text-slate-800 font-mono font-semibold">
+                      {selectedTemplate === 'aimt' ? 'Payslip_AIMT_' : 'Payslip_'}{(selectedEmailEmployee.name || 'Staff').replace(/\s+/g, '_')}_{monthLabel.replace(/\s+/g, '_')}.pdf
+                    </strong>
+                  </div>
+                </div>
+                <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded uppercase tracking-wider shrink-0 w-fit ${selectedTemplate === 'aimt' ? 'bg-[#0F3A7E]/10 text-[#0F3A7E]' : 'bg-[#009D9E]/10 text-[#007A78]'}`}>
+                  {selectedTemplate === 'aimt' ? 'AIMT Format' : 'EdLink Format'}
+                </span>
               </div>
             </div>
 
-            <DialogFooter className="pt-4 mt-2 border-t border-slate-100 flex items-center justify-between gap-3">
+            <DialogFooter className="pt-3 mt-1 border-t border-slate-100 flex items-center justify-between gap-3">
               <Button
                 type="button"
                 variant="outline"
@@ -1523,7 +1653,7 @@ export default function PayslipsPage() {
                 ) : (
                   <>
                     <Mail className="w-3.5 h-3.5" />
-                    Send Payslip Email
+                    Send Payslip Email ({selectedTemplate === 'aimt' ? 'AIMT' : 'EdLink'})
                   </>
                 )}
               </Button>

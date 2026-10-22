@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       monthLabel,
       recipientEmail,
       customMessage,
+      templateType,
     }: {
       employee: Employee
       payslipData: PayslipData
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
       monthLabel: string
       recipientEmail: string
       customMessage?: string
+      templateType?: 'edlink' | 'aimt'
     } = body
 
     if (!employee || !payslipData || !payPeriod) {
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
       employee,
       payslipData,
       payPeriod,
+      templateType: templateType || 'edlink',
     })
 
     const stream = (await renderToStream(doc as any)) as any
@@ -92,6 +95,7 @@ export async function POST(request: NextRequest) {
       netPay: payslipData.netPay,
       pdfBuffer,
       customMessage,
+      templateType: templateType || 'edlink',
     })
 
     const ccMsg = sendResult.sentCc ? ` (CC: ${sendResult.sentCc})` : ''
