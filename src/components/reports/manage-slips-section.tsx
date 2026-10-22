@@ -10,12 +10,16 @@ import {
   FileCheck,
   CheckCircle2,
   AlertCircle,
+  ExternalLink,
+  Download,
 } from 'lucide-react'
 import type { ReportSlip } from '@/types/report-slip.types'
 import {
   createReportSlipFromFile,
   createReportSlipFromClipboardBlob,
   formatFileSize,
+  downloadReportSlip,
+  createBlobUrlFromSlip,
 } from '@/lib/utils/slip-compression'
 import SlipsPreviewModal from './slips-preview-modal'
 
@@ -250,7 +254,7 @@ export default function ManageSlipsSection({
               Attached Slips ({slips.length})
             </span>
             <span className="text-[11px] font-bold text-emerald-700">
-              Click &quot;Preview&quot; to inspect document
+              Open in new tab or download any attachment
             </span>
           </div>
 
@@ -310,15 +314,35 @@ export default function ManageSlipsSection({
                     </div>
                   </div>
 
-                  {/* Right Actions: Eye Preview & Trash */}
+                  {/* Right Actions: Open in new tab, Download & Trash */}
                   <div className="flex items-center gap-1 shrink-0 ml-2">
                     <button
                       type="button"
-                      onClick={(e) => handlePreviewSlip(idx, e)}
-                      title="Preview slip"
-                      className="size-7 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 flex items-center justify-center transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        try {
+                          const blobUrl = createBlobUrlFromSlip(slip)
+                          window.open(blobUrl, '_blank')
+                        } catch {
+                          window.open(slip.data, '_blank')
+                        }
+                      }}
+                      title="Open in new tab"
+                      className="size-7 rounded-lg text-slate-400 hover:text-[#00BF8F] hover:bg-emerald-50 flex items-center justify-center transition-colors cursor-pointer"
                     >
-                      <Eye className="size-4" />
+                      <ExternalLink className="size-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        downloadReportSlip(slip)
+                      }}
+                      title="Download slip"
+                      className="size-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                      <Download className="size-3.5" />
                     </button>
 
                     {!disabled && (
@@ -328,7 +352,7 @@ export default function ManageSlipsSection({
                         title="Remove slip"
                         className="size-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer"
                       >
-                        <Trash2 className="size-4" />
+                        <Trash2 className="size-3.5" />
                       </button>
                     )}
                   </div>
