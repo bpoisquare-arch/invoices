@@ -4,6 +4,7 @@ import {
   STCStudentInstallmentSchedule,
   STCFixedInfo,
   DEFAULT_STC_FIXED_INFO,
+  formatInstallmentMonthLabel,
 } from '@/lib/services/stc-installment.service'
 import {
   STC_LOGO_BASE64,
@@ -362,7 +363,7 @@ export default function STCSchedulePDFTemplate({
             {/* 2. Installment Rows */}
             {items.map((item, idx) => (
               <View key={idx} style={idx % 2 === 0 ? styles.tableRowOdd : styles.tableRowEven}>
-                <Text style={styles.colMonth}>{item.monthLabel}</Text>
+                <Text style={styles.colMonth}>{formatInstallmentMonthLabel(item.monthLabel)}</Text>
                 <Text style={styles.colDesc}>{item.description}</Text>
                 <Text style={styles.colAmount}>AUD {Number(item.amount).toLocaleString()}</Text>
               </View>

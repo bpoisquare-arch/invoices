@@ -60,9 +60,20 @@ export const STC_COURSES: CourseOption[] = [
 ]
 
 export interface InstallmentRow {
-  monthLabel: string // e.g. "Sep-26"
+  monthLabel: string // e.g. "Sep-2026"
   description: string // e.g. "1st Installment and Admin fee and Resource fee"
   amount: number // Integer AUD
+}
+
+export function formatInstallmentMonthLabel(label?: string | null): string {
+  if (!label) return ''
+  const trimmed = label.trim()
+  const match2Digit = trimmed.match(/^([a-zA-Z]{3,})[-/\s](\d{2})$/)
+  if (match2Digit) {
+    const [, month, yy] = match2Digit
+    return `${month}-20${yy}`
+  }
+  return trimmed
 }
 
 export interface STCStudentInstallmentSchedule {
@@ -273,10 +284,10 @@ export function calculateSTCInstallmentScheduleItems(params: InstallmentCalculat
 
       let monthLabel = ''
       if (k === 0 && firstRowCustomDate) {
-        monthLabel = format(firstRowCustomDate, 'MMM-yy')
+        monthLabel = format(firstRowCustomDate, 'MMM-yyyy')
       } else {
         const d = new Date(schStartYear, schStartMonth + k, 1)
-        monthLabel = format(d, 'MMM-yy')
+        monthLabel = format(d, 'MMM-yyyy')
       }
 
       const description = getRowDescription(amt, admin, resources, material, feeState)
@@ -299,7 +310,7 @@ export function calculateSTCInstallmentScheduleItems(params: InstallmentCalculat
       for (let i = 1; i <= remainingMonths; i++) {
         const monthOffset = initialFees.length + i - 1
         const currentDate = new Date(schStartYear, schStartMonth + monthOffset, 1)
-        const monthLabel = format(currentDate, 'MMM-yy')
+        const monthLabel = format(currentDate, 'MMM-yyyy')
 
         const amt = i === remainingMonths ? basePerMonth + remainder : basePerMonth
         const description = getRowDescription(amt, admin, resources, material, feeState)
@@ -556,6 +567,7 @@ function mapDbRowToSchedule(rawRow: any): STCStudentInstallmentSchedule {
     initial_fees: extraInitialFees || [Number(row.first_installment_amount) || 0],
     schedule_items: scheduleItems.map((s) => ({
       ...s,
+      monthLabel: formatInstallmentMonthLabel(s.monthLabel),
       description: s.description ? s.description.replace(' + ', ' including ') : s.description,
     })),
     agency: row.agency || extraAgency || undefined,

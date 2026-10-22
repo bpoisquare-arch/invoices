@@ -5,6 +5,7 @@ import {
   STCStudentInstallmentSchedule,
   STCFixedInfo,
   DEFAULT_STC_FIXED_INFO,
+  formatInstallmentMonthLabel,
 } from '@/lib/services/stc-installment.service'
 
 interface STCScheduleWebPreviewProps {
@@ -223,7 +224,7 @@ export default function STCScheduleWebPreview({
                 }`}
               >
                 <div className="col-span-3 font-bold text-[#0F3A7E] text-center">
-                  {item.monthLabel}
+                  {formatInstallmentMonthLabel(item.monthLabel)}
                 </div>
                 <div className="col-span-6 text-slate-800 border-l border-slate-300 pl-3">
                   {item.description}

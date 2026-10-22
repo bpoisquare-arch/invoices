@@ -1,7 +1,12 @@
 'use client'
 
 import React from 'react'
-import { StudentInstallmentSchedule, AIMTFixedInfo, DEFAULT_AIMT_FIXED_INFO } from '@/lib/services/installment.service'
+import {
+  StudentInstallmentSchedule,
+  AIMTFixedInfo,
+  DEFAULT_AIMT_FIXED_INFO,
+  formatInstallmentMonthLabel,
+} from '@/lib/services/installment.service'
 
 interface AimtScheduleWebPreviewProps {
   schedule: Partial<StudentInstallmentSchedule>
@@ -199,7 +204,7 @@ export default function AimtScheduleWebPreview({ schedule, fixedInfo = DEFAULT_A
                   }`}
               >
                 <div className="col-span-3 font-bold text-[#0F3A7E] text-center">
-                  {item.monthLabel}
+                  {formatInstallmentMonthLabel(item.monthLabel)}
                 </div>
                 <div className="col-span-6 text-slate-800 border-l border-slate-300 pl-3">
                   {item.description}

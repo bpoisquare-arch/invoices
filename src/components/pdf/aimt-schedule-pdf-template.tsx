@@ -1,6 +1,11 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
-import { StudentInstallmentSchedule, AIMTFixedInfo, DEFAULT_AIMT_FIXED_INFO } from '@/lib/services/installment.service'
+import {
+  StudentInstallmentSchedule,
+  AIMTFixedInfo,
+  DEFAULT_AIMT_FIXED_INFO,
+  formatInstallmentMonthLabel,
+} from '@/lib/services/installment.service'
 import {
   AIMT_LOGO_BASE64,
   AIMT_ELEMENTS_TOP_RIGHT_BASE64,
@@ -374,7 +379,7 @@ export default function AimtSchedulePDFTemplate({
 
             {items.map((item, idx) => (
               <View key={idx} style={idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd}>
-                <Text style={styles.colMonth}>{item.monthLabel}</Text>
+                <Text style={styles.colMonth}>{formatInstallmentMonthLabel(item.monthLabel)}</Text>
                 <Text style={styles.colDesc}>{item.description}</Text>
                 <Text style={styles.colAmount}>AUD {Number(item.amount).toLocaleString()}</Text>
               </View>
