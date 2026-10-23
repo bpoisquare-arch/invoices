@@ -25,6 +25,7 @@ import {
   Sparkles,
   FileMinus,
   SlidersHorizontal,
+  CreditCard,
 } from 'lucide-react'
 import EmployeeCommissionModal from '@/components/attendance/employee-commission-modal'
 import EmployeeDeductionModal from '@/components/attendance/employee-deduction-modal'
@@ -99,6 +100,7 @@ export default function EmployeeOverviewPage() {
   const [newName, setNewName] = useState('')
   const [newDesignation, setNewDesignation] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [newBankAccountNo, setNewBankAccountNo] = useState('')
   const [newBranch, setNewBranch] = useState('Multan')
   const [newJoiningDate, setNewJoiningDate] = useState(todayStr)
   const [newIsOldStaff, setNewIsOldStaff] = useState(false)
@@ -113,6 +115,7 @@ export default function EmployeeOverviewPage() {
   const [editName, setEditName] = useState('')
   const [editDesignation, setEditDesignation] = useState('')
   const [editEmail, setEditEmail] = useState('')
+  const [editBankAccountNo, setEditBankAccountNo] = useState('')
   const [editBranch, setEditBranch] = useState('Multan')
   const [editJoiningDate, setEditJoiningDate] = useState(todayStr)
   const [editIsOldStaff, setEditIsOldStaff] = useState(false)
@@ -206,6 +209,7 @@ export default function EmployeeOverviewPage() {
           name: newName.trim(),
           designation: newDesignation.trim(),
           email: newEmail.trim() || null,
+          bank_account_no: newBankAccountNo.trim() || null,
           branch: newBranch,
           joining_date: newIsOldStaff ? null : newJoiningDate,
           is_old_staff: newIsOldStaff,
@@ -230,6 +234,7 @@ export default function EmployeeOverviewPage() {
       setNewName('')
       setNewDesignation('')
       setNewEmail('')
+      setNewBankAccountNo('')
       setNewBranch('Multan')
       setNewJoiningDate(todayStr)
       setNewIsOldStaff(false)
@@ -279,6 +284,7 @@ export default function EmployeeOverviewPage() {
           name: editName.trim(),
           designation: editDesignation.trim(),
           email: editEmail.trim() || null,
+          bank_account_no: editBankAccountNo.trim() || null,
           branch: editBranch,
           joining_date: editIsOldStaff ? null : editJoiningDate,
           is_old_staff: editIsOldStaff,
@@ -304,6 +310,7 @@ export default function EmployeeOverviewPage() {
                 name: editName.trim(),
                 designation: editDesignation.trim(),
                 email: editEmail.trim() || null,
+                bank_account_no: editBankAccountNo.trim() || null,
                 branch: editBranch,
                 joining_date: editIsOldStaff ? null : editJoiningDate,
                 is_old_staff: editIsOldStaff,
@@ -330,6 +337,7 @@ export default function EmployeeOverviewPage() {
     setEditName(emp.name)
     setEditDesignation(emp.designation)
     setEditEmail(emp.email || '')
+    setEditBankAccountNo(emp.bank_account_no || '')
     setEditBranch(emp.branch || 'Multan')
     setEditIsOldStaff(isOld)
     setEditIsAttendanceExempt(Boolean(emp.is_attendance_exempt))
@@ -1111,6 +1119,21 @@ export default function EmployeeOverviewPage() {
               </div>
             </div>
 
+            {/* Row 4: Bank Account Number */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-[#009D9E]" />
+                <span>Bank Account Number</span>
+              </Label>
+              <Input
+                type="text"
+                placeholder="e.g. PK00BANK0000000123456789 or Account #"
+                value={newBankAccountNo}
+                onChange={(e) => setNewBankAccountNo(e.target.value)}
+                className="text-sm border-slate-200 font-mono"
+              />
+            </div>
+
             {/* Attendance Exemption Switch Card */}
             <div className={`p-3 rounded-xl border transition-all ${newIsAttendanceExempt ? 'bg-teal-50/90 border-teal-300 ring-1 ring-teal-200' : 'bg-slate-50/80 border-slate-200'}`}>
               <div className="flex items-center justify-between gap-3">
@@ -1428,6 +1451,21 @@ export default function EmployeeOverviewPage() {
                   />
                 )}
               </div>
+            </div>
+
+            {/* Row 4: Bank Account Number */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-[#009D9E]" />
+                <span>Bank Account Number</span>
+              </Label>
+              <Input
+                type="text"
+                placeholder="e.g. PK00BANK0000000123456789 or Account #"
+                value={editBankAccountNo}
+                onChange={(e) => setEditBankAccountNo(e.target.value)}
+                className="text-sm border-slate-200 font-mono"
+              />
             </div>
 
             {/* Attendance Exemption Switch Card */}

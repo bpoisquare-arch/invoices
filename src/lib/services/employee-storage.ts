@@ -9,6 +9,7 @@ export interface EmployeeMetadata {
   name?: string
   designation?: string
   email?: string | null
+  bank_account_no?: string | null
   is_active?: boolean
   leave_quotas?: EmployeeLeaveQuotas
   base_leave_quotas?: EmployeeLeaveQuotas
@@ -78,6 +79,7 @@ export function writeEmployeeMetadata(
     name?: string
     designation?: string
     email?: string | null
+    bank_account_no?: string | null
     is_active?: boolean
     leave_quotas?: EmployeeLeaveQuotas
   }
@@ -95,6 +97,7 @@ export function writeEmployeeMetadata(
     ...(meta.name !== undefined ? { name: meta.name } : {}),
     ...(meta.designation !== undefined ? { designation: meta.designation } : {}),
     ...(meta.email !== undefined ? { email: meta.email } : {}),
+    ...(meta.bank_account_no !== undefined ? { bank_account_no: meta.bank_account_no } : {}),
     ...(meta.is_active !== undefined ? { is_active: meta.is_active } : {}),
     ...(meta.leave_quotas !== undefined ? { leave_quotas: meta.leave_quotas } : {}),
   }

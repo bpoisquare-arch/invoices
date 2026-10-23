@@ -114,6 +114,7 @@ export interface Employee {
   is_old_staff?: boolean | null
   is_attendance_exempt?: boolean | null
   email?: string | null
+  bank_account_no?: string | null
   leave_quotas?: EmployeeLeaveQuotas
   base_leave_quotas?: EmployeeLeaveQuotas
   is_active: boolean
