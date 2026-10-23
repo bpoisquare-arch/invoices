@@ -195,13 +195,13 @@ export default function ReportDataTable({
       list = list.filter((r) => {
         const normStatus = (r.status || '').toLowerCase().trim()
         if (targetStatus === 'current') {
-          return normStatus === 'current' || ['invoice raised', 'need advise', 'need advice', 'course end', 'payment received', 'defaulter'].includes(normStatus)
+          return normStatus === 'current' || ['invoice raised', 'need advise', 'need advice', 'course end', 'payment received', 'partial paid', 'defaulter'].includes(normStatus)
         }
         return normStatus === targetStatus
       })
     }
 
-    // 2b. Mark Status Filter (Invoice Raised / Need Advise / Course End / Payment Received / Defaulter / Blank)
+    // 2b. Mark Status Filter (Invoice Raised / Need Advise / Course End / Payment Received / Partial Paid / Defaulter / Blank)
     if (selectedMarkStatus !== 'all') {
       if (selectedMarkStatus === 'blank') {
         list = list.filter((r) => {
@@ -212,6 +212,7 @@ export default function ReportDataTable({
             !norm.includes('need advice') &&
             !norm.includes('course end') &&
             !norm.includes('payment received') &&
+            !norm.includes('partial paid') &&
             !norm.includes('defaulter')
           )
         })
@@ -400,6 +401,7 @@ export default function ReportDataTable({
               <option value="Need Advise">Need Advise</option>
               <option value="Course End">Course End</option>
               <option value="Payment Received">Payment Received</option>
+              <option value="Partial Paid">Partial Paid</option>
               <option value="Defaulter">Defaulter</option>
             </select>
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
@@ -842,6 +844,8 @@ export default function ReportDataTable({
                                     ? 'bg-[#9333EA] text-white shadow-2xs'
                                     : record.status === 'Payment Received'
                                     ? 'bg-[#059669] text-white shadow-2xs'
+                                    : record.status === 'Partial Paid' || record.status?.toLowerCase() === 'partial paid'
+                                    ? 'bg-[#EAB308] text-slate-900 shadow-2xs font-black'
                                     : record.status === 'Defaulter'
                                     ? 'bg-[#DC2626] text-white shadow-2xs'
                                     : record.status.toLowerCase() === 'current'
@@ -1011,12 +1015,20 @@ export default function ReportDataTable({
                                   <span>4 Payment Received</span>
                                 </DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem
+                                  checked={normStatus === 'Partial Paid' || normStatus.toLowerCase() === 'partial paid'}
+                                  onCheckedChange={() => onStatusUpdate(record, (normStatus === 'Partial Paid' || normStatus.toLowerCase() === 'partial paid') ? 'Current' : 'Partial Paid')}
+                                  className="gap-2 cursor-pointer text-yellow-800 focus:bg-yellow-50 focus:text-yellow-950 font-semibold text-xs"
+                                >
+                                  <span className="size-2 rounded-full bg-[#EAB308] shrink-0" />
+                                  <span>5 Partial Paid</span>
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
                                   checked={normStatus === 'Defaulter'}
                                   onCheckedChange={() => onStatusUpdate(record, normStatus === 'Defaulter' ? 'Current' : 'Defaulter')}
                                   className="gap-2 cursor-pointer text-red-700 focus:bg-red-50 focus:text-red-900 font-semibold text-xs"
                                 >
                                   <span className="size-2 rounded-full bg-[#DC2626] shrink-0" />
-                                  <span>5 Defaulter</span>
+                                  <span>6 Defaulter</span>
                                 </DropdownMenuCheckboxItem>
                                 {normStatus && normStatus.toLowerCase() !== 'current' && (
                                   <>

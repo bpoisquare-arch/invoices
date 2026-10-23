@@ -7,6 +7,7 @@ const MARK_MAP: Record<string, string> = {
   'need advice': 'Need Advise',
   'course end': 'Course End',
   'payment received': 'Payment Received',
+  'partial paid': 'Partial Paid',
   'defaulter': 'Defaulter',
 }
 
@@ -186,6 +187,11 @@ export async function generateStyledReportExcel({
     pattern: 'solid',
     fgColor: { argb: 'FFC6EFCE' }, // Soft Green
   }
+  const partialPaidFill: ExcelJS.Fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFEB9C' }, // Soft Yellow (Native Excel preset)
+  }
   const defaulterFill: ExcelJS.Fill = {
     type: 'pattern',
     pattern: 'solid',
@@ -319,6 +325,9 @@ export async function generateStyledReportExcel({
         } else if (markStatus === 'Payment Received') {
           cell.fill = paymentReceivedFill
           cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF006100' } }
+        } else if (markStatus === 'Partial Paid') {
+          cell.fill = partialPaidFill
+          cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF9C6500' } }
         } else if (markStatus === 'Defaulter') {
           cell.fill = defaulterFill
           cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF9C0006' } }

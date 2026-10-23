@@ -108,6 +108,8 @@ export default function ReportRecordDetailModal({
                       ? 'bg-[#9333EA] text-white shadow-2xs'
                       : record.status === 'Payment Received'
                       ? 'bg-[#059669] text-white shadow-2xs'
+                      : record.status === 'Partial Paid' || record.status?.toLowerCase() === 'partial paid'
+                      ? 'bg-[#EAB308] text-slate-900 shadow-2xs font-black'
                       : record.status === 'Defaulter'
                       ? 'bg-[#DC2626] text-white shadow-2xs'
                       : record.status?.toLowerCase() === 'current'
