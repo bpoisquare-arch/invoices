@@ -9,6 +9,7 @@ const MARK_MAP: Record<string, string> = {
   'payment received': 'Payment Received',
   'partial paid': 'Partial Paid',
   'defaulter': 'Defaulter',
+  'paid agent': 'Paid Agent',
 }
 
 const STANDARD_MAP: Record<string, string> = {
@@ -197,6 +198,11 @@ export async function generateStyledReportExcel({
     pattern: 'solid',
     fgColor: { argb: 'FFFFC7CE' }, // Soft Red
   }
+  const paidAgentFill: ExcelJS.Fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF002D42' }, // #002D42 Deep Navy Blue
+  }
 
   // Fills for Student ID Status
   const currentStatusFill: ExcelJS.Fill = {
@@ -331,6 +337,9 @@ export async function generateStyledReportExcel({
         } else if (markStatus === 'Defaulter') {
           cell.fill = defaulterFill
           cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF9C0006' } }
+        } else if (markStatus === 'Paid Agent') {
+          cell.fill = paidAgentFill
+          cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }
         } else if (markStatus === '-') {
           cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF888888' } }
         }

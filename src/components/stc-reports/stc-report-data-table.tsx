@@ -171,7 +171,7 @@ export default function StcReportDataTable({
       list = list.filter((r) => {
         const normStatus = (r.status || '').toLowerCase().trim()
         if (targetStatus === 'current') {
-          return normStatus === 'current' || ['invoice raised', 'need advise', 'need advice', 'course end', 'payment received', 'partial paid', 'defaulter'].includes(normStatus)
+          return normStatus === 'current' || ['invoice raised', 'need advise', 'need advice', 'course end', 'payment received', 'partial paid', 'defaulter', 'paid agent'].includes(normStatus)
         }
         return normStatus === targetStatus
       })
@@ -188,7 +188,8 @@ export default function StcReportDataTable({
             !norm.includes('course end') &&
             !norm.includes('payment received') &&
             !norm.includes('partial paid') &&
-            !norm.includes('defaulter')
+            !norm.includes('defaulter') &&
+            !norm.includes('paid agent')
           )
         })
       } else {
@@ -373,6 +374,7 @@ export default function StcReportDataTable({
               <option value="Payment Received">Payment Received</option>
               <option value="Partial Paid">Partial Paid</option>
               <option value="Defaulter">Defaulter</option>
+              <option value="Paid Agent">Paid Agent</option>
             </select>
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
           </div>
@@ -803,6 +805,8 @@ export default function StcReportDataTable({
                                     ? 'bg-[#EAB308] text-slate-900 shadow-2xs font-black'
                                     : record.status === 'Defaulter'
                                     ? 'bg-[#DC2626] text-white shadow-2xs'
+                                    : record.status === 'Paid Agent' || record.status?.toLowerCase() === 'paid agent'
+                                    ? 'bg-[#002D42] text-white shadow-2xs'
                                     : record.status.toLowerCase() === 'current'
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                     : record.status.toLowerCase() === 'future'
@@ -961,6 +965,14 @@ export default function StcReportDataTable({
                                 >
                                   <span className="size-2 rounded-full bg-[#DC2626] shrink-0" />
                                   <span>6 Defaulter</span>
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
+                                  checked={normStatus === 'Paid Agent' || normStatus?.toLowerCase() === 'paid agent'}
+                                  onCheckedChange={() => onStatusUpdate(record, (normStatus === 'Paid Agent' || normStatus?.toLowerCase() === 'paid agent') ? 'Current' : 'Paid Agent')}
+                                  className="gap-2 cursor-pointer text-[#002D42] focus:bg-[#002D42]/10 focus:text-[#002D42] font-semibold"
+                                >
+                                  <span className="size-2 rounded-full bg-[#002D42] shrink-0" />
+                                  <span>7 Paid Agent</span>
                                 </DropdownMenuCheckboxItem>
                                 {normStatus && normStatus.toLowerCase() !== 'current' && (
                                   <>

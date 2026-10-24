@@ -109,6 +109,8 @@ export default function StcReportRecordDetailModal({
                       ? 'bg-[#EAB308] text-slate-900 shadow-2xs font-black'
                       : record.status === 'Defaulter'
                       ? 'bg-[#DC2626] text-white shadow-2xs'
+                      : record.status === 'Paid Agent' || record.status?.toLowerCase() === 'paid agent'
+                      ? 'bg-[#002D42] text-white shadow-2xs'
                       : 'bg-white/20 text-emerald-200'
                   }`}>
                     {record.status || 'Current'}
