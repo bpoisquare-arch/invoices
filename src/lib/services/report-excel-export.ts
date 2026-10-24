@@ -9,7 +9,8 @@ const MARK_MAP: Record<string, string> = {
   'payment received': 'Payment Received',
   'partial paid': 'Partial Paid',
   'defaulter': 'Defaulter',
-  'paid agent': 'Paid Agent',
+  'paid to agent': 'Paid to Agent',
+  'paid agent': 'Paid to Agent',
 }
 
 const STANDARD_MAP: Record<string, string> = {
@@ -337,7 +338,7 @@ export async function generateStyledReportExcel({
         } else if (markStatus === 'Defaulter') {
           cell.fill = defaulterFill
           cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF9C0006' } }
-        } else if (markStatus === 'Paid Agent') {
+        } else if (markStatus === 'Paid to Agent' || markStatus === 'Paid Agent') {
           cell.fill = paidAgentFill
           cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }
         } else if (markStatus === '-') {

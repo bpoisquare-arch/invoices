@@ -112,7 +112,7 @@ export default function ReportRecordDetailModal({
                       ? 'bg-[#EAB308] text-slate-900 shadow-2xs font-black'
                       : record.status === 'Defaulter'
                       ? 'bg-[#DC2626] text-white shadow-2xs'
-                      : record.status === 'Paid Agent' || record.status?.toLowerCase() === 'paid agent'
+                      : record.status === 'Paid to Agent' || record.status?.toLowerCase() === 'paid to agent' || record.status === 'Paid Agent' || record.status?.toLowerCase() === 'paid agent'
                       ? 'bg-[#002D42] text-white shadow-2xs'
                       : record.status?.toLowerCase() === 'current'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'

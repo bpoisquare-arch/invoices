@@ -195,13 +195,13 @@ export default function ReportDataTable({
       list = list.filter((r) => {
         const normStatus = (r.status || '').toLowerCase().trim()
         if (targetStatus === 'current') {
-          return normStatus === 'current' || ['invoice raised', 'need advise', 'need advice', 'course end', 'payment received', 'partial paid', 'defaulter', 'paid agent'].includes(normStatus)
+          return normStatus === 'current' || ['invoice raised', 'need advise', 'need advice', 'course end', 'payment received', 'partial paid', 'defaulter', 'paid to agent', 'paid agent'].includes(normStatus)
         }
         return normStatus === targetStatus
       })
     }
 
-    // 2b. Mark Status Filter (Invoice Raised / Need Advise / Course End / Payment Received / Partial Paid / Defaulter / Paid Agent / Blank)
+    // 2b. Mark Status Filter (Invoice Raised / Need Advise / Course End / Payment Received / Partial Paid / Defaulter / Paid to Agent / Blank)
     if (selectedMarkStatus !== 'all') {
       if (selectedMarkStatus === 'blank') {
         list = list.filter((r) => {
@@ -214,6 +214,7 @@ export default function ReportDataTable({
             !norm.includes('payment received') &&
             !norm.includes('partial paid') &&
             !norm.includes('defaulter') &&
+            !norm.includes('paid to agent') &&
             !norm.includes('paid agent')
           )
         })
@@ -404,7 +405,7 @@ export default function ReportDataTable({
               <option value="Payment Received">Payment Received</option>
               <option value="Partial Paid">Partial Paid</option>
               <option value="Defaulter">Defaulter</option>
-              <option value="Paid Agent">Paid Agent</option>
+              <option value="Paid to Agent">Paid to Agent</option>
             </select>
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
           </div>
@@ -850,7 +851,7 @@ export default function ReportDataTable({
                                     ? 'bg-[#EAB308] text-slate-900 shadow-2xs font-black'
                                     : record.status === 'Defaulter'
                                     ? 'bg-[#DC2626] text-white shadow-2xs'
-                                    : record.status === 'Paid Agent' || record.status?.toLowerCase() === 'paid agent'
+                                    : record.status === 'Paid to Agent' || record.status?.toLowerCase() === 'paid to agent' || record.status === 'Paid Agent' || record.status?.toLowerCase() === 'paid agent'
                                     ? 'bg-[#002D42] text-white shadow-2xs'
                                     : record.status.toLowerCase() === 'current'
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -968,17 +969,6 @@ export default function ReportDataTable({
                               </DropdownMenuItem>
                             )}
 
-                            <DropdownMenuSeparator className="bg-slate-100 my-1" />
-
-                            {/* Option 3: Copy Name */}
-                            <DropdownMenuItem
-                              onClick={() => copyToClipboard(record.student_name)}
-                              className="text-xs flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-100 text-slate-600 font-medium transition-colors"
-                            >
-                              <Copy className="size-4 text-slate-400" />
-                              <span>Copy Student Name</span>
-                            </DropdownMenuItem>
-
                             {/* Status Mark Options */}
                             {onStatusUpdate && (
                               <>
@@ -1035,25 +1025,13 @@ export default function ReportDataTable({
                                   <span>6 Defaulter</span>
                                 </DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem
-                                  checked={normStatus === 'Paid Agent' || normStatus?.toLowerCase() === 'paid agent'}
-                                  onCheckedChange={() => onStatusUpdate(record, (normStatus === 'Paid Agent' || normStatus?.toLowerCase() === 'paid agent') ? 'Current' : 'Paid Agent')}
+                                  checked={normStatus === 'Paid to Agent' || normStatus?.toLowerCase() === 'paid to agent' || normStatus === 'Paid Agent' || normStatus?.toLowerCase() === 'paid agent'}
+                                  onCheckedChange={() => onStatusUpdate(record, (normStatus === 'Paid to Agent' || normStatus?.toLowerCase() === 'paid to agent' || normStatus === 'Paid Agent' || normStatus?.toLowerCase() === 'paid agent') ? 'Current' : 'Paid to Agent')}
                                   className="gap-2 cursor-pointer text-[#002D42] focus:bg-[#002D42]/10 focus:text-[#002D42] font-semibold text-xs"
                                 >
                                   <span className="size-2 rounded-full bg-[#002D42] shrink-0" />
-                                  <span>7 Paid Agent</span>
+                                  <span>7 Paid to Agent</span>
                                 </DropdownMenuCheckboxItem>
-                                {normStatus && normStatus.toLowerCase() !== 'current' && (
-                                  <>
-                                    <DropdownMenuSeparator className="bg-slate-100 my-1" />
-                                    <DropdownMenuItem
-                                      onClick={() => onStatusUpdate(record, 'Current')}
-                                      className="text-xs flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-amber-50 text-amber-700 font-semibold transition-colors"
-                                    >
-                                      <RotateCcw className="size-3.5 text-amber-500" />
-                                      <span>Clear / Remove Status</span>
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
                               </>
                             )}
 

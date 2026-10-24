@@ -131,7 +131,7 @@ function computeCalculationBreakup(yetToRaisedStr: string, dividedMonthStr: stri
   return `${firstCount} installments ${baseAmount} - Last Installment ${lastAmount}`
 }
 
-const MARK_STATUS_KEYS = ['invoice raised', 'need advise', 'need advice', 'course end', 'payment received', 'partial paid', 'defaulter', 'paid agent']
+const MARK_STATUS_KEYS = ['invoice raised', 'need advise', 'need advice', 'course end', 'payment received', 'partial paid', 'defaulter', 'paid to agent', 'paid agent']
 
 export default function StcAddReportEntryModal({
   isOpen,
