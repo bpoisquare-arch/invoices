@@ -87,10 +87,12 @@ export default function EdLinkPayslipWebPreview({ payslip }: EdLinkPayslipWebPre
             </span>
           </div>
 
-          <div>
-            <span className="font-bold text-slate-900">Payment Date: </span>
-            <span className="text-slate-800">{payslip.payment_date}</span>
-          </div>
+          {payslip.show_payment_date !== false && payslip.payment_date && payslip.payment_date.trim() !== '' && (
+            <div>
+              <span className="font-bold text-slate-900">Payment Date: </span>
+              <span className="text-slate-800">{payslip.payment_date}</span>
+            </div>
+          )}
 
           <div>
             <span className="font-bold text-slate-900">Total Earnings: </span>

@@ -25,6 +25,7 @@ export interface EdlinkPayslip {
   // Pay Summary Bar
   pay_period_start: string // formatted DD/MM/YYYY or YYYY-MM-DD
   pay_period_end: string
+  show_payment_date?: boolean
   payment_date: string
   total_earnings: number
   net_pay: number
@@ -66,6 +67,7 @@ export const DEFAULT_EDLINK_PAYSLIP: Omit<EdlinkPayslip, 'id' | 'created_at'> = 
   employment_basis: 'Full-time employment',
   pay_period_start: '01/04/2025',
   pay_period_end: '14/04/2025',
+  show_payment_date: false,
   payment_date: '05/05/2025',
   total_earnings: 4000.0,
   net_pay: 3072.0,
@@ -111,6 +113,7 @@ function fromDbRow(row: any): EdlinkPayslip {
     employment_basis: row.employmentBasis || row.employment_basis || 'Full-time employment',
     pay_period_start: row.payPeriodStart || row.pay_period_start || '',
     pay_period_end: row.payPeriodEnd || row.pay_period_end || '',
+    show_payment_date: Boolean((row.paymentDate || row.payment_date || '').trim()),
     payment_date: row.paymentDate || row.payment_date || '',
     total_earnings: Number(row.totalEarnings ?? row.total_earnings ?? 0),
     net_pay: Number(row.netPay ?? row.net_pay ?? 0),
@@ -224,7 +227,7 @@ export const edlinkPayslipService = {
           employmentBasis: payload.employment_basis || 'Full-time employment',
           payPeriodStart: payload.pay_period_start || '',
           payPeriodEnd: payload.pay_period_end || '',
-          paymentDate: payload.payment_date || '',
+          paymentDate: payload.show_payment_date === false ? '' : (payload.payment_date || ''),
           totalEarnings: Number(payload.total_earnings || 0),
           netPay: Number(payload.net_pay || 0),
           wagesDescription: payload.wages_description || 'Ordinary Hours',
@@ -254,7 +257,7 @@ export const edlinkPayslipService = {
           employmentBasis: payload.employment_basis || 'Full-time employment',
           payPeriodStart: payload.pay_period_start || '',
           payPeriodEnd: payload.pay_period_end || '',
-          paymentDate: payload.payment_date || '',
+          paymentDate: payload.show_payment_date === false ? '' : (payload.payment_date || ''),
           totalEarnings: Number(payload.total_earnings || 0),
           netPay: Number(payload.net_pay || 0),
           wagesDescription: payload.wages_description || 'Ordinary Hours',

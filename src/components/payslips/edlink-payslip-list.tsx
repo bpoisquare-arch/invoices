@@ -399,7 +399,11 @@ export default function EdLinkPayslipList() {
 
                     {/* Payment Date */}
                     <td className="py-3.5 px-4 text-slate-300 font-mono text-xs">
-                      {item.payment_date}
+                      {item.payment_date && item.payment_date.trim() !== '' ? (
+                        item.payment_date
+                      ) : (
+                        <span className="text-slate-500 italic text-[11px]">N/A</span>
+                      )}
                     </td>
 
                     {/* Total Earnings */}

@@ -233,10 +233,12 @@ export default function EdLinkPayslipPDFTemplate({ payslip }: EdLinkPayslipPDFTe
             {payslip.pay_period_start} - {payslip.pay_period_end}
           </Text>
 
-          <Text style={styles.summaryText}>
-            <Text style={styles.summaryBold}>Payment Date: </Text>
-            {payslip.payment_date}
-          </Text>
+          {payslip.show_payment_date !== false && payslip.payment_date && payslip.payment_date.trim() !== '' ? (
+            <Text style={styles.summaryText}>
+              <Text style={styles.summaryBold}>Payment Date: </Text>
+              {payslip.payment_date}
+            </Text>
+          ) : null}
 
           <Text style={styles.summaryText}>
             <Text style={styles.summaryBold}>Total Earnings: </Text>

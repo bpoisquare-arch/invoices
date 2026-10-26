@@ -179,6 +179,17 @@ export default function EdLinkPayslipForm({ initialData, isEditing = false }: Ed
     }))
   }
 
+  const handleTogglePaymentDate = (checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      show_payment_date: checked,
+      payment_date:
+        checked && (!prev.payment_date || prev.payment_date.trim() === '')
+          ? (prev.pay_period_end || toDisplayDateFormat(new Date().toISOString().split('T')[0]))
+          : prev.payment_date,
+    }))
+  }
+
   const handleTaxChange = (tax: number) => {
     const calcNet = Math.max(0, Math.round((formData.total_earnings - tax) * 100) / 100)
 
@@ -203,7 +214,12 @@ export default function EdLinkPayslipForm({ initialData, isEditing = false }: Ed
     setSaving(true)
     setSaveSuccess(false)
     try {
-      const res = await edlinkPayslipService.save(formData)
+      const dataToSave: EdlinkPayslip = {
+        ...formData,
+        show_payment_date: showPaymentDate,
+        payment_date: showPaymentDate ? (formData.payment_date || '') : '',
+      }
+      const res = await edlinkPayslipService.save(dataToSave)
       if (res.success && res.data) {
         setFormData(res.data)
         setHasSaved(true)
@@ -231,13 +247,19 @@ export default function EdLinkPayslipForm({ initialData, isEditing = false }: Ed
       .replace(/\s+/g, '_')
     const fileName = `EdLink_Payslip_${safeName}.pdf`
 
+    const payloadForPdf: EdlinkPayslip = {
+      ...formData,
+      show_payment_date: showPaymentDate,
+      payment_date: showPaymentDate ? (formData.payment_date || '') : '',
+    }
+
     try {
       // 1. Primary & Fastest: Server streaming endpoint
       try {
         const res = await fetch('/api/edlink-payslips-pdf', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(payloadForPdf),
         })
 
         if (res.ok) {
@@ -257,7 +279,7 @@ export default function EdLinkPayslipForm({ initialData, isEditing = false }: Ed
       }
 
       // 2. Fallback: Client-side @react-pdf/renderer with timeout
-      const doc = <EdLinkPayslipPDFTemplate payslip={formData} />
+      const doc = <EdLinkPayslipPDFTemplate payslip={payloadForPdf} />
       const blobPromise = pdf(doc).toBlob()
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('PDF generation timed out')), 4000)
@@ -282,6 +304,10 @@ export default function EdLinkPayslipForm({ initialData, isEditing = false }: Ed
   }
 
   const showAnnual = formData.show_annual_salary !== false
+  const showPaymentDate =
+    formData.show_payment_date !== undefined
+      ? formData.show_payment_date
+      : Boolean(formData.payment_date && formData.payment_date.trim() !== '')
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto pb-16">
@@ -628,18 +654,46 @@ export default function EdLinkPayslipForm({ initialData, isEditing = false }: Ed
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Payment Date
-                </label>
-                <input
-                  type="date"
-                  value={toInputDateFormat(formData.payment_date)}
-                  onChange={(e) => handlePaymentDateChange(e.target.value)}
-                  className="w-full bg-[#001724] border border-white/20 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50 [color-scheme:dark]"
-                />
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  Selected: {formData.payment_date || 'N/A'}
+                <div className="flex items-center justify-between mb-1">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showPaymentDate}
+                      onChange={(e) => handleTogglePaymentDate(e.target.checked)}
+                      className="size-3.5 rounded bg-[#001724] border-white/20 text-[#81F5F5] focus:ring-[#81F5F5]/40 cursor-pointer"
+                    />
+                    <span>Payment Date</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">Optional</span>
                 </div>
+
+                {showPaymentDate ? (
+                  <div className="animate-in fade-in">
+                    <input
+                      type="date"
+                      value={toInputDateFormat(formData.payment_date)}
+                      onChange={(e) => handlePaymentDateChange(e.target.value)}
+                      className="w-full bg-[#001724] border border-white/20 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50 [color-scheme:dark]"
+                    />
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      Selected: {formData.payment_date || 'N/A'}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePaymentDate(true)}
+                      className="w-full h-[38px] px-3 bg-[#001724]/40 hover:bg-[#001724]/80 border border-dashed border-white/15 hover:border-[#81F5F5]/40 rounded-xl text-xs text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center"
+                    >
+                      <span className="text-slate-400 text-xs font-bold">+</span>
+                      <span>Include Payment Date</span>
+                    </button>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      Excluded from preview & download
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -875,7 +929,13 @@ export default function EdLinkPayslipForm({ initialData, isEditing = false }: Ed
             <span className="text-[11px] text-slate-400">Updates in real-time</span>
           </div>
           <div className="overflow-x-auto rounded-xl shadow-2xl">
-            <EdLinkPayslipWebPreview payslip={formData} />
+            <EdLinkPayslipWebPreview
+              payslip={{
+                ...formData,
+                show_payment_date: showPaymentDate,
+                payment_date: showPaymentDate ? (formData.payment_date || '') : '',
+              }}
+            />
           </div>
         </div>
       </div>
