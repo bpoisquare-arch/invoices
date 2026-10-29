@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
+  getReportRecordById,
   createReportRecord,
   updateReportRecord,
   updateReportRecordsStatus,
@@ -10,6 +11,27 @@ import {
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 export const revalidate = 0
+
+// GET /api/reports/records?id={id} - Fetch single student report record with full slips media on demand
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Record ID is required.' }, { status: 400 })
+    }
+
+    const record = await getReportRecordById(id)
+    if (!record) {
+      return NextResponse.json({ success: false, error: 'Record not found.' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, record })
+  } catch (error: any) {
+    console.error('Error fetching single report record:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}
 
 // POST /api/reports/records - Create a new student report record
 export async function POST(request: NextRequest) {

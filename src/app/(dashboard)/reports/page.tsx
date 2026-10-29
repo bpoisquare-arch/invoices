@@ -130,6 +130,41 @@ export default function StudentReportsPage() {
     await fetchRecords()
   }
 
+  // View detail modal with on-demand background fetch for full slip media if present
+  const handleViewRecord = async (record: AimtReportRecord) => {
+    setDetailModalRecord(record)
+    const hasSlipsNeedingData = record.slips && record.slips.some((s) => !s.data && s.name)
+    if (hasSlipsNeedingData) {
+      try {
+        const res = await fetch(`/api/reports/records?id=${record.id}`)
+        const data = await res.json()
+        if (data.success && data.record) {
+          setDetailModalRecord(data.record)
+        }
+      } catch (err) {
+        console.warn('Failed to load full slips for detail modal:', err)
+      }
+    }
+  }
+
+  // Edit record modal with on-demand background fetch for full slip media if present
+  const handleEditRecord = async (record: AimtReportRecord) => {
+    setEditingRecord(record)
+    setIsAddEntryModalOpen(true)
+    const hasSlipsNeedingData = record.slips && record.slips.some((s) => !s.data && s.name)
+    if (hasSlipsNeedingData) {
+      try {
+        const res = await fetch(`/api/reports/records?id=${record.id}`)
+        const data = await res.json()
+        if (data.success && data.record) {
+          setEditingRecord(data.record)
+        }
+      } catch (err) {
+        console.warn('Failed to load full slips for edit modal:', err)
+      }
+    }
+  }
+
   // Live Update Status Mark in Database
   const handleStatusUpdate = async (record: AimtReportRecord, newStatus: string) => {
     try {
@@ -344,7 +379,7 @@ export default function StudentReportsPage() {
         isLoading={isLoadingRecords}
         selectedIds={selectedIds}
         onSelectChange={setSelectedIds}
-        onViewRecord={(record) => setDetailModalRecord(record)}
+        onViewRecord={handleViewRecord}
         onImportExcel={undefined}
         onAddEntry={
           isViewer
@@ -354,10 +389,7 @@ export default function StudentReportsPage() {
                 setIsAddEntryModalOpen(true)
               }
         }
-        onEditRecord={(record) => {
-          setEditingRecord(record)
-          setIsAddEntryModalOpen(true)
-        }}
+        onEditRecord={handleEditRecord}
         onDeleteRecord={isViewer ? undefined : handleDeleteRecord}
         onDeleteSelected={isViewer ? undefined : handleBulkDelete}
         onClearStatusSelected={isViewer ? undefined : handleBulkStatusClear}
@@ -395,8 +427,7 @@ export default function StudentReportsPage() {
         record={detailModalRecord}
         onEdit={(record) => {
           setDetailModalRecord(null)
-          setEditingRecord(record)
-          setIsAddEntryModalOpen(true)
+          handleEditRecord(record)
         }}
       />
     </div>

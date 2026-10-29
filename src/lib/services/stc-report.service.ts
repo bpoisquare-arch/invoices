@@ -316,7 +316,7 @@ export async function previewStcReportImport(buffer: Buffer, _fileName?: string)
   }
 }
 
-function prismaStcRecordToSnake(r: any): StcReportRecord {
+function prismaStcRecordToSnake(r: any, includeSlipData: boolean = true): StcReportRecord {
   const extraData = (r.extraData as Record<string, any>) || {}
   const rawFollowUp = r.followUp !== undefined && r.followUp !== null ? r.followUp : extraData.follow_up
   const safeFollowUp =
@@ -372,6 +372,25 @@ function prismaStcRecordToSnake(r: any): StcReportRecord {
     }
   }
 
+  const rawSlips = Array.isArray(extraData.slips) ? extraData.slips : []
+  const mappedSlips = includeSlipData
+    ? rawSlips
+    : rawSlips.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        type: s.type,
+        mimeType: s.mimeType,
+        originalSize: s.originalSize,
+        compressedSize: s.compressedSize,
+        fileSize: s.fileSize,
+        uploadedAt: s.uploadedAt,
+        data: '', // Omit heavy base64 in list view, lazy load on demand
+      }))
+
+  const cleanExtraData = includeSlipData
+    ? extraData
+    : { ...extraData, slips: mappedSlips }
+
   return {
     id: r.id,
     import_id: r.importId,
@@ -408,8 +427,8 @@ function prismaStcRecordToSnake(r: any): StcReportRecord {
         ? Number(rawDividedMonth)
         : null,
     calculation_breakup: rawCalcBreakup ? String(rawCalcBreakup) : null,
-    slips: Array.isArray(extraData.slips) ? extraData.slips : [],
-    extra_data: extraData as any,
+    slips: mappedSlips,
+    extra_data: cleanExtraData as any,
     created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt || new Date().toISOString()),
   }
 }
@@ -438,7 +457,7 @@ export async function saveStcReportImportToDatabase(params: {
   try {
     const dbRecords = await prisma.stcReportRecord.findMany()
     if (dbRecords && dbRecords.length > 0) {
-      existingRecords = dbRecords.map(prismaStcRecordToSnake)
+      existingRecords = dbRecords.map((r) => prismaStcRecordToSnake(r, false))
     }
   } catch (err) {
     console.warn('Could not fetch existing STC records from MySQL:', err)
@@ -816,7 +835,7 @@ export async function getStcReportRecords(params: {
     }
 
     return {
-      records: rows.map(prismaStcRecordToSnake),
+      records: rows.map((r) => prismaStcRecordToSnake(r, false)),
       totalCount,
       totalPendingAmount: Number(totalPending.toFixed(2)),
       totalYetToRaised: Number(totalYetRaised.toFixed(2)),
@@ -836,6 +855,18 @@ export async function getStcReportRecords(params: {
     availableAgents: [],
     availableIntakes: [],
     availableCourses: [],
+  }
+}
+
+// Fetch a single STC record with full slips media (for detail/edit view)
+export async function getStcReportRecordById(id: string): Promise<StcReportRecord | null> {
+  try {
+    const row = await prisma.stcReportRecord.findUnique({ where: { id } })
+    if (!row) return null
+    return prismaStcRecordToSnake(row, true)
+  } catch (err) {
+    console.warn('MySQL getStcReportRecordById failed:', err)
+    return null
   }
 }
 

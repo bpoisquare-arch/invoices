@@ -301,7 +301,7 @@ export async function previewReportImport(buffer: Buffer, _fileName?: string) {
   }
 }
 
-function prismaAimtRecordToSnake(r: any): AimtReportRecord {
+function prismaAimtRecordToSnake(r: any, includeSlipData: boolean = true): AimtReportRecord {
   const extraData = (r.extraData as Record<string, any>) || {}
   const rawFollowUp = r.followUp !== undefined && r.followUp !== null ? r.followUp : extraData.follow_up
   const safeFollowUp =
@@ -341,6 +341,25 @@ function prismaAimtRecordToSnake(r: any): AimtReportRecord {
     }
   }
 
+  const rawSlips = Array.isArray(extraData.slips) ? extraData.slips : []
+  const mappedSlips = includeSlipData
+    ? rawSlips
+    : rawSlips.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        type: s.type,
+        mimeType: s.mimeType,
+        originalSize: s.originalSize,
+        compressedSize: s.compressedSize,
+        fileSize: s.fileSize,
+        uploadedAt: s.uploadedAt,
+        data: '', // Omit heavy base64 in list view, lazy load on demand
+      }))
+
+  const cleanExtraData = includeSlipData
+    ? extraData
+    : { ...extraData, slips: mappedSlips }
+
   return {
     id: r.id,
     import_id: r.importId,
@@ -374,8 +393,8 @@ function prismaAimtRecordToSnake(r: any): AimtReportRecord {
     payment_status: r.paymentStatus,
     divided_month: r.dividedMonth !== undefined && r.dividedMonth !== null ? Number(r.dividedMonth) : (extraData.divided_month !== undefined && extraData.divided_month !== null ? Number(extraData.divided_month) : null),
     calculation_breakup: r.calculationBreakup || extraData.calculation_breakup || null,
-    slips: Array.isArray(extraData.slips) ? extraData.slips : [],
-    extra_data: extraData as any,
+    slips: mappedSlips,
+    extra_data: cleanExtraData as any,
     created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt || new Date().toISOString()),
   }
 }
@@ -406,7 +425,7 @@ export async function saveReportImportToDatabase(params: {
   try {
     const dbRecords = await prisma.aimtReportRecord.findMany()
     if (dbRecords && dbRecords.length > 0) {
-      existingRecords = dbRecords.map(prismaAimtRecordToSnake)
+      existingRecords = dbRecords.map((r) => prismaAimtRecordToSnake(r, false))
     }
   } catch (err) {
     console.warn('Could not fetch existing AIMT records from MySQL:', err)
@@ -780,7 +799,7 @@ export async function getReportRecords(params: {
     }
 
     return {
-      records: rows.map(prismaAimtRecordToSnake),
+      records: rows.map((r) => prismaAimtRecordToSnake(r, false)),
       totalCount,
       totalPendingAmount: Number(totalPending.toFixed(2)),
       totalYetToRaised: Number(totalYetRaised.toFixed(2)),
@@ -800,6 +819,18 @@ export async function getReportRecords(params: {
     availableAgents: [],
     availableIntakes: [],
     availableCourses: [],
+  }
+}
+
+// Fetch a single AIMT record with full slips media (for detail/edit view)
+export async function getReportRecordById(id: string): Promise<AimtReportRecord | null> {
+  try {
+    const row = await prisma.aimtReportRecord.findUnique({ where: { id } })
+    if (!row) return null
+    return prismaAimtRecordToSnake(row, true)
+  } catch (err) {
+    console.warn('MySQL getReportRecordById failed:', err)
+    return null
   }
 }
 
