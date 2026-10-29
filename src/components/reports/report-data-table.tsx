@@ -45,10 +45,182 @@ import {
   Loader2,
   PlusCircle,
   UploadCloud,
+  X,
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/types/database.types'
 import TablePagination from '@/components/ui/table-pagination'
 import { formatToDDMMYY } from '@/lib/utils'
+import { SearchableCombobox, type ComboboxOption } from '@/components/ui/combobox'
+
+export const PREDEFINED_AGENTS = [
+  'ABC Consultants',
+  'ABC Overseas Consultants',
+  'Abdul Education',
+  'AIMT Student',
+  'Brightpath Consultancy Group',
+  'Dream Education',
+  'Edlink Australia',
+  'Edlink Pakistan',
+  'Grace International Education',
+  'Marriott Education',
+  'Muskan Consultants',
+  'NexGen Consultants',
+  'No Agent ( Internal Student )',
+  'Oceanian VIC',
+  'OMEC',
+  'Rashi (Study Directions)',
+  'Sanguine Migration',
+  'Simran Consultant',
+  'Student Pro Education Consultancy',
+  'Study Directions',
+  'Ubaid Eduation',
+  'Umais Ahmed',
+  'VICPAK',
+  'World Class Consultant',
+  'Zunair Agent',
+]
+
+export const AGENT_OPTIONS: ComboboxOption[] = [
+  { value: 'all', label: 'All' },
+  { value: 'blank', label: 'Blanks' },
+  ...PREDEFINED_AGENTS.map((agent) => ({ value: agent, label: agent })),
+  { value: 'others', label: 'Others' },
+]
+
+function normalizeAgent(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function isAgentBlank(agent: string | null | undefined): boolean {
+  if (!agent) return true
+  const trimmed = agent.trim().toLowerCase()
+  return (
+    trimmed === '' ||
+    trimmed === '-' ||
+    trimmed === 'null' ||
+    trimmed === 'undefined' ||
+    trimmed === 'n/a'
+  )
+}
+
+function matchSpecificAgent(recordAgent: string, targetAgent: string): boolean {
+  const rNorm = normalizeAgent(recordAgent)
+  const tNorm = normalizeAgent(targetAgent)
+
+  if (rNorm === tNorm) return true
+
+  switch (targetAgent) {
+    case 'ABC Consultants':
+      return rNorm.includes('abcconsult') && !rNorm.includes('overseas')
+    case 'ABC Overseas Consultants':
+      return rNorm.includes('abcoverseas') || (rNorm.includes('abc') && rNorm.includes('overseas'))
+    case 'Abdul Education':
+      return rNorm.includes('abduledu')
+    case 'AIMT Student':
+      return rNorm.includes('aimtstudent')
+    case 'Brightpath Consultancy Group':
+      return rNorm.includes('brightpath') || (rNorm.includes('bright') && rNorm.includes('path'))
+    case 'Dream Education':
+      return rNorm.includes('dreamedu')
+    case 'Edlink Australia':
+      return rNorm.includes('edlink') && rNorm.includes('australia')
+    case 'Edlink Pakistan':
+      return rNorm.includes('edlink') && rNorm.includes('pakistan')
+    case 'Grace International Education':
+      return rNorm.includes('graceintern') || (rNorm.includes('grace') && rNorm.includes('international'))
+    case 'Marriott Education':
+      return rNorm.includes('marriott') || rNorm.includes('marriot')
+    case 'Muskan Consultants':
+      return rNorm.includes('muskan')
+    case 'NexGen Consultants':
+      return rNorm.includes('nexgen')
+    case 'No Agent ( Internal Student )':
+      return rNorm.includes('noagent') || rNorm.includes('internalstudent')
+    case 'Oceanian VIC':
+      return rNorm.includes('oceanian')
+    case 'OMEC':
+      return rNorm.includes('omec')
+    case 'Rashi (Study Directions)':
+      return rNorm.includes('rashi')
+    case 'Sanguine Migration':
+      return rNorm.includes('sanguine')
+    case 'Simran Consultant':
+      return rNorm.includes('simran')
+    case 'Student Pro Education Consultancy':
+      return rNorm.includes('studentpro')
+    case 'Study Directions':
+      return rNorm.includes('studydirection') && !rNorm.includes('rashi')
+    case 'Ubaid Eduation':
+      return rNorm.includes('ubaid')
+    case 'Umais Ahmed':
+      return rNorm.includes('umais')
+    case 'VICPAK':
+      return rNorm.includes('vicpak')
+    case 'World Class Consultant':
+      return rNorm.includes('worldclass')
+    case 'Zunair Agent':
+      return rNorm.includes('zunair')
+    default:
+      return rNorm.includes(tNorm) || tNorm.includes(rNorm)
+  }
+}
+
+function matchAgentFilter(recordAgent: string | null | undefined, filterValue: string): boolean {
+  if (filterValue === 'all') return true
+
+  const isBlank = isAgentBlank(recordAgent)
+
+  if (filterValue === 'blank') {
+    return isBlank
+  }
+
+  if (isBlank) return false
+
+  const agentStr = recordAgent!.trim()
+
+  if (filterValue === 'others') {
+    return !PREDEFINED_AGENTS.some((definedAgent) => matchSpecificAgent(agentStr, definedAgent))
+  }
+
+  return matchSpecificAgent(agentStr, filterValue)
+}
+
+function extractDateMonth(val: string | null | undefined): number | null {
+  if (!val || typeof val !== 'string') return null
+  const s = val.trim()
+  if (!s || s === '-' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') return null
+
+  // 1. YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
+  const ymd = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (ymd) {
+    const m = parseInt(ymd[2], 10)
+    return m >= 1 && m <= 12 ? m : null
+  }
+
+  // 2. DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+  const dmy = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/)
+  if (dmy) {
+    const m = parseInt(dmy[2], 10)
+    return m >= 1 && m <= 12 ? m : null
+  }
+
+  // 3. Excel serial number (5 digits)
+  if (/^\d{5}$/.test(s)) {
+    const num = parseInt(s, 10)
+    const d = new Date((num - 25569) * 86400 * 1000)
+    if (!isNaN(d.getTime())) {
+      return d.getUTCMonth() + 1
+    }
+  }
+
+  // 4. Date.parse
+  const d = new Date(s)
+  if (!isNaN(d.getTime())) {
+    return d.getMonth() + 1
+  }
+
+  return null
+}
 
 interface ReportDataTableProps {
   records: AimtReportRecord[]
@@ -69,13 +241,19 @@ interface ReportDataTableProps {
   onStatusUpdate?: (record: AimtReportRecord, status: string) => Promise<void>
 }
 
-type SortField = 'student_name' | 'pending_invoice' | 'pending_amount' | 'yet_to_raised' | 'course' | 'intake' | 'end_date'
+type SortField = 'student_name' | 'pending_invoice' | 'pending_amount' | 'yet_to_raised' | 'course' | 'intake' | 'end_date' | 'coe_issued_date'
 type SortOrder = 'asc' | 'desc'
 
 function parseDateValue(val: string | null | undefined): number {
   if (!val || typeof val !== 'string') return 0
   const trimmed = val.trim()
   if (!trimmed || trimmed === '-') return 0
+
+  // 5-digit Excel serial number
+  if (/^\d{5}$/.test(trimmed)) {
+    const num = parseInt(trimmed, 10)
+    return (num - 25569) * 86400 * 1000
+  }
 
   // match DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
   const ddmmyyyy = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/)
@@ -120,6 +298,8 @@ export default function ReportDataTable({
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
   const [selectedMarkStatus, setSelectedMarkStatus] = useState<string>('all')
   const [selectedDocument, setSelectedDocument] = useState<string>('all')
+  const [selectedAgent, setSelectedAgent] = useState<string>('all')
+  const [selectedCoeMonth, setSelectedCoeMonth] = useState<string>('all')
 
   // Sorting State
   const [sortField, setSortField] = useState<SortField>('student_name')
@@ -238,9 +418,24 @@ export default function ReportDataTable({
       })
     }
 
-    // 4. Sorting
+    // 4. Agent / Consultant Filter
+    if (selectedAgent !== 'all') {
+      list = list.filter((r) => matchAgentFilter(r.agent, selectedAgent))
+    }
+
+    // 5. COE Month Filter
+    if (selectedCoeMonth !== 'all') {
+      if (selectedCoeMonth === 'blank') {
+        list = list.filter((r) => extractDateMonth(r.coe_issued_date) === null)
+      } else {
+        const targetMonthNum = parseInt(selectedCoeMonth, 10)
+        list = list.filter((r) => extractDateMonth(r.coe_issued_date) === targetMonthNum)
+      }
+    }
+
+    // 6. Sorting
     list.sort((a, b) => {
-      if (sortField === 'intake' || sortField === 'end_date') {
+      if (sortField === 'intake' || sortField === 'end_date' || sortField === 'coe_issued_date') {
         const aDate = parseDateValue(a[sortField])
         const bDate = parseDateValue(b[sortField])
         if (aDate && bDate) {
@@ -271,7 +466,7 @@ export default function ReportDataTable({
     })
 
     return list
-  }, [records, searchTerm, selectedStatus, selectedMarkStatus, selectedDocument, sortField, sortOrder])
+  }, [records, searchTerm, selectedStatus, selectedMarkStatus, selectedDocument, selectedAgent, selectedCoeMonth, sortField, sortOrder])
 
   // Notify parent of filtered records
   React.useEffect(() => {
@@ -361,189 +556,256 @@ export default function ReportDataTable({
     }
   }
 
-  const hasActiveFilters = Boolean(searchTerm.trim() || selectedStatus !== 'all' || selectedMarkStatus !== 'all' || selectedDocument !== 'all')
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+    selectedStatus !== 'all' ||
+    selectedMarkStatus !== 'all' ||
+    selectedDocument !== 'all' ||
+    selectedAgent !== 'all' ||
+    selectedCoeMonth !== 'all'
+  )
 
   return (
     <div className="w-full space-y-4">
-      {/* Top Controls Bar with Filters */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-gradient-to-r from-white via-slate-50/60 to-slate-50 p-4 rounded-2xl border border-slate-200/90 shadow-xs">
-        {/* Left: Search filter input with full remaining width */}
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-[#009D9E]" />
-          <Input
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value)
-              setCurrentPage(1)
-            }}
-            placeholder="Search student name, ID, agent, course, document..."
-            className="w-full pl-10 pr-4 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl text-xs h-10 focus-visible:ring-2 focus-visible:ring-[#009D9E]/30 focus-visible:border-[#009D9E] shadow-2xs font-medium transition-all"
-          />
+      {/* Top Controls & Filters Card */}
+      <div className="bg-gradient-to-r from-white via-slate-50/70 to-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-3.5">
+        {/* Tier 1: Search Bar (Generous Width) + Action Buttons */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Left: Search filter input with full remaining width */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-[#009D9E]" />
+            <Input
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setCurrentPage(1)
+              }}
+              placeholder="Search student name, ID, agent, course, document, remarks..."
+              className="w-full pl-10 pr-9 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl text-xs h-10 focus-visible:ring-2 focus-visible:ring-[#009D9E]/30 focus-visible:border-[#009D9E] shadow-2xs font-medium transition-all"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 size-5 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer transition-colors"
+                title="Clear search"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Right: Actions (Bulk selection buttons & Add Entry) */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+            {/* Bulk Clear Status Button */}
+            {selectedIds.length > 0 && onClearStatusSelected && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsBulkClearStatusOpen(true)}
+                className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:border-amber-400 h-10 px-3.5 rounded-xl text-xs gap-1.5 shadow-2xs font-bold cursor-pointer shrink-0 animate-in fade-in"
+                title="Remove monthly status marks from selected records"
+              >
+                <RotateCcw className="size-3.5 text-amber-600" />
+                <span>Clear Status ({selectedIds.length})</span>
+              </Button>
+            )}
+
+            {/* Bulk Delete Selected Button */}
+            {selectedIds.length > 0 && onDeleteSelected && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsBulkDeleteOpen(true)}
+                className="border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-400 h-10 px-3.5 rounded-xl text-xs gap-1.5 shadow-2xs font-bold cursor-pointer shrink-0 animate-in fade-in"
+                title="Delete all selected student records directly from live database"
+              >
+                <Trash2 className="size-3.5 text-rose-600" />
+                <span>Delete ({selectedIds.length})</span>
+              </Button>
+            )}
+
+            {/* Add Entry Button */}
+            {onAddEntry && (
+              <Button
+                size="sm"
+                onClick={onAddEntry}
+                className="bg-gradient-to-r from-[#003D5C] to-[#002b42] hover:from-[#002b42] hover:to-[#001f30] text-white h-10 px-5 rounded-xl text-xs font-bold gap-2 shadow-sm transition-all cursor-pointer shrink-0 border border-cyan-500/20"
+              >
+                <PlusCircle className="size-4 text-cyan-300" />
+                <span>Add Entry</span>
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Right: Separate Status & Document Type Filter Dropdowns + Actions */}
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-          {/* 1. Dedicated Mark Status Filter */}
-          <div className="relative flex items-center min-w-[155px]">
-            <select
-              value={selectedMarkStatus}
-              onChange={(e) => {
-                setSelectedMarkStatus(e.target.value)
-                setCurrentPage(1)
-              }}
-              className={`w-full h-10 pl-3.5 pr-8 text-xs font-semibold rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 shadow-2xs transition-all appearance-none border ${
-                selectedMarkStatus !== 'all'
-                  ? 'border-[#009D9E] bg-cyan-100/90 text-[#003D5C] font-extrabold shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <option value="all">Mark Status: All</option>
-              <option value="blank">Blank</option>
-              <option value="Invoice Raised">Invoice Raised</option>
-              <option value="Need Advise">Need Advise</option>
-              <option value="Course End">Course End</option>
-              <option value="Payment Received">Payment Received</option>
-              <option value="Partial Paid">Partial Paid</option>
-              <option value="Defaulter">Defaulter</option>
-              <option value="Paid to Agent">Paid to Agent</option>
-            </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+        {/* Tier 2: Filter Toolbar (5 Dropdowns + Reset + Live Result Counter) */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 pt-3 border-t border-slate-200/70">
+          {/* Left: Filter dropdowns group */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 text-slate-500 font-bold text-[11px] uppercase tracking-wider mr-1 select-none">
+              <Filter className="size-3.5 text-[#009D9E]" />
+              <span>Filters:</span>
+            </span>
+
+            {/* 1. Mark Status */}
+            <div className="relative flex items-center min-w-[145px]">
+              <select
+                value={selectedMarkStatus}
+                onChange={(e) => {
+                  setSelectedMarkStatus(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className={`w-full h-9.5 pl-3.5 pr-8 text-xs font-semibold rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 shadow-2xs transition-all appearance-none border ${
+                  selectedMarkStatus !== 'all'
+                    ? 'border-[#009D9E] bg-cyan-100/90 text-[#003D5C] font-extrabold shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <option value="all">Mark Status: All</option>
+                <option value="blank">Blank</option>
+                <option value="Invoice Raised">Invoice Raised</option>
+                <option value="Need Advise">Need Advise</option>
+                <option value="Course End">Course End</option>
+                <option value="Payment Received">Payment Received</option>
+                <option value="Partial Paid">Partial Paid</option>
+                <option value="Defaulter">Defaulter</option>
+                <option value="Paid to Agent">Paid to Agent</option>
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* 2. Status */}
+            <div className="relative flex items-center min-w-[125px]">
+              <select
+                value={selectedStatus}
+                onChange={(e) => {
+                  setSelectedStatus(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className={`w-full h-9.5 pl-3.5 pr-8 text-xs font-semibold rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 shadow-2xs transition-all appearance-none border ${
+                  selectedStatus !== 'all'
+                    ? 'border-[#009D9E] bg-cyan-50/80 text-[#003D5C] font-bold'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <option value="all">Status: All</option>
+                <option value="Current">Status: Current</option>
+                <option value="Future">Status: Future</option>
+                <option value="Cancelled">Status: Cancelled</option>
+                <option value="Completed">Status: Completed</option>
+                <option value="Deferred">Status: Deferred</option>
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* 3. Document */}
+            <div className="relative flex items-center min-w-[135px]">
+              <select
+                value={selectedDocument}
+                onChange={(e) => {
+                  setSelectedDocument(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className={`w-full h-9.5 pl-3.5 pr-8 text-xs font-semibold rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 shadow-2xs transition-all appearance-none border ${
+                  selectedDocument !== 'all'
+                    ? 'border-[#009D9E] bg-cyan-50/80 text-[#003D5C] font-bold'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <option value="all">Document: All</option>
+                <option value="CoE">Document: CoE</option>
+                <option value="VoE">Document: VoE</option>
+                <option value="Offer Letter">Document: Offer Letter</option>
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* 4. Agent */}
+            <div className="relative flex items-center min-w-[170px] max-w-[220px]">
+              <SearchableCombobox
+                options={AGENT_OPTIONS}
+                value={selectedAgent}
+                onSelect={(val) => {
+                  setSelectedAgent(val)
+                  setCurrentPage(1)
+                }}
+                placeholder="Agent: All"
+                searchPlaceholder="Search agent..."
+                emptyText="No agents found."
+                popoverWidth="w-[280px]"
+                prefix="Agent: "
+                triggerClassName={`w-full h-9.5 text-xs font-semibold rounded-xl cursor-pointer shadow-2xs transition-all border ${
+                  selectedAgent !== 'all'
+                    ? 'border-[#009D9E] bg-cyan-100/90 text-[#003D5C] font-extrabold shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              />
+            </div>
+
+            {/* 5. COE Month */}
+            <div className="relative flex items-center min-w-[145px]">
+              <select
+                value={selectedCoeMonth}
+                onChange={(e) => {
+                  setSelectedCoeMonth(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className={`w-full h-9.5 pl-3.5 pr-8 text-xs font-semibold rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 shadow-2xs transition-all appearance-none border ${
+                  selectedCoeMonth !== 'all'
+                    ? 'border-[#009D9E] bg-cyan-100/90 text-[#003D5C] font-extrabold shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <option value="all">COE Month: All</option>
+                <option value="blank">Blank</option>
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Reset Filters button */}
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('')
+                  setSelectedStatus('all')
+                  setSelectedMarkStatus('all')
+                  setSelectedDocument('all')
+                  setSelectedAgent('all')
+                  setSelectedCoeMonth('all')
+                  setCurrentPage(1)
+                }}
+                className="h-9.5 px-3 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl cursor-pointer font-bold shrink-0 transition-colors"
+                title="Reset search & filters"
+              >
+                <RotateCcw className="size-3.5 mr-1 text-rose-500" />
+                <span>Reset</span>
+              </Button>
+            )}
           </div>
 
-          {/* 2. Standard Student Status Filter */}
-          <div className="relative flex items-center min-w-[135px]">
-            <select
-              value={selectedStatus}
-              onChange={(e) => {
-                setSelectedStatus(e.target.value)
-                setCurrentPage(1)
-              }}
-              className={`w-full h-10 pl-3.5 pr-8 text-xs font-semibold rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 shadow-2xs transition-all appearance-none border ${
-                selectedStatus !== 'all'
-                  ? 'border-[#009D9E] bg-cyan-50/80 text-[#003D5C] font-bold'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <option value="all">Status: All</option>
-              <option value="Current">Status: Current</option>
-              <option value="Future">Status: Future</option>
-              <option value="Cancelled">Status: Cancelled</option>
-              <option value="Completed">Status: Completed</option>
-              <option value="Deferred">Status: Deferred</option>
-            </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+          {/* Right: Record count indicator */}
+          <div className="text-xs font-medium text-slate-500 shrink-0 self-center hidden sm:block">
+            Showing <span className="font-extrabold text-[#003D5C]">{filteredRecords.length}</span> of{' '}
+            <span className="font-bold text-slate-700">{records.length}</span> students
           </div>
-
-          {/* 3. Document Type Filter */}
-          <div className="relative flex items-center min-w-[145px]">
-            <select
-              value={selectedDocument}
-              onChange={(e) => {
-                setSelectedDocument(e.target.value)
-                setCurrentPage(1)
-              }}
-              className={`w-full h-10 pl-3.5 pr-8 text-xs font-semibold rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#009D9E]/30 shadow-2xs transition-all appearance-none border ${
-                selectedDocument !== 'all'
-                  ? 'border-[#009D9E] bg-cyan-50/80 text-[#003D5C] font-bold'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <option value="all">Document: All</option>
-              <option value="CoE">Document: CoE</option>
-              <option value="VoE">Document: VoE</option>
-              <option value="Offer Letter">Document: Offer Letter</option>
-            </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
-          </div>
-
-          {/* Reset Filters button if any filter is active */}
-          {hasActiveFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSearchTerm('')
-                setSelectedStatus('all')
-                setSelectedMarkStatus('all')
-                setSelectedDocument('all')
-                setCurrentPage(1)
-              }}
-              className="h-10 px-3 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl cursor-pointer font-bold shrink-0"
-              title="Reset search & filters"
-            >
-              <RotateCcw className="size-3.5 mr-1 text-rose-500" />
-              <span>Reset</span>
-            </Button>
-          )}
-
-          {/* Bulk Clear Status Button in Table Controls */}
-          {selectedIds.length > 0 && onClearStatusSelected && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsBulkClearStatusOpen(true)}
-              className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:border-amber-400 h-10 px-3.5 rounded-xl text-xs gap-1.5 shadow-2xs font-bold cursor-pointer shrink-0 animate-in fade-in"
-              title="Remove monthly status marks from selected records"
-            >
-              <RotateCcw className="size-3.5 text-amber-600" />
-              <span>Clear Status ({selectedIds.length})</span>
-            </Button>
-          )}
-
-          {/* Bulk Delete Selected Button */}
-          {selectedIds.length > 0 && onDeleteSelected && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsBulkDeleteOpen(true)}
-              className="border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-400 h-10 px-3.5 rounded-xl text-xs gap-1.5 shadow-2xs font-bold cursor-pointer shrink-0 animate-in fade-in"
-              title="Delete all selected student records directly from live database"
-            >
-              <Trash2 className="size-3.5 text-rose-600" />
-              <span>Delete ({selectedIds.length})</span>
-            </Button>
-          )}
-
-          {/* Export Filtered button in Table Controls */}
-          {onExportFiltered && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onExportFiltered?.(filteredRecords)}
-              disabled={filteredRecords.length === 0}
-              className="border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 hover:from-emerald-100 hover:to-teal-100 hover:border-emerald-400 h-10 px-4 rounded-xl text-xs gap-2 shadow-2xs font-bold cursor-pointer shrink-0 transition-all"
-              title="Export filtered records to Excel"
-            >
-              <Download className="size-4 text-emerald-600" />
-              <span className="hidden sm:inline">Export Excel ({filteredRecords.length})</span>
-            </Button>
-          )}
-
-          {/* Import Excel Button in Table Controls - Temporarily Hidden */}
-          {/* {onImportExcel && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onImportExcel}
-              className="border-cyan-300/90 bg-gradient-to-r from-cyan-50 to-teal-50 text-[#003D5C] hover:bg-cyan-100/70 hover:border-cyan-400 h-10 px-4 rounded-xl text-xs gap-2 shadow-2xs font-bold cursor-pointer shrink-0 transition-all"
-              title="Import student Excel report"
-            >
-              <UploadCloud className="size-4 text-[#009D9E]" />
-              <span className="hidden sm:inline">Import Excel</span>
-            </Button>
-          )} */}
-
-          {/* Add Entry Button */}
-          {onAddEntry && (
-            <Button
-              size="sm"
-              onClick={onAddEntry}
-              className="bg-gradient-to-r from-[#003D5C] to-[#002b42] hover:from-[#002b42] hover:to-[#001f30] text-white h-10 px-4.5 rounded-xl text-xs font-bold gap-2 shadow-sm transition-all cursor-pointer shrink-0 border border-cyan-500/20"
-            >
-              <PlusCircle className="size-4 text-cyan-300" />
-              <span>Add Entry</span>
-            </Button>
-          )}
         </div>
       </div>
 
@@ -759,6 +1021,26 @@ export default function ReportDataTable({
                   </div>
                 </th>
 
+                {/* 8. COE Date (COE Issue Date) */}
+                <th
+                  onClick={() => toggleSort('coe_issued_date')}
+                  className="p-3.5 min-w-[130px] cursor-pointer hover:text-cyan-300 transition-colors group select-none"
+                  title="Sort by COE Date"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>COE Date</span>
+                    {sortField === 'coe_issued_date' ? (
+                      sortOrder === 'asc' ? (
+                        <ArrowUp className="size-3.5 text-cyan-300 stroke-[2.5]" />
+                      ) : (
+                        <ArrowDown className="size-3.5 text-cyan-300 stroke-[2.5]" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="size-3 text-cyan-400/40 group-hover:text-cyan-300" />
+                    )}
+                  </div>
+                </th>
+
                 {/* Actions column */}
                 <th className="p-3.5 w-12 text-center"></th>
               </tr>
@@ -768,7 +1050,7 @@ export default function ReportDataTable({
             <tbody className="divide-y divide-slate-200/70 text-xs">
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-16 text-slate-500">
+                  <td colSpan={10} className="text-center py-16 text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2.5">
                       <div className="size-7 border-3 border-[#009D9E] border-t-transparent rounded-full animate-spin" />
                       <span className="font-semibold text-slate-700">Loading student report records...</span>
@@ -777,14 +1059,14 @@ export default function ReportDataTable({
                 </tr>
               ) : paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-16 text-slate-500">
+                  <td colSpan={10} className="text-center py-16 text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2.5">
                       <div className="size-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
                         <GraduationCap className="size-7" />
                       </div>
                       <span className="font-extrabold text-slate-800 text-sm">No student records found</span>
                       <span className="text-xs text-slate-500 max-w-sm">
-                        {searchTerm || selectedStatus !== 'all' || selectedDocument !== 'all'
+                        {searchTerm || selectedStatus !== 'all' || selectedDocument !== 'all' || selectedAgent !== 'all' || selectedCoeMonth !== 'all'
                           ? 'Try adjusting your search query or filters.'
                           : 'Use "+ Add Entry" to create a new student record.'}
                       </span>
@@ -930,6 +1212,18 @@ export default function ReportDataTable({
                           <span className="inline-flex items-center gap-1.5 font-mono text-slate-700 font-bold text-xs bg-slate-200/60 px-2 py-0.5 rounded border border-slate-300/60">
                             <Calendar className="size-3 text-amber-600 shrink-0" />
                             <span>{formatToDDMMYY(record.end_date)}</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-normal">-</span>
+                        )}
+                      </td>
+
+                      {/* 9. COE Date */}
+                      <td className="p-3.5 whitespace-nowrap">
+                        {record.coe_issued_date && record.coe_issued_date !== '-' ? (
+                          <span className="inline-flex items-center gap-1.5 font-mono text-slate-700 font-bold text-xs bg-slate-200/60 px-2 py-0.5 rounded border border-slate-300/60">
+                            <Calendar className="size-3 text-[#009D9E] shrink-0" />
+                            <span>{formatToDDMMYY(record.coe_issued_date)}</span>
                           </span>
                         ) : (
                           <span className="text-slate-400 font-normal">-</span>

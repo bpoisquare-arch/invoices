@@ -349,6 +349,25 @@ export default function StudentReportsPage() {
             <span>Refresh Data</span>
           </Button>
 
+          {/* Export to Excel (moved beside Refresh Data) */}
+          {!isViewer && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportToExcel()}
+              disabled={isExporting || records.length === 0}
+              className="border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 hover:from-emerald-100 hover:to-teal-100 hover:border-emerald-400 h-9.5 px-3.5 rounded-xl text-xs gap-2 shadow-2xs font-bold cursor-pointer transition-all"
+              title="Export filtered records to Excel"
+            >
+              {isExporting ? (
+                <Loader2 className="size-3.5 text-emerald-600 animate-spin" />
+              ) : (
+                <Download className="size-3.5 text-emerald-600" />
+              )}
+              <span>Export Excel ({selectedIds.length > 0 ? selectedIds.length : filteredRecords.length})</span>
+            </Button>
+          )}
+
           {/* Import Excel - Temporarily Hidden */}
           {/* {!isViewer && (
             <Button

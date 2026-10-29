@@ -20,6 +20,7 @@ interface SearchableComboboxProps {
   className?: string
   triggerClassName?: string
   popoverWidth?: string
+  prefix?: string
 }
 
 export function SearchableCombobox({
@@ -31,7 +32,8 @@ export function SearchableCombobox({
   emptyText = "No results found.",
   className,
   triggerClassName,
-  popoverWidth = "w-[240px]"
+  popoverWidth = "w-[240px]",
+  prefix,
 }: SearchableComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
@@ -69,7 +71,9 @@ export function SearchableCombobox({
           )}
         >
           <span className="truncate">
-            {selectedOption ? selectedOption.label : placeholder}
+            {prefix && !(selectedOption ? selectedOption.label : placeholder).toLowerCase().startsWith(prefix.toLowerCase())
+              ? `${prefix}${selectedOption ? selectedOption.label : placeholder}`
+              : selectedOption ? selectedOption.label : placeholder}
           </span>
           <ChevronsUpDown className="ml-1.5 h-3.5 w-3.5 shrink-0 opacity-50 text-slate-500" />
         </button>
