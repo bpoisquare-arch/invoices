@@ -21,16 +21,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'No records provided for export.' }, { status: 400 })
     }
 
+    // Defensive server-side sanitation: strip heavy non-tabular slip attachments
+    const sanitizedRecords = records.map((r: any) => {
+      const { slips, ...rest } = r
+      let cleanExtra: Record<string, any> = {}
+      if (rest.extra_data && typeof rest.extra_data === 'object') {
+        cleanExtra = { ...rest.extra_data }
+        delete cleanExtra.slips
+        for (const [k, v] of Object.entries(cleanExtra)) {
+          if (typeof v === 'string' && (v.length > 2000 || v.startsWith('data:'))) {
+            delete cleanExtra[k]
+          }
+        }
+      }
+      return {
+        ...rest,
+        extra_data: cleanExtra,
+      }
+    })
+
     const fileBuffer = await generateStyledReportExcel({
       title: 'AIMT Student Fee & Enrollment Report',
       entityName: 'AIMT College - Academic & Vocational',
-      records,
+      records: sanitizedRecords,
     })
 
     const dateStr = new Date().toISOString().split('T')[0]
     const filename = `AIMT_Student_Report_${dateStr}.xlsx`
 
-    return new NextResponse(fileBuffer as any, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

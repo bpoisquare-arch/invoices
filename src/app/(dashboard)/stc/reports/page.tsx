@@ -242,11 +242,9 @@ export default function StcReportsPage() {
 
   // Export to Excel
   const handleExportToExcel = async (customRows?: StcReportRecord[]) => {
-    const exportRows = customRows || (
-      selectedIds.length > 0
-        ? records.filter((r) => selectedIds.includes(r.id))
-        : (filteredRecords.length > 0 ? filteredRecords : records)
-    )
+    const exportRows = selectedIds.length > 0
+      ? records.filter((r) => selectedIds.includes(r.id))
+      : (customRows && customRows.length > 0 ? customRows : (filteredRecords.length > 0 ? filteredRecords : records))
 
     if (exportRows.length === 0) {
       alert('No records available to export.')
@@ -255,14 +253,35 @@ export default function StcReportsPage() {
 
     try {
       setIsExporting(true)
+
+      // Sanitize records by stripping heavy attachments (deposit slip base64 images / PDFs)
+      const sanitizedRows = exportRows.map((r) => {
+        const { slips, ...rest } = r as any
+        let cleanExtra: Record<string, any> = {}
+        if (rest.extra_data && typeof rest.extra_data === 'object') {
+          cleanExtra = { ...(rest.extra_data as any) }
+          delete cleanExtra.slips
+          for (const [k, v] of Object.entries(cleanExtra)) {
+            if (typeof v === 'string' && (v.length > 2000 || v.startsWith('data:'))) {
+              delete cleanExtra[k]
+            }
+          }
+        }
+        return {
+          ...rest,
+          extra_data: cleanExtra,
+        }
+      })
+
       const res = await fetch('/api/stc/reports/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ records: exportRows }),
+        body: JSON.stringify({ records: sanitizedRows }),
       })
 
       if (!res.ok) {
-        throw new Error('Export request failed.')
+        const errorData = await res.json().catch(() => null)
+        throw new Error(errorData?.error || 'Export request failed.')
       }
 
       const blob = await res.blob()
@@ -272,8 +291,10 @@ export default function StcReportsPage() {
       a.download = `STC_Student_Report_${new Date().toISOString().split('T')[0]}.xlsx`
       document.body.appendChild(a)
       a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      }, 1000)
     } catch (err: any) {
       console.error('Export error:', err)
       alert(err.message || 'Failed to export Excel report.')
