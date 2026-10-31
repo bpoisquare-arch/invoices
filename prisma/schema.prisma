@@ -684,3 +684,23 @@ model SecurityAuditLog {
 
   @@map("security_audit_logs")
 }
+
+// 28. NOTEPAD NOTES
+model Note {
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  userId    String?  @map("user_id") @db.VarChar(36)
+  userEmail String?  @map("user_email") @db.VarChar(255)
+  title     String   @default("Untitled Note") @db.VarChar(255)
+  content   String   @default("") @db.LongText
+  category  String   @default("General") @db.VarChar(100)
+  color     String   @default("amber") @db.VarChar(50)
+  isPinned  Boolean  @default(false) @map("is_pinned")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([userId], map: "idx_notes_user_id")
+  @@index([userEmail], map: "idx_notes_user_email")
+  @@index([updatedAt], map: "idx_notes_updated_at")
+  @@index([isPinned], map: "idx_notes_is_pinned")
+  @@map("notes")
+}

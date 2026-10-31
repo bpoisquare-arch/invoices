@@ -15,7 +15,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/api/auth/login') ||
     pathname.startsWith('/api/auth/logout') ||
     pathname.startsWith('/api/auth/session') ||
-    pathname.startsWith('/api/audit-log')
+    pathname.startsWith('/api/audit-log') ||
+    pathname.startsWith('/api/notes')
 
   const isStaticOrPublic =
     pathname === '/' ||

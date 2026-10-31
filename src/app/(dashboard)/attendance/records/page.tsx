@@ -30,6 +30,7 @@ import {
   CalendarDays,
   ArrowUpRight,
   ArrowDownRight,
+  NotebookPen,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -61,6 +62,7 @@ import {
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
 import { BranchRequestsModal } from '@/components/attendance/branch-requests-modal'
+import { NotepadDrawer } from '@/components/notepad/notepad-drawer'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
 import { cn } from '@/lib/utils'
 import { DataTableViewOptions } from '@/components/ui/data-table-view-options'
@@ -631,6 +633,22 @@ export default function AttendanceRecordsPage() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all')
   const [arrivalStatus, setArrivalStatus] = useState<string>('all')
   const [departureStatus, setDepartureStatus] = useState<string>('all')
+
+  // Real-time Notepad State
+  const [isNotepadOpen, setIsNotepadOpen] = useState(false)
+  const [notesCount, setNotesCount] = useState<number>(0)
+
+  // Fetch initial notes count from real database
+  useEffect(() => {
+    fetch('/api/notes', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.notes)) {
+          setNotesCount(data.notes.length)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // Quick Month Change Handler
   const handleQuickMonthChange = (newMonth: string) => {
@@ -2566,8 +2584,26 @@ export default function AttendanceRecordsPage() {
             )}
           </div>
 
-          {/* Right Section: View (Toggle columns) Options */}
+          {/* Right Section: Notepad & View (Toggle columns) Options */}
           <div className="flex items-center gap-2.5 ml-auto">
+            {/* Real-time Notepad Button */}
+            <Button
+              type="button"
+              onClick={() => setIsNotepadOpen(true)}
+              variant="outline"
+              size="sm"
+              title="Open Real-time Attendance Notepad (Real Database Sync)"
+              className="h-8 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-amber-50 hover:text-amber-900 hover:border-amber-400 border-slate-300 rounded-md shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer group"
+            >
+              <NotebookPen className="w-3.5 h-3.5 text-amber-600 group-hover:scale-110 transition-transform" />
+              <span>Notepad</span>
+              {notesCount > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-full border border-amber-300">
+                  {notesCount}
+                </span>
+              )}
+            </Button>
+
             {/* View (Toggle Columns) Component */}
             <DataTableViewOptions
               columns={[
@@ -3116,6 +3152,13 @@ export default function AttendanceRecordsPage() {
           fetchRecords()
           fetchPendingRequestsCount()
         }}
+      />
+
+      {/* Real-Time Notepad Drawer Component */}
+      <NotepadDrawer
+        isOpen={isNotepadOpen}
+        onClose={() => setIsNotepadOpen(false)}
+        onNotesCountChange={setNotesCount}
       />
     </div>
   )
