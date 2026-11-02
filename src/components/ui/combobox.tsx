@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, Search, X } from "lucide-react"
+import { Check, ChevronsUpDown, Search, X, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
@@ -21,6 +21,9 @@ interface SearchableComboboxProps {
   triggerClassName?: string
   popoverWidth?: string
   prefix?: string
+  allowAddNew?: boolean
+  addNewText?: string
+  onAddNew?: (searchQuery?: string) => void
 }
 
 export function SearchableCombobox({
@@ -34,6 +37,9 @@ export function SearchableCombobox({
   triggerClassName,
   popoverWidth = "w-[240px]",
   prefix,
+  allowAddNew = false,
+  addNewText = "+ Add New",
+  onAddNew,
 }: SearchableComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
@@ -109,36 +115,85 @@ export function SearchableCombobox({
           {/* Options List */}
           <div className="max-h-56 overflow-y-auto space-y-0.5 custom-scrollbar">
             {filteredOptions.length === 0 ? (
-              <div className="py-3 text-center text-xs font-medium text-slate-400">
-                {emptyText}
-              </div>
-            ) : (
-              filteredOptions.map((option) => {
-                const isSelected = option.value === value
-                return (
+              <div className="py-2.5 px-2 text-center text-xs space-y-2">
+                <div className="text-slate-400 font-medium">{emptyText}</div>
+                {allowAddNew && onAddNew && (
                   <button
-                    key={option.value}
                     type="button"
                     onClick={() => {
-                      onSelect(option.value)
                       setOpen(false)
+                      onAddNew(search.trim())
                     }}
-                    className={cn(
-                      "relative flex w-full cursor-pointer items-center justify-between rounded-lg py-2 px-2.5 text-xs font-medium transition-colors text-left select-none",
-                      isSelected
-                        ? "bg-teal-100/70 text-[#003D5C] font-bold"
-                        : "text-slate-700 hover:bg-teal-50/80 hover:text-[#003D5C]"
-                    )}
+                    className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-[#008080] font-semibold text-xs border border-teal-200 transition-colors shadow-2xs"
                   >
-                    <span className="truncate">{option.label}</span>
-                    {isSelected && (
-                      <Check className="h-3.5 w-3.5 shrink-0 text-[#009D9E] stroke-[2.5]" />
-                    )}
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>{search.trim() ? `Add "${search.trim()}"` : addNewText}</span>
                   </button>
-                )
-              })
+                )}
+              </div>
+            ) : (
+              <>
+                {filteredOptions.map((option) => {
+                  const isSelected = option.value === value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        onSelect(option.value)
+                        setOpen(false)
+                      }}
+                      className={cn(
+                        "relative flex w-full cursor-pointer items-center justify-between rounded-lg py-2 px-2.5 text-xs font-medium transition-colors text-left select-none",
+                        isSelected
+                          ? "bg-teal-100/70 text-[#003D5C] font-bold"
+                          : "text-slate-700 hover:bg-teal-50/80 hover:text-[#003D5C]"
+                      )}
+                    >
+                      <span className="truncate">{option.label}</span>
+                      {isSelected && (
+                        <Check className="h-3.5 w-3.5 shrink-0 text-[#009D9E] stroke-[2.5]" />
+                      )}
+                    </button>
+                  )
+                })}
+
+                {/* If searching and no exact match, offer to add what was typed */}
+                {allowAddNew && onAddNew && search.trim() && !options.some((o) => o.label.toLowerCase() === search.trim().toLowerCase()) && (
+                  <div className="pt-1 mt-1 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpen(false)
+                        onAddNew(search.trim())
+                      }}
+                      className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-50/70 hover:bg-teal-100 text-[#008080] font-medium text-xs border border-teal-100 transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Add &ldquo;{search.trim()}&rdquo;</span>
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
+
+          {/* Persistent Footer Button for Add New */}
+          {allowAddNew && onAddNew && (
+            <div className="pt-1.5 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  onAddNew(search.trim() || undefined)
+                }}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-[#008080] hover:text-[#005a5a] hover:bg-teal-50/70 rounded-md transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>{addNewText}</span>
+              </button>
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>

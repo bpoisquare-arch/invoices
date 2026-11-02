@@ -64,6 +64,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
+import { useDesignations } from '@/lib/hooks/use-designations'
+import AddDesignationModal from '@/components/attendance/add-designation-modal'
 import { SearchableCombobox } from '@/components/ui/combobox'
 import { Employee } from '@/types/database.types'
 
@@ -83,6 +85,26 @@ export default function EmployeeOverviewPage() {
   const [search, setSearch] = useState('')
   const [branchFilter, setBranchFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+
+  // Live Designations & Add Designation Modal State
+  const { designations, addDesignation } = useDesignations()
+  const [isAddDesignationOpen, setIsAddDesignationOpen] = useState(false)
+  const [designationTargetField, setDesignationTargetField] = useState<'add' | 'edit'>('add')
+  const [initialDesignationValue, setInitialDesignationValue] = useState('')
+
+  const handleOpenAddDesignation = (target: 'add' | 'edit', initial: string = '') => {
+    setDesignationTargetField(target)
+    setInitialDesignationValue(initial)
+    setIsAddDesignationOpen(true)
+  }
+
+  const handleDesignationAdded = (added: string) => {
+    if (designationTargetField === 'add') {
+      setNewDesignation(added)
+    } else {
+      setEditDesignation(added)
+    }
+  }
 
   // Commission, Deduction & Adjustment Modal State
   const [selectedCommissionEmployee, setSelectedCommissionEmployee] = useState<Employee | null>(null)
@@ -1009,11 +1031,21 @@ export default function EmployeeOverviewPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Designation *
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Designation *
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddDesignation('add')}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#009D9E] hover:text-[#007F80] hover:underline"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add New
+                  </button>
+                </div>
                 <SearchableCombobox
-                  options={EMPLOYEE_DESIGNATIONS.map((desig) => ({
+                  options={designations.map((desig) => ({
                     value: desig,
                     label: desig,
                   }))}
@@ -1021,8 +1053,11 @@ export default function EmployeeOverviewPage() {
                   onSelect={(val) => setNewDesignation(val)}
                   placeholder="Select Designation..."
                   searchPlaceholder="Search designation..."
-                  popoverWidth="w-[280px]"
+                  popoverWidth="w-[300px]"
                   triggerClassName="bg-white h-9.5 text-xs text-slate-800 border-slate-200 font-normal"
+                  allowAddNew={true}
+                  addNewText="+ Add New Designation"
+                  onAddNew={(typedVal) => handleOpenAddDesignation('add', typedVal || '')}
                 />
               </div>
             </div>
@@ -1339,17 +1374,27 @@ export default function EmployeeOverviewPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Designation *
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Designation *
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddDesignation('edit')}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#009D9E] hover:text-[#007F80] hover:underline"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add New
+                  </button>
+                </div>
                 <SearchableCombobox
                   options={
-                    editDesignation && !EMPLOYEE_DESIGNATIONS.includes(editDesignation as any)
+                    editDesignation && !designations.includes(editDesignation)
                       ? [
                           { value: editDesignation, label: editDesignation },
-                          ...EMPLOYEE_DESIGNATIONS.map((desig) => ({ value: desig, label: desig })),
+                          ...designations.map((desig) => ({ value: desig, label: desig })),
                         ]
-                      : EMPLOYEE_DESIGNATIONS.map((desig) => ({ value: desig, label: desig }))
+                      : designations.map((desig) => ({ value: desig, label: desig }))
                   }
                   value={editDesignation}
                   onSelect={(val) => setEditDesignation(val)}
@@ -1357,6 +1402,9 @@ export default function EmployeeOverviewPage() {
                   searchPlaceholder="Search designation..."
                   popoverWidth="w-[300px]"
                   triggerClassName="bg-white h-9.5 text-xs text-slate-800 border-slate-200"
+                  allowAddNew={true}
+                  addNewText="+ Add New Designation"
+                  onAddNew={(typedVal) => handleOpenAddDesignation('edit', typedVal || '')}
                 />
               </div>
             </div>
@@ -1734,6 +1782,15 @@ export default function EmployeeOverviewPage() {
         onSaveSuccess={() => {
           fetchEmployees()
         }}
+      />
+
+      {/* Live Add Designation Modal */}
+      <AddDesignationModal
+        open={isAddDesignationOpen}
+        onOpenChange={setIsAddDesignationOpen}
+        initialValue={initialDesignationValue}
+        onDesignationAdded={handleDesignationAdded}
+        addDesignationFn={addDesignation}
       />
     </div>
   )

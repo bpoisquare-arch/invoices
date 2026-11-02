@@ -48,6 +48,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
+import { useDesignations } from '@/lib/hooks/use-designations'
 import { Employee } from '@/types/database.types'
 import { pdf } from '@react-pdf/renderer'
 import PayslipPDFTemplate from '@/components/pdf/payslip-pdf-template'
@@ -297,13 +298,15 @@ export default function PayslipsPage() {
     return Array.from(s).sort()
   }, [employees])
 
+  const { designations: allKnownDesignations } = useDesignations()
+
   const availableDesignations = useMemo(() => {
-    const s = new Set<string>(EMPLOYEE_DESIGNATIONS)
+    const s = new Set<string>(allKnownDesignations)
     employees.forEach((e) => {
       if (e.designation) s.add(e.designation)
     })
-    return Array.from(s).sort()
-  }, [employees])
+    return Array.from(s).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  }, [allKnownDesignations, employees])
 
   // Exact real-time attendance aggregates per employee for the selected month across all calendar days
   const employeeAttendanceStats = useMemo(() => {

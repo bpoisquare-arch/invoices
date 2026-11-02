@@ -64,6 +64,7 @@ import ViewPunchesModal from '@/components/attendance/view-punches-modal'
 import { BranchRequestsModal } from '@/components/attendance/branch-requests-modal'
 import { NotepadDrawer } from '@/components/notepad/notepad-drawer'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
+import { useDesignations } from '@/lib/hooks/use-designations'
 import { cn } from '@/lib/utils'
 import { DataTableViewOptions } from '@/components/ui/data-table-view-options'
 import { DataTableFacetedFilter } from '@/components/ui/data-table-faceted-filter'
@@ -1081,14 +1082,16 @@ export default function AttendanceRecordsPage() {
     fetchRecords()
   }, [startDate, endDate, selectedEmployeeId, arrivalStatus, departureStatus])
 
+  const { designations: allKnownDesignations } = useDesignations()
+
   // Extract distinct designations for dropdown (merging default constants and custom existing)
   const availableDesignations = useMemo(() => {
-    const set = new Set<string>(EMPLOYEE_DESIGNATIONS)
+    const set = new Set<string>(allKnownDesignations)
     employees.forEach((emp) => {
       if (emp.designation?.trim()) set.add(emp.designation.trim())
     })
-    return Array.from(set)
-  }, [employees])
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  }, [allKnownDesignations, employees])
 
   // Extract distinct branches for dropdown
   const availableBranches = useMemo(() => {
