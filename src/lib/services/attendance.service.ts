@@ -1482,9 +1482,7 @@ export async function getEmployeeLeaveBalanceSummary(
     }
   }
 
-  const hasProbationInTargetMonth = targetMonthStr
-    ? probationDates.some((d) => d.startsWith(targetMonthStr))
-    : false
+  const hasProbationInTargetMonth = false
 
   return {
     isProbation,
@@ -1537,31 +1535,26 @@ export async function validateEmployeeLeaveQuotas(
     if (!summary.isProbation) {
       throw new Error('Probation period has completed (> 3 months from joining). Only Annual, Sick, or Casual Leaves can be applied.')
     }
-    if (summary.hasProbationInTargetMonth) {
-      const monthStr = attendanceDate.substring(0, 7)
-      const existingDates = summary.probationDates.filter((d) => d.startsWith(monthStr)).join(', ')
-      throw new Error(`Monthly Limit Exceeded: Only 1 Probation Leave is allowed per calendar month. This employee already has a Probation Leave recorded in ${monthStr} (${existingDates}).`)
-    }
     if (summary.remaining.probation_leaves < requestedValue) {
       throw new Error(`Probation Leaves Quota Exceeded: Only ${summary.remaining.probation_leaves} remaining, but ${requestedValue} day(s) requested.`)
     }
   } else if (isAnnualLeave) {
     if (summary.isProbation) {
-      throw new Error('Employee is currently in 3-month probation period. Only Probation Leaves (max 1/month) can be applied during probation.')
+      throw new Error('Employee is currently in 3-month probation period. Only Probation Leaves can be applied during probation.')
     }
     if (summary.remaining.annual_leaves < requestedValue) {
       throw new Error(`Annual Leaves Quota Exceeded: Only ${summary.remaining.annual_leaves} remaining, but ${requestedValue} day(s) requested.`)
     }
   } else if (isSickLeave) {
     if (summary.isProbation) {
-      throw new Error('Employee is currently in 3-month probation period. Only Probation Leaves (max 1/month) can be applied during probation.')
+      throw new Error('Employee is currently in 3-month probation period. Only Probation Leaves can be applied during probation.')
     }
     if (summary.remaining.sick_leaves < requestedValue) {
       throw new Error(`Sick Leaves Quota Exceeded: Only ${summary.remaining.sick_leaves} remaining, but ${requestedValue} day(s) requested.`)
     }
   } else if (isCasualLeave) {
     if (summary.isProbation) {
-      throw new Error('Employee is currently in 3-month probation period. Only Probation Leaves (max 1/month) can be applied during probation.')
+      throw new Error('Employee is currently in 3-month probation period. Only Probation Leaves can be applied during probation.')
     }
     if (summary.remaining.casual_leaves < requestedValue) {
       throw new Error(`Casual Leaves Quota Exceeded: Only ${summary.remaining.casual_leaves} remaining, but ${requestedValue} day(s) requested.`)

@@ -1082,7 +1082,7 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-600 font-semibold">
-                      {monthlyLeaves.probation} used in {selectedMonthLabel.split(' ')[0]} (Max 1/mo)
+                      {monthlyLeaves.probation} used in {selectedMonthLabel.split(' ')[0]}
                     </span>
                     {(balanceSummary?.remaining.probation_leaves ?? 3) === 0 ? (
                       <Badge variant="destructive" className="text-[9px] px-1 py-0 font-bold">

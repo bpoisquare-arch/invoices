@@ -1114,7 +1114,7 @@ export default function EmployeesPage() {
               </div>
               {showNewProbation ? (
                 <p className="text-[10px] text-slate-500 leading-tight">
-                  Probation leaves apply during 1st 3 months from joining (max 1/month). Standard leaves apply after probation.
+                  Probation leaves apply during 1st 3 months from joining. Standard leaves apply after probation.
                 </p>
               ) : (
                 <p className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">

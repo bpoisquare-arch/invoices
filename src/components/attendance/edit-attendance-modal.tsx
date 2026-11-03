@@ -358,13 +358,6 @@ export default function EditAttendanceModal({
           setError('Employee is in probation period (within 3 months of joining). Only Probation Leaves can be applied.')
           return
         }
-        if (balanceSummary?.hasProbationInTargetMonth) {
-          const monthStr = date.substring(0, 7)
-          setError(
-            `Monthly Limit Exceeded: Only 1 Probation Leave is allowed per calendar month. This employee already has a Probation Leave in ${monthStr}.`
-          )
-          return
-        }
         if ((effectiveRemaining.probation_leaves || 0) < numLeaveDays) {
           setError(
             `Probation Leaves Quota Exceeded: Only ${effectiveRemaining.probation_leaves ?? 0} remaining, but ${numLeaveDays} day(s) requested.`
@@ -684,7 +677,7 @@ export default function EditAttendanceModal({
                   </span>
                 ) : isProbation ? (
                   <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
-                    Probation Active (Max 1/mo, {effectiveQuotas.probation_leaves ?? 3} total)
+                    Probation Active ({effectiveQuotas.probation_leaves ?? 3} total)
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
@@ -695,17 +688,6 @@ export default function EditAttendanceModal({
 
               {isProbation ? (
                 <div className="space-y-2">
-                  {balanceSummary?.hasProbationInTargetMonth && (
-                    <div className="bg-amber-100/90 border border-amber-300 text-amber-900 text-xs p-2.5 rounded-lg flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-bold">Monthly Limit Exceeded for this Month</p>
-                        <p className="text-[11px] text-amber-800">
-                          A Probation Leave is already recorded in this month ({balanceSummary.probationDates.filter(d => d.startsWith(date.substring(0, 7))).join(', ')}). Limit is 1 per calendar month.
-                        </p>
-                      </div>
-                    </div>
-                  )}
 
                   <Select
                     value={selectedLeaveType}
@@ -716,7 +698,7 @@ export default function EditAttendanceModal({
                     </SelectTrigger>
                     <SelectContent className="w-[var(--radix-select-trigger-width)] min-w-[320px]">
                       <SelectItem value="Probation Leaves" disabled={isProbationExhausted} className={`text-xs font-bold text-indigo-950 py-2 ${isProbationExhausted ? 'text-slate-400 opacity-50 cursor-not-allowed' : ''}`}>
-                        Probation Leaves ({effectiveRemaining.probation_leaves ?? 3} remaining / {effectiveQuotas.probation_leaves ?? 3}{isProbationExhausted ? ' • Exhausted (0)' : ' • Max 1/month'})
+                        Probation Leaves ({effectiveRemaining.probation_leaves ?? 3} remaining / {effectiveQuotas.probation_leaves ?? 3}{isProbationExhausted ? ' • Exhausted (0)' : ''})
                       </SelectItem>
                       <SelectItem value="Maternity Leave" className="text-xs font-semibold text-purple-700 py-2">
                         Maternity Leave (No Quota Limit)
