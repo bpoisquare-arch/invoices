@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,7 @@ import {
   AlertCircle,
   Edit2,
   Copy,
+  Check,
   Building2,
   ShieldCheck,
   CreditCard,
@@ -55,6 +56,8 @@ export default function ReportRecordDetailModal({
 }: ReportRecordDetailModalProps) {
   if (!record) return null
 
+  const [copiedField, setCopiedField] = useState<'name' | 'id' | 'email' | null>(null)
+
   const formatAUD = (amount: number | null | undefined) => {
     return new Intl.NumberFormat('en-AU', {
       style: 'currency',
@@ -63,8 +66,15 @@ export default function ReportRecordDetailModal({
     }).format(amount || 0)
   }
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text?: string | null, field?: 'name' | 'id' | 'email') => {
+    if (!text) return
     navigator.clipboard.writeText(text)
+    if (field) {
+      setCopiedField(field)
+      setTimeout(() => {
+        setCopiedField((curr) => (curr === field ? null : curr))
+      }, 1500)
+    }
   }
 
   return (
@@ -73,29 +83,70 @@ export default function ReportRecordDetailModal({
         {/* Header with Deep Navy & Cyan Gradient */}
         <div className="relative bg-gradient-to-r from-[#002D42] via-[#003D5C] to-[#00283d] p-5 sm:p-6 text-white flex items-center justify-between shrink-0 border-b border-[#002D42]">
           <div className="flex items-center gap-3.5">
-            <div className="size-12 rounded-2xl bg-white/10 backdrop-blur-md text-cyan-300 flex items-center justify-center font-extrabold text-sm border border-cyan-400/20 shadow-inner">
+            <div className="size-12 rounded-2xl bg-white/10 backdrop-blur-md text-cyan-300 flex items-center justify-center font-extrabold text-sm border border-cyan-400/20 shadow-inner shrink-0">
               {record.sr_no ? `#${record.sr_no}` : '#'}
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <DialogTitle className="text-xl sm:text-2xl font-extrabold text-white tracking-tight font-['Montserrat']">
-                  {record.student_name}
-                </DialogTitle>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(record.student_name)}
-                  className="p-1 text-cyan-300/70 hover:text-cyan-200 transition-colors cursor-pointer"
-                  title="Copy student name"
-                >
-                  <Copy className="size-3.5" />
-                </button>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <DialogTitle className="text-xl sm:text-2xl font-extrabold text-white tracking-tight font-['Montserrat']">
+                    {record.student_name}
+                  </DialogTitle>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(record.student_name, 'name')}
+                    className="inline-flex items-center justify-center size-7 rounded-lg bg-white/20 hover:bg-white text-white hover:text-[#002D42] border border-white/40 shadow-xs transition-all active:scale-95 cursor-pointer"
+                    title={copiedField === 'name' ? 'Copied name!' : 'Copy student name'}
+                  >
+                    {copiedField === 'name' ? (
+                      <Check className="size-3.5" />
+                    ) : (
+                      <Copy className="size-3.5" />
+                    )}
+                  </button>
+                </div>
+
+                {record.student_id && (
+                  <div className="inline-flex items-center gap-2 bg-white/15 hover:bg-white/20 border border-white/30 px-3 py-1 rounded-xl shadow-xs transition-colors">
+                    <span className="font-mono text-white font-bold text-sm sm:text-base tracking-wide">
+                      ID: {record.student_id}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(record.student_id, 'id')}
+                      className="inline-flex items-center justify-center size-6 rounded-md bg-white/20 hover:bg-white text-white hover:text-[#002D42] border border-white/40 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                      title={copiedField === 'id' ? 'Copied ID!' : 'Copy student ID'}
+                    >
+                      {copiedField === 'id' ? (
+                        <Check className="size-3" />
+                      ) : (
+                        <Copy className="size-3" />
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs">
-                {record.student_id && (
-                  <span className="font-mono text-cyan-300 font-bold bg-cyan-950/60 px-2 py-0.5 rounded-md border border-cyan-500/30">
-                    ID: {record.student_id}
-                  </span>
+              <div className="flex items-center gap-2.5 mt-2 flex-wrap text-xs">
+                {record.email_id?.trim() && (
+                  <div className="inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/20 border border-white/30 px-2.5 py-0.5 rounded-lg shadow-xs transition-colors">
+                    <Mail className="size-3 text-white/80 shrink-0" />
+                    <span className="text-white font-medium text-xs font-mono">
+                      {record.email_id}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(record.email_id, 'email')}
+                      className="inline-flex items-center justify-center size-5 rounded-md bg-white/20 hover:bg-white text-white hover:text-[#002D42] border border-white/40 shadow-2xs transition-all active:scale-95 cursor-pointer ml-0.5"
+                      title={copiedField === 'email' ? 'Copied email!' : 'Copy student email'}
+                    >
+                      {copiedField === 'email' ? (
+                        <Check className="size-2.5" />
+                      ) : (
+                        <Copy className="size-2.5" />
+                      )}
+                    </button>
+                  </div>
                 )}
                 <span className="flex items-center gap-1">
                   <span className="text-slate-300">Status:</span>
