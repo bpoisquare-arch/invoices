@@ -25,6 +25,7 @@ import {
   Edit2,
   Copy,
   Check,
+  X,
   Building2,
   ShieldCheck,
   CreditCard,
@@ -79,7 +80,7 @@ export default function ReportRecordDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[96vw] max-w-4xl lg:max-w-5xl max-h-[92vh] bg-white border border-slate-200/90 text-slate-900 p-0 overflow-hidden shadow-2xl rounded-2xl flex flex-col font-sans">
+      <DialogContent showCloseButton={false} className="w-[96vw] max-w-4xl lg:max-w-5xl max-h-[92vh] bg-white border border-slate-200/90 text-slate-900 p-0 overflow-hidden shadow-2xl rounded-2xl flex flex-col font-sans">
         {/* Header with Deep Navy & Cyan Gradient */}
         <div className="relative bg-gradient-to-r from-[#002D42] via-[#003D5C] to-[#00283d] p-5 sm:p-6 text-white flex items-center justify-between shrink-0 border-b border-[#002D42]">
           <div className="flex items-center gap-3.5">
@@ -185,7 +186,7 @@ export default function ReportRecordDetailModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 shrink-0 ml-4">
             {onEdit && (
               <Button
                 variant="outline"
@@ -194,12 +195,22 @@ export default function ReportRecordDetailModal({
                   onClose()
                   onEdit(record)
                 }}
-                className="border-cyan-400/30 bg-white/10 hover:bg-white/20 text-white h-9 px-3.5 rounded-xl text-xs gap-1.5 font-bold backdrop-blur-xs transition-all cursor-pointer"
+                className="border-cyan-400/30 bg-white/10 hover:bg-white/20 text-white h-9 px-4 rounded-xl text-xs gap-1.5 font-bold backdrop-blur-xs transition-all cursor-pointer shadow-xs active:scale-95"
               >
                 <Edit2 className="size-3.5 text-cyan-300" />
                 <span>Edit Entry</span>
               </Button>
             )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="size-9 rounded-xl bg-white/10 hover:bg-white/25 active:bg-white/35 text-white/90 hover:text-white border border-white/20 hover:border-white/40 flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95"
+              title="Close"
+              aria-label="Close modal"
+            >
+              <X className="size-4.5 stroke-[2.2]" />
+            </button>
           </div>
         </div>
 
