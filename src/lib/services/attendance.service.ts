@@ -346,7 +346,7 @@ async function calculateAllEmployeeUsedLeaves(): Promise<Map<string, {
         if (isWfh) {
           current.wfh_quota += leaveVal
         } else if (isLeave) {
-          if (depStatus.includes('Probation') || arrStatus.includes('Probation')) {
+          if (depStatus.includes('Probation') || arrStatus.includes('Probation') || Boolean(noteStr?.includes('Probation'))) {
             current.probation_leaves += leaveVal
           } else if (depStatus.includes('Annual') || arrStatus.includes('Annual')) {
             current.annual_leaves += leaveVal
@@ -1466,7 +1466,7 @@ export async function getEmployeeLeaveBalanceSummary(
       if (isWfh) {
         used_wfh += leaveVal
       } else if (isLeave) {
-        if (depStatus.includes('Probation') || arrStatus.includes('Probation')) {
+        if (depStatus.includes('Probation') || arrStatus.includes('Probation') || Boolean(noteStr?.includes('Probation'))) {
           used_probation += leaveVal
           if (r.attendance_date) {
             probationDates.push(r.attendance_date.split('T')[0])

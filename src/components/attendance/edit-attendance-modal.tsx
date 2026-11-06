@@ -220,6 +220,7 @@ export default function EditAttendanceModal({
       } else if (
         record.arrival_status === 'Leave' ||
         record.departure_status?.includes('Leave') ||
+        record.departure_status?.includes('Probation') ||
         LEAVE_TYPES.includes(record.departure_status as any) ||
         LEAVE_TYPES.includes(record.arrival_status as any)
       ) {
@@ -227,10 +228,10 @@ export default function EditAttendanceModal({
         const matched = LEAVE_TYPES.find(
           (t) => t === record.departure_status || t === record.arrival_status
         )
-        if (isProb) {
-          setSelectedLeaveType('Probation Leaves')
+        if (isProb || record.departure_status?.includes('Probation') || record.notes?.includes('Probation')) {
+          setSelectedLeaveType('Probation Leave')
         } else {
-          setSelectedLeaveType(matched && matched !== 'Probation Leaves' && matched !== 'Probation Leave' ? matched : 'Casual Leave')
+          setSelectedLeaveType(matched && !matched.includes('Probation') ? matched : 'Casual Leave')
         }
       } else if (
         record.arrival_status === 'Absent' ||
@@ -297,7 +298,7 @@ export default function EditAttendanceModal({
         if (isProbationExhausted) {
           setError('Probation leave quota is exhausted (0 remaining).')
         }
-        setSelectedLeaveType('Probation Leaves')
+        setSelectedLeaveType('Probation Leave')
       } else {
         if (isAllStandardExhausted) {
           setError('All standard leave balances are 0 (Exhausted).')
@@ -327,8 +328,8 @@ export default function EditAttendanceModal({
       setOutTime(wfh.outTime)
     } else if (attendanceStatus === 'leave') {
       if (prob.isProbation) {
-        setSelectedLeaveType('Probation Leaves')
-      } else if (selectedLeaveType === 'Probation Leaves' || selectedLeaveType === 'Probation Leave') {
+        setSelectedLeaveType('Probation Leave')
+      } else if (selectedLeaveType.includes('Probation')) {
         setSelectedLeaveType('Casual Leave')
       }
     }
@@ -354,7 +355,7 @@ export default function EditAttendanceModal({
     // Validation 1: Probation Rule Enforcement
     if (attendanceStatus === 'leave' && selectedLeaveType !== 'Maternity Leave') {
       if (isProbation) {
-        if (selectedLeaveType !== 'Probation Leaves' && selectedLeaveType !== 'Probation Leave') {
+        if (!selectedLeaveType.includes('Probation')) {
           setError('Employee is in probation period (within 3 months of joining). Only Probation Leaves can be applied.')
           return
         }
@@ -365,7 +366,7 @@ export default function EditAttendanceModal({
           return
         }
       } else {
-        if (selectedLeaveType === 'Probation Leaves' || selectedLeaveType === 'Probation Leave') {
+        if (selectedLeaveType.includes('Probation')) {
           setError('Probation period has ended (3 months completed). Please select Annual, Sick, or Casual Leave.')
           return
         }
@@ -400,11 +401,12 @@ export default function EditAttendanceModal({
         payloadOutTime = null
         payloadNotes = null
       } else if (attendanceStatus === 'leave') {
+        const finalLeaveName = selectedLeaveType.includes('Probation') ? 'Probation Leave' : selectedLeaveType
         payloadArrivalStatus = 'Leave'
-        payloadDepartureStatus = selectedLeaveType
+        payloadDepartureStatus = finalLeaveName
         payloadInTime = null
         payloadOutTime = null
-        payloadNotes = `${selectedLeaveType} (${numLeaveDays} day${numLeaveDays === 1 ? '' : 's'})`
+        payloadNotes = `${finalLeaveName} (${numLeaveDays} day${numLeaveDays === 1 ? '' : 's'})`
       } else if (attendanceStatus === 'wfh') {
         payloadInTime = wfhTimes.inTime
         payloadOutTime = wfhTimes.outTime
@@ -690,15 +692,15 @@ export default function EditAttendanceModal({
                 <div className="space-y-2">
 
                   <Select
-                    value={selectedLeaveType}
-                    onValueChange={(val) => setSelectedLeaveType(val || 'Probation Leaves')}
+                    value={selectedLeaveType.includes('Probation') ? 'Probation Leave' : selectedLeaveType}
+                    onValueChange={(val) => setSelectedLeaveType(val || 'Probation Leave')}
                   >
                     <SelectTrigger className="w-full text-xs bg-white border-amber-300 font-bold text-amber-950 h-10 px-3">
                       <SelectValue placeholder="Select Leave Type" />
                     </SelectTrigger>
                     <SelectContent className="w-[var(--radix-select-trigger-width)] min-w-[320px]">
-                      <SelectItem value="Probation Leaves" disabled={isProbationExhausted} className={`text-xs font-bold text-indigo-950 py-2 ${isProbationExhausted ? 'text-slate-400 opacity-50 cursor-not-allowed' : ''}`}>
-                        Probation Leaves ({effectiveRemaining.probation_leaves ?? 3} remaining / {effectiveQuotas.probation_leaves ?? 3}{isProbationExhausted ? ' • Exhausted (0)' : ''})
+                      <SelectItem value="Probation Leave" disabled={isProbationExhausted} className={`text-xs font-bold text-indigo-950 py-2 ${isProbationExhausted ? 'text-slate-400 opacity-50 cursor-not-allowed' : ''}`}>
+                        Probation Leave ({effectiveRemaining.probation_leaves ?? 3} remaining / {effectiveQuotas.probation_leaves ?? 3}{isProbationExhausted ? ' • Exhausted (0)' : ''})
                       </SelectItem>
                       <SelectItem value="Maternity Leave" className="text-xs font-semibold text-purple-700 py-2">
                         Maternity Leave (No Quota Limit)
@@ -721,7 +723,7 @@ export default function EditAttendanceModal({
               ) : (
                 <div className="space-y-1.5">
                   <Select
-                    value={selectedLeaveType === 'Probation Leaves' ? 'Casual Leave' : selectedLeaveType}
+                    value={selectedLeaveType.includes('Probation') ? 'Casual Leave' : selectedLeaveType}
                     onValueChange={(val) => setSelectedLeaveType(val || 'Casual Leave')}
                   >
                     <SelectTrigger className="w-full text-xs bg-white border-indigo-300 font-bold text-indigo-950 h-10 px-3">
@@ -743,7 +745,7 @@ export default function EditAttendanceModal({
                     </SelectContent>
                   </Select>
                   <p className="text-[11px] text-indigo-700">
-                    Employee recorded under <span className="font-bold">{selectedLeaveType === 'Probation Leaves' ? 'Casual Leave' : selectedLeaveType}</span> (Paid approved leave).
+                    Employee recorded under <span className="font-bold">{selectedLeaveType.includes('Probation') ? 'Casual Leave' : selectedLeaveType}</span> (Paid approved leave).
                   </p>
                 </div>
               )}

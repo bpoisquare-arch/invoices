@@ -295,8 +295,8 @@ export default function EmployeeDetailPage({ params }: PageProps) {
           existing?.arrival_status === 'Work From Home' ||
           existing?.departure_status === 'Work From Home' ||
           existing?.notes?.includes('Work From Home') ||
-          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(existing?.departure_status as any) ||
-          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(existing?.arrival_status as any)
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave', 'Half Day'].includes(existing?.departure_status as any) ||
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave', 'Half Day'].includes(existing?.arrival_status as any)
 
         const isBeforeJoining = Boolean(
           !currentEmp?.is_old_staff &&
@@ -608,8 +608,8 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         const isLeave =
           r.arrival_status === 'Leave' ||
           (r.departure_status || '').includes('Leave') ||
-          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(r.departure_status as any) ||
-          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Gazetted Leave', 'Half Day'].includes(r.arrival_status as any)
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave', 'Half Day'].includes(r.departure_status as any) ||
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave', 'Half Day'].includes(r.arrival_status as any)
 
         const isNeutralPlaceholder = r.arrival_status === '--' || r.departure_status === '--'
 
@@ -1585,9 +1585,17 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                         }
                         className="text-[11px] font-bold uppercase tracking-wider"
                       >
-                        {record.departure_status?.toLowerCase().includes('leave') && record.notes?.includes('day')
-                          ? record.notes
-                          : record.departure_status}
+                        {(() => {
+                          const dep = record.departure_status || ''
+                          const notes = record.notes || ''
+                          if (dep.includes('Probation') || notes.includes('Probation')) {
+                            return notes && notes.includes('day') ? notes.replace(/Leaves/g, 'Leave') : 'Probation Leave'
+                          }
+                          if (dep.toLowerCase().includes('leave') && notes.includes('day')) {
+                            return notes
+                          }
+                          return dep
+                        })()}
                       </Badge>
                     )}
                   </TableCell>
