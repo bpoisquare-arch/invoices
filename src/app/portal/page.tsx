@@ -86,6 +86,15 @@ const ENTITIES: EntityPortal[] = [
     route: '/stc/installments',
     tag: 'Higher Education & VET',
   },
+  {
+    id: 'lahori-lounge',
+    name: 'The Lahori Lounge',
+    prefix: 'TLL',
+    subtitle: 'Restaurant & Hospitality',
+    logo: '/Lahori Lounge.png',
+    route: '/lahori-lounge/payslips',
+    tag: 'Hospitality & Dining',
+  },
 ]
 
 export default function EntityPortalPage() {

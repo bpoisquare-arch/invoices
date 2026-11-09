@@ -128,6 +128,16 @@ const ENTITIES: EntityItem[] = [
     route: '/stc/installments',
     shortcut: '⌘6',
   },
+  {
+    id: 'lahori-lounge',
+    name: 'The Lahori Lounge',
+    shortName: 'Lahori Lounge',
+    subtitle: 'Restaurant & Hospitality',
+    prefix: 'TLL',
+    logo: '/Lahori Lounge.png',
+    route: '/lahori-lounge/payslips',
+    shortcut: '⌘7',
+  },
 ]
 
 export default function AppSidebar() {
@@ -153,7 +163,10 @@ export default function AppSidebar() {
       return
     }
 
-    if (pathname.startsWith('/stc')) {
+    if (pathname.startsWith('/lahori-lounge')) {
+      setActiveEntity('lahori-lounge')
+      if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'lahori-lounge')
+    } else if (pathname.startsWith('/stc')) {
       setActiveEntity('stc')
       if (typeof window !== 'undefined') localStorage.setItem('active_entity', 'stc')
     } else if (pathname.startsWith('/edlink')) {
@@ -169,7 +182,11 @@ export default function AppSidebar() {
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search)
         const entityParam = urlParams.get('entity') || urlParams.get('company')
-        if (entityParam === 'nsc') {
+        if (entityParam === 'lahori-lounge' || entityParam === 'tll') {
+          setActiveEntity('lahori-lounge')
+          localStorage.setItem('active_entity', 'lahori-lounge')
+          return
+        } else if (entityParam === 'nsc') {
           setActiveEntity('nsc')
           localStorage.setItem('active_entity', 'nsc')
           return
@@ -188,7 +205,8 @@ export default function AppSidebar() {
         }
 
         const stored = localStorage.getItem('active_entity')
-        if (stored === 'stc') setActiveEntity('stc')
+        if (stored === 'lahori-lounge') setActiveEntity('lahori-lounge')
+        else if (stored === 'stc') setActiveEntity('stc')
         else if (stored === 'aimt') setActiveEntity('aimt')
         else if (stored === 'edlink-au') setActiveEntity('edlink-au')
         else if (stored === 'nsc') setActiveEntity('nsc')
@@ -241,7 +259,8 @@ export default function AppSidebar() {
       } else if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search)
         const entityParam = urlParams.get('entity') || urlParams.get('company')
-        if (entityParam === 'nsc') setActiveEntity('nsc')
+        if (entityParam === 'lahori-lounge' || entityParam === 'tll') setActiveEntity('lahori-lounge')
+        else if (entityParam === 'nsc') setActiveEntity('nsc')
         else if (entityParam === 'isq' || entityParam === 'isquare-bpo') setActiveEntity('isquare-bpo')
         else if (entityParam === 'edlink' || entityParam === 'edlink-au') setActiveEntity('edlink-au')
         else if (entityParam === 'anonymous' || entityParam === 'edlink-pk') setActiveEntity('edlink-pk')
@@ -282,6 +301,7 @@ export default function AppSidebar() {
     router.push(entity.route)
   }
 
+  const isLahoriLoungePayslipsActive = pathname.startsWith('/lahori-lounge/payslips')
   const isInvoiceActive =
     pathname.startsWith('/invoices') || pathname.startsWith('/companies')
 
@@ -296,6 +316,7 @@ export default function AppSidebar() {
   const isStcPayslipsActive = pathname.startsWith('/stc/payslips')
   const isStcReportsActive = pathname.startsWith('/stc/reports')
 
+  const [lahoriLoungePayslipsOpen, setLahoriLoungePayslipsOpen] = useState(true)
   const [invoicesOpen, setInvoicesOpen] = useState(true)
   const [payrollOpen, setPayrollOpen] = useState(true)
   const [installmentsOpen, setInstallmentsOpen] = useState(true)
@@ -305,6 +326,10 @@ export default function AppSidebar() {
   const [stcInstallmentsOpen, setStcInstallmentsOpen] = useState(true)
   const [stcPayslipsOpen, setStcPayslipsOpen] = useState(true)
   const [stcReportsOpen, setStcReportsOpen] = useState(true)
+
+  useEffect(() => {
+    if (isLahoriLoungePayslipsActive) setLahoriLoungePayslipsOpen(true)
+  }, [isLahoriLoungePayslipsActive])
 
   useEffect(() => {
     if (isInvoiceActive) setInvoicesOpen(true)
@@ -342,14 +367,15 @@ export default function AppSidebar() {
     if (isStcReportsActive) setStcReportsOpen(true)
   }, [isStcReportsActive])
 
-  const isStc = activeEntity === 'stc' || pathname.startsWith('/stc')
-  const isEdLinkAu = !isStc && (activeEntity === 'edlink-au' || pathname.startsWith('/edlink'))
-  const isAimt = !isStc && !isEdLinkAu && (activeEntity === 'aimt' || pathname.startsWith('/installments') || pathname.startsWith('/payslips') || pathname.startsWith('/reports'))
-  const isEdLinkPk = !isStc && !isAimt && !isEdLinkAu && (activeEntity === 'edlink-pk' || pathname.startsWith('/attendance'))
+  const isLahoriLounge = activeEntity === 'lahori-lounge' || pathname.startsWith('/lahori-lounge')
+  const isStc = !isLahoriLounge && (activeEntity === 'stc' || pathname.startsWith('/stc'))
+  const isEdLinkAu = !isLahoriLounge && !isStc && (activeEntity === 'edlink-au' || pathname.startsWith('/edlink'))
+  const isAimt = !isLahoriLounge && !isStc && !isEdLinkAu && (activeEntity === 'aimt' || pathname.startsWith('/installments') || pathname.startsWith('/payslips') || pathname.startsWith('/reports'))
+  const isEdLinkPk = !isLahoriLounge && !isStc && !isAimt && !isEdLinkAu && (activeEntity === 'edlink-pk' || pathname.startsWith('/attendance'))
 
   const currentEntityObj =
     ENTITIES.find((e) => e.id === activeEntity) ||
-    (isStc ? ENTITIES[5] : isAimt ? ENTITIES[2] : isEdLinkAu ? ENTITIES[1] : ENTITIES[0])
+    (isLahoriLounge ? ENTITIES[6] : isStc ? ENTITIES[5] : isAimt ? ENTITIES[2] : isEdLinkAu ? ENTITIES[1] : ENTITIES[0])
 
   return (
     <Sidebar
@@ -456,7 +482,75 @@ export default function AppSidebar() {
 
       {/* 2. Main Navigation Content */}
       <SidebarContent className="px-3 py-4 space-y-4 overflow-y-auto bg-[#001E2F]">
-        {isStc ? (
+        {isLahoriLounge ? (
+          /* =========================================================================
+             THE LAHORI LOUNGE ENTITY: Payslips Module
+             ========================================================================= */
+          <>
+            <SidebarGroup className="p-0">
+              <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#81F5F5]/70 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
+                Payslips
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <Collapsible
+                    open={lahoriLoungePayslipsOpen}
+                    onOpenChange={setLahoriLoungePayslipsOpen}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton
+                            tooltip="Payslips"
+                            className={`text-[13px] font-medium transition-all hover:bg-[#0E3E5B]/80 hover:text-white rounded-lg px-2.5 py-2 ${
+                              isLahoriLoungePayslipsActive
+                                ? 'text-[#81F5F5] bg-[#0E3E5B]'
+                                : 'text-slate-300'
+                            }`}
+                          />
+                        }
+                      >
+                        <Banknote className="size-4 shrink-0 text-[#81F5F5]" />
+                        <span className="font-semibold text-slate-200">Payslips</span>
+                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
+                          {/* Generate Payslip - Admin Only */}
+                          {!isViewer && (
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                render={<Link href="/lahori-lounge/payslips/new" onClick={handleNavClick} />}
+                                isActive={pathname === '/lahori-lounge/payslips/new'}
+                                className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                              >
+                                <PlusCircle className="size-3.5 shrink-0" />
+                                <span>Generate Payslip</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          )}
+
+                          {/* All Payslips */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/lahori-lounge/payslips" onClick={handleNavClick} />}
+                              isActive={pathname === '/lahori-lounge/payslips'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <FileText className="size-3.5 shrink-0" />
+                              <span>All Payslips</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        ) : isStc ? (
           /* =========================================================================
              STC ENTITY: States College Australia Installments Module
              ========================================================================= */
