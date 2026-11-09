@@ -65,7 +65,8 @@ import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
 import { useDesignations } from '@/lib/hooks/use-designations'
 import AddDesignationModal from '@/components/attendance/add-designation-modal'
 import { SearchableCombobox } from '@/components/ui/combobox'
-import { Employee } from '@/types/database.types'
+import { Employee, DEFAULT_WORK_DAYS } from '@/types/database.types'
+import { WorkingDaysSelector } from '@/components/attendance/working-days-selector'
 
 const BRANCHES = ['Lahore', 'Multan', 'Onshore', 'AIMT']
 
@@ -125,6 +126,7 @@ export default function EmployeesPage() {
   const [newJoiningDate, setNewJoiningDate] = useState(todayStr)
   const [newIsOldStaff, setNewIsOldStaff] = useState(false)
   const [newIsAttendanceExempt, setNewIsAttendanceExempt] = useState(false)
+  const [newWorkDays, setNewWorkDays] = useState<string[]>(DEFAULT_WORK_DAYS)
   const [newSalary, setNewSalary] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [addWarning, setAddWarning] = useState<string | null>(null)
@@ -140,6 +142,7 @@ export default function EmployeesPage() {
   const [editJoiningDate, setEditJoiningDate] = useState(todayStr)
   const [editIsOldStaff, setEditIsOldStaff] = useState(false)
   const [editIsAttendanceExempt, setEditIsAttendanceExempt] = useState(false)
+  const [editWorkDays, setEditWorkDays] = useState<string[]>(DEFAULT_WORK_DAYS)
   const [editSalary, setEditSalary] = useState('')
   const [editActive, setEditActive] = useState(true)
   const [editError, setEditError] = useState<string | null>(null)
@@ -234,6 +237,7 @@ export default function EmployeesPage() {
           joining_date: newIsOldStaff ? null : newJoiningDate,
           is_old_staff: newIsOldStaff,
           is_attendance_exempt: newIsAttendanceExempt,
+          work_days: newWorkDays,
           salary: newSalary ? Number(newSalary) : null,
           leave_quotas: {
             annual_leaves: Number(newAnnualLeaves) || 0,
@@ -259,6 +263,7 @@ export default function EmployeesPage() {
       setNewJoiningDate(todayStr)
       setNewIsOldStaff(false)
       setNewIsAttendanceExempt(false)
+      setNewWorkDays(DEFAULT_WORK_DAYS)
       setNewSalary('')
       setNewAnnualLeaves(6)
       setNewSickLeaves(7)
@@ -311,6 +316,7 @@ export default function EmployeesPage() {
           is_attendance_exempt: editIsAttendanceExempt,
           salary: targetSalary,
           is_active: editActive,
+          work_days: editWorkDays,
           leave_quotas,
         }),
       })
@@ -337,6 +343,7 @@ export default function EmployeesPage() {
                 is_attendance_exempt: editIsAttendanceExempt,
                 salary: targetSalary,
                 is_active: editActive,
+                work_days: editWorkDays,
               }
             : emp
         )
@@ -361,6 +368,7 @@ export default function EmployeesPage() {
     setEditBranch(emp.branch || 'Multan')
     setEditIsOldStaff(isOld)
     setEditIsAttendanceExempt(Boolean(emp.is_attendance_exempt))
+    setEditWorkDays(Array.isArray(emp.work_days) && emp.work_days.length > 0 ? emp.work_days : DEFAULT_WORK_DAYS)
     const rawDate = emp.joining_date || (!isOld ? emp.created_at : null)
     setEditJoiningDate(rawDate ? rawDate.split('T')[0] : todayStr)
     setEditSalary(emp.salary !== undefined && emp.salary !== null ? String(emp.salary) : '')
@@ -702,6 +710,11 @@ export default function EmployeesPage() {
                               ⚡ Fixed Full Salary
                             </span>
                           )}
+                          {Array.isArray(emp.work_days) && emp.work_days.length > 0 && emp.work_days.length < 6 && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-800 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded" title={emp.work_days.join(', ')}>
+                              🗓️ {emp.work_days.length} Days/wk
+                            </span>
+                          )}
                         </div>
                       </TableCell>
 
@@ -1033,6 +1046,9 @@ export default function EmployeesPage() {
                 </button>
               </div>
             </div>
+
+            {/* Custom Working Days Selector */}
+            <WorkingDaysSelector value={newWorkDays} onChange={setNewWorkDays} />
 
             {/* Initial Remaining Leave Quotas Section */}
             <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3 space-y-2">
@@ -1380,6 +1396,9 @@ export default function EmployeesPage() {
                 </button>
               </div>
             </div>
+
+            {/* Custom Working Days Selector */}
+            <WorkingDaysSelector value={editWorkDays} onChange={setEditWorkDays} />
 
             {/* Locked Remaining Leave Balances Section */}
             <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3 space-y-2">

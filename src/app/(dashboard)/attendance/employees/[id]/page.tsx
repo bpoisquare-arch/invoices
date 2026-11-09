@@ -54,6 +54,7 @@ import {
   AttendanceSettings,
   Employee,
   EmployeeLeaveQuotas,
+  DEFAULT_WORK_DAYS,
 } from '@/types/database.types'
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
@@ -282,6 +283,8 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         const dayName = dayNames[cur.getDay()]
         const isSunday = cur.getDay() === 0
         const isGazettedHoliday = Boolean(holMap[dStr])
+        const workDays = (Array.isArray(employee?.work_days) && employee.work_days.length > 0) ? employee.work_days : DEFAULT_WORK_DAYS
+        const isScheduledOffDay = !workDays.includes(dayName)
 
         const existing = recordsByDate.get(dStr)
 
@@ -321,6 +324,14 @@ export default function EmployeeDetailPage({ params }: PageProps) {
               total_working_minutes: 0,
               total_working_hours_formatted: '00:00',
             })
+          } else if (isScheduledOffDay && !hasPunches && !isExplicitLeaveOrWfh) {
+            fullGridRows.push({
+              ...existing,
+              arrival_status: 'Off Day',
+              departure_status: `${dayName} Off Day`,
+              total_working_minutes: 0,
+              total_working_hours_formatted: '00:00',
+            })
           } else {
             fullGridRows.push(existing)
           }
@@ -351,6 +362,23 @@ export default function EmployeeDetailPage({ params }: PageProps) {
             out_time: null,
             arrival_status: isGazettedHoliday ? 'Gazetted Holiday' : 'Holiday',
             departure_status: isGazettedHoliday ? (holMap[dStr] ? `Gazetted Holiday (${holMap[dStr]})` : 'Gazetted Holiday') : 'Sunday Holiday',
+            total_working_minutes: 0,
+            total_working_hours_formatted: '00:00',
+            raw_punches: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            employee: currentEmp || undefined,
+          } as any)
+        } else if (isScheduledOffDay) {
+          fullGridRows.push({
+            id: `offday-${dStr}`,
+            employee_id: currentEmp?.id || employeeId,
+            attendance_date: dStr,
+            day_of_week: dayName,
+            in_time: null,
+            out_time: null,
+            arrival_status: 'Off Day',
+            departure_status: `${dayName} Off Day`,
             total_working_minutes: 0,
             total_working_hours_formatted: '00:00',
             raw_punches: [],
@@ -583,8 +611,11 @@ export default function EmployeeDetailPage({ params }: PageProps) {
       let future = 0
 
       list.forEach((r) => {
-        const isSunday = (r.day_of_week || '').toLowerCase() === 'sunday'
+        const dayName = r.day_of_week || ''
+        const isSunday = dayName.toLowerCase() === 'sunday'
         const isGazettedHoliday = Boolean(r.attendance_date && holidays[r.attendance_date.split('T')[0]])
+        const workDays = (Array.isArray(employee?.work_days) && employee.work_days.length > 0) ? employee.work_days : DEFAULT_WORK_DAYS
+        const isScheduledOffDay = !workDays.includes(dayName)
         const hasPunches =
           Boolean(r.in_time && r.in_time !== '---') ||
           Boolean(r.out_time && r.out_time !== '---') ||
@@ -593,12 +624,17 @@ export default function EmployeeDetailPage({ params }: PageProps) {
         const isHoliday =
           (isSunday && !hasPunches) ||
           (isGazettedHoliday && !hasPunches) ||
+          (isScheduledOffDay && !hasPunches) ||
           r.arrival_status === 'Holiday' ||
           r.arrival_status === 'Gazetted Holiday' ||
+          r.arrival_status === 'Off Day' ||
           r.arrival_status?.toLowerCase().includes('holiday') ||
+          r.arrival_status?.toLowerCase().includes('off day') ||
           r.departure_status === 'Holiday' ||
           r.departure_status === 'Gazetted Holiday' ||
-          r.departure_status?.toLowerCase().includes('holiday')
+          r.departure_status === 'Off Day' ||
+          r.departure_status?.toLowerCase().includes('holiday') ||
+          r.departure_status?.toLowerCase().includes('off day')
 
         const isWfh =
           r.departure_status === 'Work From Home' ||
@@ -773,6 +809,9 @@ export default function EmployeeDetailPage({ params }: PageProps) {
                 className="text-xs font-bold"
               >
                 {employee?.branch || 'Multan'} Branch
+              </Badge>
+              <Badge variant="outline" className="text-xs font-semibold bg-sky-50 text-sky-800 border-sky-200">
+                🗓️ {(Array.isArray(employee?.work_days) && employee.work_days.length > 0 ? employee.work_days : DEFAULT_WORK_DAYS).map((d: string) => d.slice(0, 3)).join(', ')}
               </Badge>
             </div>
             <p className="text-sm font-semibold text-slate-500 mt-0.5">

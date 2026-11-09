@@ -392,8 +392,8 @@ export default function StcReportsPage() {
             <span>Refresh Data</span>
           </Button>
 
-          {/* Import Excel - Temporarily Hidden */}
-          {/* {!isViewer && (
+          {/* Import Excel */}
+          {!isViewer && (
             <Button
               size="sm"
               onClick={() => setIsUploadModalOpen(true)}
@@ -403,7 +403,7 @@ export default function StcReportsPage() {
               <UploadCloud className="size-4 text-[#001E2F]" />
               <span>Import Excel</span>
             </Button>
-          )} */}
+          )}
         </div>
       </div>
 
@@ -423,7 +423,7 @@ export default function StcReportsPage() {
         selectedIds={selectedIds}
         onSelectChange={setSelectedIds}
         onViewRecord={handleViewRecord}
-        onImportExcel={undefined}
+        onImportExcel={isViewer ? undefined : () => setIsUploadModalOpen(true)}
         onAddEntry={
           isViewer
             ? undefined

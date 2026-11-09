@@ -49,7 +49,7 @@ import {
 } from '@/components/ui/dialog'
 import { EMPLOYEE_DESIGNATIONS } from '@/lib/constants/designations'
 import { useDesignations } from '@/lib/hooks/use-designations'
-import { Employee } from '@/types/database.types'
+import { Employee, DEFAULT_WORK_DAYS } from '@/types/database.types'
 import { pdf } from '@react-pdf/renderer'
 import PayslipPDFTemplate from '@/components/pdf/payslip-pdf-template'
 import EmployeeCommissionModal from '@/components/attendance/employee-commission-modal'
@@ -409,6 +409,10 @@ export default function PayslipsPage() {
         const isSunday = dateObj.getDay() === 0
         const isGazettedHoliday = Boolean(holidays[dStr])
         const isFuture = dStr > todayStr
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        const dayName = dayNames[dateObj.getDay()]
+        const workDays = (Array.isArray(emp.work_days) && emp.work_days.length > 0) ? emp.work_days : DEFAULT_WORK_DAYS
+        const isScheduledOffDay = !workDays.includes(dayName)
         const isBeforeJoining =
           !emp.is_old_staff && emp.joining_date
             ? dStr < emp.joining_date.split('T')[0]
@@ -508,8 +512,8 @@ export default function PayslipsPage() {
           alDays += leaveVal
         } else if (hasPunches) {
           presentDays += 1
-        } else if (isExplicitHoliday) {
-          // Paid Sunday or Paid Gazetted Holiday on/after joining date (not absent)
+        } else if (isExplicitHoliday || isScheduledOffDay || arrStatus === 'Off Day' || depStatus === 'Off Day') {
+          // Paid Sunday, Paid Gazetted Holiday, or Employee's Scheduled Off Day on/after joining date (not absent, not unpaid)
         } else if (isFuture || arrStatus === '--' || depStatus === '--') {
           // Future day or neutral placeholder
         } else {

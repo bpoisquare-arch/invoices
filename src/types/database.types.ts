@@ -93,6 +93,27 @@ export interface InvoiceWithDetails extends Omit<Invoice, 'template_snapshot'> {
   invoice_items: InvoiceItem[]
 }
 
+export const DAYS_OF_WEEK = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+] as const
+
+export type DayOfWeek = typeof DAYS_OF_WEEK[number]
+
+export const DEFAULT_WORK_DAYS: string[] = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+]
+
 export interface EmployeeLeaveQuotas {
   annual_leaves?: number
   sick_leaves?: number
@@ -115,6 +136,7 @@ export interface Employee {
   is_attendance_exempt?: boolean | null
   email?: string | null
   bank_account_no?: string | null
+  work_days?: string[]
   leave_quotas?: EmployeeLeaveQuotas
   base_leave_quotas?: EmployeeLeaveQuotas
   is_active: boolean

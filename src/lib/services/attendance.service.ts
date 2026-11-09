@@ -1,9 +1,21 @@
 import { prisma } from '@/lib/prisma'
+import { DEFAULT_WORK_DAYS } from '@/types/database.types'
 
 export function toEmployeeModel(emp: any): Employee {
   const joiningStr = emp.joiningDate
     ? (emp.joiningDate instanceof Date ? emp.joiningDate.toISOString().slice(0, 10) : String(emp.joiningDate).slice(0, 10))
     : (emp.joining_date || null)
+
+  let workDays: string[] = DEFAULT_WORK_DAYS
+  const rawWorkDays = emp.workDays ?? emp.work_days
+  if (Array.isArray(rawWorkDays) && rawWorkDays.length > 0) {
+    workDays = rawWorkDays
+  } else if (typeof rawWorkDays === 'string') {
+    try {
+      const parsed = JSON.parse(rawWorkDays)
+      if (Array.isArray(parsed) && parsed.length > 0) workDays = parsed
+    } catch {}
+  }
 
   return {
     id: emp.id,
@@ -19,6 +31,7 @@ export function toEmployeeModel(emp: any): Employee {
     joining_date: joiningStr,
     is_old_staff: Boolean(emp.isOldStaff ?? emp.is_old_staff),
     is_attendance_exempt: Boolean(emp.isAttendanceExempt ?? emp.is_attendance_exempt),
+    work_days: workDays,
     leave_quotas: emp.leaveQuotas ?? emp.leave_quotas ?? DEFAULT_ATTENDANCE_SETTINGS,
     is_active: Boolean(emp.isActive ?? emp.is_active ?? true),
     created_at: emp.createdAt instanceof Date ? emp.createdAt.toISOString() : (emp.created_at || new Date().toISOString()),
@@ -219,7 +232,7 @@ export async function getEmployeeMetadataMap(): Promise<Record<string, EmployeeM
 
 export async function saveEmployeeMetadata(
   idOrEmpId: string,
-  meta: { branch?: string | null; salary?: number | null; joining_date?: string | null; is_old_staff?: boolean | null; is_attendance_exempt?: boolean | null; email?: string | null; bank_account_no?: string | null; leave_quotas?: EmployeeLeaveQuotas }
+  meta: { branch?: string | null; salary?: number | null; joining_date?: string | null; is_old_staff?: boolean | null; is_attendance_exempt?: boolean | null; email?: string | null; bank_account_no?: string | null; work_days?: string[]; leave_quotas?: EmployeeLeaveQuotas }
 ): Promise<void> {
   // 1. Write immediately to server-side in-memory & file store
   writeEmployeeMetadata(idOrEmpId, meta)
@@ -241,6 +254,7 @@ export async function saveEmployeeMetadata(
       joining_date: joiningDateVal || undefined,
       is_old_staff: isOldStaffVal,
       is_attendance_exempt: isExemptVal,
+      ...(meta.work_days !== undefined ? { work_days: meta.work_days } : {}),
       ...(meta.leave_quotas !== undefined ? { leave_quotas: meta.leave_quotas } : {}),
     }
 
@@ -421,6 +435,17 @@ export async function getEmployees(params?: {
       const rawJoining = emp.joining_date || meta.joining_date || null
       const cleanJoining = isOldStaff ? null : (rawJoining ? rawJoining.split('T')[0] : null)
 
+      const rawWorkDays = emp.work_days ?? meta.work_days
+      let workDays: string[] = DEFAULT_WORK_DAYS
+      if (Array.isArray(rawWorkDays) && rawWorkDays.length > 0) {
+        workDays = rawWorkDays
+      } else if (typeof rawWorkDays === 'string') {
+        try {
+          const parsed = JSON.parse(rawWorkDays)
+          if (Array.isArray(parsed) && parsed.length > 0) workDays = parsed
+        } catch {}
+      }
+
       return {
         ...emp,
         email: emp.email || meta.email || null,
@@ -431,6 +456,7 @@ export async function getEmployees(params?: {
         joining_date: cleanJoining,
         is_old_staff: isOldStaff,
         is_attendance_exempt: isAttendanceExempt,
+        work_days: workDays,
         leave_quotas: {
           annual_leaves: Math.max(0, Number((initialAnn - used.annual_leaves).toFixed(2))),
           sick_leaves: Math.max(0, Number((initialSick - used.sick_leaves).toFixed(2))),
@@ -518,6 +544,17 @@ export async function getEmployeeById(idOrEmpId: string): Promise<Employee | nul
     const rawJoining = data.joining_date || meta.joining_date || null
     const cleanJoining = isOldStaff ? null : (rawJoining ? rawJoining.split('T')[0] : null)
 
+    const rawWorkDays = data.work_days ?? meta.work_days
+    let workDays: string[] = DEFAULT_WORK_DAYS
+    if (Array.isArray(rawWorkDays) && rawWorkDays.length > 0) {
+      workDays = rawWorkDays
+    } else if (typeof rawWorkDays === 'string') {
+      try {
+        const parsed = JSON.parse(rawWorkDays)
+        if (Array.isArray(parsed) && parsed.length > 0) workDays = parsed
+      } catch {}
+    }
+
     return {
       ...data,
       email: data.email || meta.email || null,
@@ -528,6 +565,7 @@ export async function getEmployeeById(idOrEmpId: string): Promise<Employee | nul
       joining_date: cleanJoining,
       is_old_staff: isOldStaff,
       is_attendance_exempt: isAttendanceExempt,
+      work_days: workDays,
       leave_quotas: {
         annual_leaves: Math.max(0, Number((initialAnn - used.annual_leaves).toFixed(2))),
         sick_leaves: Math.max(0, Number((initialSick - used.sick_leaves).toFixed(2))),
@@ -611,6 +649,7 @@ export async function createEmployee(params: {
   is_old_staff?: boolean | null
   is_attendance_exempt?: boolean | null
   bank_account_no?: string | null
+  work_days?: string[]
   leave_quotas?: EmployeeLeaveQuotas
 }): Promise<{ employee: Employee; warning?: string }> {
   const name = params.name.trim()
@@ -621,6 +660,7 @@ export async function createEmployee(params: {
   const salary = params.salary !== undefined && params.salary !== null && params.salary !== '' ? Number(params.salary) : null
   const isOldStaff = Boolean(params.is_old_staff)
   const isAttendanceExempt = Boolean(params.is_attendance_exempt)
+  const workDays = (Array.isArray(params.work_days) && params.work_days.length > 0) ? params.work_days : DEFAULT_WORK_DAYS
   const joiningDate = isOldStaff ? null : (params.joining_date && params.joining_date.trim() ? params.joining_date.trim() : new Date().toISOString().split('T')[0])
   const normalizedName = normalizeEmployeeName(name)
   const probationEligible = isWithinProbation(joiningDate, isOldStaff)
@@ -660,9 +700,10 @@ export async function createEmployee(params: {
         joiningDate: joiningDate ? new Date(joiningDate) : null,
         isOldStaff,
         isAttendanceExempt,
+        workDays: workDays as any,
         leaveQuotas: leaveQuotas as any,
         isActive: true,
-      },
+      } as any,
     })
     if (created) {
       data = toEmployeeModel(created)
@@ -672,15 +713,23 @@ export async function createEmployee(params: {
   }
 
   if (data) {
-    await saveEmployeeMetadata(data.id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, is_attendance_exempt: isAttendanceExempt, email, bank_account_no: bankAccountNo, leave_quotas: leaveQuotas })
-    await saveEmployeeMetadata(data.employee_id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, is_attendance_exempt: isAttendanceExempt, email, bank_account_no: bankAccountNo, leave_quotas: leaveQuotas })
+    try {
+      await prisma.$executeRawUnsafe(
+        'UPDATE employees SET work_days = ? WHERE id = ? OR employee_id = ?',
+        JSON.stringify(workDays),
+        data.id,
+        data.employee_id
+      )
+    } catch {}
+    await saveEmployeeMetadata(data.id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, is_attendance_exempt: isAttendanceExempt, email, bank_account_no: bankAccountNo, work_days: workDays, leave_quotas: leaveQuotas })
+    await saveEmployeeMetadata(data.employee_id, { branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, is_attendance_exempt: isAttendanceExempt, email, bank_account_no: bankAccountNo, work_days: workDays, leave_quotas: leaveQuotas })
   }
 
   if (!data) {
     throw new Error('Failed to create employee in database')
   }
 
-  return { employee: { ...data, branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, is_attendance_exempt: isAttendanceExempt, email, bank_account_no: bankAccountNo, designation, leave_quotas: leaveQuotas }, warning }
+  return { employee: { ...data, branch, salary, joining_date: joiningDate, is_old_staff: isOldStaff, is_attendance_exempt: isAttendanceExempt, email, bank_account_no: bankAccountNo, designation, work_days: workDays, leave_quotas: leaveQuotas }, warning }
 }
 
 export async function updateEmployee(
@@ -696,6 +745,7 @@ export async function updateEmployee(
     is_old_staff?: boolean | null
     is_attendance_exempt?: boolean | null
     is_active?: boolean
+    work_days?: string[]
     leave_quotas?: EmployeeLeaveQuotas
   }
 ): Promise<Employee> {
@@ -724,6 +774,7 @@ export async function updateEmployee(
       ...(isOldStaff !== undefined ? { isOldStaff } : {}),
       ...(isAttendanceExempt !== undefined ? { isAttendanceExempt } : {}),
       ...(params.is_active !== undefined ? { isActive: params.is_active } : {}),
+      ...(params.work_days !== undefined ? { workDays: params.work_days as any } : {}),
       ...(finalQuotas !== undefined ? { leaveQuotas: finalQuotas as any } : {}),
     }
 
@@ -732,6 +783,15 @@ export async function updateEmployee(
       where: isUuid ? { OR: [{ id }, { employeeId: id }] } : { employeeId: id },
       data: prismaData,
     })
+
+    if (params.work_days !== undefined) {
+      await prisma.$executeRawUnsafe(
+        'UPDATE employees SET work_days = ? WHERE id = ? OR employee_id = ?',
+        JSON.stringify(params.work_days),
+        id,
+        id
+      )
+    }
   } catch (mysqlErr) {
     console.warn('MySQL updateEmployee warning:', mysqlErr)
   }
@@ -747,6 +807,7 @@ export async function updateEmployee(
     is_attendance_exempt: isAttendanceExempt,
     email: emailVal,
     bank_account_no: bankAccountVal,
+    work_days: params.work_days,
     leave_quotas: finalQuotas,
   })
 

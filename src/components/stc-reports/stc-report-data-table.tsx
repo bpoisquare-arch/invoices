@@ -488,8 +488,8 @@ export default function StcReportDataTable({
             </Button>
           )}
 
-          {/* Import Excel - Temporarily Hidden */}
-          {/* {onImportExcel && (
+          {/* Import Excel */}
+          {onImportExcel && (
             <Button
               variant="outline"
               size="sm"
@@ -500,7 +500,7 @@ export default function StcReportDataTable({
               <UploadCloud className="size-4 text-[#00BF8F]" />
               <span className="hidden sm:inline">Import Excel</span>
             </Button>
-          )} */}
+          )}
 
           {/* Add Entry */}
           {onAddEntry && (

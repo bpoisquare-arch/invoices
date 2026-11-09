@@ -6,6 +6,7 @@ export interface EmployeeMetadata {
   joining_date?: string | null
   is_old_staff?: boolean | null
   is_attendance_exempt?: boolean | null
+  work_days?: string[]
   name?: string
   designation?: string
   email?: string | null

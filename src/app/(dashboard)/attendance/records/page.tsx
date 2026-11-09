@@ -58,6 +58,7 @@ import {
   AttendanceRecordWithEmployee,
   AttendanceSettings,
   Employee,
+  DEFAULT_WORK_DAYS,
 } from '@/types/database.types'
 import EditAttendanceModal from '@/components/attendance/edit-attendance-modal'
 import ViewPunchesModal from '@/components/attendance/view-punches-modal'
@@ -276,6 +277,8 @@ function getRecordStatusFlags(
   const dayName = getDayName(date)
   const isSunday = dayName === 'Sunday'
   const isGazettedHoliday = Boolean(holidays[date])
+  const workDays = (Array.isArray(emp.work_days) && emp.work_days.length > 0) ? emp.work_days : DEFAULT_WORK_DAYS
+  const isScheduledOffDay = !workDays.includes(dayName)
   const todayStr = formatDate(new Date())
   const isFuture = date > todayStr
   const isToday = date === todayStr
@@ -364,6 +367,7 @@ function getRecordStatusFlags(
           isGazettedHoliday,
           isLeave: false,
           isAbsent: false,
+          isOffDay: false,
           isLate: false,
           isEarlyLeave: false,
           isMissingIn: false,
@@ -371,6 +375,23 @@ function getRecordStatusFlags(
           isWfh: false,
           isPresent: false,
           statusLabel: isSunday ? 'Sunday' : 'Holiday',
+        }
+      }
+
+      if (isScheduledOffDay) {
+        return {
+          isSunday: false,
+          isGazettedHoliday: false,
+          isLeave: false,
+          isAbsent: false,
+          isOffDay: true,
+          isLate: false,
+          isEarlyLeave: false,
+          isMissingIn: false,
+          isMissingOut: false,
+          isWfh: false,
+          isPresent: false,
+          statusLabel: 'Off Day',
         }
       }
 
@@ -434,6 +455,7 @@ function getRecordStatusFlags(
       isGazettedHoliday,
       isLeave: false,
       isAbsent: false,
+      isOffDay: false,
       isLate: false,
       isEarlyLeave: false,
       isMissingIn: false,
@@ -441,6 +463,23 @@ function getRecordStatusFlags(
       isWfh: false,
       isPresent: false,
       statusLabel: isSunday ? 'Sunday' : 'Holiday',
+    }
+  }
+
+  if (isScheduledOffDay) {
+    return {
+      isSunday: false,
+      isGazettedHoliday: false,
+      isLeave: false,
+      isAbsent: false,
+      isOffDay: true,
+      isLate: false,
+      isEarlyLeave: false,
+      isMissingIn: false,
+      isMissingOut: false,
+      isWfh: false,
+      isPresent: false,
+      statusLabel: 'Off Day',
     }
   }
 
@@ -1686,6 +1725,12 @@ export default function AttendanceRecordsPage() {
             timeOutVal = 'Leave'
             workedHoursVal = '0:00'
             statusVal = flags.statusLabel || 'Leave'
+          } else if (flags.isOffDay) {
+            attendanceVal = 'Off Day'
+            timeInVal = 'Off Day'
+            timeOutVal = 'Off Day'
+            workedHoursVal = '0:00'
+            statusVal = 'Off Day'
           } else if (flags.isAbsent) {
             attendanceVal = 'Absent'
             timeInVal = 'Absent'
@@ -1729,8 +1774,8 @@ export default function AttendanceRecordsPage() {
           const timeOutCell = row.getCell(8)
           const statusCell = row.getCell(10)
 
-          // 1. Sunday / Off -> Blue bold font
-          if (isSunday || attendanceVal === 'Off') {
+          // 1. Sunday / Off / Off Day -> Blue bold font
+          if (isSunday || attendanceVal === 'Off' || attendanceVal === 'Off Day') {
             const blueFont: Partial<ExcelJS.Font> = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF002060' } }
             attCell.font = blueFont
             timeInCell.font = blueFont
@@ -1855,6 +1900,8 @@ export default function AttendanceRecordsPage() {
     const isPast = date < todayStr
     const presentCountOnDate = getPresentEmployeesCountOnDate(date)
     const isGazettedHoliday = Boolean(holidays[date]) && presentCountOnDate === 0
+    const workDays = (Array.isArray(emp.work_days) && emp.work_days.length > 0) ? emp.work_days : DEFAULT_WORK_DAYS
+    const isScheduledOffDay = !workDays.includes(dayName)
 
     const rec = recordMatrixMap.get(`${emp.id}_${date}`) || recordMatrixMap.get(`${emp.employee_id}_${date}`)
 
@@ -1943,6 +1990,20 @@ export default function AttendanceRecordsPage() {
 
       // B. Explicit Absent Record
       if (isExplicitAbsent) {
+        if (isScheduledOffDay) {
+          return (
+            <div
+              onClick={() => handleBlankCellClick(emp, date)}
+              className="flex items-center justify-center py-2 select-none cursor-pointer hover:bg-slate-100 rounded transition-colors"
+              title={`${dayName} (Scheduled Off Day). Click to add extra shift or timings`}
+            >
+              <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold shadow-2xs tracking-wide">
+                Off Day
+              </span>
+            </div>
+          )
+        }
+
         if (isFuture) {
           return (
             <div
@@ -2063,7 +2124,22 @@ export default function AttendanceRecordsPage() {
     }
 
     // 3. If NO record exists:
-    // A. Future Date OR Date after the last uploaded attendance date -> Show neutral placeholder "--"
+    // A. Scheduled Off Day for this employee
+    if (isScheduledOffDay) {
+      return (
+        <div
+          onClick={() => handleBlankCellClick(emp, date)}
+          className="flex items-center justify-center py-2 select-none cursor-pointer hover:bg-slate-100 rounded transition-colors"
+          title={`${dayName} (Scheduled Off Day). Click to add extra shift or timings`}
+        >
+          <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold shadow-2xs tracking-wide">
+            Off Day
+          </span>
+        </div>
+      )
+    }
+
+    // B. Future Date OR Date after the last uploaded attendance date -> Show neutral placeholder "--"
     if (isFuture || (maxUploadedDate && date > maxUploadedDate)) {
       return (
         <div

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, designation, email, bank_account_no, branch, salary, joining_date, is_old_staff, is_attendance_exempt, leave_quotas } = body
+    const { name, designation, email, bank_account_no, branch, salary, joining_date, is_old_staff, is_attendance_exempt, work_days, leave_quotas } = body
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return NextResponse.json({ success: false, error: 'Employee name is required.' }, { status: 400 })
@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
       joining_date,
       is_old_staff,
       is_attendance_exempt,
+      work_days,
       leave_quotas,
     })
 
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, name, designation, email, bank_account_no, branch, salary, joining_date, is_old_staff, is_attendance_exempt, is_active, leave_quotas } = body
+    const { id, name, designation, email, bank_account_no, branch, salary, joining_date, is_old_staff, is_attendance_exempt, is_active, work_days, leave_quotas } = body
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Employee ID is required.' }, { status: 400 })
@@ -83,6 +84,7 @@ export async function PUT(request: NextRequest) {
       is_old_staff,
       is_attendance_exempt,
       is_active,
+      work_days,
       leave_quotas,
     })
 
