@@ -33,13 +33,17 @@ function fromDbRow(row: any) {
     hourly_rate: Number(row.hourlyRate ?? row.hourly_rate ?? 0),
     wages_amount: Number(row.wagesAmount ?? row.wages_amount ?? 0),
     wages_total: Number(row.wagesTotal ?? row.wages_total ?? 0),
+    wages_ytd: Number(row.wagesYtd ?? row.wages_ytd ?? row.wagesTotal ?? row.wages_total ?? 0),
     tax_description: row.taxDescription || row.tax_description || 'PAYG',
     tax_amount: Number(row.taxAmount ?? row.tax_amount ?? 0),
     tax_total: Number(row.taxTotal ?? row.tax_total ?? 0),
+    tax_ytd: Number(row.taxYtd ?? row.tax_ytd ?? row.taxTotal ?? row.tax_total ?? 0),
+    include_ytd: Boolean(row.includeYtd ?? row.include_ytd ?? false),
     include_superannuation: hasSuper,
     superannuation_description: row.superannuationDescription || row.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122',
     superannuation_amount: Number(row.superannuationAmount ?? row.superannuation_amount ?? 0),
     superannuation_total: Number(row.superannuationTotal ?? row.superannuation_total ?? row.superannuationAmount ?? 0),
+    superannuation_ytd: Number(row.superannuationYtd ?? row.superannuation_ytd ?? row.superannuationTotal ?? row.superannuation_total ?? 0),
     bank_account_masked: row.bankAccountMasked || row.bank_account_masked || '',
     account_name: row.accountName || row.account_name || '',
     payment_reference: row.paymentReference || row.payment_reference || 'AIMT Pay',
@@ -53,11 +57,28 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get('id')
 
     if (id) {
+      try {
+        const rawRows: any[] = await prisma.$queryRawUnsafe('SELECT * FROM aimt_payslips WHERE id = ? LIMIT 1', id)
+        if (rawRows && rawRows.length > 0) {
+          return NextResponse.json(fromDbRow(rawRows[0]))
+        }
+      } catch (err) {
+        // fallback to prisma
+      }
       const row = await prisma.aimtPayslip.findUnique({ where: { id } })
       if (!row) {
         return NextResponse.json({ error: 'Payslip not found' }, { status: 404 })
       }
       return NextResponse.json(fromDbRow(row))
+    }
+
+    try {
+      const rawRows: any[] = await prisma.$queryRawUnsafe('SELECT * FROM aimt_payslips ORDER BY created_at DESC')
+      if (rawRows && Array.isArray(rawRows)) {
+        return NextResponse.json(rawRows.map(fromDbRow))
+      }
+    } catch (err) {
+      // fallback to prisma
     }
 
     const rows = await prisma.aimtPayslip.findMany({
@@ -144,7 +165,31 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(fromDbRow(row))
+    // Persist YTD columns directly to MySQL
+    try {
+      const incYtd = body.include_ytd ? 1 : 0
+      const wYtd = Number(body.wages_ytd ?? body.wages_total ?? 0)
+      const tYtd = Number(body.tax_ytd ?? body.tax_total ?? 0)
+      const sYtd = Number(body.superannuation_ytd ?? body.superannuation_total ?? body.superannuation_amount ?? 0)
+      await prisma.$executeRawUnsafe(
+        'UPDATE aimt_payslips SET include_ytd = ?, wages_ytd = ?, tax_ytd = ?, superannuation_ytd = ? WHERE id = ?',
+        incYtd,
+        wYtd,
+        tYtd,
+        sYtd,
+        id
+      )
+    } catch (rawErr) {
+      console.warn('YTD columns raw update note:', rawErr)
+    }
+
+    return NextResponse.json({
+      ...fromDbRow(row),
+      include_ytd: Boolean(body.include_ytd),
+      wages_ytd: Number(body.wages_ytd ?? body.wages_total ?? 0),
+      tax_ytd: Number(body.tax_ytd ?? body.tax_total ?? 0),
+      superannuation_ytd: Number(body.superannuation_ytd ?? body.superannuation_total ?? body.superannuation_amount ?? 0),
+    })
   } catch (error: any) {
     console.error('Error saving AIMT payslip:', error)
     return NextResponse.json({ error: error?.message || 'Failed to save payslip' }, { status: 500 })

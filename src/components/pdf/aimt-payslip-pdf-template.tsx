@@ -124,6 +124,18 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     paddingBottom: 4,
   },
+  thisPayHeaderGrid: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    fontSize: 9.5,
+    fontFamily: 'Helvetica-Bold',
+    color: '#0f172a',
+    paddingBottom: 4,
+  },
+  thisPayHeaderCol: {
+    width: 75,
+    textAlign: 'right',
+  },
   tableHeaderRow: {
     flexDirection: 'row',
     borderTopWidth: 1.2,
@@ -157,9 +169,11 @@ const styles = StyleSheet.create({
 
   // Columns for Salary & Wages
   colWagesDesc: { flex: 2.2 },
-  colWagesHours: { width: 75, textAlign: 'right' },
-  colWagesRate: { width: 85, textAlign: 'right' },
+  colWagesHours: { width: 65, textAlign: 'right' },
+  colWagesRate: { width: 75, textAlign: 'right' },
   colWagesAmount: { width: 95, textAlign: 'right' },
+  colAmountYtd: { width: 75, textAlign: 'right' },
+  colYtd: { width: 75, textAlign: 'right' },
 
   // Columns for Tax
   colTaxDesc: { flex: 3 },
@@ -181,6 +195,14 @@ export default function AIMTPayslipPDFTemplate({ payslip }: AIMTPayslipPDFTempla
     return String(val)
   }
   const formatRate = (val: number) => `$${(Number(val) || 0).toFixed(4)}`
+
+  const showYtd = Boolean(payslip.include_ytd)
+  const wagesYtd = payslip.wages_ytd !== undefined ? payslip.wages_ytd : payslip.wages_total
+  const taxYtd = payslip.tax_ytd !== undefined ? payslip.tax_ytd : payslip.tax_total
+  const superYtd =
+    payslip.superannuation_ytd !== undefined
+      ? payslip.superannuation_ytd
+      : payslip.superannuation_total ?? payslip.superannuation_amount ?? 0
 
   return (
     <Document>
@@ -252,24 +274,39 @@ export default function AIMTPayslipPDFTemplate({ payslip }: AIMTPayslipPDFTempla
 
         {/* 4. SALARY & WAGES Section */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.thisPayHeader}>THIS PAY</Text>
+          {showYtd ? (
+            <View style={styles.thisPayHeaderGrid}>
+              <Text style={styles.thisPayHeaderCol}>THIS PAY</Text>
+              <Text style={styles.thisPayHeaderCol}>YTD</Text>
+            </View>
+          ) : (
+            <Text style={styles.thisPayHeader}>THIS PAY</Text>
+          )}
+
           <View style={styles.tableHeaderRow}>
             <Text style={styles.colWagesDesc}>SALARY & WAGES</Text>
             <Text style={styles.colWagesHours} />
             <Text style={styles.colWagesRate}>RATE</Text>
-            <Text style={styles.colWagesAmount} />
+            <Text style={showYtd ? styles.colAmountYtd : styles.colWagesAmount} />
+            {showYtd && <Text style={styles.colYtd} />}
           </View>
 
           <View style={styles.tableDataRow}>
             <Text style={styles.colWagesDesc}>{payslip.wages_description || 'Ordinary Hours'}</Text>
             <Text style={styles.colWagesHours}>{formatHours(payslip.ordinary_hours)}</Text>
             <Text style={styles.colWagesRate}>{formatRate(payslip.hourly_rate)}</Text>
-            <Text style={styles.colWagesAmount}>{formatCurrency(payslip.wages_amount)}</Text>
+            <Text style={showYtd ? styles.colAmountYtd : styles.colWagesAmount}>
+              {formatCurrency(payslip.wages_amount)}
+            </Text>
+            {showYtd && <Text style={styles.colYtd}>{formatCurrency(wagesYtd)}</Text>}
           </View>
 
           <View style={styles.tableTotalRow}>
             <Text style={{ flex: 1 }}>TOTAL</Text>
-            <Text style={styles.colWagesAmount}>{formatCurrency(payslip.wages_total)}</Text>
+            <Text style={showYtd ? styles.colAmountYtd : styles.colWagesAmount}>
+              {formatCurrency(payslip.wages_total)}
+            </Text>
+            {showYtd && <Text style={styles.colYtd}>{formatCurrency(wagesYtd)}</Text>}
           </View>
         </View>
 
@@ -277,17 +314,24 @@ export default function AIMTPayslipPDFTemplate({ payslip }: AIMTPayslipPDFTempla
         <View style={styles.sectionContainer}>
           <View style={styles.tableHeaderRow}>
             <Text style={styles.colTaxDesc}>TAX</Text>
-            <Text style={styles.colTaxAmount} />
+            <Text style={showYtd ? styles.colAmountYtd : styles.colTaxAmount} />
+            {showYtd && <Text style={styles.colYtd} />}
           </View>
 
           <View style={styles.tableDataRow}>
             <Text style={styles.colTaxDesc}>{payslip.tax_description || 'PAYG'}</Text>
-            <Text style={styles.colTaxAmount}>{formatCurrency(payslip.tax_amount)}</Text>
+            <Text style={showYtd ? styles.colAmountYtd : styles.colTaxAmount}>
+              {formatCurrency(payslip.tax_amount)}
+            </Text>
+            {showYtd && <Text style={styles.colYtd}>{formatCurrency(taxYtd)}</Text>}
           </View>
 
           <View style={styles.tableTotalRow}>
             <Text style={{ flex: 1 }}>TOTAL</Text>
-            <Text style={styles.colTaxAmount}>{formatCurrency(payslip.tax_total)}</Text>
+            <Text style={showYtd ? styles.colAmountYtd : styles.colTaxAmount}>
+              {formatCurrency(payslip.tax_total)}
+            </Text>
+            {showYtd && <Text style={styles.colYtd}>{formatCurrency(taxYtd)}</Text>}
           </View>
         </View>
 
@@ -296,23 +340,26 @@ export default function AIMTPayslipPDFTemplate({ payslip }: AIMTPayslipPDFTempla
           <View style={styles.sectionContainer}>
             <View style={styles.tableHeaderRow}>
               <Text style={styles.colTaxDesc}>SUPERANNUATION</Text>
-              <Text style={styles.colTaxAmount} />
+              <Text style={showYtd ? styles.colAmountYtd : styles.colTaxAmount} />
+              {showYtd && <Text style={styles.colYtd} />}
             </View>
 
             <View style={styles.tableDataRow}>
               <Text style={styles.colTaxDesc}>
                 {payslip.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122'}
               </Text>
-              <Text style={styles.colTaxAmount}>
+              <Text style={showYtd ? styles.colAmountYtd : styles.colTaxAmount}>
                 {formatCurrency(payslip.superannuation_amount || 0)}
               </Text>
+              {showYtd && <Text style={styles.colYtd}>{formatCurrency(superYtd)}</Text>}
             </View>
 
             <View style={styles.tableTotalRow}>
               <Text style={{ flex: 1 }}>TOTAL</Text>
-              <Text style={styles.colTaxAmount}>
+              <Text style={showYtd ? styles.colAmountYtd : styles.colTaxAmount}>
                 {formatCurrency(payslip.superannuation_total ?? payslip.superannuation_amount ?? 0)}
               </Text>
+              {showYtd && <Text style={styles.colYtd}>{formatCurrency(superYtd)}</Text>}
             </View>
           </View>
         )}

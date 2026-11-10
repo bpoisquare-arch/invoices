@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -25,6 +25,8 @@ import {
   Sparkles,
   Briefcase,
   Check,
+  Calculator,
+  RefreshCw,
 } from 'lucide-react'
 
 interface AIMTPayslipFormProps {
@@ -92,6 +94,87 @@ function calculateAnnualSalary(wages: number, frequency: string): number {
   }
 }
 
+interface YtdCalculationResult {
+  wagesYtd: number
+  taxYtd: number
+  superYtd: number
+  pastCount: number
+  baseWages: number
+  baseTax: number
+  baseSuper: number
+  lastPaymentDate?: string
+}
+
+function computeCumulativeYtdFromList(
+  employeeName: string,
+  currentWages: number,
+  currentTax: number,
+  currentSuper: number,
+  savedList: AIMTPayslip[],
+  currentId?: string
+): YtdCalculationResult {
+  const allPast = (savedList || [])
+    .filter((p) => !currentId || p.id !== currentId)
+    .sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime())
+
+  if (allPast.length === 0) {
+    return {
+      wagesYtd: currentWages,
+      taxYtd: currentTax,
+      superYtd: currentSuper,
+      pastCount: 0,
+      baseWages: 0,
+      baseTax: 0,
+      baseSuper: 0,
+    }
+  }
+
+  // 1. Try finding records for matching employee name if available
+  const normalized = (employeeName || '').trim().toLowerCase()
+  const employeePast = normalized
+    ? allPast.filter(
+        (p) =>
+          p.employee_name &&
+          (p.employee_name.trim().toLowerCase() === normalized ||
+            p.employee_name.trim().toLowerCase().includes(normalized) ||
+            normalized.includes(p.employee_name.trim().toLowerCase()))
+      )
+    : []
+
+  // 2. If employee-specific records found use them, otherwise use the previous database record
+  const targetPast = employeePast.length > 0 ? employeePast : allPast
+  const latest = targetPast[targetPast.length - 1]
+
+  const baseWages =
+    Number(latest.wages_ytd ?? 0) > 0
+      ? Number(latest.wages_ytd)
+      : targetPast.reduce((acc, p) => acc + Number(p.wages_total || p.wages_amount || 0), 0)
+
+  const baseTax =
+    Number(latest.tax_ytd ?? 0) > 0
+      ? Number(latest.tax_ytd)
+      : targetPast.reduce((acc, p) => acc + Number(p.tax_total || p.tax_amount || 0), 0)
+
+  const baseSuper =
+    Number(latest.superannuation_ytd ?? 0) > 0
+      ? Number(latest.superannuation_ytd)
+      : targetPast.reduce(
+          (acc, p) => acc + Number(p.superannuation_total || p.superannuation_amount || 0),
+          0
+        )
+
+  return {
+    wagesYtd: Math.round((baseWages + currentWages) * 100) / 100,
+    taxYtd: Math.round((baseTax + currentTax) * 100) / 100,
+    superYtd: Math.round((baseSuper + currentSuper) * 100) / 100,
+    pastCount: targetPast.length,
+    baseWages: Math.round(baseWages * 100) / 100,
+    baseTax: Math.round(baseTax * 100) / 100,
+    baseSuper: Math.round(baseSuper * 100) / 100,
+    lastPaymentDate: latest.payment_date || latest.pay_period_end || undefined,
+  }
+}
+
 export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMTPayslipFormProps) {
   const router = useRouter()
   const [formData, setFormData] = useState<AIMTPayslip>(
@@ -110,23 +193,195 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
   const [hasSaved, setHasSaved] = useState<boolean>(Boolean(isEditing && initialData?.id))
   const [showSavedModal, setShowSavedModal] = useState<boolean>(false)
 
+  // Cumulative Year-To-Date (YTD) states
+  const [savedPayslips, setSavedPayslips] = useState<AIMTPayslip[]>([])
+  const [calculatingYtd, setCalculatingYtd] = useState<boolean>(false)
+  const [ytdCalculationMsg, setYtdCalculationMsg] = useState<string>('')
+  const [pastCount, setPastCount] = useState<number>(0)
+  const [baseHistory, setBaseHistory] = useState<{
+    baseWages: number
+    baseTax: number
+    baseSuper: number
+    lastDate?: string
+  } | null>(null)
+  const [isManualWagesYtd, setIsManualWagesYtd] = useState<boolean>(
+    Boolean(initialData?.wages_ytd && initialData.wages_ytd > 0 && isEditing)
+  )
+  const [isManualTaxYtd, setIsManualTaxYtd] = useState<boolean>(
+    Boolean(initialData?.tax_ytd && initialData.tax_ytd > 0 && isEditing)
+  )
+  const [isManualSuperYtd, setIsManualSuperYtd] = useState<boolean>(
+    Boolean(initialData?.superannuation_ytd && initialData.superannuation_ytd > 0 && isEditing)
+  )
+
+  // Pre-load past payslips to compute cumulative YTD
+  useEffect(() => {
+    let isMounted = true
+    aimtPayslipService.getAll().then((list) => {
+      if (!isMounted) return
+      const validList = list || []
+      setSavedPayslips(validList)
+
+      const res = computeCumulativeYtdFromList(
+        formData.employee_name || '',
+        formData.wages_total || 0,
+        formData.tax_amount || 0,
+        formData.superannuation_amount || 0,
+        validList,
+        formData.id
+      )
+      setPastCount(res.pastCount)
+      setBaseHistory({
+        baseWages: res.baseWages,
+        baseTax: res.baseTax,
+        baseSuper: res.baseSuper,
+        lastDate: res.lastPaymentDate,
+      })
+
+      if (formData.include_ytd && !isEditing) {
+        setFormData((prev) => ({
+          ...prev,
+          wages_ytd: prev.wages_ytd ?? res.wagesYtd,
+          tax_ytd: prev.tax_ytd ?? res.taxYtd,
+          superannuation_ytd: prev.superannuation_ytd ?? res.superYtd,
+        }))
+      }
+    })
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  // Toggle YTD on/off
+  const handleYtdToggle = (enabled: boolean) => {
+    if (enabled) {
+      const res = computeCumulativeYtdFromList(
+        formData.employee_name || '',
+        formData.wages_total || 0,
+        formData.tax_amount || 0,
+        formData.superannuation_amount || 0,
+        savedPayslips,
+        formData.id
+      )
+      setPastCount(res.pastCount)
+      setBaseHistory({
+        baseWages: res.baseWages,
+        baseTax: res.baseTax,
+        baseSuper: res.baseSuper,
+        lastDate: res.lastPaymentDate,
+      })
+      setFormData((prev) => ({
+        ...prev,
+        include_ytd: true,
+        wages_ytd: isManualWagesYtd && prev.wages_ytd ? prev.wages_ytd : res.wagesYtd,
+        tax_ytd: isManualTaxYtd && prev.tax_ytd ? prev.tax_ytd : res.taxYtd,
+        superannuation_ytd:
+          isManualSuperYtd && prev.superannuation_ytd ? prev.superannuation_ytd : res.superYtd,
+      }))
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        include_ytd: false,
+      }))
+    }
+  }
+
+  // Recalculate YTD from database history
+  const handleCalculateYtdFromHistory = async () => {
+    setCalculatingYtd(true)
+    setYtdCalculationMsg('')
+    try {
+      const list = await aimtPayslipService.getAll()
+      const validList = list || []
+      setSavedPayslips(validList)
+      const res = computeCumulativeYtdFromList(
+        formData.employee_name || '',
+        formData.wages_total || 0,
+        formData.tax_amount || 0,
+        formData.superannuation_amount || 0,
+        validList,
+        formData.id
+      )
+      setPastCount(res.pastCount)
+      setBaseHistory({
+        baseWages: res.baseWages,
+        baseTax: res.baseTax,
+        baseSuper: res.baseSuper,
+        lastDate: res.lastPaymentDate,
+      })
+      setFormData((prev) => ({
+        ...prev,
+        wages_ytd: res.wagesYtd,
+        tax_ytd: res.taxYtd,
+        superannuation_ytd: res.superYtd,
+      }))
+      setIsManualWagesYtd(false)
+      setIsManualTaxYtd(false)
+      setIsManualSuperYtd(false)
+      setYtdCalculationMsg(
+        res.pastCount > 0
+          ? `Successfully recalculated YTD using ${res.pastCount} previous record(s)!`
+          : 'No prior records found; YTD set equal to current pay.'
+      )
+      setTimeout(() => setYtdCalculationMsg(''), 4000)
+    } catch (err) {
+      console.error('Failed to recalculate YTD:', err)
+    } finally {
+      setCalculatingYtd(false)
+    }
+  }
+
+  // Reset a specific manual field back to auto-calculation
+  const resetFieldToAuto = (field: 'wages' | 'tax' | 'super') => {
+    const res = computeCumulativeYtdFromList(
+      formData.employee_name || '',
+      formData.wages_total || 0,
+      formData.tax_amount || 0,
+      formData.superannuation_amount || 0,
+      savedPayslips,
+      formData.id
+    )
+    if (field === 'wages') {
+      setIsManualWagesYtd(false)
+      setFormData((prev) => ({ ...prev, wages_ytd: res.wagesYtd }))
+    } else if (field === 'tax') {
+      setIsManualTaxYtd(false)
+      setFormData((prev) => ({ ...prev, tax_ytd: res.taxYtd }))
+    } else if (field === 'super') {
+      setIsManualSuperYtd(false)
+      setFormData((prev) => ({ ...prev, superannuation_ytd: res.superYtd }))
+    }
+  }
+
+  const resetAllYtdToAuto = () => {
+    handleCalculateYtdFromHistory()
+  }
+
   // Auto-calculation handler for hours and rate
   const handleHoursRateChange = (hours: number, rate: number) => {
     const calcWages = Math.round(hours * rate * 100) / 100
     const calcAnnual = calculateAnnualSalary(calcWages, formData.pay_frequency || 'Fortnightly')
     const calcNet = Math.max(0, Math.round((calcWages - formData.tax_amount) * 100) / 100)
 
-    setFormData((prev) => ({
-      ...prev,
-      ordinary_hours: hours,
-      hourly_rate: rate,
-      wages_amount: calcWages,
-      wages_total: calcWages,
-      total_earnings: calcWages,
-      annual_salary: prev.show_annual_salary !== false ? calcAnnual : prev.annual_salary,
-      net_pay: calcNet,
-      payment_amount: calcNet,
-    }))
+    setFormData((prev) => {
+      const nextWagesYtd =
+        prev.include_ytd && !isManualWagesYtd
+          ? Math.round(((baseHistory?.baseWages || 0) + calcWages) * 100) / 100
+          : prev.wages_ytd
+
+      return {
+        ...prev,
+        ordinary_hours: hours,
+        hourly_rate: rate,
+        wages_amount: calcWages,
+        wages_total: calcWages,
+        total_earnings: calcWages,
+        annual_salary: prev.show_annual_salary !== false ? calcAnnual : prev.annual_salary,
+        net_pay: calcNet,
+        payment_amount: calcNet,
+        wages_ytd: nextWagesYtd,
+      }
+    })
   }
 
   // Handle Pay Frequency change
@@ -183,17 +438,27 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
   const handleTaxChange = (tax: number) => {
     const calcNet = Math.max(0, Math.round((formData.total_earnings - tax) * 100) / 100)
 
-    setFormData((prev) => ({
-      ...prev,
-      tax_amount: tax,
-      tax_total: tax,
-      net_pay: calcNet,
-      payment_amount: calcNet,
-    }))
+    setFormData((prev) => {
+      const nextTaxYtd =
+        prev.include_ytd && !isManualTaxYtd
+          ? Math.round(((baseHistory?.baseTax || 0) + tax) * 100) / 100
+          : prev.tax_ytd
+
+      return {
+        ...prev,
+        tax_amount: tax,
+        tax_total: tax,
+        net_pay: calcNet,
+        payment_amount: calcNet,
+        tax_ytd: nextTaxYtd,
+      }
+    })
   }
 
   const handleSuperannuationToggle = (enabled: boolean) => {
-    const defaultDesc = formData.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122'
+    const defaultDesc =
+      formData.superannuation_description ||
+      'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122'
 
     setFormData((prev) => ({
       ...prev,
@@ -203,11 +468,19 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
   }
 
   const handleSuperannuationAmountChange = (amount: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      superannuation_amount: amount,
-      superannuation_total: amount,
-    }))
+    setFormData((prev) => {
+      const nextSuperYtd =
+        prev.include_ytd && !isManualSuperYtd
+          ? Math.round(((baseHistory?.baseSuper || 0) + amount) * 100) / 100
+          : prev.superannuation_ytd
+
+      return {
+        ...prev,
+        superannuation_amount: amount,
+        superannuation_total: amount,
+        superannuation_ytd: nextSuperYtd,
+      }
+    })
   }
 
   const handleSuperannuationDescriptionChange = (desc: string) => {
@@ -218,11 +491,41 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
   }
 
   const handleEmployeeNameChange = (name: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      employee_name: name,
-      account_name: name,
-    }))
+    setFormData((prev) => {
+      let nextWagesYtd = prev.wages_ytd
+      let nextTaxYtd = prev.tax_ytd
+      let nextSuperYtd = prev.superannuation_ytd
+
+      if (prev.include_ytd && savedPayslips.length > 0) {
+        const res = computeCumulativeYtdFromList(
+          name,
+          prev.wages_total || 0,
+          prev.tax_amount || 0,
+          prev.superannuation_amount || 0,
+          savedPayslips,
+          prev.id
+        )
+        setPastCount(res.pastCount)
+        setBaseHistory({
+          baseWages: res.baseWages,
+          baseTax: res.baseTax,
+          baseSuper: res.baseSuper,
+          lastDate: res.lastPaymentDate,
+        })
+        if (!isManualWagesYtd) nextWagesYtd = res.wagesYtd
+        if (!isManualTaxYtd) nextTaxYtd = res.taxYtd
+        if (!isManualSuperYtd) nextSuperYtd = res.superYtd
+      }
+
+      return {
+        ...prev,
+        employee_name: name,
+        account_name: name,
+        wages_ytd: nextWagesYtd,
+        tax_ytd: nextTaxYtd,
+        superannuation_ytd: nextSuperYtd,
+      }
+    })
   }
 
   async function handleSave() {
@@ -670,6 +973,120 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
             </div>
           </div>
 
+          {/* Card: Cumulative Year-To-Date (YTD) Optional Setup */}
+          <div className="bg-[#001E2F] border border-white/10 rounded-2xl p-5 shadow-lg space-y-4">
+            <div className="flex items-center justify-between pb-2.5 border-b border-white/10">
+              <div className="flex items-center gap-2 text-[#81F5F5] font-semibold text-sm">
+                <Calculator className="size-4" />
+                <span>Cumulative Year-To-Date (YTD)</span>
+              </div>
+              <span className="text-[10px] text-slate-400">Optional</span>
+            </div>
+
+            <div className="space-y-3">
+              <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-200 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formData.include_ytd)}
+                  onChange={(e) => handleYtdToggle(e.target.checked)}
+                  className="size-4 rounded bg-[#001724] border-white/20 text-[#81F5F5] focus:ring-[#81F5F5]/40 cursor-pointer"
+                />
+                <span>Include Cumulative YTD on Payslip</span>
+              </label>
+
+              {formData.include_ytd && (
+                <div className="pt-2 border-t border-white/10 space-y-3 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold ${
+                        pastCount > 0
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-slate-700/50 text-slate-300 border border-white/10'
+                      }`}
+                    >
+                      {pastCount > 0 ? `${pastCount} Past Record(s) in DB` : 'Initial Record (No History)'}
+                    </span>
+                    {(isManualWagesYtd || isManualTaxYtd || isManualSuperYtd) && (
+                      <span className="text-[10px] text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
+                        Manual Override Active
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    {pastCount > 0 ? (
+                      <span>
+                        Auto-accumulating: <strong className="text-[#81F5F5]">Previous Base YTD + This Pay</strong>. You can click &quot;Recalculate&quot; to pull fresh history or override any field below.
+                      </span>
+                    ) : (
+                      <span>
+                        Initial record. YTD equals this pay. You can also manually type custom cumulative starting values below.
+                      </span>
+                    )}
+                  </p>
+
+                  {baseHistory && pastCount > 0 && (
+                    <div className="bg-[#001724] border border-white/15 rounded-xl p-3 text-[11px] space-y-1">
+                      <div className="text-slate-400 flex items-center justify-between">
+                        <span>Previous Base YTD (from latest payslip):</span>
+                        {baseHistory.lastDate && (
+                          <span className="text-slate-500 text-[10px]">Date: {baseHistory.lastDate}</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 font-mono text-slate-300">
+                        <div>
+                          Wages Base: <strong className="text-white">${baseHistory.baseWages.toFixed(2)}</strong>
+                        </div>
+                        <div>
+                          Tax Base: <strong className="text-white">${baseHistory.baseTax.toFixed(2)}</strong>
+                        </div>
+                        {formData.include_superannuation && (
+                          <div>
+                            Super Base: <strong className="text-white">${baseHistory.baseSuper.toFixed(2)}</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCalculateYtdFromHistory}
+                      disabled={calculatingYtd}
+                      className="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-[#003D5C] hover:bg-[#0E3E5B] text-[#81F5F5] border border-[#81F5F5]/40 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                    >
+                      {calculatingYtd ? (
+                        <div className="size-3.5 border-2 border-[#81F5F5] border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <RefreshCw className="size-3.5 text-[#81F5F5]" />
+                      )}
+                      <span>{calculatingYtd ? 'Recalculating...' : 'Recalculate YTD from Database'}</span>
+                    </button>
+
+                    {(isManualWagesYtd || isManualTaxYtd || isManualSuperYtd) && (
+                      <button
+                        type="button"
+                        onClick={resetAllYtdToAuto}
+                        className="py-2 px-3 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-all cursor-pointer whitespace-nowrap"
+                        title="Reset all manual overrides to auto-calculated"
+                      >
+                        Reset All to Auto
+                      </button>
+                    )}
+                  </div>
+
+                  {ytdCalculationMsg && (
+                    <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] flex items-center gap-1.5 animate-in fade-in-50">
+                      <CheckCircle2 className="size-3.5 shrink-0" />
+                      <span>{ytdCalculationMsg}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Card 4: Salary, Wages & Hours Calculation */}
           <div className="bg-[#001E2F] border border-white/10 rounded-2xl p-5 shadow-lg space-y-4">
             <div className="flex items-center gap-2 text-[#81F5F5] font-semibold text-sm border-b border-white/10 pb-2.5">
@@ -714,6 +1131,54 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
               </div>
             </div>
 
+            {/* Optional Wages YTD Input */}
+            {formData.include_ytd && (
+              <div className="pt-1">
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span>Wages YTD ($)</span>
+                    {isManualWagesYtd ? (
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 font-medium">
+                        Manual Override
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-medium">
+                        {pastCount > 0 ? `Auto (${pastCount} past)` : 'Auto'}
+                      </span>
+                    )}
+                  </div>
+                  {isManualWagesYtd && (
+                    <button
+                      type="button"
+                      onClick={() => resetFieldToAuto('wages')}
+                      className="text-[#81F5F5] text-[10px] hover:underline cursor-pointer"
+                    >
+                      Reset to Auto
+                    </button>
+                  )}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.wages_ytd ?? ''}
+                    onChange={(e) => {
+                      setIsManualWagesYtd(true)
+                      setFormData((prev) => ({
+                        ...prev,
+                        wages_ytd: parseFloat(e.target.value) || 0,
+                      }))
+                    }}
+                    placeholder="e.g. 18695.04"
+                    className={`w-full bg-[#001724] border rounded-xl pl-7 pr-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50 ${
+                      isManualWagesYtd ? 'border-amber-500/60' : 'border-white/20'
+                    }`}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Wages & Tax Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <div>
@@ -728,15 +1193,19 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
                     const val = parseFloat(e.target.value) || 0
                     const calcAnnual = calculateAnnualSalary(val, formData.pay_frequency || 'Fortnightly')
                     const calcNet = Math.max(0, Math.round((val - formData.tax_amount) * 100) / 100)
-                    setFormData({
-                      ...formData,
+                    setFormData((prev) => ({
+                      ...prev,
                       total_earnings: val,
                       wages_amount: val,
                       wages_total: val,
-                      annual_salary: formData.show_annual_salary !== false ? calcAnnual : formData.annual_salary,
+                      annual_salary: prev.show_annual_salary !== false ? calcAnnual : prev.annual_salary,
                       net_pay: calcNet,
                       payment_amount: calcNet,
-                    })
+                      wages_ytd:
+                        prev.include_ytd && !isManualWagesYtd
+                          ? Math.round(((baseHistory?.baseWages || 0) + val) * 100) / 100
+                          : prev.wages_ytd,
+                    }))
                   }}
                   className="w-full bg-[#001724] border border-white/20 rounded-xl px-3 py-2 text-sm text-white font-bold text-emerald-400 focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50"
                 />
@@ -755,6 +1224,54 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
                 />
               </div>
             </div>
+
+            {/* Optional Tax YTD Input */}
+            {formData.include_ytd && (
+              <div className="pt-1">
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span>Tax YTD ($)</span>
+                    {isManualTaxYtd ? (
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 font-medium">
+                        Manual Override
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-medium">
+                        {pastCount > 0 ? `Auto (${pastCount} past)` : 'Auto'}
+                      </span>
+                    )}
+                  </div>
+                  {isManualTaxYtd && (
+                    <button
+                      type="button"
+                      onClick={() => resetFieldToAuto('tax')}
+                      className="text-[#81F5F5] text-[10px] hover:underline cursor-pointer"
+                    >
+                      Reset to Auto
+                    </button>
+                  )}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.tax_ytd ?? ''}
+                    onChange={(e) => {
+                      setIsManualTaxYtd(true)
+                      setFormData((prev) => ({
+                        ...prev,
+                        tax_ytd: parseFloat(e.target.value) || 0,
+                      }))
+                    }}
+                    placeholder="e.g. 4316.00"
+                    className={`w-full bg-[#001724] border rounded-xl pl-7 pr-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50 ${
+                      isManualTaxYtd ? 'border-amber-500/60' : 'border-white/20'
+                    }`}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Superannuation Section (Optional Toggle + Description + Amount) */}
             <div className="pt-2 border-t border-white/10 space-y-3">
@@ -802,6 +1319,54 @@ export default function AIMTPayslipForm({ initialData, isEditing = false }: AIMT
                       Superannuation is an employer contribution and only appears on the payslip without deducting from Net Pay.
                     </div>
                   </div>
+
+                  {/* Optional Superannuation YTD Input */}
+                  {formData.include_ytd && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span>Superannuation YTD ($)</span>
+                          {isManualSuperYtd ? (
+                            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 font-medium">
+                              Manual Override
+                            </span>
+                          ) : (
+                            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-medium">
+                              {pastCount > 0 ? `Auto (${pastCount} past)` : 'Auto'}
+                            </span>
+                          )}
+                        </div>
+                        {isManualSuperYtd && (
+                          <button
+                            type="button"
+                            onClick={() => resetFieldToAuto('super')}
+                            className="text-[#81F5F5] text-[10px] hover:underline cursor-pointer"
+                          >
+                            Reset to Auto
+                          </button>
+                        )}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formData.superannuation_ytd ?? ''}
+                          onChange={(e) => {
+                            setIsManualSuperYtd(true)
+                            setFormData((prev) => ({
+                              ...prev,
+                              superannuation_ytd: parseFloat(e.target.value) || 0,
+                            }))
+                          }}
+                          placeholder="e.g. 2150.00"
+                          className={`w-full bg-[#001724] border rounded-xl pl-7 pr-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-[#81F5F5]/50 ${
+                            isManualSuperYtd ? 'border-amber-500/60' : 'border-white/20'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

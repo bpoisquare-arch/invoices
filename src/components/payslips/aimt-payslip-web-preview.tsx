@@ -14,6 +14,14 @@ export default function AIMTPayslipWebPreview({ payslip }: AIMTPayslipWebPreview
   }
   const formatRate = (val: number) => `$${(Number(val) || 0).toFixed(4)}`
 
+  const showYtd = Boolean(payslip.include_ytd)
+  const wagesYtd = payslip.wages_ytd !== undefined ? payslip.wages_ytd : payslip.wages_total
+  const taxYtd = payslip.tax_ytd !== undefined ? payslip.tax_ytd : payslip.tax_total
+  const superYtd =
+    payslip.superannuation_ytd !== undefined
+      ? payslip.superannuation_ytd
+      : payslip.superannuation_total ?? payslip.superannuation_amount ?? 0
+
   return (
     <div className="w-full max-w-[820px] min-h-[960px] mx-auto bg-white text-[#0f172a] shadow-xl rounded-lg p-10 sm:p-14 font-sans border border-slate-200 print:border-none print:shadow-none print:p-0 transition-all flex flex-col justify-between">
       <div>
@@ -103,83 +111,110 @@ export default function AIMTPayslipWebPreview({ payslip }: AIMTPayslipWebPreview
           </div>
         </div>
 
-        {/* 4. SALARY & WAGES Section */}
+        {/* 4. SALARY & WAGES Section (With THIS PAY & optional YTD Columns) */}
         <div className="mb-7">
-          <div className="text-right text-xs font-bold text-slate-900 uppercase tracking-wider mb-1.5 pr-1">
-            THIS PAY
-          </div>
-          <div className="border-t-2 border-b-2 border-slate-300 py-2 px-3 text-xs font-bold uppercase tracking-wider grid grid-cols-12 text-slate-900">
-            <div className="col-span-6">SALARY & WAGES</div>
-            <div className="col-span-2 text-right"></div>
-            <div className="col-span-2 text-right">RATE</div>
-            <div className="col-span-2 text-right"></div>
+          <div className="flex justify-end items-center text-xs font-bold text-slate-900 uppercase tracking-wider mb-1.5 px-3">
+            <span className="w-28 text-right">THIS PAY</span>
+            {showYtd && <span className="w-28 text-right">YTD</span>}
           </div>
 
-          <div className="py-3 px-3 text-[13px] grid grid-cols-12 text-slate-800 items-center">
-            <div className="col-span-6 font-medium">{payslip.wages_description || 'Ordinary Hours'}</div>
-            <div className="col-span-2 text-right font-mono text-xs">
+          <div className="border-t-2 border-b-2 border-slate-300 py-2 px-3 text-xs font-bold uppercase tracking-wider flex items-center text-slate-900">
+            <div className="flex-1">SALARY & WAGES</div>
+            <div className="w-16"></div>
+            <div className="w-24 text-right">RATE</div>
+            <div className="w-28"></div>
+            {showYtd && <div className="w-28"></div>}
+          </div>
+
+          <div className="py-3 px-3 text-[13px] flex items-center text-slate-800">
+            <div className="flex-1 font-medium truncate pr-3">{payslip.wages_description || 'Ordinary Hours'}</div>
+            <div className="w-16 text-right font-mono text-xs">
               {formatHours(payslip.ordinary_hours)}
             </div>
-            <div className="col-span-2 text-right font-mono text-xs">
+            <div className="w-24 text-right font-mono text-xs">
               {formatRate(payslip.hourly_rate)}
             </div>
-            <div className="col-span-2 text-right font-bold text-slate-900">
+            <div className="w-28 text-right font-mono font-bold text-slate-900">
               {formatCurrency(payslip.wages_amount)}
             </div>
+            {showYtd && (
+              <div className="w-28 text-right font-mono font-semibold text-slate-700">
+                {formatCurrency(wagesYtd)}
+              </div>
+            )}
           </div>
 
-          <div className="bg-slate-100 border-t border-b border-slate-300 py-2 px-3 text-[13px] font-bold text-slate-900 grid grid-cols-12">
-            <div className="col-span-6">TOTAL</div>
-            <div className="col-span-6 text-right font-bold">
-              {formatCurrency(payslip.wages_total)}
-            </div>
+          <div className="bg-slate-100 border-t border-b border-slate-300 py-2 px-3 text-[13px] font-bold text-slate-900 flex items-center">
+            <div className="flex-1">TOTAL</div>
+            <div className="w-16"></div>
+            <div className="w-24"></div>
+            <div className="w-28 text-right font-mono font-bold">{formatCurrency(payslip.wages_total)}</div>
+            {showYtd && (
+              <div className="w-28 text-right font-mono font-bold">{formatCurrency(wagesYtd)}</div>
+            )}
           </div>
         </div>
 
-        {/* 5. TAX Section */}
+        {/* 5. TAX Section (With THIS PAY & optional YTD Columns) */}
         <div className="mb-7">
-          <div className="border-t-2 border-b-2 border-slate-300 py-2 px-3 text-xs font-bold uppercase tracking-wider grid grid-cols-12 text-slate-900">
-            <div className="col-span-8">TAX</div>
-            <div className="col-span-4 text-right"></div>
+          <div className="border-t-2 border-b-2 border-slate-300 py-2 px-3 text-xs font-bold uppercase tracking-wider flex items-center text-slate-900">
+            <div className="flex-1">TAX</div>
+            <div className="w-28"></div>
+            {showYtd && <div className="w-28"></div>}
           </div>
 
-          <div className="py-3 px-3 text-[13px] grid grid-cols-12 text-slate-800 items-center">
-            <div className="col-span-8 font-medium">{payslip.tax_description || 'PAYG'}</div>
-            <div className="col-span-4 text-right font-bold text-slate-900">
+          <div className="py-3 px-3 text-[13px] flex items-center text-slate-800">
+            <div className="flex-1 font-medium truncate pr-3">{payslip.tax_description || 'PAYG'}</div>
+            <div className="w-28 text-right font-mono font-bold text-slate-900">
               {formatCurrency(payslip.tax_amount)}
             </div>
+            {showYtd && (
+              <div className="w-28 text-right font-mono font-semibold text-slate-700">
+                {formatCurrency(taxYtd)}
+              </div>
+            )}
           </div>
 
-          <div className="bg-slate-100 border-t border-b border-slate-300 py-2 px-3 text-[13px] font-bold text-slate-900 grid grid-cols-12">
-            <div className="col-span-8">TOTAL</div>
-            <div className="col-span-4 text-right font-bold">
-              {formatCurrency(payslip.tax_total)}
-            </div>
+          <div className="bg-slate-100 border-t border-b border-slate-300 py-2 px-3 text-[13px] font-bold text-slate-900 flex items-center">
+            <div className="flex-1">TOTAL</div>
+            <div className="w-28 text-right font-mono font-bold">{formatCurrency(payslip.tax_total)}</div>
+            {showYtd && (
+              <div className="w-28 text-right font-mono font-bold">{formatCurrency(taxYtd)}</div>
+            )}
           </div>
         </div>
 
-        {/* 5b. SUPERANNUATION Section (Optional, Placed after TAX and before PAYMENT DETAILS) */}
+        {/* 5b. SUPERANNUATION Section (With THIS PAY & optional YTD Columns) */}
         {(payslip.include_superannuation || Number(payslip.superannuation_amount || 0) > 0) && (
           <div className="mb-7">
-            <div className="border-t-2 border-b-2 border-slate-300 py-2 px-3 text-xs font-bold uppercase tracking-wider grid grid-cols-12 text-slate-900">
-              <div className="col-span-8">SUPERANNUATION</div>
-              <div className="col-span-4 text-right"></div>
+            <div className="border-t-2 border-b-2 border-slate-300 py-2 px-3 text-xs font-bold uppercase tracking-wider flex items-center text-slate-900">
+              <div className="flex-1">SUPERANNUATION</div>
+              <div className="w-28"></div>
+              {showYtd && <div className="w-28"></div>}
             </div>
 
-            <div className="py-3 px-3 text-[13px] grid grid-cols-12 text-slate-800 items-center">
-              <div className="col-span-8 font-medium">
+            <div className="py-3 px-3 text-[13px] flex items-center text-slate-800">
+              <div className="flex-1 font-medium truncate pr-3">
                 {payslip.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122'}
               </div>
-              <div className="col-span-4 text-right font-bold text-slate-900">
+              <div className="w-28 text-right font-mono font-bold text-slate-900">
                 {formatCurrency(payslip.superannuation_amount || 0)}
               </div>
+              {showYtd && (
+                <div className="w-28 text-right font-mono font-semibold text-slate-700">
+                  {formatCurrency(superYtd)}
+                </div>
+              )}
             </div>
 
-            <div className="bg-slate-100 border-t border-b border-slate-300 py-2 px-3 text-[13px] font-bold text-slate-900 grid grid-cols-12">
-              <div className="col-span-8">TOTAL</div>
-              <div className="col-span-4 text-right font-bold">
+            <div className="bg-slate-100 border-t border-b border-slate-300 py-2 px-3 text-[13px] font-bold text-slate-900 flex items-center">
+              <div className="flex-1">TOTAL</div>
+              <div className="w-28 text-right font-mono font-bold">
                 {formatCurrency(payslip.superannuation_total ?? payslip.superannuation_amount ?? 0)}
               </div>
+              {showYtd && (
+                <div className="w-28 text-right font-mono font-bold">{formatCurrency(superYtd)}</div>
+              )}
             </div>
           </div>
         )}

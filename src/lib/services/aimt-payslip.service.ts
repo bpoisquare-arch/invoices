@@ -35,17 +35,23 @@ export interface AIMTPayslip {
   hourly_rate: number
   wages_amount: number
   wages_total: number
+  wages_ytd?: number
 
   // Tax Table
   tax_description: string
   tax_amount: number
   tax_total: number
+  tax_ytd?: number
 
   // Superannuation Table (Optional)
   include_superannuation?: boolean
   superannuation_description?: string
   superannuation_amount?: number
   superannuation_total?: number
+  superannuation_ytd?: number
+
+  // Optional Cumulative YTD Flag
+  include_ytd?: boolean
 
   // Payment Details Table
   bank_account_masked: string
@@ -83,6 +89,10 @@ export const DEFAULT_AIMT_PAYSLIP: Omit<AIMTPayslip, 'id' | 'created_at'> = {
   tax_description: 'PAYG',
   tax_amount: 928.0,
   tax_total: 928.0,
+  wages_ytd: 4000.0,
+  tax_ytd: 928.0,
+  superannuation_ytd: 0.0,
+  include_ytd: false,
   include_superannuation: false,
   superannuation_description: 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122',
   superannuation_amount: 0.0,
@@ -137,14 +147,18 @@ function fromDbRow(row: any): AIMTPayslip {
     hourly_rate: Number(row.hourlyRate ?? row.hourly_rate ?? 0),
     wages_amount: Number(row.wagesAmount ?? row.wages_amount ?? 0),
     wages_total: Number(row.wagesTotal ?? row.wages_total ?? 0),
+    wages_ytd: Number(row.wagesYtd ?? row.wages_ytd ?? row.wagesTotal ?? row.wages_total ?? 0),
     tax_description: row.taxDescription || row.tax_description || 'PAYG',
     tax_amount: Number(row.taxAmount ?? row.tax_amount ?? 0),
     tax_total: Number(row.taxTotal ?? row.tax_total ?? 0),
+    tax_ytd: Number(row.taxYtd ?? row.tax_ytd ?? row.taxTotal ?? row.tax_total ?? 0),
+    include_ytd: Boolean(row.includeYtd ?? row.include_ytd ?? false),
     include_superannuation: hasSuper,
     superannuation_description:
       row.superannuationDescription || row.superannuation_description || 'SGC - HOSTPLUS Superannuation Fund - Industry - 102860122',
     superannuation_amount: Number(row.superannuationAmount ?? row.superannuation_amount ?? 0),
     superannuation_total: Number(row.superannuationTotal ?? row.superannuation_total ?? row.superannuationAmount ?? 0),
+    superannuation_ytd: Number(row.superannuationYtd ?? row.superannuation_ytd ?? row.superannuationTotal ?? row.superannuation_total ?? 0),
     bank_account_masked: row.bankAccountMasked || row.bank_account_masked || '',
     account_name: row.accountName || row.account_name || '',
     payment_reference: row.paymentReference || row.payment_reference || 'AIMT Pay',
@@ -335,7 +349,35 @@ export const aimtPayslipService = {
           paymentAmount: Number(payload.payment_amount || 0),
         },
       })
-      return { success: true, data: fromDbRow(row) }
+
+      // Persist YTD columns directly to MySQL
+      try {
+        const incYtd = payload.include_ytd ? 1 : 0
+        const wYtd = Number(payload.wages_ytd ?? payload.wages_total ?? 0)
+        const tYtd = Number(payload.tax_ytd ?? payload.tax_total ?? 0)
+        const sYtd = Number(payload.superannuation_ytd ?? payload.superannuation_total ?? payload.superannuation_amount ?? 0)
+        await prisma.$executeRawUnsafe(
+          'UPDATE aimt_payslips SET include_ytd = ?, wages_ytd = ?, tax_ytd = ?, superannuation_ytd = ? WHERE id = ?',
+          incYtd,
+          wYtd,
+          tYtd,
+          sYtd,
+          id
+        )
+      } catch (rawErr) {
+        // Non-blocking
+      }
+
+      return {
+        success: true,
+        data: {
+          ...fromDbRow(row),
+          include_ytd: payload.include_ytd,
+          wages_ytd: payload.wages_ytd,
+          tax_ytd: payload.tax_ytd,
+          superannuation_ytd: payload.superannuation_ytd,
+        },
+      }
     } catch (e: any) {
       return { success: false, error: e?.message || 'Prisma error' }
     }
