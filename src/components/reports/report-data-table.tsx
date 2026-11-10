@@ -53,10 +53,8 @@ import { formatToDDMMYY } from '@/lib/utils'
 import { SearchableCombobox, type ComboboxOption } from '@/components/ui/combobox'
 
 export const PREDEFINED_AGENTS = [
-  'ABC Consultants',
   'ABC Overseas Consultants',
   'Abdul Education',
-  'AIMT Student',
   'Brightpath Consultancy Group',
   'Dream Education',
   'Edlink Australia',
@@ -65,19 +63,26 @@ export const PREDEFINED_AGENTS = [
   'Marriott Education',
   'Muskan Consultants',
   'NexGen Consultants',
-  'No Agent ( Internal Student )',
-  'Oceanian VIC',
-  'OMEC',
+  'Oceanian Migration And Education Consultants',
   'Rashi (Study Directions)',
   'Sanguine Migration',
   'Simran Consultant',
   'Student Pro Education Consultancy',
   'Study Directions',
-  'Ubaid Eduation',
+  'Ubaid Raza',
   'Umais Ahmed',
-  'VICPAK',
+  'VicPak Education Migration',
   'World Class Consultant',
-  'Zunair Agent',
+  'ZEN Migration & Education Services',
+  'Zunair Imtiaz',
+  'ASEES AHMED',
+  'Solve Education & Migration',
+  'Suzzie Dollie',
+  'IEXCEL GROUP',
+  'AI Global Education & Migration',
+  'ASEES UR REHMAN',
+  'Optimistic Education',
+  'UniKey Global',
 ]
 
 export const AGENT_OPTIONS: ComboboxOption[] = [
@@ -110,36 +115,28 @@ function matchSpecificAgent(recordAgent: string, targetAgent: string): boolean {
   if (rNorm === tNorm) return true
 
   switch (targetAgent) {
-    case 'ABC Consultants':
-      return rNorm.includes('abcconsult') && !rNorm.includes('overseas')
     case 'ABC Overseas Consultants':
       return rNorm.includes('abcoverseas') || (rNorm.includes('abc') && rNorm.includes('overseas'))
     case 'Abdul Education':
-      return rNorm.includes('abduledu')
-    case 'AIMT Student':
-      return rNorm.includes('aimtstudent')
+      return rNorm.includes('abduledu') || rNorm.includes('abdul')
     case 'Brightpath Consultancy Group':
       return rNorm.includes('brightpath') || (rNorm.includes('bright') && rNorm.includes('path'))
     case 'Dream Education':
-      return rNorm.includes('dreamedu')
+      return rNorm.includes('dreamedu') || rNorm.includes('dream')
     case 'Edlink Australia':
       return rNorm.includes('edlink') && rNorm.includes('australia')
     case 'Edlink Pakistan':
       return rNorm.includes('edlink') && rNorm.includes('pakistan')
     case 'Grace International Education':
-      return rNorm.includes('graceintern') || (rNorm.includes('grace') && rNorm.includes('international'))
+      return rNorm.includes('graceintern') || (rNorm.includes('grace') && rNorm.includes('international')) || rNorm.includes('grace')
     case 'Marriott Education':
       return rNorm.includes('marriott') || rNorm.includes('marriot')
     case 'Muskan Consultants':
       return rNorm.includes('muskan')
     case 'NexGen Consultants':
       return rNorm.includes('nexgen')
-    case 'No Agent ( Internal Student )':
-      return rNorm.includes('noagent') || rNorm.includes('internalstudent')
-    case 'Oceanian VIC':
-      return rNorm.includes('oceanian')
-    case 'OMEC':
-      return rNorm.includes('omec')
+    case 'Oceanian Migration And Education Consultants':
+      return rNorm.includes('oceanian') || rNorm.includes('omec')
     case 'Rashi (Study Directions)':
       return rNorm.includes('rashi')
     case 'Sanguine Migration':
@@ -147,19 +144,37 @@ function matchSpecificAgent(recordAgent: string, targetAgent: string): boolean {
     case 'Simran Consultant':
       return rNorm.includes('simran')
     case 'Student Pro Education Consultancy':
-      return rNorm.includes('studentpro')
+      return rNorm.includes('studentpro') || (rNorm.includes('student') && rNorm.includes('pro'))
     case 'Study Directions':
       return rNorm.includes('studydirection') && !rNorm.includes('rashi')
-    case 'Ubaid Eduation':
+    case 'Ubaid Raza':
       return rNorm.includes('ubaid')
     case 'Umais Ahmed':
       return rNorm.includes('umais')
-    case 'VICPAK':
+    case 'VicPak Education Migration':
       return rNorm.includes('vicpak')
     case 'World Class Consultant':
-      return rNorm.includes('worldclass')
-    case 'Zunair Agent':
+      return rNorm.includes('worldclass') || (rNorm.includes('world') && rNorm.includes('class'))
+    case 'ZEN Migration & Education Services':
+      return rNorm.includes('zen')
+    case 'Zunair Imtiaz':
       return rNorm.includes('zunair')
+    case 'ASEES AHMED':
+      return rNorm.includes('asees') && (rNorm.includes('ahmed') || rNorm.includes('ahmad')) && !rNorm.includes('rehman') && !rNorm.includes('rahman')
+    case 'Solve Education & Migration':
+      return rNorm.includes('solve')
+    case 'Suzzie Dollie':
+      return rNorm.includes('suzzie') || rNorm.includes('dollie')
+    case 'IEXCEL GROUP':
+      return rNorm.includes('iexcel')
+    case 'AI Global Education & Migration':
+      return rNorm.includes('aiglobal') || (rNorm.includes('ai') && rNorm.includes('global'))
+    case 'ASEES UR REHMAN':
+      return rNorm.includes('asees') && (rNorm.includes('rehman') || rNorm.includes('rahman'))
+    case 'Optimistic Education':
+      return rNorm.includes('optimistic')
+    case 'UniKey Global':
+      return rNorm.includes('unikey')
     default:
       return rNorm.includes(tNorm) || tNorm.includes(rNorm)
   }
