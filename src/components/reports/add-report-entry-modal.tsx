@@ -41,6 +41,8 @@ import { useAuthRole } from '@/lib/hooks/use-auth-role'
 import type { AimtReportRecord } from '@/types/database.types'
 import type { ReportSlip } from '@/types/report-slip.types'
 import ManageSlipsSection from '@/components/reports/manage-slips-section'
+import { SearchableCombobox, type ComboboxOption } from '@/components/ui/combobox'
+import { PREDEFINED_AGENTS } from '@/components/reports/report-data-table'
 
 interface AddReportEntryModalProps {
   isOpen: boolean
@@ -188,6 +190,14 @@ export default function AddReportEntryModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isManualTotalFee, setIsManualTotalFee] = useState(false)
   const [statusModified, setStatusModified] = useState(false)
+
+  const agentOptions: ComboboxOption[] = React.useMemo(() => {
+    const list = PREDEFINED_AGENTS.map((a) => ({ value: a, label: a }))
+    if (formData.agent && !PREDEFINED_AGENTS.includes(formData.agent)) {
+      return [{ value: formData.agent, label: formData.agent }, ...list]
+    }
+    return list
+  }, [formData.agent])
 
   // Populate or reset form when modal opens
   useEffect(() => {
@@ -739,11 +749,15 @@ export default function AddReportEntryModal({
                     {/* Agent */}
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label className="text-xs font-bold text-slate-700">Agent / Agency</Label>
-                      <Input
+                      <SearchableCombobox
+                        options={agentOptions}
                         value={formData.agent}
-                        onChange={(e) => handleChange('agent', e.target.value)}
-                        placeholder="e.g. Edlink Australia"
-                        className="h-9 text-xs bg-white border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl shadow-2xs"
+                        onSelect={(val) => handleChange('agent', val)}
+                        placeholder="Select agent / agency..."
+                        searchPlaceholder="Search agent..."
+                        emptyText="No agents found in list."
+                        popoverWidth="w-full sm:w-[420px]"
+                        triggerClassName="w-full h-9 text-xs bg-white border-slate-200 text-slate-900 focus:border-[#009D9E] focus:ring-1 focus:ring-[#009D9E] rounded-xl shadow-2xs font-medium"
                       />
                     </div>
 

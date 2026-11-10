@@ -51,39 +51,9 @@ import type { AimtReportRecord } from '@/types/database.types'
 import TablePagination from '@/components/ui/table-pagination'
 import { formatToDDMMYY } from '@/lib/utils'
 import { SearchableCombobox, type ComboboxOption } from '@/components/ui/combobox'
+import { PREDEFINED_AGENTS } from '@/lib/constants/aimt-agents'
 
-export const PREDEFINED_AGENTS = [
-  'ABC Overseas Consultants',
-  'Abdul Education',
-  'Brightpath Consultancy Group',
-  'Dream Education',
-  'Edlink Australia',
-  'Edlink Pakistan',
-  'Grace International Education',
-  'Marriott Education',
-  'Muskan Consultants',
-  'NexGen Consultants',
-  'Oceanian Migration And Education Consultants',
-  'Rashi (Study Directions)',
-  'Sanguine Migration',
-  'Simran Consultant',
-  'Student Pro Education Consultancy',
-  'Study Directions',
-  'Ubaid Raza',
-  'Umais Ahmed',
-  'VicPak Education Migration',
-  'World Class Consultant',
-  'ZEN Migration & Education Services',
-  'Zunair Imtiaz',
-  'ASEES AHMED',
-  'Solve Education & Migration',
-  'Suzzie Dollie',
-  'IEXCEL GROUP',
-  'AI Global Education & Migration',
-  'ASEES UR REHMAN',
-  'Optimistic Education',
-  'UniKey Global',
-]
+export { PREDEFINED_AGENTS }
 
 export const AGENT_OPTIONS: ComboboxOption[] = [
   { value: 'all', label: 'All' },

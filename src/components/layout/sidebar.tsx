@@ -21,6 +21,7 @@ import {
   Sparkles,
   Headphones,
   Check,
+  BadgePercent,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -310,7 +311,8 @@ export default function AppSidebar() {
 
   const isInstallmentsActive = pathname.startsWith('/installments')
   const isPayslipsActive = pathname.startsWith('/payslips')
-  const isReportsActive = pathname.startsWith('/reports')
+  const isReportsActive = pathname.startsWith('/reports') && !pathname.startsWith('/reports/commissions')
+  const isAimtCommissionsActive = pathname.startsWith('/reports/commissions')
   const isEdLinkPayslipsActive = pathname.startsWith('/edlink/payslips')
   const isStcInstallmentsActive = pathname.startsWith('/stc/installments')
   const isStcPayslipsActive = pathname.startsWith('/stc/payslips')
@@ -322,10 +324,15 @@ export default function AppSidebar() {
   const [installmentsOpen, setInstallmentsOpen] = useState(true)
   const [payslipsOpen, setPayslipsOpen] = useState(true)
   const [reportsOpen, setReportsOpen] = useState(true)
+  const [commissionsOpen, setCommissionsOpen] = useState(true)
   const [edlinkPayslipsOpen, setEdlinkPayslipsOpen] = useState(true)
   const [stcInstallmentsOpen, setStcInstallmentsOpen] = useState(true)
   const [stcPayslipsOpen, setStcPayslipsOpen] = useState(true)
   const [stcReportsOpen, setStcReportsOpen] = useState(true)
+
+  useEffect(() => {
+    if (isAimtCommissionsActive) setCommissionsOpen(true)
+  }, [isAimtCommissionsActive])
 
   useEffect(() => {
     if (isLahoriLoungePayslipsActive) setLahoriLoungePayslipsOpen(true)
@@ -905,6 +912,68 @@ export default function AppSidebar() {
                             >
                               <FileText className="size-3.5 shrink-0" />
                               <span>Report Management</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* 4. Agents Commission & Payouts Module */}
+            <SidebarGroup className="p-0 mt-3">
+              <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-[#81F5F5]/70 px-2.5 mb-1 group-data-[collapsible=icon]:hidden">
+                Commissions & Payouts
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <Collapsible
+                    open={commissionsOpen}
+                    onOpenChange={setCommissionsOpen}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton
+                            tooltip="Agents Commission & Payouts"
+                            className={`text-[13px] font-medium transition-all hover:bg-[#0E3E5B]/80 hover:text-white rounded-lg px-2.5 py-2 ${
+                              isAimtCommissionsActive
+                                ? 'text-[#81F5F5] bg-[#0E3E5B]'
+                                : 'text-slate-300'
+                            }`}
+                          />
+                        }
+                      >
+                        <BadgePercent className="size-4 shrink-0 text-[#81F5F5]" />
+                        <span className="font-semibold text-slate-200">Agents Commission & Payouts</span>
+                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[panel-open]/collapsible:rotate-90 text-slate-400 group-data-[collapsible=icon]:hidden" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="border-l border-white/15 ml-3.5 pl-2.5 space-y-1 mt-1.5 py-0.5">
+                          {/* Commissions & Payouts Overview */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/reports/commissions" onClick={handleNavClick} />}
+                              isActive={pathname === '/reports/commissions'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <FileSpreadsheet className="size-3.5 shrink-0" />
+                              <span>Commissions & Payouts</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+
+                          {/* Commission Settings */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/reports/commissions/settings" onClick={handleNavClick} />}
+                              isActive={pathname === '/reports/commissions/settings'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <Settings className="size-3.5 shrink-0" />
+                              <span>Commission Settings</span>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         </SidebarMenuSub>
