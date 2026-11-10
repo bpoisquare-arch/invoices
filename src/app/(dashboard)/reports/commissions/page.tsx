@@ -96,20 +96,34 @@ export default function AgentCommissionsPage() {
     fetchData()
   }, [fetchData])
 
-  // Helper to extract fee paid by student
+  // Helper to extract fee paid by student - PRIORITY is strictly "Total Paid ($)"
   const getFeePaid = useCallback((r: AimtReportRecord): number => {
-    if (typeof r.paid_amount === 'number' && r.paid_amount > 0) return r.paid_amount
-    if (typeof (r as any).initial_payment === 'number' && (r as any).initial_payment > 0) return (r as any).initial_payment
-    if (typeof (r as any).total_paid === 'number' && (r as any).total_paid > 0) return (r as any).total_paid
+    // 1. Direct total_paid (The "Total Paid ($)" field in Edit Student Record)
+    const tpRaw = (r as any).total_paid ?? (r.extra_data as any)?.total_paid
+    if (tpRaw !== undefined && tpRaw !== null && tpRaw !== '') {
+      const tpNum = typeof tpRaw === 'number' ? tpRaw : parseFloat(String(tpRaw).replace(/[^0-9.-]+/g, ''))
+      if (!isNaN(tpNum) && tpNum >= 0) {
+        return tpNum
+      }
+    }
 
+    // 2. Fallback: Compute from total_fee - (pending_amount + yet_to_raised)
     const total = Number(r.total_fee) || 0
     const pending = Number(r.pending_amount) || 0
     const yet =
       typeof r.yet_to_raised === 'number'
         ? r.yet_to_raised
         : parseFloat(String(r.yet_to_raised || '0').replace(/[^0-9.-]+/g, '')) || 0
-    const calc = total - (pending + yet)
-    return calc > 0 ? calc : 0
+    if (total > 0 && (pending > 0 || yet > 0)) {
+      const calc = Math.max(0, Math.round((total - (pending + yet)) * 100) / 100)
+      if (calc > 0) return calc
+    }
+
+    // 3. Fallback to paid_amount or initial_payment only if total_paid is completely absent
+    if (typeof r.paid_amount === 'number' && r.paid_amount > 0) return r.paid_amount
+    if (typeof (r as any).initial_payment === 'number' && (r as any).initial_payment > 0) return (r as any).initial_payment
+
+    return 0
   }, [])
 
   // Helper to find configured rule for an agent name (with trimmed fuzzy fallback)
