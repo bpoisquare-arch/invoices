@@ -33,7 +33,7 @@ export default function AgentCommissionSettingsPage() {
   const [rules, setRules] = useState<Record<string, AgentCommissionRule>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeFilter, setActiveFilter] = useState<'all' | 'configured' | 'percentage' | 'fixed' | 'unconfigured'>('all')
+  const [activeFilter, setActiveFilter] = useState<'all' | 'configured' | 'percentage' | 'fixed' | 'net_remainder' | 'unconfigured'>('all')
 
   // Selected agent for configuration modal
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
@@ -69,6 +69,7 @@ export default function AgentCommissionSettingsPage() {
     const total = agents.length
     let percentageCount = 0
     let fixedCount = 0
+    let remainderCount = 0
     let configuredCount = 0
 
     agents.forEach((agent) => {
@@ -77,6 +78,7 @@ export default function AgentCommissionSettingsPage() {
         configuredCount++
         if (rule.type === 'percentage') percentageCount++
         if (rule.type === 'fixed') fixedCount++
+        if (rule.type === 'net_remainder') remainderCount++
       }
     })
 
@@ -86,6 +88,7 @@ export default function AgentCommissionSettingsPage() {
       total,
       percentageCount,
       fixedCount,
+      remainderCount,
       configuredCount,
       unconfiguredCount,
     }
@@ -102,6 +105,7 @@ export default function AgentCommissionSettingsPage() {
       if (activeFilter === 'configured') return !!rule
       if (activeFilter === 'percentage') return rule?.type === 'percentage'
       if (activeFilter === 'fixed') return rule?.type === 'fixed'
+      if (activeFilter === 'net_remainder') return rule?.type === 'net_remainder'
       if (activeFilter === 'unconfigured') return !rule
       return true
     })
@@ -348,6 +352,17 @@ export default function AgentCommissionSettingsPage() {
             </button>
             <button
               type="button"
+              onClick={() => setActiveFilter('net_remainder')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeFilter === 'net_remainder'
+                  ? 'bg-purple-700 text-white shadow-xs'
+                  : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
+              }`}
+            >
+              Remainder ({stats.remainderCount})
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveFilter('unconfigured')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeFilter === 'unconfigured'
@@ -399,6 +414,7 @@ export default function AgentCommissionSettingsPage() {
                   const isConfigured = !!rule
                   const isPercentage = rule?.type === 'percentage'
                   const isFixed = rule?.type === 'fixed'
+                  const isRemainder = rule?.type === 'net_remainder'
 
                   const initials = agent
                     .split(' ')
@@ -444,10 +460,15 @@ export default function AgentCommissionSettingsPage() {
                               <Percent className="size-3 text-teal-600" />
                               Percentage (%)
                             </span>
-                          ) : (
+                          ) : isFixed ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 font-bold text-xs">
                               <DollarSign className="size-3 text-indigo-600" />
                               Fixed ($ AUD)
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 text-purple-800 border border-purple-200 font-bold text-xs">
+                              <Calculator className="size-3 text-purple-600" />
+                              Net Remainder
                             </span>
                           )
                         ) : (
@@ -462,8 +483,10 @@ export default function AgentCommissionSettingsPage() {
                         {isConfigured ? (
                           isPercentage ? (
                             <span className="text-teal-700 text-sm">{rule.rate}%</span>
-                          ) : (
+                          ) : isFixed ? (
                             <span className="text-indigo-700 text-sm">${rule.rate.toLocaleString()} AUD</span>
+                          ) : (
+                            <span className="text-purple-700 text-sm">${rule.rate.toLocaleString()} Base</span>
                           )
                         ) : (
                           <span className="text-slate-400">-</span>
@@ -477,9 +500,13 @@ export default function AgentCommissionSettingsPage() {
                             <span className="text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200/60">
                               Fee Paid × <strong className="text-teal-700">{rule.rate}%</strong>
                             </span>
-                          ) : (
+                          ) : isFixed ? (
                             <span className="text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200/60">
                               Flat <strong className="text-indigo-700">${rule.rate.toLocaleString()} AUD</strong> / Student
+                            </span>
+                          ) : (
+                            <span className="text-purple-900 bg-purple-50 px-2 py-1 rounded-md border border-purple-200/60">
+                              Course Fee - <strong className="text-purple-700">${rule.rate.toLocaleString()}</strong> College
                             </span>
                           )
                         ) : (

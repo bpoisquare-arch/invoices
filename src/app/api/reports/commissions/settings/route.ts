@@ -36,9 +36,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (type !== 'percentage' && type !== 'fixed') {
+    if (type !== 'percentage' && type !== 'fixed' && type !== 'net_remainder') {
       return NextResponse.json(
-        { success: false, error: 'Commission type must be either "percentage" or "fixed"' },
+        { success: false, error: 'Commission type must be "percentage", "fixed", or "net_remainder"' },
         { status: 400 }
       )
     }

@@ -2,12 +2,12 @@ import fs from 'fs'
 import path from 'path'
 import { PREDEFINED_AGENTS } from '@/lib/constants/aimt-agents'
 
-export type CommissionType = 'percentage' | 'fixed'
+export type CommissionType = 'percentage' | 'fixed' | 'net_remainder'
 
 export interface AgentCommissionRule {
   agentName: string
   type: CommissionType
-  rate: number // If percentage: e.g. 35 for 35%. If fixed: e.g. 4000 for $4,000 AUD
+  rate: number // If percentage: e.g. 35 for 35%. If fixed: e.g. 4000 for $4,000 AUD. If net_remainder: e.g. 4000 for College Retention Base ($ AUD)
   notes?: string
   updatedAt: string
 }
