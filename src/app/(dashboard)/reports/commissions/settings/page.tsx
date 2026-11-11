@@ -461,13 +461,13 @@ export default function AgentCommissionSettingsPage() {
                               Percentage (%)
                             </span>
                           ) : isFixed ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 font-bold text-xs">
-                              <DollarSign className="size-3 text-indigo-600" />
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs">
+                              <DollarSign className="size-3 text-blue-600" />
                               Fixed ($ AUD)
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 text-purple-800 border border-purple-200 font-bold text-xs">
-                              <Calculator className="size-3 text-purple-600" />
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-300 font-bold text-xs">
+                              <Building2 className="size-3 text-amber-600" />
                               Net Remainder
                             </span>
                           )
@@ -484,9 +484,9 @@ export default function AgentCommissionSettingsPage() {
                           isPercentage ? (
                             <span className="text-teal-700 text-sm">{rule.rate}%</span>
                           ) : isFixed ? (
-                            <span className="text-indigo-700 text-sm">${rule.rate.toLocaleString()} AUD</span>
+                            <span className="text-blue-700 text-sm">${rule.rate.toLocaleString()} AUD</span>
                           ) : (
-                            <span className="text-purple-700 text-sm">${rule.rate.toLocaleString()} Base</span>
+                            <span className="text-amber-800 text-sm">${rule.rate.toLocaleString()} Base</span>
                           )
                         ) : (
                           <span className="text-slate-400">-</span>
@@ -501,12 +501,12 @@ export default function AgentCommissionSettingsPage() {
                               Fee Paid × <strong className="text-teal-700">{rule.rate}%</strong>
                             </span>
                           ) : isFixed ? (
-                            <span className="text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200/60">
-                              Flat <strong className="text-indigo-700">${rule.rate.toLocaleString()} AUD</strong> / Student
+                            <span className="text-blue-800 bg-blue-50/70 px-2 py-1 rounded-md border border-blue-200/80">
+                              Flat <strong className="text-blue-700">${rule.rate.toLocaleString()} AUD</strong> / Student
                             </span>
                           ) : (
-                            <span className="text-purple-900 bg-purple-50 px-2 py-1 rounded-md border border-purple-200/60">
-                              Course Fee - <strong className="text-purple-700">${rule.rate.toLocaleString()}</strong> College
+                            <span className="text-amber-950 bg-amber-50 px-2 py-1 rounded-md border border-amber-300/80">
+                              Course Fee - <strong className="text-amber-700">${rule.rate.toLocaleString()}</strong> College
                             </span>
                           )
                         ) : (

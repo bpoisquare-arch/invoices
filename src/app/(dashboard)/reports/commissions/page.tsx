@@ -793,9 +793,9 @@ export default function AgentCommissionsPage() {
                 className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden transition-all duration-200 hover:border-slate-300"
               >
                 {/* Agency Row Header */}
-                <div className="p-4 sm:p-4.5 bg-gradient-to-r from-slate-50/70 via-white to-slate-50/40 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                  {/* Left: Accordion Dropdown Trigger + Agency Name + Rule badge */}
-                  <div className="flex items-center gap-3 min-w-0">
+                <div className="p-3.5 sm:p-4 bg-gradient-to-r from-slate-50/70 via-white to-slate-50/40 border-b border-slate-100 flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-3 sm:gap-4">
+                  {/* Left: Accordion Dropdown Trigger + Agency Avatar + Agency Name + Rule badge */}
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                     {/* Expand/Collapse Dropdown Toggle Button */}
                     <button
                       type="button"
@@ -811,7 +811,7 @@ export default function AgentCommissionsPage() {
                     </button>
 
                     {/* Agency Avatar */}
-                    <div className="size-10 rounded-xl bg-gradient-to-br from-[#003D5C] to-[#002233] text-cyan-300 font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs border border-cyan-500/20">
+                    <div className="size-9 sm:size-10 rounded-xl bg-gradient-to-br from-[#003D5C] to-[#002233] text-cyan-300 font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs border border-cyan-500/20">
                       {initials || 'AG'}
                     </div>
 
@@ -825,13 +825,13 @@ export default function AgentCommissionsPage() {
                         >
                           {agency.agentName}
                         </h3>
-                        <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+                        <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 shrink-0">
                           {agency.students.length} Student{agency.students.length > 1 ? 's' : ''}
                         </span>
                       </div>
 
                       {/* Rule Badge */}
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {rule ? (
                           rule.type === 'percentage' ? (
                             <span className="inline-flex items-center gap-1 bg-teal-50 text-teal-800 border border-teal-200 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">
@@ -839,14 +839,14 @@ export default function AgentCommissionsPage() {
                               {rule.rate}% of Paid Fee
                             </span>
                           ) : rule.type === 'fixed' ? (
-                            <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">
-                              <DollarSign className="size-3 text-indigo-600" />
+                            <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">
+                              <DollarSign className="size-3 text-blue-600" />
                               ${rule.rate.toLocaleString()} Flat / Student
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-900 border border-purple-200 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">
-                              <Building2 className="size-3 text-purple-600" />
-                              Course Fee - ${rule.rate.toLocaleString()} College Share
+                            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">
+                              <Building2 className="size-3 text-amber-600" />
+                              Fee - ${rule.rate.toLocaleString()} College Base
                             </span>
                           )
                         ) : (
@@ -862,77 +862,77 @@ export default function AgentCommissionsPage() {
                     </div>
                   </div>
 
-                  {/* Right: Metrics & Actions */}
-                  <div className="flex flex-wrap items-center justify-between xl:justify-end gap-3 sm:gap-4.5 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100">
+                  {/* Right: Metrics & Actions - Responsive Grid/Flex in single line */}
+                  <div className="flex flex-wrap lg:flex-nowrap items-center justify-between 2xl:justify-end gap-2.5 sm:gap-3.5 pt-2.5 2xl:pt-0 border-t 2xl:border-t-0 border-slate-100">
                     {/* Total Course Fee (Sum of student total_fee) */}
-                    <div className="text-left xl:text-right bg-slate-50/80 px-2.5 py-1 rounded-lg border border-slate-200/70">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    <div className="text-left sm:text-right bg-slate-50/90 px-2 py-1 rounded-lg border border-slate-200/70 shrink-0">
+                      <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Total Courses Fee
                       </div>
-                      <div className="font-mono font-bold text-slate-800 text-sm">
+                      <div className="font-mono font-bold text-slate-800 text-xs sm:text-sm">
                         ${agency.totalCourseFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
 
                     {/* Student Fees Paid */}
-                    <div className="text-left xl:text-right">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <div className="text-left sm:text-right shrink-0">
+                      <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400">
                         Student Fee Paid
                       </div>
-                      <div className="font-mono font-bold text-slate-900 text-sm">
+                      <div className="font-mono font-bold text-slate-900 text-xs sm:text-sm">
                         ${agency.totalFeePaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
 
                     {/* Payable */}
-                    <div className="text-left xl:text-right">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-[#009D9E]">
+                    <div className="text-left sm:text-right shrink-0">
+                      <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#009D9E]">
                         Commission Payable
                       </div>
-                      <div className="font-mono font-black text-[#003D5C] text-sm">
+                      <div className="font-mono font-black text-[#003D5C] text-xs sm:text-sm">
                         ${agency.totalPayable.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
 
                     {/* Paid */}
-                    <div className="text-left xl:text-right">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                    <div className="text-left sm:text-right shrink-0">
+                      <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-emerald-600">
                         Paid to Agency
                       </div>
-                      <div className="font-mono font-bold text-emerald-700 text-sm">
+                      <div className="font-mono font-bold text-emerald-700 text-xs sm:text-sm">
                         ${agency.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
 
                     {/* Balance */}
-                    <div className="text-left xl:text-right">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-amber-600">
+                    <div className="text-left sm:text-right shrink-0">
+                      <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-amber-600">
                         Balance Due
                       </div>
-                      <div className="font-mono font-extrabold text-amber-700 text-sm">
+                      <div className="font-mono font-extrabold text-amber-700 text-xs sm:text-sm">
                         ${agency.balanceDue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
 
                     {/* Status Badge */}
-                    <div>
+                    <div className="shrink-0">
                       {agency.status === 'full' ? (
-                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">
-                          <CheckCircle2 className="size-3.5 text-emerald-600" />
-                          Paid in Full
+                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap">
+                          <CheckCircle2 className="size-3 text-emerald-600" />
+                          Paid
                         </span>
                       ) : agency.status === 'partial' ? (
-                        <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">
-                          <Clock className="size-3.5 text-amber-600" />
-                          Partial Paid
+                        <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap">
+                          <Clock className="size-3 text-amber-600" />
+                          Partial
                         </span>
                       ) : agency.status === 'unpaid' ? (
-                        <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-800 border border-rose-200 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">
-                          <AlertCircle className="size-3.5 text-rose-600" />
+                        <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap">
+                          <AlertCircle className="size-3 text-rose-600" />
                           Unpaid
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
                           No Rule
                         </span>
                       )}
@@ -943,7 +943,7 @@ export default function AgentCommissionsPage() {
                       type="button"
                       size="sm"
                       onClick={() => handleOpenAgencyPayout(agency)}
-                      className="bg-[#003D5C] hover:bg-[#002b40] text-cyan-200 font-bold h-9 px-3.5 rounded-xl text-xs gap-1.5 cursor-pointer shadow-xs border border-cyan-500/20"
+                      className="bg-[#003D5C] hover:bg-[#002b40] text-cyan-200 font-bold h-8.5 px-3 rounded-xl text-xs gap-1.5 cursor-pointer shadow-xs border border-cyan-500/20 shrink-0"
                     >
                       <Wallet className="size-3.5 text-cyan-300" />
                       <span>Disburse Payout</span>
@@ -1148,13 +1148,13 @@ export default function AgentCommissionsPage() {
                               {rule.rate}% of Paid
                             </span>
                           ) : rule.type === 'fixed' ? (
-                            <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-md font-mono text-[11px] font-bold">
-                              <DollarSign className="size-3 text-indigo-600" />
+                            <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md font-mono text-[11px] font-bold">
+                              <DollarSign className="size-3 text-blue-600" />
                               ${rule.rate.toLocaleString()} Flat
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-900 border border-purple-200 px-2 py-0.5 rounded-md font-mono text-[11px] font-bold">
-                              <Building2 className="size-3 text-purple-600" />
+                            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md font-mono text-[11px] font-bold">
+                              <Building2 className="size-3 text-amber-600" />
                               Fee - ${rule.rate.toLocaleString()}
                             </span>
                           )

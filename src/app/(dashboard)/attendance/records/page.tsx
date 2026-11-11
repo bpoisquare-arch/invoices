@@ -2053,22 +2053,22 @@ export default function AttendanceRecordsPage() {
             isWfh
               ? 'bg-sky-50 hover:bg-sky-100 border-sky-300 text-sky-950 shadow-2xs hover:shadow-xs'
               : isMissingOut || isMissingIn
-              ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-950 shadow-2xs hover:shadow-xs'
+              ? 'bg-rose-50 hover:bg-rose-100 border-rose-300 text-rose-950 shadow-2xs hover:shadow-xs'
               : isCurrentlyInOffice
               ? 'bg-emerald-50/70 hover:bg-emerald-100 border-emerald-300 text-emerald-950'
               : isLate || isEarlyLeave
               ? 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-950 shadow-2xs hover:shadow-xs'
               : 'bg-emerald-50/50 hover:bg-emerald-100/80 border-emerald-200/70 text-slate-800'
           }`}
-          title={isWfh ? 'Work From Home (Full Present). Click to edit.' : isCurrentlyInOffice ? 'Currently active in office' : 'Click to edit timings or enter missing Out Time'}
+          title={isWfh ? 'Work From Home (Full Present). Click to edit.' : isCurrentlyInOffice ? 'Currently active in office' : isMissingOut ? 'Missing Out Time! Click to edit and add punch.' : isMissingIn ? 'Missing In Time! Click to edit and add punch.' : 'Click to edit timings'}
         >
           {/* In Time - Out Time */}
           <div className="font-mono text-[11px] font-semibold tracking-tight whitespace-nowrap flex items-center justify-center gap-1">
-            <span className={isMissingIn ? 'text-emerald-800 font-bold bg-emerald-200/80 px-1 rounded' : ''}>
+            <span className={isMissingIn ? 'text-rose-800 font-bold bg-rose-200/90 px-1 rounded' : ''}>
               {hasInTime ? rec.in_time : isMissingIn ? 'Missing In' : '---'}
             </span>
             <span className="text-slate-400">-</span>
-            <span className={isMissingOut ? 'text-emerald-800 font-bold bg-emerald-200/80 px-1 rounded' : isCurrentlyInOffice ? 'text-emerald-700 font-semibold' : ''}>
+            <span className={isMissingOut ? 'text-rose-800 font-bold bg-rose-200/90 px-1 rounded' : isCurrentlyInOffice ? 'text-emerald-700 font-semibold' : ''}>
               {hasOutTime ? rec.out_time : isCurrentlyInOffice ? 'In Office' : isMissingOut ? 'Missing Out' : '---'}
             </span>
           </div>
@@ -2080,7 +2080,7 @@ export default function AttendanceRecordsPage() {
                 isWfh
                   ? 'bg-sky-600 text-white'
                   : isMissingOut || isMissingIn
-                  ? 'bg-emerald-600 text-white'
+                  ? 'bg-rose-600 text-white animate-pulse'
                   : isCurrentlyInOffice
                   ? 'bg-emerald-500 text-white animate-pulse'
                   : isLate || isEarlyLeave
@@ -2090,19 +2090,19 @@ export default function AttendanceRecordsPage() {
             >
               {isWfh ? '🏠' : '⏱'}
             </span>
-            <span className={`font-bold ${isMissingOut || isMissingIn ? 'text-emerald-800' : isWfh ? 'text-sky-900' : isLate || isEarlyLeave ? 'text-amber-800' : 'text-slate-700'}`}>
+            <span className={`font-bold ${isMissingOut || isMissingIn ? 'text-rose-800' : isWfh ? 'text-sky-900' : isLate || isEarlyLeave ? 'text-amber-800' : 'text-slate-700'}`}>
               ({rec.total_working_hours_formatted && rec.total_working_hours_formatted !== '00:00' ? rec.total_working_hours_formatted : isCurrentlyInOffice ? 'Working' : '--'})
             </span>
           </div>
 
           {/* Missing In / Out / Status Pill */}
           {isMissingOut ? (
-            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-0.5 mt-0.5 group-hover/cell:bg-emerald-200 transition-colors">
+            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-900 border border-rose-300 flex items-center gap-0.5 mt-0.5 group-hover/cell:bg-rose-200 transition-colors">
               <span>Missing Out</span>
               <Edit2 className="w-2.5 h-2.5 inline" />
             </span>
           ) : isMissingIn ? (
-            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-0.5 mt-0.5 group-hover/cell:bg-emerald-200 transition-colors">
+            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-900 border border-rose-300 flex items-center gap-0.5 mt-0.5 group-hover/cell:bg-rose-200 transition-colors">
               <span>Missing In</span>
               <Edit2 className="w-2.5 h-2.5 inline" />
             </span>
@@ -3016,6 +3016,9 @@ export default function AttendanceRecordsPage() {
             </span>
             <span className="inline-flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Late / Deviation
+            </span>
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Missing In / Out
             </span>
             <span className="inline-flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#b38600]"></span> Holiday

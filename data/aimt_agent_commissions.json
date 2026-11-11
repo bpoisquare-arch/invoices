@@ -1,9 +1,10 @@
 {
   "ABC Overseas Consultants": {
     "agentName": "ABC Overseas Consultants",
-    "type": "fixed",
+    "type": "net_remainder",
     "rate": 4000,
-    "updatedAt": "2026-11-10T12:00:00.000Z"
+    "notes": "",
+    "updatedAt": "2026-11-11T08:51:02.227Z"
   },
   "Abdul Education": {
     "agentName": "Abdul Education",
@@ -156,4 +157,3 @@
     "updatedAt": "2026-11-10T12:00:00.000Z"
   }
 }
-
