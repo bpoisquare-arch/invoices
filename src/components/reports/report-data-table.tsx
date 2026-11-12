@@ -46,6 +46,8 @@ import {
   PlusCircle,
   UploadCloud,
   X,
+  BadgePercent,
+  CheckCircle2,
 } from 'lucide-react'
 import type { AimtReportRecord } from '@/types/database.types'
 import TablePagination from '@/components/ui/table-pagination'
@@ -219,6 +221,7 @@ interface ReportDataTableProps {
   onDeleteRecord?: (record: AimtReportRecord) => Promise<void>
   onDeleteSelected?: (ids: string[]) => Promise<void>
   onClearStatusSelected?: (ids: string[]) => Promise<void>
+  onSetCommissionEligibility?: (ids: string[], eligible: boolean) => Promise<void>
   availableAgents?: string[]
   availableIntakes?: string[]
   onExportFiltered?: (exportRows: AimtReportRecord[]) => void
@@ -274,6 +277,7 @@ export default function ReportDataTable({
   onDeleteRecord,
   onDeleteSelected,
   onClearStatusSelected,
+  onSetCommissionEligibility,
   onExportFiltered,
   onFilteredRecordsChange,
   onStatusUpdate,
@@ -305,6 +309,10 @@ export default function ReportDataTable({
   // Bulk Clear Status State
   const [isBulkClearStatusOpen, setIsBulkClearStatusOpen] = useState(false)
   const [isBulkClearingStatus, setIsBulkClearingStatus] = useState(false)
+
+  // Bulk Commission Eligibility State
+  const [isBulkEligibleOpen, setIsBulkEligibleOpen] = useState(false)
+  const [isBulkSettingEligible, setIsBulkSettingEligible] = useState(false)
 
   // Compute available document types dynamically
   const availableDocuments = useMemo(() => {
@@ -538,6 +546,19 @@ export default function ReportDataTable({
       alert(err.message || 'Failed to clear status for selected records.')
     } finally {
       setIsBulkClearingStatus(false)
+    }
+  }
+
+  const handleConfirmBulkEligible = async (eligible: boolean) => {
+    if (selectedIds.length === 0 || !onSetCommissionEligibility) return
+    setIsBulkSettingEligible(true)
+    try {
+      await onSetCommissionEligibility(selectedIds, eligible)
+      setIsBulkEligibleOpen(false)
+    } catch (err: any) {
+      alert(err.message || 'Failed to update commission eligibility.')
+    } finally {
+      setIsBulkSettingEligible(false)
     }
   }
 
@@ -815,7 +836,7 @@ export default function ReportDataTable({
             )}
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <button
               type="button"
               onClick={() => onSelectChange([])}
@@ -823,6 +844,17 @@ export default function ReportDataTable({
             >
               Clear selection
             </button>
+            {onSetCommissionEligibility && (
+              <Button
+                size="sm"
+                onClick={() => setIsBulkEligibleOpen(true)}
+                className="h-8 px-3.5 text-xs font-bold bg-[#003D5C] hover:bg-[#002b40] text-cyan-200 rounded-xl gap-1.5 shadow-2xs cursor-pointer transition-all border border-cyan-500/30"
+                title="Mark selected student records as eligible for Agent Commission & Payouts"
+              >
+                <BadgePercent className="size-3.5 text-cyan-300" />
+                <span>Eligible for Commission Payout ({selectedIds.length})</span>
+              </Button>
+            )}
             {onClearStatusSelected && (
               <Button
                 size="sm"
@@ -1131,6 +1163,12 @@ export default function ReportDataTable({
                                   {record.status}
                                 </span>
                               )}
+                                {record.eligible_for_commission && (
+                                  <span className='inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-cyan-100 text-[#003D5C] border border-cyan-300 shadow-2xs' title='Eligible for Commission Payout'>
+                                    <BadgePercent className='size-2.5 text-[#009D9E]' />
+                                    <span>Commission</span>
+                                  </span>
+                                )}
                             </div>
                           </div>
                         </div>
@@ -1364,6 +1402,72 @@ export default function ReportDataTable({
           theme="light"
         />
       </div>
+
+      {/* Commission Eligibility Confirmation Dialog */}
+      <Dialog
+        open={isBulkEligibleOpen}
+        onOpenChange={(open) => !open && !isBulkSettingEligible && setIsBulkEligibleOpen(false)}
+      >
+        <DialogContent className="w-[95vw] max-w-md bg-white border border-slate-200 text-slate-900 p-6 shadow-2xl rounded-2xl">
+          <DialogHeader className="space-y-2">
+            <div className="size-11 rounded-2xl bg-cyan-50 text-[#003D5C] flex items-center justify-center border border-cyan-200">
+              <BadgePercent className="size-6 text-[#009D9E]" />
+            </div>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              Commission Payout Eligibility
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 leading-relaxed">
+              You have selected <strong className="text-slate-800">{selectedIds.length}</strong> student record(s).
+              Do you want to mark these specific course admissions as <strong>Eligible for Commission & Payout</strong>?
+              Only eligible courses will appear in the Agent Commissions ledger and be calculated for payout disbursement.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="flex items-center justify-between sm:justify-between gap-2.5 pt-4 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isBulkSettingEligible}
+              onClick={() => handleConfirmBulkEligible(false)}
+              className="h-9 px-3.5 text-xs font-semibold rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 cursor-pointer"
+            >
+              Remove Eligibility
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isBulkSettingEligible}
+                onClick={() => setIsBulkEligibleOpen(false)}
+                className="h-9 px-3.5 text-xs font-semibold rounded-xl border-slate-200 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={isBulkSettingEligible}
+                onClick={() => handleConfirmBulkEligible(true)}
+                className="h-9 px-4 text-xs font-bold rounded-xl bg-[#003D5C] hover:bg-[#002b40] text-cyan-200 gap-1.5 shadow-sm cursor-pointer border border-cyan-500/20"
+              >
+                {isBulkSettingEligible ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    <span>Applying...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="size-3.5 text-cyan-300" />
+                    <span>Confirm Eligible ({selectedIds.length})</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Clear Status Confirmation Dialog */}
       <Dialog

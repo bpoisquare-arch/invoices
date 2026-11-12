@@ -244,6 +244,31 @@ export default function StudentReportsPage() {
     }
   }
 
+  // Handle Bulk Commission Eligibility Update
+  const handleBulkCommissionEligibility = async (ids: string[], eligible: boolean) => {
+    if (ids.length === 0) return
+    try {
+      const res = await fetch('/api/reports/records', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, eligible_for_commission: eligible }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to update commission eligibility.')
+      }
+
+      // Optimistically update local records state
+      setRecords((prev) =>
+        prev.map((r) => (ids.includes(r.id) ? { ...r, eligible_for_commission: eligible } : r))
+      )
+      setSelectedIds([])
+    } catch (err: any) {
+      console.error('Failed to update commission eligibility:', err)
+      alert(err.message || 'Failed to update commission eligibility.')
+    }
+  }
+
   // Handle Export to Excel (exports selected rows, or current filtered view, or all records)
   const handleExportToExcel = async (customRows?: AimtReportRecord[]) => {
     const exportRows = selectedIds.length > 0
@@ -412,6 +437,7 @@ export default function StudentReportsPage() {
         onDeleteRecord={isViewer ? undefined : handleDeleteRecord}
         onDeleteSelected={isViewer ? undefined : handleBulkDelete}
         onClearStatusSelected={isViewer ? undefined : handleBulkStatusClear}
+        onSetCommissionEligibility={isViewer ? undefined : handleBulkCommissionEligibility}
         availableAgents={availableAgents}
         availableIntakes={availableIntakes}
         onExportFiltered={isViewer ? undefined : handleExportToExcel}

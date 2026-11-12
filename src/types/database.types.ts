@@ -295,6 +295,7 @@ export interface AimtReportRecord {
   divided_month?: number | null
   calculation_breakup?: string | null
   admin_comments?: string | null
+  eligible_for_commission?: boolean
   extra_data: Json
   created_at: string
 }

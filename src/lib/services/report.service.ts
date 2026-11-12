@@ -393,6 +393,7 @@ function prismaAimtRecordToSnake(r: any, includeSlipData: boolean = true): AimtR
     payment_status: r.paymentStatus,
     divided_month: r.dividedMonth !== undefined && r.dividedMonth !== null ? Number(r.dividedMonth) : (extraData.divided_month !== undefined && extraData.divided_month !== null ? Number(extraData.divided_month) : null),
     calculation_breakup: r.calculationBreakup || extraData.calculation_breakup || null,
+    eligible_for_commission: Boolean(extraData.eligible_for_commission),
     slips: mappedSlips,
     extra_data: cleanExtraData as any,
     created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt || new Date().toISOString()),
@@ -1223,4 +1224,34 @@ export async function updateReportRecordsStatus(ids: string[], status: string): 
   })
   return result.count
 }
+
+// Bulk update commission eligibility for selected student records
+export async function updateReportRecordsCommissionEligibility(
+  ids: string[],
+  eligible: boolean
+): Promise<number> {
+  if (!ids || ids.length === 0) return 0
+
+  const targetRecords = await prisma.aimtReportRecord.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, extraData: true },
+  })
+
+  let updatedCount = 0
+  for (const r of targetRecords) {
+    const currentExtra = (r.extraData as Record<string, any>) || {}
+    const newExtra = {
+      ...currentExtra,
+      eligible_for_commission: eligible,
+    }
+    await prisma.aimtReportRecord.update({
+      where: { id: r.id },
+      data: { extraData: newExtra },
+    })
+    updatedCount++
+  }
+
+  return updatedCount
+}
+
 

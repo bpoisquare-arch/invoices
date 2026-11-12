@@ -181,9 +181,15 @@ export default function AgentCommissionsPage() {
   )
 
   // Compute calculated commission rows for all records
+  // Only records marked as eligible_for_commission (or with previous payouts recorded) are calculated & displayed
   const calculatedRows = useMemo(() => {
     return records
-      .filter((r) => r.agent && r.agent.trim() !== '' && r.agent.trim() !== '-')
+      .filter((r) => {
+        if (!r.agent || r.agent.trim() === '' || r.agent.trim() === '-') return false
+        const hasPayoutRecorded = Boolean(payouts[r.id] && payouts[r.id].commissionPaid > 0)
+        const isEligible = Boolean(r.eligible_for_commission || (r.extra_data as any)?.eligible_for_commission)
+        return isEligible || hasPayoutRecorded
+      })
       .map((record) => {
         const canonicalAgent = canonicalizeAgent(record.agent)
         const feePaid = getFeePaid(record)

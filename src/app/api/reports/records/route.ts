@@ -4,6 +4,7 @@ import {
   createReportRecord,
   updateReportRecord,
   updateReportRecordsStatus,
+  updateReportRecordsCommissionEligibility,
   deleteReportRecord,
   deleteReportRecords,
 } from '@/lib/services/report.service'
@@ -74,6 +75,21 @@ export async function PUT(request: NextRequest) {
     const isViewer = devSessionVal === 'viewer' || userRoleVal === 'viewer'
 
     const body = await request.json()
+
+    // Support Bulk Commission Eligibility Update
+    if (Array.isArray(body.ids) && body.ids.length > 0 && typeof body.eligible_for_commission === 'boolean') {
+      if (isViewer) {
+        return NextResponse.json(
+          { success: false, error: 'Viewer role is not authorized to update records.' },
+          { status: 403 }
+        )
+      }
+      const count = await updateReportRecordsCommissionEligibility(
+        body.ids,
+        body.eligible_for_commission
+      )
+      return NextResponse.json({ success: true, count, eligible_for_commission: body.eligible_for_commission })
+    }
 
     // Support Bulk Status Update
     if (Array.isArray(body.ids) && body.ids.length > 0) {
