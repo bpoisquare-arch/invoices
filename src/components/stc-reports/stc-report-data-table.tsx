@@ -68,7 +68,7 @@ interface StcReportDataTableProps {
   onStatusUpdate?: (record: StcReportRecord, status: string) => Promise<void>
 }
 
-type SortField = 'student_name' | 'pending_invoice' | 'pending_amount' | 'yet_to_raised' | 'course' | 'intake' | 'end_date'
+type SortField = 'student_name' | 'pending_invoice' | 'pending_amount' | 'yet_to_raised' | 'course' | 'intake' | 'end_date' | 'coe_issued_date'
 type SortOrder = 'asc' | 'desc'
 
 function parseDateValue(val: string | null | undefined): number {
@@ -213,7 +213,7 @@ export default function StcReportDataTable({
     }
 
     list.sort((a, b) => {
-      if (sortField === 'intake' || sortField === 'end_date') {
+      if (sortField === 'intake' || sortField === 'end_date' || sortField === 'coe_issued_date') {
         const aDate = parseDateValue(a[sortField])
         const bDate = parseDateValue(b[sortField])
         if (aDate && bDate) {
@@ -719,6 +719,26 @@ export default function StcReportDataTable({
                   </div>
                 </th>
 
+                {/* 8. COE Date (COE Issue Date) */}
+                <th
+                  onClick={() => toggleSort('coe_issued_date')}
+                  className="p-3.5 min-w-[130px] cursor-pointer hover:text-emerald-300 transition-colors group select-none"
+                  title="Sort by COE Issue Date"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>COE Date</span>
+                    {sortField === 'coe_issued_date' ? (
+                      sortOrder === 'asc' ? (
+                        <ArrowUp className="size-3.5 text-emerald-300 stroke-[2.5]" />
+                      ) : (
+                        <ArrowDown className="size-3.5 text-emerald-300 stroke-[2.5]" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="size-3 text-emerald-400/40 group-hover:text-emerald-300" />
+                    )}
+                  </div>
+                </th>
+
                 <th className="p-3.5 w-12 text-center"></th>
               </tr>
             </thead>
@@ -726,7 +746,7 @@ export default function StcReportDataTable({
             <tbody className="divide-y divide-slate-200/70 text-xs">
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-16 text-slate-500">
+                  <td colSpan={10} className="text-center py-16 text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2.5">
                       <div className="size-7 border-3 border-[#00BF8F] border-t-transparent rounded-full animate-spin" />
                       <span className="font-semibold text-slate-700">Loading STC student report records...</span>
@@ -735,7 +755,7 @@ export default function StcReportDataTable({
                 </tr>
               ) : paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-16 text-slate-500">
+                  <td colSpan={10} className="text-center py-16 text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2.5">
                       <div className="size-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
                         <GraduationCap className="size-7 text-[#00BF8F]" />
@@ -877,6 +897,18 @@ export default function StcReportDataTable({
                       {/* 7. Course End Date */}
                       <td className="p-3.5 text-slate-700 font-medium font-mono text-xs">
                         {formatToDDMMYY(record.end_date)}
+                      </td>
+
+                      {/* 8. COE Date */}
+                      <td className="p-3.5 text-slate-700 font-medium font-mono text-xs">
+                        {record.coe_issued_date && record.coe_issued_date !== '-' ? (
+                          <span className="inline-flex items-center gap-1.5 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
+                            <Calendar className="size-3 text-emerald-600" />
+                            <span>{formatToDDMMYY(record.coe_issued_date)}</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-normal">-</span>
+                        )}
                       </td>
 
                       {/* Actions */}

@@ -44,7 +44,7 @@ export function cleanScholarshipNumber(val: any): number {
   return num
 }
 
-// Format dates from Excel serial or string
+// Format dates from Excel serial or string to DD/MM/YY
 function formatExcelDate(val: any): string {
   if (!val && val !== 0) return ''
   if (typeof val === 'number') {
@@ -53,7 +53,7 @@ function formatExcelDate(val: any): string {
       if (dateObj) {
         const d = String(dateObj.d).padStart(2, '0')
         const m = String(dateObj.m).padStart(2, '0')
-        const y = dateObj.y
+        const y = String(dateObj.y).slice(-2)
         return `${d}/${m}/${y}`
       }
     } catch {
@@ -62,11 +62,33 @@ function formatExcelDate(val: any): string {
   }
 
   const str = String(val).trim()
-  if (!str) return ''
+  if (!str || str === '-') return ''
 
-  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-    const parts = str.split('T')[0].split('-')
-    return `${parts[2]}/${parts[1]}/${parts[0]}`
+  // 1. Match YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
+  const ymdMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (ymdMatch) {
+    const year = ymdMatch[1].slice(-2)
+    const month = ymdMatch[2].padStart(2, '0')
+    const day = ymdMatch[3].padStart(2, '0')
+    return `${day}/${month}/${year}`
+  }
+
+  // 2. Match DD/MM/YYYY or DD-MM-YYYY
+  const dmy4Match = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/)
+  if (dmy4Match) {
+    const day = dmy4Match[1].padStart(2, '0')
+    const month = dmy4Match[2].padStart(2, '0')
+    const year = dmy4Match[3].slice(-2)
+    return `${day}/${month}/${year}`
+  }
+
+  // 3. Match DD/MM/YY or DD-MM-YY
+  const dmy2Match = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2})$/)
+  if (dmy2Match) {
+    const day = dmy2Match[1].padStart(2, '0')
+    const month = dmy2Match[2].padStart(2, '0')
+    const year = dmy2Match[3]
+    return `${day}/${month}/${year}`
   }
 
   return str
@@ -180,7 +202,7 @@ export function parseExcelBuffer(buffer: Buffer, _fileName?: string): {
   const idxPaidAmount = findColIndex(['paid amount', 'initial payment', 'deposit', 'paid'])
   const idxTotalPaid = findColIndex(['total paid', 'total received'])
   const idxFollowUp = findColIndex(['follow up', 'followup', 'next action'])
-  const idxCoeIssuedDate = findColIndex(['coe issued date', 'coe date', 'coe issued'])
+  const idxCoeIssuedDate = findColIndex(['coe issue date', 'coe issued date', 'coe date', 'coe issued', 'coe'])
   const idxEmailId = findColIndex(['email id', 'email', 'e-mail'])
   const idxPhoneNo = findColIndex(['phone no', 'phone', 'contact', 'mobile'])
   const idxPaymentStatus = findColIndex(['payment status', 'pay status'])
@@ -207,7 +229,7 @@ export function parseExcelBuffer(buffer: Buffer, _fileName?: string): {
     const dob = idxDob !== -1 ? formatExcelDate(row[idxDob]) : ''
     const document = idxDocument !== -1 ? (normalizeDocumentType(cleanString(row[idxDocument])) || '') : ''
     const status = idxStatus !== -1 ? (cleanString(row[idxStatus]) || 'Current') : 'Current'
-    const intake = idxIntake !== -1 ? cleanString(row[idxIntake]) : ''
+    const intake = idxIntake !== -1 ? formatExcelDate(row[idxIntake]) : ''
     const endDate = idxEndDate !== -1 ? formatExcelDate(row[idxEndDate]) : ''
     const course = idxCourse !== -1 ? cleanString(row[idxCourse]) : ''
 
