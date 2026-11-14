@@ -1,5 +1,12 @@
 import fs from 'fs'
 import path from 'path'
+import { prisma } from '@/lib/prisma'
+import type { ReportSlip } from '@/types/report-slip.types'
+import {
+  createCommissionInvoice,
+  getNextInvoiceReference,
+  CommissionInvoice,
+} from './commission-invoice.service'
 
 export interface StudentCommissionPayout {
   recordId: string // Unique student report record ID
@@ -8,6 +15,11 @@ export interface StudentCommissionPayout {
   agentName?: string
   commissionPaid: number // Amount paid so far to the agent
   paymentDate?: string
+  paymentMethod?: 'Cash' | 'Bank'
+  bankTransactionId?: string
+  reference?: string
+  invoiceReference?: string
+  slips?: ReportSlip[]
   notes?: string
   updatedAt: string
 }
@@ -17,7 +29,11 @@ export interface AgencyPayoutLog {
   agentName: string
   amountPaid: number
   paymentDate: string
+  paymentMethod?: 'Cash' | 'Bank'
+  bankTransactionId?: string
   reference?: string
+  invoiceReference?: string
+  slips?: ReportSlip[]
   notes?: string
   allocatedStudentCount: number
   createdAt: string
@@ -123,8 +139,14 @@ export async function saveCommissionPayout(params: {
   commissionPaid: number
   notes?: string
   paymentDate?: string
+  paymentMethod?: 'Cash' | 'Bank'
+  bankTransactionId?: string
+  reference?: string
+  invoiceReference?: string
+  slips?: ReportSlip[]
 }): Promise<StudentCommissionPayout> {
   const payouts = await getAllCommissionPayouts()
+  const now = new Date().toISOString()
 
   const updated: StudentCommissionPayout = {
     recordId: params.recordId,
@@ -133,13 +155,42 @@ export async function saveCommissionPayout(params: {
     agentName: params.agentName || '',
     commissionPaid: Math.max(0, Number(params.commissionPaid) || 0),
     notes: params.notes?.trim() || '',
-    paymentDate: params.paymentDate || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    paymentDate: params.paymentDate || now,
+    paymentMethod: params.paymentMethod || 'Bank',
+    bankTransactionId: params.bankTransactionId?.trim() || '',
+    reference: params.reference?.trim() || params.bankTransactionId?.trim() || '',
+    invoiceReference: params.invoiceReference?.trim() || '',
+    slips: params.slips || [],
+    updatedAt: now,
   }
 
   payouts[params.recordId] = updated
   inMemoryPayouts = payouts
   writePayoutsToFile(payouts)
+
+  // Asynchronously sync to MySQL aimtReportRecord extra_data
+  try {
+    const existingDb = await prisma.aimtReportRecord.findUnique({
+      where: { id: params.recordId },
+      select: { id: true, extraData: true },
+    })
+    if (existingDb) {
+      const extraData = (existingDb.extraData as Record<string, any>) || {}
+      await prisma.aimtReportRecord.update({
+        where: { id: params.recordId },
+        data: {
+          extraData: {
+            ...extraData,
+            commission_payout: updated,
+            commission_paid: updated.commissionPaid,
+            commission_slips: updated.slips || [],
+          } as any,
+        },
+      })
+    }
+  } catch (err) {
+    console.warn(`Could not sync payout to MySQL for student ${params.recordId}:`, err)
+  }
 
   return updated
 }
@@ -153,7 +204,11 @@ export async function saveAgencyBulkPayout(params: {
   agentName: string
   amount: number
   paymentDate?: string
+  paymentMethod?: 'Cash' | 'Bank'
+  bankTransactionId?: string
   reference?: string
+  invoiceReference?: string
+  slips?: ReportSlip[]
   notes?: string
   students: Array<{
     recordId: string
@@ -165,6 +220,7 @@ export async function saveAgencyBulkPayout(params: {
 }): Promise<{
   updatedPayouts: Record<string, StudentCommissionPayout>
   payoutLog: AgencyPayoutLog
+  invoice?: CommissionInvoice | null
 }> {
   const payouts = await getAllCommissionPayouts()
   const logs = await getAllAgencyPayoutLogs()
@@ -172,7 +228,12 @@ export async function saveAgencyBulkPayout(params: {
   let remainingToDistribute = Math.max(0, Number(params.amount) || 0)
   const now = new Date().toISOString()
   const paymentDate = params.paymentDate || now
+  const paymentMethod = params.paymentMethod || 'Bank'
+  const bankTransactionId = params.bankTransactionId?.trim() || ''
+  const invoiceReference = params.invoiceReference?.trim() || ''
+  const slips = params.slips || []
   let allocatedStudentCount = 0
+  const affectedRecordIds: string[] = []
 
   // 1. First allocate to students that have an outstanding balance
   const studentsWithBalance = params.students
@@ -196,14 +257,19 @@ export async function saveAgencyBulkPayout(params: {
       commissionPaid: newTotalPaid,
       notes: params.notes ? `${params.notes} (Bulk Agency Payout)` : 'Bulk Agency Payout',
       paymentDate,
+      paymentMethod,
+      bankTransactionId,
+      invoiceReference,
+      slips,
       updatedAt: now,
     }
 
+    affectedRecordIds.push(student.recordId)
     remainingToDistribute = Math.round((remainingToDistribute - toAllocate) * 100) / 100
     allocatedStudentCount++
   }
 
-  // 2. If any excess remains (e.g. advance payout), allocate it to the first student or create a pool
+  // 2. If any excess remains (e.g. advance payout), allocate it to the first student
   if (remainingToDistribute > 0 && params.students.length > 0) {
     const firstStudent = params.students[0]
     const currentPaid = payouts[firstStudent.recordId]?.commissionPaid ?? firstStudent.currentlyPaid ?? 0
@@ -215,20 +281,54 @@ export async function saveAgencyBulkPayout(params: {
       commissionPaid: Math.round((currentPaid + remainingToDistribute) * 100) / 100,
       notes: params.notes ? `${params.notes} (Surplus Agency Payout)` : 'Surplus Agency Payout',
       paymentDate,
+      paymentMethod,
+      bankTransactionId,
+      invoiceReference,
+      slips,
       updatedAt: now,
+    }
+    if (!affectedRecordIds.includes(firstStudent.recordId)) {
+      affectedRecordIds.push(firstStudent.recordId)
     }
   }
 
   inMemoryPayouts = payouts
   writePayoutsToFile(payouts)
 
-  // 3. Create and append the Agency Payout Log
+  // 3. Ensure a Commission Invoice is generated and persisted for this disbursement
+  let finalInvoiceRef = params.invoiceReference?.trim()
+  if (!finalInvoiceRef) {
+    finalInvoiceRef = await getNextInvoiceReference()
+  }
+
+  let createdInvoice: CommissionInvoice | null = null
+  try {
+    createdInvoice = await createCommissionInvoice({
+      referenceNumber: finalInvoiceRef,
+      agencyName: params.agentName,
+      totalAmount: Math.max(0, Number(params.amount) || 0),
+      invoiceDate: paymentDate,
+      paymentMethod,
+      bankTransactionId,
+      slips,
+      notes: params.notes,
+      allocatedStudentsCount: allocatedStudentCount,
+    })
+  } catch (invErr) {
+    console.warn('Could not auto-create commission invoice record:', invErr)
+  }
+
+  // 4. Create and append the Agency Payout Log
   const payoutLog: AgencyPayoutLog = {
     id: `agency_pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     agentName: params.agentName,
     amountPaid: Math.max(0, Number(params.amount) || 0),
     paymentDate,
-    reference: params.reference || '',
+    paymentMethod,
+    bankTransactionId,
+    reference: params.reference || bankTransactionId || finalInvoiceRef || '',
+    invoiceReference: finalInvoiceRef,
+    slips,
     notes: params.notes || '',
     allocatedStudentCount,
     createdAt: now,
@@ -238,9 +338,40 @@ export async function saveAgencyBulkPayout(params: {
   inMemoryAgencyLogs = logs
   writeAgencyLogsToFile(logs)
 
+  // 4. Asynchronously sync updated payout records to live MySQL aimtReportRecord
+  if (affectedRecordIds.length > 0) {
+    try {
+      for (const recId of affectedRecordIds) {
+        const studentPayout = payouts[recId]
+        if (!studentPayout) continue
+        const dbRec = await prisma.aimtReportRecord.findUnique({
+          where: { id: recId },
+          select: { id: true, extraData: true },
+        })
+        if (dbRec) {
+          const ex = (dbRec.extraData as Record<string, any>) || {}
+          await prisma.aimtReportRecord.update({
+            where: { id: recId },
+            data: {
+              extraData: {
+                ...ex,
+                commission_payout: studentPayout,
+                commission_paid: studentPayout.commissionPaid,
+                commission_slips: slips,
+              } as any,
+            },
+          })
+        }
+      }
+    } catch (err) {
+      console.warn('Could not sync bulk agency payout to MySQL aimtReportRecord:', err)
+    }
+  }
+
   return {
     updatedPayouts: payouts,
     payoutLog,
+    invoice: createdInvoice,
   }
 }
 

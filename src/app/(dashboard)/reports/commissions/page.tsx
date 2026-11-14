@@ -348,11 +348,13 @@ export default function AgentCommissionsPage() {
 
   // Overall KPI statistics
   const stats = useMemo(() => {
+    let totalCourseFee = 0
     let totalFee = 0
     let totalPayable = 0
     let totalPaid = 0
 
     filteredRows.forEach((r) => {
+      totalCourseFee += r.courseFee
       totalFee += r.feePaid
       totalPayable += r.commissionPayable
       totalPaid += r.commissionPaid
@@ -363,6 +365,7 @@ export default function AgentCommissionsPage() {
     return {
       totalStudents: filteredRows.length,
       totalAgencies: filteredAgencies.length,
+      totalCourseFee: Math.round(totalCourseFee * 100) / 100,
       totalFee: Math.round(totalFee * 100) / 100,
       totalPayable: Math.round(totalPayable * 100) / 100,
       totalPaid: Math.round(totalPaid * 100) / 100,
@@ -478,6 +481,17 @@ export default function AgentCommissionsPage() {
             <span>Refresh</span>
           </Button>
 
+          <Link href="/reports/commissions/invoices">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-emerald-300/80 bg-emerald-50/70 text-emerald-900 hover:bg-emerald-100/70 h-9.5 px-3.5 rounded-xl text-xs gap-1.5 font-bold cursor-pointer"
+            >
+              <Receipt className="size-3.5 text-emerald-600" />
+              <span>Invoices History</span>
+            </Button>
+          </Link>
+
           <Link href="/reports/commissions/settings">
             <Button
               variant="outline"
@@ -492,8 +506,35 @@ export default function AgentCommissionsPage() {
       </div>
 
       {/* 2. Vibrant KPI Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Student Fee Paid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        {/* Card 1: Total Receivable (Total Courses Fee) */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1e1b4b] via-[#2e1065] to-[#4c1d95] p-5 text-white shadow-md border border-purple-400/20 group">
+          <div className="absolute -right-6 -bottom-6 size-28 rounded-full bg-purple-400/10 blur-xl group-hover:scale-125 transition-transform duration-500" />
+          <div className="relative z-10 flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-purple-200 bg-purple-500/25 px-2.5 py-0.5 rounded-full border border-purple-300/30">
+                Total Receivable
+              </span>
+              <h3 className="text-2xl font-black tracking-tight text-white mt-2 font-mono">
+                ${stats.totalCourseFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
+              <p className="text-xs text-purple-200/90 font-medium mt-1">
+                Total Courses Fee ({stats.totalStudents} Students)
+              </p>
+            </div>
+            <div className="size-12 rounded-xl bg-white/10 backdrop-blur-xs border border-white/15 text-purple-200 flex items-center justify-center shadow-inner">
+              <Building2 className="size-6" />
+            </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-purple-200/80">
+            <span>College Gross Fees</span>
+            <span className="font-bold text-purple-300">
+              {stats.totalCourseFee > 0 ? Math.round((stats.totalFee / stats.totalCourseFee) * 100) : 0}% Collected
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: Total Student Fee Paid */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#001724] via-[#002b40] to-[#003D5C] p-5 text-white shadow-md border border-cyan-500/20 group">
           <div className="absolute -right-6 -bottom-6 size-28 rounded-full bg-cyan-500/10 blur-xl group-hover:scale-125 transition-transform duration-500" />
           <div className="relative z-10 flex items-start justify-between">
@@ -518,7 +559,7 @@ export default function AgentCommissionsPage() {
           </div>
         </div>
 
-        {/* Card 2: Total Commission Payable */}
+        {/* Card 3: Total Commission Payable */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#004d40] via-[#00695c] to-[#00897b] p-5 text-white shadow-md border border-teal-400/20 group">
           <div className="absolute -right-6 -bottom-6 size-28 rounded-full bg-emerald-400/10 blur-xl group-hover:scale-125 transition-transform duration-500" />
           <div className="relative z-10 flex items-start justify-between">
@@ -543,7 +584,7 @@ export default function AgentCommissionsPage() {
           </div>
         </div>
 
-        {/* Card 3: Paid to Agents */}
+        {/* Card 4: Paid to Agents */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#283593] via-[#3949ab] to-[#5c6bc0] p-5 text-white shadow-md border border-indigo-400/20 group">
           <div className="absolute -right-6 -bottom-6 size-28 rounded-full bg-indigo-300/10 blur-xl group-hover:scale-125 transition-transform duration-500" />
           <div className="relative z-10 flex items-start justify-between">
@@ -570,7 +611,7 @@ export default function AgentCommissionsPage() {
           </div>
         </div>
 
-        {/* Card 4: Outstanding Balance Due */}
+        {/* Card 5: Outstanding Balance Due */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#bf360c] via-[#d84315] to-[#f4511e] p-5 text-white shadow-md border border-orange-400/20 group">
           <div className="absolute -right-6 -bottom-6 size-28 rounded-full bg-orange-300/10 blur-xl group-hover:scale-125 transition-transform duration-500" />
           <div className="relative z-10 flex items-start justify-between">

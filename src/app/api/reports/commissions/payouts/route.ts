@@ -23,7 +23,20 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { recordId, studentId, studentName, agentName, commissionPaid, notes } = body
+    const {
+      recordId,
+      studentId,
+      studentName,
+      agentName,
+      commissionPaid,
+      notes,
+      paymentDate,
+      paymentMethod,
+      bankTransactionId,
+      reference,
+      invoiceReference,
+      slips,
+    } = body
 
     if (!recordId) {
       return NextResponse.json(
@@ -47,6 +60,12 @@ export async function POST(req: NextRequest) {
       agentName,
       commissionPaid: numericAmount,
       notes,
+      paymentDate,
+      paymentMethod,
+      bankTransactionId,
+      reference,
+      invoiceReference,
+      slips: Array.isArray(slips) ? slips : [],
     })
 
     return NextResponse.json({

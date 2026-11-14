@@ -23,7 +23,18 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { agentName, amount, paymentDate, reference, notes, students } = body
+    const {
+      agentName,
+      amount,
+      paymentDate,
+      paymentMethod,
+      bankTransactionId,
+      reference,
+      invoiceReference,
+      slips,
+      notes,
+      students,
+    } = body
 
     if (!agentName || typeof agentName !== 'string') {
       return NextResponse.json(
@@ -51,7 +62,11 @@ export async function POST(req: NextRequest) {
       agentName,
       amount: numericAmount,
       paymentDate,
-      reference,
+      paymentMethod,
+      bankTransactionId,
+      reference: reference || bankTransactionId || invoiceReference || '',
+      invoiceReference,
+      slips: Array.isArray(slips) ? slips : [],
       notes,
       students,
     })
@@ -60,6 +75,7 @@ export async function POST(req: NextRequest) {
       success: true,
       updatedPayouts: result.updatedPayouts,
       payoutLog: result.payoutLog,
+      invoice: result.invoice,
     })
   } catch (error: any) {
     console.error('Error in agency bulk payout API:', error)

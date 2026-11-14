@@ -976,6 +976,18 @@ export default function AppSidebar() {
                               <span>Commission Settings</span>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
+
+                          {/* Invoices History */}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              render={<Link href="/reports/commissions/invoices" onClick={handleNavClick} />}
+                              isActive={pathname === '/reports/commissions/invoices'}
+                              className="text-xs font-medium text-slate-300 hover:text-white hover:bg-[#0E3E5B]/60 data-[active=true]:bg-[#81F5F5] data-[active=true]:text-[#002020] data-[active=true]:font-bold rounded-md px-2.5 py-1.5 transition-all"
+                            >
+                              <Receipt className="size-3.5 shrink-0" />
+                              <span>Invoices History</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
                         </SidebarMenuSub>
                       </CollapsibleContent>
                     </SidebarMenuItem>
