@@ -88,6 +88,7 @@ export interface STCStudentInstallmentSchedule {
   schedule_start_month?: string // YYYY-MM schedule table start month
   schedule_end_month?: string // YYYY-MM schedule table end month
   first_installment_custom_month?: string // Optional YYYY-MM 1st installment override
+  excluded_months?: string[] // Optional YYYY-MM array of skipped months
   start_month_year?: string // Legacy YYYY-MM manual selection
   end_month_offset?: number // Legacy Months to subtract before end date
   admin_fee: number
@@ -171,6 +172,7 @@ export interface InstallmentCalculationParams {
   schedule_start_month?: string // YYYY-MM
   schedule_end_month?: string // YYYY-MM
   first_installment_custom_month?: string // YYYY-MM override for 1st installment only
+  excluded_months?: string[] // Optional YYYY-MM array of skipped months
   start_month_year?: string // Legacy YYYY-MM
   end_month_offset?: number // Legacy
   admin_fee: number
@@ -239,7 +241,26 @@ export function calculateSTCInstallmentScheduleItems(params: InstallmentCalculat
 
     const startMonthIndex = schStartYear * 12 + schStartMonth
     const targetEndMonthIndex = Math.max(startMonthIndex, schEndYear * 12 + schEndMonth)
-    let totalScheduleMonths = targetEndMonthIndex - startMonthIndex + 1
+
+    // Generate all timeline months in chronological order
+    const allTimelineMonths: string[] = []
+    for (let idx = startMonthIndex; idx <= targetEndMonthIndex; idx++) {
+      const y = Math.floor(idx / 12)
+      const m = (idx % 12) + 1
+      allTimelineMonths.push(`${y}-${m < 10 ? '0' : ''}${m}`)
+    }
+
+    // Filter out user-excluded / skipped months
+    const excludedSet = new Set(params.excluded_months || [])
+    const activeTimelineMonths = allTimelineMonths.filter((m) => !excludedSet.has(m))
+    const effectiveActiveMonths =
+      activeTimelineMonths.length > 0
+        ? activeTimelineMonths
+        : allTimelineMonths.length > 0
+        ? [allTimelineMonths[0]]
+        : []
+
+    let totalScheduleMonths = effectiveActiveMonths.length
     if (totalScheduleMonths < 1) totalScheduleMonths = 1
 
     // 3. Resolve initial fee inputs array
@@ -286,8 +307,15 @@ export function calculateSTCInstallmentScheduleItems(params: InstallmentCalculat
       if (k === 0 && firstRowCustomDate) {
         monthLabel = format(firstRowCustomDate, 'MMM-yyyy')
       } else {
-        const d = new Date(schStartYear, schStartMonth + k, 1)
-        monthLabel = format(d, 'MMM-yyyy')
+        const monthKey = effectiveActiveMonths[k]
+        if (monthKey) {
+          const [my, mm] = monthKey.split('-').map(Number)
+          const d = new Date(my, mm - 1, 1)
+          monthLabel = format(d, 'MMM-yyyy')
+        } else {
+          const d = new Date(schStartYear, schStartMonth + k, 1)
+          monthLabel = format(d, 'MMM-yyyy')
+        }
       }
 
       const description = getRowDescription(amt, admin, resources, material, feeState)
@@ -308,9 +336,18 @@ export function calculateSTCInstallmentScheduleItems(params: InstallmentCalculat
       const remainder = remainingTotal - basePerMonth * remainingMonths
 
       for (let i = 1; i <= remainingMonths; i++) {
-        const monthOffset = initialFees.length + i - 1
-        const currentDate = new Date(schStartYear, schStartMonth + monthOffset, 1)
-        const monthLabel = format(currentDate, 'MMM-yyyy')
+        const activeIdx = initialFees.length + i - 1
+        const monthKey = effectiveActiveMonths[activeIdx]
+
+        let monthLabel = ''
+        if (monthKey) {
+          const [my, mm] = monthKey.split('-').map(Number)
+          const currentDate = new Date(my, mm - 1, 1)
+          monthLabel = format(currentDate, 'MMM-yyyy')
+        } else {
+          const currentDate = new Date(schStartYear, schStartMonth + activeIdx, 1)
+          monthLabel = format(currentDate, 'MMM-yyyy')
+        }
 
         const amt = i === remainingMonths ? basePerMonth + remainder : basePerMonth
         const description = getRowDescription(amt, admin, resources, material, feeState)
@@ -488,6 +525,7 @@ function mapDbRowToSchedule(rawRow: any): STCStudentInstallmentSchedule {
   let extraScheduleStartMonth: string | undefined = undefined
   let extraScheduleEndMonth: string | undefined = undefined
   let extraFirstCustomMonth: string | undefined = undefined
+  let extraExcludedMonths: string[] | undefined = undefined
 
   if (typeof row.schedule_items === 'string') {
     try {
@@ -502,6 +540,7 @@ function mapDbRowToSchedule(rawRow: any): STCStudentInstallmentSchedule {
         extraScheduleStartMonth = parsed.__schedule_start_month
         extraScheduleEndMonth = parsed.__schedule_end_month
         extraFirstCustomMonth = parsed.__first_installment_custom_month
+        extraExcludedMonths = parsed.__excluded_months
       }
     } catch {
       scheduleItems = []
@@ -514,6 +553,7 @@ function mapDbRowToSchedule(rawRow: any): STCStudentInstallmentSchedule {
     extraScheduleStartMonth = row.schedule_items.__schedule_start_month
     extraScheduleEndMonth = row.schedule_items.__schedule_end_month
     extraFirstCustomMonth = row.schedule_items.__first_installment_custom_month
+    extraExcludedMonths = row.schedule_items.__excluded_months
   } else if (Array.isArray(row.schedule_items)) {
     scheduleItems = row.schedule_items
   }
@@ -555,6 +595,7 @@ function mapDbRowToSchedule(rawRow: any): STCStudentInstallmentSchedule {
     schedule_start_month: scheduleStartMonth,
     schedule_end_month: scheduleEndMonth,
     first_installment_custom_month: extraFirstCustomMonth || row.start_month_year || undefined,
+    excluded_months: Array.isArray(extraExcludedMonths) ? extraExcludedMonths : [],
     start_month_year: row.start_month_year || undefined,
     end_month_offset: row.end_month_offset ?? 3,
     admin_fee: admin,
@@ -609,6 +650,7 @@ function mapScheduleToDbRow(schedule: STCStudentInstallmentSchedule): any {
       __schedule_start_month: schedule.schedule_start_month,
       __schedule_end_month: schedule.schedule_end_month,
       __first_installment_custom_month: schedule.first_installment_custom_month,
+      __excluded_months: schedule.excluded_months || [],
     },
     recipient_email: schedule.recipient_email || null,
     from_email: schedule.from_email || null,

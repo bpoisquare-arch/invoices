@@ -14,6 +14,7 @@ import {
   getInstallments,
 } from '@/lib/services/installment.service'
 import AimtScheduleWebPreview from '@/components/installments/aimt-schedule-web-preview'
+import MonthToggleSelector from '@/components/installments/month-toggle-selector'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -62,6 +63,9 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
   )
   const [scheduleEndMonth, setScheduleEndMonth] = useState<string>(
     existingSchedule?.schedule_end_month || '2027-08'
+  )
+  const [excludedMonths, setExcludedMonths] = useState<string[]>(
+    existingSchedule?.excluded_months || []
   )
 
   // 3. Optional 1st Installment Custom Month Override
@@ -187,6 +191,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     schedule_start_month: scheduleStartMonth,
     schedule_end_month: scheduleEndMonth,
     first_installment_custom_month: effectiveCustomFirstMonth,
+    excluded_months: excludedMonths,
     admin_fee: adminFee,
     resources_fee: resourcesFee,
     material_fee: activeMaterialFee,
@@ -209,6 +214,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
     schedule_end_month: scheduleEndMonth,
     first_installment_custom_month: effectiveCustomFirstMonth,
     start_month_year: effectiveCustomFirstMonth || scheduleStartMonth,
+    excluded_months: excludedMonths,
     admin_fee: adminFee,
     resources_fee: resourcesFee,
     material_fee: activeMaterialFee > 0 ? activeMaterialFee : undefined,
@@ -276,6 +282,7 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
         schedule_end_month: scheduleEndMonth,
         first_installment_custom_month: effectiveCustomFirstMonth,
         start_month_year: effectiveCustomFirstMonth || scheduleStartMonth,
+        excluded_months: excludedMonths,
         admin_fee: Number(adminFee) || 0,
         resources_fee: Number(resourcesFee) || 0,
         material_fee: activeMaterialFee > 0 ? Number(activeMaterialFee) : undefined,
@@ -555,6 +562,14 @@ export default function InstallmentForm({ mode, existingSchedule }: InstallmentF
                   </p>
                 </div>
               </div>
+
+              {/* Months Toggle Selector */}
+              <MonthToggleSelector
+                startMonth={scheduleStartMonth}
+                endMonth={scheduleEndMonth}
+                excludedMonths={excludedMonths}
+                onChange={setExcludedMonths}
+              />
 
               {/* Optional 1st Installment Custom Month Override */}
               <div className="pt-2 border-t border-slate-100">
