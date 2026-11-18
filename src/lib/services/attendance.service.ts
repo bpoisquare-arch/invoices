@@ -1022,9 +1022,10 @@ export async function getAttendanceRecords(
   const recordsWithEmp: AttendanceRecordWithEmployee[] = pagedRecords.map((r) => {
     const rawP = Array.isArray(r.raw_punches) ? (r.raw_punches as any[]) : []
     const noteObj = rawP.find((p) => p && typeof p === 'object' && p.notes)
+    const isExplicitAbsent = r.arrival_status === 'Absent' && r.departure_status === 'Absent'
     return {
       ...r,
-      notes: noteObj ? noteObj.notes : null,
+      notes: isExplicitAbsent ? null : (noteObj ? noteObj.notes : null),
       employee: empMap.get(r.employee_id) || null,
       raw_punches_parsed: rawP as unknown as RawPunch[],
     }
@@ -1748,7 +1749,16 @@ export async function updateAttendanceRecord(
   }
 
   let punchesToSave: any = current.raw_punches || []
-  if (isWfh) {
+  if (arrivalStatus === 'Absent' && departureStatus === 'Absent') {
+    // Explicit absent: strip any active LEAVE punches from raw_punches
+    if (Array.isArray(current.raw_punches)) {
+      punchesToSave = (current.raw_punches as any[]).filter(
+        (p) => p && typeof p === 'object' && p.type !== 'LEAVE'
+      )
+    } else {
+      punchesToSave = []
+    }
+  } else if (isWfh) {
     punchesToSave = [
       { punch_time: inTimeToUse, type: 'IN', source: 'WFH', notes: effectiveNote || 'Work From Home' },
       { punch_time: outTimeToUse, type: 'OUT', source: 'WFH', notes: effectiveNote || 'Work From Home' },

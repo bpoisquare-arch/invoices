@@ -260,6 +260,22 @@ export async function createAttendanceRequest(params: {
     console.warn('Could not resolve employee in Prisma for attendance request:', err)
   }
 
+  if (params.request_type === 'LEAVE' && params.leave_type !== 'Maternity Leave' && params.leave_type !== 'Work From Home') {
+    const { getEmployeeLeaveBalanceSummary } = await import('./attendance.service')
+    const summary = await getEmployeeLeaveBalanceSummary(empUuid, params.attendance_date)
+    const leaveName = params.leave_type || 'Casual Leave'
+    const duration = params.leave_duration !== undefined && params.leave_duration !== null ? params.leave_duration : 1
+    let remaining = 0
+    if (leaveName.includes('Probation')) remaining = summary.remaining.probation_leaves
+    else if (leaveName.includes('Annual')) remaining = summary.remaining.annual_leaves
+    else if (leaveName.includes('Sick')) remaining = summary.remaining.sick_leaves
+    else remaining = summary.remaining.casual_leaves
+
+    if (remaining < duration) {
+      throw new Error(`Cannot submit leave request: Quota exceeded for ${leaveName}. Only ${remaining} day(s) remaining, but ${duration} day(s) requested.`)
+    }
+  }
+
   const newItem: AttendanceRequestItem = {
     id: reqId,
     employee_id: empUuid,
@@ -432,6 +448,22 @@ export async function reviewAttendanceRequest(params: {
     const isWfh = targetRequest.leave_type === 'Work From Home'
     const duration = targetRequest.leave_duration === 0.5 ? 0.5 : 1
     const leaveName = targetRequest.leave_type || 'Casual Leave'
+
+    // Validate employee leave quotas before approving (except Maternity & WFH)
+    if (!isWfh && leaveName !== 'Maternity Leave') {
+      const { validateEmployeeLeaveQuotas } = await import('./attendance.service')
+      try {
+        await validateEmployeeLeaveQuotas(
+          targetRequest.employee_id,
+          targetRequest.attendance_date,
+          leaveName,
+          currentRecord?.id,
+          duration
+        )
+      } catch (quotaErr: any) {
+        throw new Error(`Cannot approve request: ${quotaErr.message || 'Leave quota exceeded.'}`)
+      }
+    }
 
     if (isWfh) {
       const wfhIn = '10:30 AM'

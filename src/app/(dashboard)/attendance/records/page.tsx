@@ -299,18 +299,25 @@ function getRecordStatusFlags(
       rec.departure_status === 'Work From Home'
     )
 
-    const isLeave =
-      rec.arrival_status === 'Leave' ||
-      rec.departure_status?.includes('Leave') ||
-      rec.departure_status?.includes('Probation') ||
-      rec.arrival_status?.includes('Probation') ||
-      rec.notes?.includes('Probation') ||
-      rec.notes?.includes('Leave') ||
-      ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave'].includes(rec.departure_status as any) ||
-      ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave'].includes(rec.arrival_status as any)
-
     const hasInTime = Boolean(rec.in_time && rec.in_time !== '---' && rec.in_time !== '--')
     const hasOutTime = Boolean(rec.out_time && rec.out_time !== '---' && rec.out_time !== '--')
+
+    const isExplicitAbsent =
+      (rec.arrival_status === 'Absent' && rec.departure_status === 'Absent') ||
+      (!hasInTime && !hasOutTime && rec.arrival_status === 'Absent')
+
+    const isLeave =
+      !isExplicitAbsent && (
+        rec.arrival_status === 'Leave' ||
+        rec.departure_status?.includes('Leave') ||
+        rec.departure_status?.includes('Probation') ||
+        rec.arrival_status?.includes('Probation') ||
+        rec.notes?.includes('Probation') ||
+        rec.notes?.includes('Leave') ||
+        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave'].includes(rec.departure_status as any) ||
+        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Gazetted Leave'].includes(rec.arrival_status as any)
+      )
+
     const isLate = rec.arrival_status === 'Late Arrival'
     const isEarlyLeave = rec.departure_status === 'Early Departure'
 
@@ -320,11 +327,6 @@ function getRecordStatusFlags(
     const isMissingIn = !isWfh && !isLeave && !hasInTime && hasOutTime
 
     const hasActualData = hasInTime || hasOutTime || (rec.total_working_minutes ? rec.total_working_minutes > 0 : false) || isLeave || isWfh
-
-    const isExplicitAbsent =
-      rec.arrival_status === 'Absent' ||
-      rec.departure_status === 'Absent' ||
-      (!hasInTime && !hasOutTime && !isLeave && !isWfh)
 
     if (isLeave) {
       const leaveLabel = resolveLeaveLabel(rec, emp, date)
@@ -1451,17 +1453,24 @@ export default function AttendanceRecordsPage() {
         const isPast = date < todayStr
 
         if (rec) {
+          const isExplicitAbsent =
+            (rec.arrival_status === 'Absent' && rec.departure_status === 'Absent') ||
+            (!rec.in_time && !rec.out_time && rec.arrival_status === 'Absent')
+
           const isLeave =
-            rec.arrival_status === 'Leave' ||
-            rec.departure_status?.includes('Leave') ||
-            rec.departure_status?.includes('Probation') ||
-            rec.arrival_status?.includes('Probation') ||
-            rec.notes?.includes('Probation') ||
-            rec.notes?.includes('Leave') ||
-            ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave'].includes(rec.departure_status as any) ||
-            ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave'].includes(rec.arrival_status as any)
+            !isExplicitAbsent && (
+              rec.arrival_status === 'Leave' ||
+              rec.departure_status?.includes('Leave') ||
+              rec.departure_status?.includes('Probation') ||
+              rec.arrival_status?.includes('Probation') ||
+              rec.notes?.includes('Probation') ||
+              rec.notes?.includes('Leave') ||
+              ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave'].includes(rec.departure_status as any) ||
+              ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave'].includes(rec.arrival_status as any)
+            )
 
           const isAbsent =
+            isExplicitAbsent ||
             rec.arrival_status === 'Absent' ||
             rec.departure_status === 'Absent' ||
             (!rec.in_time && !rec.out_time && !isLeave)
@@ -1953,20 +1962,21 @@ export default function AttendanceRecordsPage() {
 
     // 2. If an explicit record exists in database (or manually added)
     if (rec) {
-      const isLeave =
-        rec.arrival_status === 'Leave' ||
-        rec.departure_status?.includes('Leave') ||
-        rec.departure_status?.includes('Probation') ||
-        rec.arrival_status?.includes('Probation') ||
-        rec.notes?.includes('Probation') ||
-        rec.notes?.includes('Leave') ||
-        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave'].includes(rec.departure_status as any) ||
-        ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave'].includes(rec.arrival_status as any)
-
       const isExplicitAbsent =
-        rec.arrival_status === 'Absent' ||
-        rec.departure_status === 'Absent' ||
-        (!rec.in_time && !rec.out_time && !isLeave)
+        (rec.arrival_status === 'Absent' && rec.departure_status === 'Absent') ||
+        (!rec.in_time && !rec.out_time && rec.arrival_status === 'Absent')
+
+      const isLeave =
+        !isExplicitAbsent && (
+          rec.arrival_status === 'Leave' ||
+          rec.departure_status?.includes('Leave') ||
+          rec.departure_status?.includes('Probation') ||
+          rec.arrival_status?.includes('Probation') ||
+          rec.notes?.includes('Probation') ||
+          rec.notes?.includes('Leave') ||
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave'].includes(rec.departure_status as any) ||
+          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Probation Leave', 'Probation Leaves', 'Gazetted Leave'].includes(rec.arrival_status as any)
+        )
 
       // A. Leave Record
       if (isLeave) {
