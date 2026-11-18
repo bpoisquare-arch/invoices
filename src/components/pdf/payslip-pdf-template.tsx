@@ -211,6 +211,7 @@ export interface PayslipData {
   slDays: number
   wfhDays: number
   probationDays?: number
+  maternityDays?: number
   unpaidDays: number
   totalPaidDays: number
   basicPay: number
@@ -333,6 +334,12 @@ export default function PayslipPDFTemplate({
                 <Text style={styles.rowLabel}>Probation Leaves</Text>
                 <Text style={styles.rowValue}>{payslipData.probationDays ?? 0}</Text>
               </View>
+              {Boolean(payslipData.maternityDays) && (
+                <View style={styles.tableRowEven}>
+                  <Text style={styles.rowLabel}>Maternity Leaves</Text>
+                  <Text style={styles.rowValue}>{payslipData.maternityDays}</Text>
+                </View>
+              )}
               <View style={styles.tableRowEven}>
                 <Text style={styles.rowLabel}>WFH/L Days</Text>
                 <Text style={styles.rowValue}>{payslipData.wfhDays}</Text>
@@ -356,6 +363,12 @@ export default function PayslipPDFTemplate({
                 <Text style={styles.rowLabel}>S/L Days</Text>
                 <Text style={styles.rowValue}>{payslipData.slDays}</Text>
               </View>
+              {Boolean(payslipData.maternityDays) && (
+                <View style={styles.tableRowEven}>
+                  <Text style={styles.rowLabel}>Maternity Leaves</Text>
+                  <Text style={styles.rowValue}>{payslipData.maternityDays}</Text>
+                </View>
+              )}
               <View style={styles.tableRowEven}>
                 <Text style={styles.rowLabel}>WFH/L Days</Text>
                 <Text style={styles.rowValue}>{payslipData.wfhDays}</Text>

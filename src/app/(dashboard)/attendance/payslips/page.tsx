@@ -320,6 +320,7 @@ export default function PayslipsPage() {
         slDays: number
         wfhDays: number
         probationDays: number
+        maternityDays: number
         unpaidDays: number
       }
     > = {}
@@ -385,6 +386,7 @@ export default function PayslipsPage() {
           slDays: 0,
           wfhDays: 0,
           probationDays: 0,
+          maternityDays: 0,
           unpaidDays: 0,
         }
         if (emp.id) map[emp.id] = statsObj
@@ -400,6 +402,7 @@ export default function PayslipsPage() {
       let slDays = 0
       let wfhDays = 0
       let probationDays = 0
+      let maternityDays = 0
       let unpaidDays = 0
 
       for (let day = 1; day <= daysInMonth; day++) {
@@ -462,30 +465,45 @@ export default function PayslipsPage() {
           depStatus === 'Work From Home' ||
           (noteStr ? noteStr.toLowerCase().includes('work from home') || noteStr.toLowerCase().includes('wfh') : false)
 
+        const isMaternityLeave =
+          depStatus.includes('Maternity') ||
+          arrStatus.includes('Maternity') ||
+          (noteStr ? noteStr.toLowerCase().includes('maternity') : false)
+
         const isAnnualLeave =
-          depStatus.includes('Annual') ||
-          arrStatus.includes('Annual') ||
-          (noteStr ? noteStr.toLowerCase().includes('annual') : false)
+          !isMaternityLeave && (
+            depStatus.includes('Annual') ||
+            arrStatus.includes('Annual') ||
+            (noteStr ? noteStr.toLowerCase().includes('annual') : false)
+          )
 
         const isCasualLeave =
-          depStatus.includes('Casual') ||
-          arrStatus.includes('Casual') ||
-          (noteStr ? noteStr.toLowerCase().includes('casual') : false)
+          !isMaternityLeave && (
+            depStatus.includes('Casual') ||
+            arrStatus.includes('Casual') ||
+            (noteStr ? noteStr.toLowerCase().includes('casual') : false)
+          )
 
         const isSickLeave =
-          depStatus.includes('Sick') ||
-          arrStatus.includes('Sick') ||
-          (noteStr ? noteStr.toLowerCase().includes('sick') : false)
+          !isMaternityLeave && (
+            depStatus.includes('Sick') ||
+            arrStatus.includes('Sick') ||
+            (noteStr ? noteStr.toLowerCase().includes('sick') : false)
+          )
 
         const isProbationLeave =
-          depStatus.includes('Probation') ||
-          arrStatus.includes('Probation') ||
-          (noteStr ? noteStr.toLowerCase().includes('probation') : false)
+          !isMaternityLeave && (
+            depStatus.includes('Probation') ||
+            arrStatus.includes('Probation') ||
+            (noteStr ? noteStr.toLowerCase().includes('probation') : false)
+          )
 
         const isGenericLeave =
-          arrStatus === 'Leave' ||
-          depStatus.includes('Leave') ||
-          ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Probation Leaves'].includes(depStatus)
+          !isMaternityLeave && (
+            arrStatus === 'Leave' ||
+            depStatus.includes('Leave') ||
+            ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Probation Leave', 'Probation Leaves'].includes(depStatus)
+          )
 
         const isExplicitHoliday =
           isSunday ||
@@ -500,6 +518,8 @@ export default function PayslipsPage() {
         if (isWfh) {
           wfhDays += leaveVal
           presentDays += leaveVal
+        } else if (isMaternityLeave) {
+          maternityDays += leaveVal
         } else if (isProbationLeave) {
           probationDays += leaveVal
         } else if (isAnnualLeave) {
@@ -530,6 +550,7 @@ export default function PayslipsPage() {
         slDays,
         wfhDays,
         probationDays,
+        maternityDays,
         unpaidDays,
       }
       if (emp.id) map[emp.id] = statsObj
@@ -588,6 +609,7 @@ export default function PayslipsPage() {
           slDays: 0,
           wfhDays: 0,
           probationDays: 0,
+          maternityDays: 0,
           unpaidDays: 0,
         }
       : employeeAttendanceStats[emp.id] ||
@@ -599,6 +621,7 @@ export default function PayslipsPage() {
           slDays: 0,
           wfhDays: 0,
           probationDays: 0,
+          maternityDays: 0,
           unpaidDays: 0,
         }
 
@@ -660,6 +683,7 @@ export default function PayslipsPage() {
       slDays: stats.slDays,
       wfhDays: stats.wfhDays,
       probationDays: stats.probationDays || 0,
+      maternityDays: stats.maternityDays || 0,
       unpaidDays,
       totalPaidDays,
       basicPay,
@@ -1288,6 +1312,12 @@ export default function PayslipsPage() {
                           <span>Probation Leaves</span>
                           <span className="font-mono">{currentPayslipData.probationDays ?? 0}</span>
                         </div>
+                        {Boolean(currentPayslipData.maternityDays) && (
+                          <div className="bg-[#F3E8FF] px-4 py-2 flex justify-between items-center text-purple-900 font-semibold">
+                            <span>Maternity Leaves</span>
+                            <span className="font-mono">{currentPayslipData.maternityDays}</span>
+                          </div>
+                        )}
                         <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
                           <span>WFH/L Days</span>
                           <span className="font-mono">{currentPayslipData.wfhDays}</span>
@@ -1311,6 +1341,12 @@ export default function PayslipsPage() {
                           <span>S/L Days</span>
                           <span className="font-mono">{currentPayslipData.slDays}</span>
                         </div>
+                        {Boolean(currentPayslipData.maternityDays) && (
+                          <div className="bg-[#F3E8FF] px-4 py-2 flex justify-between items-center text-purple-900 font-semibold">
+                            <span>Maternity Leaves</span>
+                            <span className="font-mono">{currentPayslipData.maternityDays}</span>
+                          </div>
+                        )}
                         <div className="bg-[#EFEFEF] px-4 py-2 flex justify-between items-center text-slate-800">
                           <span>WFH/L Days</span>
                           <span className="font-mono">{currentPayslipData.wfhDays}</span>
