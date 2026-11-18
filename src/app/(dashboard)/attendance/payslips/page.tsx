@@ -362,25 +362,39 @@ export default function PayslipsPage() {
         emp.name?.toLowerCase?.().trim(),
       ].filter(Boolean)
 
-      // Count active working / calendar days in this month on/after employee's joining date
-      let activeWorkingDays = 0
+      // Determine work schedule: custom schedule (e.g. 1 day/week, 5 days/week) vs standard 6-day Mon-Sat
+      const workDays = (Array.isArray(emp.work_days) && emp.work_days.length > 0) ? emp.work_days : DEFAULT_WORK_DAYS
+      const hasCustomSchedule = Array.isArray(emp.work_days) && emp.work_days.length > 0 && emp.work_days.length < 6
+
+      // Count active calendar days and scheduled working days in this month on/after employee's joining date
+      let activeCalendarDays = 0
+      let scheduledWorkDays = 0
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
       for (let day = 1; day <= daysInMonth; day++) {
         const dayStr = String(day).padStart(2, '0')
         const dStr = `${y}-${String(m).padStart(2, '0')}-${dayStr}`
+        const dateObj = new Date(y, m - 1, day, 12, 0, 0)
+        const dayName = dayNames[dateObj.getDay()]
         const isBeforeJoining =
           !emp.is_old_staff && emp.joining_date
             ? dStr < emp.joining_date.split('T')[0]
             : false
         if (!isBeforeJoining) {
-          activeWorkingDays += 1
+          activeCalendarDays += 1
+          if (workDays.includes(dayName)) {
+            scheduledWorkDays += 1
+          }
         }
       }
+
+      // Total working days for payslip: for custom schedule employees (e.g. Friday only), count actual scheduled work days; for standard staff, calendar days
+      const effectiveWorkingDays = hasCustomSchedule ? scheduledWorkDays : activeCalendarDays
 
       // If employee is attendance exempt, treat all active days as present / full pay
       if (emp.is_attendance_exempt) {
         const statsObj = {
-          totalWorkingDays: activeWorkingDays,
-          presentDays: activeWorkingDays,
+          totalWorkingDays: effectiveWorkingDays,
+          presentDays: effectiveWorkingDays,
           alDays: 0,
           clDays: 0,
           slDays: 0,
@@ -543,7 +557,7 @@ export default function PayslipsPage() {
       }
 
       const statsObj = {
-        totalWorkingDays: activeWorkingDays,
+        totalWorkingDays: effectiveWorkingDays,
         presentDays,
         alDays,
         clDays,
@@ -639,14 +653,37 @@ export default function PayslipsPage() {
       })()
     )
 
+    const workDays = (Array.isArray(emp.work_days) && emp.work_days.length > 0) ? emp.work_days : DEFAULT_WORK_DAYS
+    const hasCustomSchedule = Array.isArray(emp.work_days) && emp.work_days.length > 0 && emp.work_days.length < 6
+
     const totalWorkingDays = stats.totalWorkingDays !== undefined ? stats.totalWorkingDays : daysInMonth
     const unpaidDays = isExempt ? 0 : stats.unpaidDays
     const totalPaidDays = isExempt ? totalWorkingDays : Math.max(0, totalWorkingDays - unpaidDays)
 
     const contractedSalary = Number(emp.salary) || 0
     const perDaySalary = daysInMonth > 0 ? contractedSalary / daysInMonth : 0
-    const basicPay = totalWorkingDays === daysInMonth ? contractedSalary : Math.round(perDaySalary * totalWorkingDays)
-    const unpaidDeduction = isExempt ? 0 : Math.round(perDaySalary * unpaidDays)
+
+    // Check if employee joined in the middle of this selected month (date > 1)
+    const joinedMidMonth = Boolean(
+      !emp.is_old_staff &&
+      emp.joining_date &&
+      emp.joining_date.startsWith(`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`) &&
+      new Date(emp.joining_date.split('T')[0] + 'T00:00:00').getDate() > 1
+    )
+
+    // Basic Pay: Full contracted monthly salary unless they joined mid-month
+    const basicPay = joinedMidMonth ? Math.round(perDaySalary * totalWorkingDays) : contractedSalary
+
+    // Unpaid Deduction
+    let unpaidDeduction = 0
+    if (!isExempt && unpaidDays > 0) {
+      if (hasCustomSchedule && totalWorkingDays > 0) {
+        const perScheduledDaySalary = contractedSalary / totalWorkingDays
+        unpaidDeduction = Math.round(perScheduledDaySalary * unpaidDays)
+      } else {
+        unpaidDeduction = Math.round(perDaySalary * unpaidDays)
+      }
+    }
     const commission =
       commissionsMap[emp.id] ||
       commissionsMap[emp.employee_id] ||
@@ -687,7 +724,7 @@ export default function PayslipsPage() {
       unpaidDays,
       totalPaidDays,
       basicPay,
-      perDaySalary,
+      perDaySalary: hasCustomSchedule && totalWorkingDays > 0 ? Math.round(contractedSalary / totalWorkingDays) : perDaySalary,
       commission,
       adjustments,
       totalEarnings,
